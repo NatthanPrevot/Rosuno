@@ -1,4 +1,41 @@
 {
   "version": 1,
-  "work_items": []
+  "work_items": [
+    {
+      "work_item_id": "WI-P0-SUPABASE-EXECUTE",
+      "title": "Record applied Supabase EXECUTE restriction evidence",
+      "objective": "Make the already-applied P0 Supabase security migration derivable locally without changing the database or adding product implementation.",
+      "in_scope": [
+        "Reviewed migration-history artifact",
+        "Privilege and invariant evidence supplied for migration 20260828192126"
+      ],
+      "out_of_scope": [
+        "Database calls or changes",
+        "Product schema, business migrations, application code, and P1 work"
+      ],
+      "status": "completed",
+      "owner": "P0 control owner",
+      "reviewer": {
+        "identity": null,
+        "status": "unresolved_external_dependency"
+      },
+      "priority": "P0",
+      "authority_refs": ["P0-001-LOCKED"],
+      "decision_refs": ["DEC-20260828-SUPABASE-EXECUTE"],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "The exact migration version and name are recorded",
+        "Privilege, invariant, advisor, and clean schema-drift evidence is recorded without secret values"
+      ],
+      "validation_commands": ["pnpm run p0:validate", "pnpm run p0:test"],
+      "environment": "staging",
+      "release_refs": ["REL-20260828-SUPABASE-SECURITY"],
+      "migration_refs": [
+        "20260828192126_p0_restrict_rls_auto_enable_execution"
+      ],
+      "rollback_reference": "governance/rollback-recovery.md",
+      "created_at": "2026-08-28T19:21:26Z",
+      "updated_at": "2026-08-28T19:21:26Z"
+    }
+  ]
 }

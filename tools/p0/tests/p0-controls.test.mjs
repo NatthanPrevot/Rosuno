@@ -9,6 +9,7 @@ import {
   validateDecisionRecord,
   validateDriftReport,
   validateEnvironmentContract,
+  validateMigrationArtifact,
   validateMigrationRegister,
   validateNeutralPaths,
   validatePackageJson,
@@ -222,6 +223,7 @@ test("migration ordering gaps are rejected", () => {
     migrations: [
       {
         migration_id: "M-002",
+        migration_kind: "security_control",
         sequence: 2,
         artifact_path: "migrations/002.sql",
         authority_refs: ["P0-001-LOCKED"],
@@ -240,6 +242,58 @@ test("migration ordering gaps are rejected", () => {
     ],
   };
   assert.throws(() => validateMigrationRegister(register), /out of order/);
+});
+
+test("recorded migration privilege and invariant evidence cannot be weakened", () => {
+  const artifact = readJson(
+    "governance/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.json",
+  );
+  const migration = readJson("governance/migrations/reviewed-migrations.json")
+    .migrations[0];
+
+  artifact.validation_evidence.authenticated_execute = true;
+  assert.throws(
+    () => validateMigrationArtifact(artifact, migration, "migration artifact"),
+    /authenticated_execute/,
+  );
+
+  const changedInvariant = readJson(
+    "governance/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.json",
+  );
+  changedInvariant.preserved_invariants.security_definer_unchanged = false;
+  assert.throws(
+    () =>
+      validateMigrationArtifact(
+        changedInvariant,
+        migration,
+        "migration artifact",
+      ),
+    /security_definer_unchanged/,
+  );
+});
+
+test("security migration does not set the product-migration presence flag", () => {
+  const register = readJson("governance/migrations/reviewed-migrations.json");
+  register.product_migrations_present = true;
+  assert.throws(
+    () =>
+      validateMigrationRegister(
+        register,
+        {
+          authorityIds: new Set(["P0-001-LOCKED"]),
+          workItemIds: new Set(["WI-P0-SUPABASE-EXECUTE"]),
+          decisionIds: new Set(["DEC-20260828-SUPABASE-EXECUTE"]),
+          releaseIds: new Set(["REL-20260828-SUPABASE-SECURITY"]),
+          migrationIds: new Set([
+            "20260828192126_p0_restrict_rls_auto_enable_execution",
+          ]),
+        },
+        [
+          "governance/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.json",
+        ],
+      ),
+    /product migration presence/,
+  );
 });
 
 test("unregistered migration artifacts are rejected", () => {

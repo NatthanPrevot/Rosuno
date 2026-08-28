@@ -10,21 +10,21 @@ This directory contains local, product-neutral controls for controlled software 
 
 ## Control map
 
-| Area              | Local control                                                                                                      | External dependency                                      |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
-| Branches          | `main` is the integration branch; release branches are created only for a traced release                           | GitHub protected-branch/ruleset configuration            |
-| Pull requests     | The PR template requires scope, authority, work item, validation, release, migration, and rollback evidence        | GitHub required review and required-check rules          |
-| Ownership         | `CODEOWNERS` names the repository owner, `@NatthanPrevot`, as the owner of repository content                      | A designated human reviewer is still unresolved          |
-| Commits           | One logical P0 change per commit; commit messages reference a bounded work item                                    | Remote merge enforcement                                 |
-| Traceability      | Authority → decision → work item → commit/PR → release artifact → migration evidence                               | Release hosting and PR metadata                          |
-| Environments      | Development, staging/test, and production have distinct scopes and no implicit inheritance                         | Replit/GitHub environment configuration                  |
-| Secrets           | Values never belong in source, examples, logs, decisions, work items, or release records                           | Secret store policy and CI secret scanning               |
-| Migrations        | Only reviewed, ordered, non-production-validated migrations may be recorded; none exist in this neutral repository | Non-production database and reviewed migration execution |
-| Schema drift      | A clean, empty baseline is recorded; any drift input fails validation                                              | Database introspection and restore drill                 |
-| Releases          | A release is not traceable until all required references and validation evidence exist                             | Remote release artifact and approval                     |
-| Rollback/recovery | Every future release records a reversible action and recovery owner/status                                         | Runtime operator and production controls                 |
-| Logging           | Structured, minimal, redacted logs are required; credentials and sensitive payloads are prohibited                 | Runtime log sink and retention controls                  |
-| Provider security | Least privilege, server-side credentials, no raw tokens, and explicit provider ownership are required              | Provider account and scope configuration                 |
+| Area              | Local control                                                                                               | External dependency                                      |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Branches          | `main` is the integration branch; release branches are created only for a traced release                    | GitHub protected-branch/ruleset configuration            |
+| Pull requests     | The PR template requires scope, authority, work item, validation, release, migration, and rollback evidence | GitHub required review and required-check rules          |
+| Ownership         | `CODEOWNERS` names the repository owner, `@NatthanPrevot`, as the owner of repository content               | A designated human reviewer is still unresolved          |
+| Commits           | One logical P0 change per commit; commit messages reference a bounded work item                             | Remote merge enforcement                                 |
+| Traceability      | Authority → decision → work item → commit/PR → release artifact → migration evidence                        | Release hosting and PR metadata                          |
+| Environments      | Development, staging/test, and production have distinct scopes and no implicit inheritance                  | Replit/GitHub environment configuration                  |
+| Secrets           | Values never belong in source, examples, logs, decisions, work items, or release records                    | Secret store policy and CI secret scanning               |
+| Migrations        | One already-applied, reviewed P0 security-control migration is recorded; no product migration exists        | Non-production database and reviewed migration execution |
+| Schema drift      | A clean, empty baseline is recorded; any drift input fails validation                                       | Database introspection and restore drill                 |
+| Releases          | A release is not traceable until all required references and validation evidence exist                      | Remote release artifact and approval                     |
+| Rollback/recovery | Every future release records a reversible action and recovery owner/status                                  | Runtime operator and production controls                 |
+| Logging           | Structured, minimal, redacted logs are required; credentials and sensitive payloads are prohibited          | Runtime log sink and retention controls                  |
+| Provider security | Least privilege, server-side credentials, no raw tokens, and explicit provider ownership are required       | Provider account and scope configuration                 |
 
 ## Branch and pull-request controls
 
@@ -52,11 +52,11 @@ The examples under `governance/environments/` contain placeholders only. Develop
 
 ## Migration and schema-drift review
 
-This repository has no product schema and no product migrations. The reviewed-migration register is intentionally empty. A future migration record must be ordered, reviewed, non-production validated, drift checked, reversible, and linked to its work item, decision, release, and evidence. Any ordering gap, duplicate, drift item, or unreviewed entry fails local validation.
+This repository has no product schema and no product migrations. The reviewed-migration register contains one already-applied P0 security-control migration and its supplied validation evidence. A migration record must be ordered, reviewed, non-production validated, drift checked, reversible, and linked to its work item, decision, release, and evidence. Any ordering gap, duplicate, drift item, or unreviewed entry fails local validation.
 
 ## Release, rollback, and recovery
 
-No release is currently recorded and nothing is deployed. A future release artifact must include its immutable commit, bounded work items, decisions, migration references, validation evidence, artifact digest, environment, reviewer state, rollback reference, and recovery evidence. Rollback is a controlled action with an explicit trigger, last-known-good reference, owner, verification, and recovery path.
+One P0 security-control traceability record is present; it does not represent a product release or repository deployment. A release artifact must include its immutable commit, bounded work items, decisions, migration references, validation evidence, artifact digest, environment, reviewer state, rollback reference, and recovery evidence. Rollback is a controlled action with an explicit trigger, last-known-good reference, owner, verification, and recovery path.
 
 ## Logging and provider security
 

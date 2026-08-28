@@ -1,4 +1,29 @@
 {
   "version": 1,
-  "decisions": []
+  "decisions": [
+    {
+      "decision_id": "DEC-20260828-SUPABASE-EXECUTE",
+      "title": "Record the applied Supabase EXECUTE restriction",
+      "status": "accepted",
+      "scope": "P0 security-control evidence only; no product schema or application behavior",
+      "decision": "Record migration 20260828192126_p0_restrict_rls_auto_enable_execution as an already-applied security control while preserving the function body, SECURITY DEFINER property, ensure_rls event trigger, schema design, and all other privileges.",
+      "rationale": "The supplied post-remediation evidence shows direct EXECUTE is false for anonymous and authenticated roles, true for postgres and service_role, ensure_rls remains enabled for ddl_command_end, and both Supabase advisors returned no findings.",
+      "authority_refs": ["P0-001-LOCKED"],
+      "work_item_refs": ["WI-P0-SUPABASE-EXECUTE"],
+      "owner": "P0 control owner",
+      "reviewer": {
+        "identity": null,
+        "status": "unresolved_external_dependency"
+      },
+      "created_at": "2026-08-28T19:21:26Z",
+      "updated_at": "2026-08-28T19:21:26Z",
+      "supersedes": [],
+      "impact": "local-control-only",
+      "evidence": [
+        "governance/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.json",
+        "governance/schema-drift/baseline.json"
+      ],
+      "expiry": null
+    }
+  ]
 }

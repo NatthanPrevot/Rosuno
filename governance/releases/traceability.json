@@ -1,4 +1,27 @@
 {
   "version": 1,
-  "releases": []
+  "releases": [
+    {
+      "release_id": "REL-20260828-SUPABASE-SECURITY",
+      "commit_sha": "ed5e0bc63b5f898165729034297e683adad74e72",
+      "work_item_refs": ["WI-P0-SUPABASE-EXECUTE"],
+      "decision_refs": ["DEC-20260828-SUPABASE-EXECUTE"],
+      "migration_refs": [
+        "20260828192126_p0_restrict_rls_auto_enable_execution"
+      ],
+      "validation_evidence": [
+        "governance/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.json",
+        "pnpm run p0:validate",
+        "pnpm run p0:test"
+      ],
+      "artifact_digest": "sha256:06a9d477a94186a236c8579148d8cfac689738319408b7c7b9633210113207ad",
+      "environment": "staging",
+      "reviewer": {
+        "identity": null,
+        "status": "unresolved_external_dependency"
+      },
+      "rollback_reference": "governance/rollback-recovery.md",
+      "created_at": "2026-08-28T19:21:26Z"
+    }
+  ]
 }

@@ -1,0 +1,38 @@
+{
+  "migration_id": "20260828192126_p0_restrict_rls_auto_enable_execution",
+  "version": "20260828192126",
+  "name": "p0_restrict_rls_auto_enable_execution",
+  "migration_kind": "security_control",
+  "intent": {
+    "execute_revoked_from": ["PUBLIC", "anon", "authenticated"],
+    "execute_retained_for": ["postgres", "service_role"]
+  },
+  "preserved_invariants": {
+    "function_body_unchanged": true,
+    "security_definer_unchanged": true,
+    "ensure_rls_event_trigger_unchanged": true,
+    "schema_design_unchanged": true,
+    "other_privileges_unchanged": true
+  },
+  "validation_evidence": {
+    "anonymous_execute": false,
+    "authenticated_execute": false,
+    "postgres_execute": true,
+    "service_role_execute": true,
+    "ensure_rls": {
+      "enabled": true,
+      "event": "ddl_command_end"
+    },
+    "security_advisor": {
+      "findings_after_remediation": 0
+    },
+    "performance_advisor": {
+      "findings_after_remediation": 0
+    },
+    "evidence_source": "already-applied Supabase validation evidence supplied by the request"
+  },
+  "schema_drift": {
+    "status": "clean",
+    "database_calls_made": false
+  }
+}

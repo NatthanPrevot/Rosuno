@@ -1,5 +1,24 @@
 {
   "version": 1,
   "product_migrations_present": false,
-  "migrations": []
+  "migrations": [
+    {
+      "migration_id": "20260828192126_p0_restrict_rls_auto_enable_execution",
+      "migration_kind": "security_control",
+      "sequence": 1,
+      "artifact_path": "governance/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.json",
+      "authority_refs": ["P0-001-LOCKED"],
+      "work_item_refs": ["WI-P0-SUPABASE-EXECUTE"],
+      "decision_refs": ["DEC-20260828-SUPABASE-EXECUTE"],
+      "release_refs": ["REL-20260828-SUPABASE-SECURITY"],
+      "reviewed": true,
+      "reviewed_by": "external reviewer identity pending",
+      "reviewed_at": "2026-08-28T19:21:26Z",
+      "applied_environment": "staging",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Reapply the prior privilege state only through an independently reviewed non-production rollback.",
+      "depends_on": []
+    }
+  ]
 }

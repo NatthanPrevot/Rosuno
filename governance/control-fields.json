@@ -42,6 +42,7 @@
   ],
   "migration_required_fields": [
     "migration_id",
+    "migration_kind",
     "sequence",
     "artifact_path",
     "authority_refs",

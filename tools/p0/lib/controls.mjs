@@ -52,6 +52,7 @@ export const WORK_ITEM_FIELDS = [
 
 export const MIGRATION_FIELDS = [
   "migration_id",
+  "migration_kind",
   "sequence",
   "artifact_path",
   "authority_refs",
@@ -510,10 +511,93 @@ export function validateEnvironmentExample(example, expectedEnvironment) {
 function migrationArtifactPaths(files) {
   return files.filter(
     (file) =>
-      !file.startsWith("governance/") &&
-      (file.endsWith(".sql") ||
-        /^(?:db|database|drizzle|migrations|prisma|supabase)\//i.test(file)),
+      (file.startsWith("governance/migrations/") &&
+        file !== "governance/migrations/reviewed-migrations.json") ||
+      (!file.startsWith("governance/") &&
+        (file.endsWith(".sql") ||
+          /^(?:db|database|drizzle|migrations|prisma|supabase)\//i.test(file))),
   );
+}
+
+export function validateMigrationArtifact(artifact, migration, context) {
+  requireExactFields(
+    artifact,
+    [
+      "migration_id",
+      "version",
+      "name",
+      "migration_kind",
+      "intent",
+      "preserved_invariants",
+      "validation_evidence",
+      "schema_drift",
+    ],
+    context,
+  );
+  if (artifact.migration_id !== migration.migration_id) {
+    fail(`${context}.migration_id does not match its register entry`);
+  }
+  if (!/^\d{14}$/.test(artifact.version)) {
+    fail(`${context}.version must be a 14-digit migration version`);
+  }
+  requireBoundedString(artifact.name, `${context}.name`, 200);
+  if (artifact.migration_kind !== "security_control") {
+    fail(`${context}.migration_kind must be security_control`);
+  }
+  if (
+    artifact.intent?.execute_revoked_from?.join("|") !==
+    "PUBLIC|anon|authenticated"
+  ) {
+    fail(
+      `${context}.intent must revoke direct EXECUTE from PUBLIC, anon, and authenticated`,
+    );
+  }
+  if (
+    artifact.intent?.execute_retained_for?.join("|") !== "postgres|service_role"
+  ) {
+    fail(
+      `${context}.intent must retain direct EXECUTE for postgres and service_role`,
+    );
+  }
+  for (const invariant of [
+    "function_body_unchanged",
+    "security_definer_unchanged",
+    "ensure_rls_event_trigger_unchanged",
+    "schema_design_unchanged",
+    "other_privileges_unchanged",
+  ]) {
+    if (artifact.preserved_invariants?.[invariant] !== true) {
+      fail(`${context}.preserved_invariants.${invariant} must be true`);
+    }
+  }
+  const evidence = artifact.validation_evidence;
+  for (const [field, expected] of [
+    ["anonymous_execute", false],
+    ["authenticated_execute", false],
+    ["postgres_execute", true],
+    ["service_role_execute", true],
+  ]) {
+    if (evidence?.[field] !== expected) {
+      fail(`${context}.validation_evidence.${field} is incorrect`);
+    }
+  }
+  if (
+    evidence.ensure_rls?.enabled !== true ||
+    evidence.ensure_rls?.event !== "ddl_command_end" ||
+    evidence.security_advisor?.findings_after_remediation !== 0 ||
+    evidence.performance_advisor?.findings_after_remediation !== 0
+  ) {
+    fail(`${context} lacks the required Supabase validation evidence`);
+  }
+  if (
+    artifact.schema_drift?.status !== "clean" ||
+    artifact.schema_drift?.database_calls_made !== false
+  ) {
+    fail(`${context}.schema_drift must be clean without database calls`);
+  }
+  if (scanSecretLikeText(JSON.stringify(artifact), context).length > 0) {
+    fail(`${context} contains a secret-like value`);
+  }
 }
 
 export function validateMigrationRegister(
@@ -522,20 +606,34 @@ export function validateMigrationRegister(
   files = [],
 ) {
   requireArray(register.migrations, "migration register");
-  if (register.product_migrations_present !== register.migrations.length > 0) {
-    fail("product migration presence flag does not match the register");
-  }
   uniqueIds(register.migrations, "migration_id", "migration");
   const registeredArtifacts = new Set();
   for (const [index, migration] of register.migrations.entries()) {
     const context = `migration ${index + 1}`;
-    requireFields(migration, MIGRATION_FIELDS, context);
+    requireExactFields(migration, MIGRATION_FIELDS, context);
+    if (migration.migration_kind !== "security_control") {
+      fail(`${context}.migration_kind must be security_control`);
+    }
     if (migration.sequence !== index + 1) fail(`${context} is out of order`);
     requireNonEmptyString(migration.artifact_path, `${context}.artifact_path`);
     if (registeredArtifacts.has(migration.artifact_path)) {
       fail(`${context}.artifact_path is duplicated`);
     }
     registeredArtifacts.add(migration.artifact_path);
+    if (
+      !migration.artifact_path.startsWith("governance/migrations/") ||
+      migration.artifact_path ===
+        "governance/migrations/reviewed-migrations.json"
+    ) {
+      fail(
+        `${context}.artifact_path must point to a governance migration artifact`,
+      );
+    }
+    validateMigrationArtifact(
+      readJson(migration.artifact_path),
+      migration,
+      `${context}.artifact`,
+    );
     if (migration.reviewed !== true) fail(`${context} is not reviewed`);
     for (const field of ["reviewed_by", "reviewed_at", "rollback_plan"]) {
       requireNonEmptyString(migration[field], `${context}.${field}`);
@@ -578,6 +676,12 @@ export function validateMigrationRegister(
       references.migrationIds,
       `${context}.depends_on`,
     );
+  }
+  const productMigrationsPresent = register.migrations.some(
+    (migration) => migration.migration_kind === "product",
+  );
+  if (register.product_migrations_present !== productMigrationsPresent) {
+    fail("product migration presence flag does not match the register");
   }
   const discovered = migrationArtifactPaths(files);
   if (
