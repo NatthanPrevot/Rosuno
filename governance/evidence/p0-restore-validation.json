@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "evidence_id": "P0-001-NON-PRODUCTION-RESTORE",
+  "scope": "P0-only non-production restore validation",
+  "environment": "staging",
+  "project_refs": {
+    "source": "wwcwfbzwljbjlaifklaj",
+    "target": "mxjlvmowmodzdtdfgqpb"
+  },
+  "timing": {
+    "restore_started_at": "2026-08-28T21:59:42Z",
+    "restore_completed_at": "2026-08-28T22:00:38Z",
+    "validation_completed_at": "2026-08-28T22:16:11Z"
+  },
+  "tools": {
+    "supabase_cli": "2.116.0",
+    "postgresql_server": "17.6",
+    "psql": "16.10"
+  },
+  "backup_restore": {
+    "official_roles_schema_data": "passed",
+    "official_migration_history": "passed",
+    "migration_version": "20260828192126",
+    "roles_original_sha256": "168a95a9c745af5ed4679751f90419ac9dc434240a213b03e32a06d5664c2308",
+    "roles_normalized_sha256": "1d1e5124716f95355dc95ed896d1b30823c39f6dd537b7802597448036c604d4",
+    "normalized_statement_count": 1,
+    "normalization_category": "redundant generated parameter SET grant",
+    "parameter_acl_fingerprint": "0c76cbe6bc3831caee75ade02f91dee6"
+  },
+  "security_reconciliation": {
+    "procedure": "Re-executed the reviewed migration effective revocations on staging only",
+    "revoked_from": ["PUBLIC", "anon", "authenticated"],
+    "retained_for": ["postgres", "service_role"],
+    "function_definition_fingerprint": "6998ea6b4c2480f5d2e34b5dcf3f8d36",
+    "owner": "postgres",
+    "security_definer": true,
+    "migration_history_modified": false,
+    "security_advisor_findings": 0
+  },
+  "event_trigger_recovery": {
+    "cli_schema_dump_omission": "event trigger omitted while referenced function was present",
+    "authority": "live source catalog",
+    "name": "ensure_rls",
+    "event": "ddl_command_end",
+    "tags": ["CREATE TABLE", "CREATE TABLE AS", "SELECT INTO"],
+    "enabled": "O",
+    "owner": "postgres",
+    "function_identity": "public.rls_auto_enable()",
+    "catalog_fingerprint": "3ee61f9c6b28f71f04966e4dac539d11",
+    "behavior_test": "passed",
+    "probe_cleanup": "passed"
+  },
+  "parity": {
+    "status": "passed",
+    "postgresql_version": "170006",
+    "extensions_sha256": "0180d1ec304abbd863c304f53c59a0db4727c979c082dd89c8946103c7a00609",
+    "public_objects_sha256": "e3c9d987d6daca969e32f83bac708712fa2e2e93321962d8127d577807f851b4",
+    "event_triggers_sha256": "e28bfba3b7095691b8b577d8089182f9ce8911adad70adbbe4c8a6c5e1052160",
+    "migration_history_sha256": "9f6d786901a12753d173ed8ac670a02291eb72493a0eab5284f383ee2e3ef9ae",
+    "parameter_acls_sha256": "e2999db9375b7d27592c8b56538cd1c3c954b2913ecc84ad2a9e0199d692affc",
+    "auth_storage_inventory_sha256": "c0aa68cd1c8e3f0880c1a265f6fb1da5f37aed3c49fd56e2e654aca43b4c895c",
+    "source_unchanged": true,
+    "source_security_advisor_findings": 0,
+    "target_security_advisor_findings": 0
+  },
+  "limitations": [
+    "The official CLI schema dump omitted the event trigger.",
+    "The generated roles dump required one source-and-target ACL-proven normalization.",
+    "The primary restore did not reproduce the reviewed function execution ACL and required exact reviewed-migration reconciliation.",
+    "No broader default-privilege parity is claimed beyond the recorded parameter ACL and object ACL checks."
+  ],
+  "cleanup": {
+    "temporary_material_removed": true,
+    "probe_object_absent": true
+  },
+  "sensitive_payloads_present": false
+}

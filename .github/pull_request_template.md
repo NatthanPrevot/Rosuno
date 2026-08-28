@@ -23,6 +23,10 @@ Out of scope:
 - Schema-drift result: `clean` / `not applicable`
 - Rollback reference:
 - Recovery owner/status:
+- Restore evidence reference: `governance/evidence/p0-restore-validation.json` or `none`
+- [ ] CLI event-trigger omission and source-authoritative recovery are recorded.
+- [ ] Roles-dump normalization is limited to one statement and both hashes are recorded.
+- [ ] ACL/default-privilege limitations, parity, behavior, timing, and cleanup are recorded.
 
 ## Validation
 

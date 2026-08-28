@@ -613,6 +613,114 @@ export function validateMigrationArtifact(artifact, migration, context) {
   }
 }
 
+export function validateRestoreEvidence(evidence) {
+  requireExactFields(
+    evidence,
+    [
+      "version",
+      "evidence_id",
+      "scope",
+      "environment",
+      "project_refs",
+      "timing",
+      "tools",
+      "backup_restore",
+      "security_reconciliation",
+      "event_trigger_recovery",
+      "parity",
+      "limitations",
+      "cleanup",
+      "sensitive_payloads_present",
+    ],
+    "restore evidence",
+  );
+  if (
+    evidence.version !== 1 ||
+    evidence.evidence_id !== "P0-001-NON-PRODUCTION-RESTORE" ||
+    evidence.environment !== "staging"
+  ) {
+    fail("restore evidence identity or environment is invalid");
+  }
+  if (
+    evidence.project_refs?.source !== "wwcwfbzwljbjlaifklaj" ||
+    evidence.project_refs?.target !== "mxjlvmowmodzdtdfgqpb"
+  ) {
+    fail("restore evidence project orientation is invalid");
+  }
+  for (const field of [
+    "restore_started_at",
+    "restore_completed_at",
+    "validation_completed_at",
+  ]) {
+    requireTimestamp(
+      evidence.timing?.[field],
+      `restore evidence timing.${field}`,
+    );
+  }
+  const restore = evidence.backup_restore;
+  if (
+    restore?.official_roles_schema_data !== "passed" ||
+    restore?.official_migration_history !== "passed" ||
+    restore?.migration_version !== "20260828192126" ||
+    restore?.normalized_statement_count !== 1 ||
+    restore?.parameter_acl_fingerprint !== "0c76cbe6bc3831caee75ade02f91dee6"
+  ) {
+    fail("restore evidence backup, history, or normalization is invalid");
+  }
+  for (const field of ["roles_original_sha256", "roles_normalized_sha256"]) {
+    if (!/^[a-f0-9]{64}$/.test(restore?.[field] ?? "")) {
+      fail(`restore evidence ${field} is invalid`);
+    }
+  }
+  if (restore.roles_original_sha256 === restore.roles_normalized_sha256) {
+    fail("restore evidence normalized roles hash must differ");
+  }
+  const reconciliation = evidence.security_reconciliation;
+  if (
+    reconciliation?.revoked_from?.join("|") !== "PUBLIC|anon|authenticated" ||
+    reconciliation?.retained_for?.join("|") !== "postgres|service_role" ||
+    reconciliation?.function_definition_fingerprint !==
+      "6998ea6b4c2480f5d2e34b5dcf3f8d36" ||
+    reconciliation?.owner !== "postgres" ||
+    reconciliation?.security_definer !== true ||
+    reconciliation?.migration_history_modified !== false ||
+    reconciliation?.security_advisor_findings !== 0
+  ) {
+    fail("restore evidence security reconciliation is invalid");
+  }
+  const trigger = evidence.event_trigger_recovery;
+  if (
+    trigger?.authority !== "live source catalog" ||
+    trigger?.name !== "ensure_rls" ||
+    trigger?.event !== "ddl_command_end" ||
+    trigger?.tags?.join("|") !== "CREATE TABLE|CREATE TABLE AS|SELECT INTO" ||
+    trigger?.enabled !== "O" ||
+    trigger?.owner !== "postgres" ||
+    trigger?.function_identity !== "public.rls_auto_enable()" ||
+    trigger?.behavior_test !== "passed" ||
+    trigger?.probe_cleanup !== "passed"
+  ) {
+    fail("restore evidence event-trigger recovery is invalid");
+  }
+  if (
+    evidence.parity?.status !== "passed" ||
+    evidence.parity?.source_unchanged !== true ||
+    evidence.parity?.source_security_advisor_findings !== 0 ||
+    evidence.parity?.target_security_advisor_findings !== 0 ||
+    evidence.cleanup?.temporary_material_removed !== true ||
+    evidence.cleanup?.probe_object_absent !== true ||
+    evidence.sensitive_payloads_present !== false
+  ) {
+    fail("restore evidence parity, cleanup, or redaction is invalid");
+  }
+  requireStringArray(evidence.limitations, "restore evidence limitations", 3, {
+    meaningful: true,
+  });
+  if (scanSecretLikeText(JSON.stringify(evidence), "restore evidence").length) {
+    fail("restore evidence contains secret-like content");
+  }
+}
+
 export function validateMigrationRegister(
   register,
   references = {},
@@ -1064,6 +1172,9 @@ export function validateRepository() {
   }
 
   validateMigrationRegister(migrations, references, files);
+  validateRestoreEvidence(
+    readJson("governance/evidence/p0-restore-validation.json"),
+  );
   validateDriftReport(readJson("governance/schema-drift/baseline.json"));
   validateReleaseRegister(releases, references, (sha) => {
     try {
@@ -1086,6 +1197,7 @@ export function validateRepository() {
       "relational decision and work-item registers",
       "environment isolation",
       "migration inventory and clean drift baseline",
+      "sanitized non-production restore evidence",
       "release traceability",
     ],
   };

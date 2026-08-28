@@ -11,6 +11,7 @@
       ],
       "validation_evidence": [
         "governance/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.json",
+        "governance/evidence/p0-restore-validation.json",
         "pnpm run p0:validate",
         "pnpm run p0:test"
       ],
