@@ -15,6 +15,7 @@ import {
   validatePackageJson,
   validateReleaseRegister,
   validateRepository,
+  validateRestoreEvidence,
   validateSchemaArtifact,
   validateTraceabilityConsistency,
   validateWorkItem,
@@ -338,6 +339,24 @@ test("schema drift findings are rejected", () => {
   const report = readJson("governance/schema-drift/baseline.json");
   report.drift_status = "detected";
   assert.throws(() => validateDriftReport(report), /drift status/);
+});
+
+test("sanitized restore evidence validates and rejects weakened recovery", () => {
+  const evidence = readJson("governance/evidence/p0-restore-validation.json");
+  assert.doesNotThrow(() => validateRestoreEvidence(evidence));
+
+  evidence.event_trigger_recovery.authority = "generated dump";
+  assert.throws(() => validateRestoreEvidence(evidence), /event-trigger/);
+});
+
+test("restore evidence rejects extra normalization and failed cleanup", () => {
+  const extra = readJson("governance/evidence/p0-restore-validation.json");
+  extra.backup_restore.normalized_statement_count = 2;
+  assert.throws(() => validateRestoreEvidence(extra), /normalization/);
+
+  const dirty = readJson("governance/evidence/p0-restore-validation.json");
+  dirty.cleanup.temporary_material_removed = false;
+  assert.throws(() => validateRestoreEvidence(dirty), /cleanup/);
 });
 
 test("incomplete release traceability is rejected", () => {
