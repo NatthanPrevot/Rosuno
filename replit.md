@@ -1,45 +1,22 @@
-# [Project name]
+# Rosuno
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Rosuno is an intentionally blank repository scaffold for controlled software implementation.
 
-## Run & Operate
+## Initialization scope
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+This repository contains only the neutral starter configuration needed to begin a future implementation. No product behavior, domain model, integrations, infrastructure, or user-facing application has been defined.
 
-## Stack
+## Current files
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- `.replit` — Node.js workspace and agent configuration
+- `.gitignore` — standard ignored generated files and dependencies
+- `.npmrc` — minimal pnpm peer-dependency settings
+- `package.json` — root project metadata and TypeScript check
+- `pnpm-lock.yaml` — dependency lockfile
+- `pnpm-workspace.yaml` — empty workspace with package-age protection
+- `tsconfig.base.json` and `tsconfig.json` — minimal TypeScript configuration
+- `replit.md` — repository initialization note
 
-## Where things live
+## Status
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
-
-## Architecture decisions
-
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
-
-## Product
-
-_Describe the high-level user-facing capabilities of this app once they exist._
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+Initialization is complete and intentionally stopped. Future implementation requires explicit approval.
