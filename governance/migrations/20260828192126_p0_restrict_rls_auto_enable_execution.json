@@ -3,6 +3,10 @@
   "version": "20260828192126",
   "name": "p0_restrict_rls_auto_enable_execution",
   "migration_kind": "security_control",
+  "target_project": {
+    "name": "Rosuno",
+    "project_ref": "wwcwfbzwljbjlaifklaj"
+  },
   "intent": {
     "execute_revoked_from": ["PUBLIC", "anon", "authenticated"],
     "execute_retained_for": ["postgres", "service_role"]

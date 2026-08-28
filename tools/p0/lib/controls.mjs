@@ -83,6 +83,8 @@ export const RELEASE_FIELDS = [
   "created_at",
 ];
 
+const UNCLASSIFIED_EXTERNAL_PROJECT = "unclassified_external_project";
+
 const DIRECT_SECRET_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
   /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/i,
@@ -381,9 +383,13 @@ export function validateWorkItem(
     fail(`${context}.status is not allowed`);
   }
   if (
-    !["development", "staging", "production", "none"].includes(
-      record.environment,
-    )
+    ![
+      "development",
+      "staging",
+      "production",
+      "none",
+      UNCLASSIFIED_EXTERNAL_PROJECT,
+    ].includes(record.environment)
   ) {
     fail(`${context}.environment is not allowed`);
   }
@@ -527,6 +533,7 @@ export function validateMigrationArtifact(artifact, migration, context) {
       "version",
       "name",
       "migration_kind",
+      "target_project",
       "intent",
       "preserved_invariants",
       "validation_evidence",
@@ -543,6 +550,12 @@ export function validateMigrationArtifact(artifact, migration, context) {
   requireBoundedString(artifact.name, `${context}.name`, 200);
   if (artifact.migration_kind !== "security_control") {
     fail(`${context}.migration_kind must be security_control`);
+  }
+  if (
+    artifact.target_project?.name !== "Rosuno" ||
+    artifact.target_project?.project_ref !== "wwcwfbzwljbjlaifklaj"
+  ) {
+    fail(`${context}.target_project must identify the active Rosuno project`);
   }
   if (
     artifact.intent?.execute_revoked_from?.join("|") !==
@@ -638,14 +651,29 @@ export function validateMigrationRegister(
     for (const field of ["reviewed_by", "reviewed_at", "rollback_plan"]) {
       requireNonEmptyString(migration[field], `${context}.${field}`);
     }
-    if (!["development", "staging"].includes(migration.applied_environment)) {
-      fail(`${context} must be validated in a non-production environment`);
+    if (
+      !["development", "staging", UNCLASSIFIED_EXTERNAL_PROJECT].includes(
+        migration.applied_environment,
+      )
+    ) {
+      fail(`${context}.applied_environment is not recognized`);
     }
     if (
-      migration.non_production_validation !== true ||
-      migration.drift_check !== "clean"
+      migration.applied_environment === UNCLASSIFIED_EXTERNAL_PROJECT &&
+      migration.non_production_validation !== false
     ) {
-      fail(`${context} lacks clean non-production validation`);
+      fail(
+        `${context} must not classify an unclassified external project as non-production`,
+      );
+    }
+    if (
+      migration.applied_environment !== UNCLASSIFIED_EXTERNAL_PROJECT &&
+      migration.non_production_validation !== true
+    ) {
+      fail(`${context} must be validated in a non-production environment`);
+    }
+    if (migration.drift_check !== "clean") {
+      fail(`${context} lacks a clean drift check`);
     }
     validateReferences(
       migration.authority_refs,
@@ -765,8 +793,14 @@ export function validateReleaseRegister(
     if (!/^sha256:[a-f0-9]{64}$/i.test(release.artifact_digest)) {
       fail(`${context}.artifact_digest must be a SHA-256 digest`);
     }
-    if (!["staging", "production"].includes(release.environment)) {
-      fail(`${context}.environment must be staging or production`);
+    if (
+      !["staging", "production", UNCLASSIFIED_EXTERNAL_PROJECT].includes(
+        release.environment,
+      )
+    ) {
+      fail(
+        `${context}.environment must be staging, production, or an unclassified external project`,
+      );
     }
     validateReferences(
       release.work_item_refs,

@@ -14,8 +14,8 @@
         "pnpm run p0:validate",
         "pnpm run p0:test"
       ],
-      "artifact_digest": "sha256:06a9d477a94186a236c8579148d8cfac689738319408b7c7b9633210113207ad",
-      "environment": "staging",
+      "artifact_digest": "sha256:6fbcb4fbf3df23e7c68d60343c1bdd30bbf564ac1f29e731430124b2adc29ecd",
+      "environment": "unclassified_external_project",
       "reviewer": {
         "identity": null,
         "status": "unresolved_external_dependency"

@@ -28,7 +28,7 @@
         "Privilege, invariant, advisor, and clean schema-drift evidence is recorded without secret values"
       ],
       "validation_commands": ["pnpm run p0:validate", "pnpm run p0:test"],
-      "environment": "staging",
+      "environment": "unclassified_external_project",
       "release_refs": ["REL-20260828-SUPABASE-SECURITY"],
       "migration_refs": [
         "20260828192126_p0_restrict_rls_auto_enable_execution"

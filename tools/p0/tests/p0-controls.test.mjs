@@ -272,6 +272,32 @@ test("recorded migration privilege and invariant evidence cannot be weakened", (
   );
 });
 
+test("recorded migration provenance identifies Rosuno without a staging classification", () => {
+  const artifact = readJson(
+    "governance/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.json",
+  );
+  const register = readJson("governance/migrations/reviewed-migrations.json");
+  const migration = register.migrations[0];
+  const workItem = readJson("governance/work-items/index.json").work_items[0];
+  const release = readJson("governance/releases/traceability.json").releases[0];
+
+  assert.deepEqual(artifact.target_project, {
+    name: "Rosuno",
+    project_ref: "wwcwfbzwljbjlaifklaj",
+  });
+  assert.equal(migration.applied_environment, "unclassified_external_project");
+  assert.equal(migration.non_production_validation, false);
+  assert.equal(workItem.environment, "unclassified_external_project");
+  assert.equal(release.environment, "unclassified_external_project");
+  assert.notEqual(artifact.target_project.project_ref, "mxjlvmowmodzdtdfgqpb");
+
+  artifact.target_project.project_ref = "mxjlvmowmodzdtdfgqpb";
+  assert.throws(
+    () => validateMigrationArtifact(artifact, migration, "migration artifact"),
+    /active Rosuno project/,
+  );
+});
+
 test("security migration does not set the product-migration presence flag", () => {
   const register = readJson("governance/migrations/reviewed-migrations.json");
   register.product_migrations_present = true;

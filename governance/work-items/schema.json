@@ -108,7 +108,13 @@
       "items": { "type": "string", "minLength": 1, "maxLength": 2000 }
     },
     "environment": {
-      "enum": ["development", "staging", "production", "none"]
+      "enum": [
+        "development",
+        "staging",
+        "production",
+        "none",
+        "unclassified_external_project"
+      ]
     },
     "release_refs": {
       "type": "array",
