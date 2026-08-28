@@ -1,0 +1,25 @@
+{
+  "work_item_id": "WI-P0-UNIQUE",
+  "title": "Short bounded control title",
+  "objective": "One observable P0 control objective",
+  "in_scope": ["Explicit included control"],
+  "out_of_scope": ["P1 and product implementation"],
+  "status": "proposed",
+  "owner": "named accountable owner or unresolved_external_dependency",
+  "reviewer": {
+    "identity": null,
+    "status": "unresolved_external_dependency"
+  },
+  "priority": "P0",
+  "authority_refs": ["P0-001-LOCKED"],
+  "decision_refs": [],
+  "dependencies": [],
+  "acceptance_criteria": ["Observable success condition"],
+  "validation_commands": ["pnpm run p0:validate"],
+  "environment": "none",
+  "release_refs": [],
+  "migration_refs": [],
+  "rollback_reference": "governance/rollback-recovery.md",
+  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
+}

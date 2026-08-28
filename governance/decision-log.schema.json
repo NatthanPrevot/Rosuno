@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rosuno:p0:decision-record",
+  "title": "P0 decision record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decision_id",
+    "title",
+    "status",
+    "scope",
+    "decision",
+    "rationale",
+    "authority_refs",
+    "work_item_refs",
+    "owner",
+    "reviewer",
+    "created_at",
+    "updated_at",
+    "supersedes",
+    "impact",
+    "evidence",
+    "expiry"
+  ],
+  "properties": {
+    "decision_id": {
+      "type": "string",
+      "pattern": "^DEC-[0-9]{8}-[A-Z0-9][A-Z0-9-]*$"
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "status": {
+      "enum": ["proposed", "accepted", "rejected", "superseded"]
+    },
+    "scope": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "decision": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "rationale": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "authority_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "work_item_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "owner": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "reviewer": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["identity", "status"],
+          "properties": {
+            "identity": { "type": "null" },
+            "status": { "const": "unresolved_external_dependency" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["identity", "status"],
+          "properties": {
+            "identity": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "status": { "enum": ["pending", "approved", "rejected"] }
+          }
+        }
+      ]
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "supersedes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "impact": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 2000 }
+    },
+    "expiry": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    }
+  }
+}

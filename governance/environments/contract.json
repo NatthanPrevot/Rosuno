@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "scope_names": ["development", "staging", "production"],
+  "rules": {
+    "secret_values_forbidden": true,
+    "shared_secret_scope_forbidden": true,
+    "production_must_not_inherit": ["development", "staging"],
+    "staging_must_not_inherit": ["development"]
+  },
+  "environments": {
+    "development": {
+      "config_scope": "development",
+      "secret_scope": "development",
+      "inherits_from": []
+    },
+    "staging": {
+      "config_scope": "staging",
+      "secret_scope": "staging",
+      "inherits_from": []
+    },
+    "production": {
+      "config_scope": "production",
+      "secret_scope": "production",
+      "inherits_from": []
+    }
+  }
+}

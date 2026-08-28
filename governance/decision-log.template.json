@@ -1,0 +1,21 @@
+{
+  "decision_id": "DEC-YYYYMMDD-UNIQUE",
+  "title": "Short decision title",
+  "status": "proposed",
+  "scope": "P0-only scope statement",
+  "decision": "Decision text without product or secret values",
+  "rationale": "Evidence-based rationale",
+  "authority_refs": ["P0-001-LOCKED"],
+  "work_item_refs": ["WI-P0-UNIQUE"],
+  "owner": "named accountable owner or unresolved_external_dependency",
+  "reviewer": {
+    "identity": null,
+    "status": "unresolved_external_dependency"
+  },
+  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "updated_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "supersedes": [],
+  "impact": "local-control-only",
+  "evidence": ["path-or-external-reference"],
+  "expiry": null
+}

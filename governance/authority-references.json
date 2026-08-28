@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "references": [
+    {
+      "authority_id": "P0-001-LOCKED",
+      "title": "Locked P0-001 requirement set",
+      "location": "external locked source; content intentionally not stored here",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "not_available",
+      "usage": "reference-only",
+      "status": "external_reference_pending"
+    }
+  ]
+}

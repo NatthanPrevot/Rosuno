@@ -4,7 +4,14 @@
   "license": "MIT",
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit --incremental false",
+    "build": "tsc --noEmit --incremental false",
+    "format:check": "prettier --check \"governance/**/*.{md,json,yaml,yml}\" \".github/**/*.{md,yml,yaml}\" \"tools/**/*.mjs\" \"package.json\" \"pnpm-workspace.yaml\" \"tsconfig*.json\"",
+    "lint": "pnpm run format:check",
+    "p0:validate": "node tools/p0/validate.mjs",
+    "p0:test": "node --test tools/p0/tests/*.test.mjs",
+    "secrets:check": "node tools/p0/secret-scan.mjs",
+    "dependency:check": "pnpm audit --audit-level=high"
   },
   "private": true,
   "devDependencies": {

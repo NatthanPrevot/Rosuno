@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "product_schema_present": false,
+  "baseline_id": "none",
+  "baseline_digest": null,
+  "checked_environment": "none",
+  "checked_at": null,
+  "evidence": [],
+  "drift_status": "clean",
+  "drift_items": []
+}

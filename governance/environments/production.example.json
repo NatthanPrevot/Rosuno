@@ -1,0 +1,10 @@
+{
+  "environment": "production",
+  "config_scope": "production",
+  "secret_scope": "production",
+  "inherits_from": [],
+  "values": {
+    "EXAMPLE_ONLY": "placeholder"
+  },
+  "secret_values_present": false
+}

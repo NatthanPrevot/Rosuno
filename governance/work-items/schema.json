@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rosuno:p0:bounded-work-item",
+  "title": "P0 bounded work item",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "work_item_id",
+    "title",
+    "objective",
+    "in_scope",
+    "out_of_scope",
+    "status",
+    "owner",
+    "reviewer",
+    "priority",
+    "authority_refs",
+    "decision_refs",
+    "dependencies",
+    "acceptance_criteria",
+    "validation_commands",
+    "environment",
+    "release_refs",
+    "migration_refs",
+    "rollback_reference",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "work_item_id": {
+      "type": "string",
+      "pattern": "^WI-P0-[A-Z0-9][A-Z0-9-]*$"
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "objective": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "in_scope": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "maxLength": 2000 }
+    },
+    "out_of_scope": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "maxLength": 2000 }
+    },
+    "status": {
+      "enum": [
+        "proposed",
+        "approved",
+        "in_progress",
+        "blocked",
+        "completed",
+        "cancelled"
+      ]
+    },
+    "owner": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "reviewer": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["identity", "status"],
+          "properties": {
+            "identity": { "type": "null" },
+            "status": { "const": "unresolved_external_dependency" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["identity", "status"],
+          "properties": {
+            "identity": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "status": { "enum": ["pending", "approved", "rejected"] }
+          }
+        }
+      ]
+    },
+    "priority": { "const": "P0" },
+    "authority_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "decision_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "dependencies": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "maxLength": 2000 }
+    },
+    "validation_commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "maxLength": 2000 }
+    },
+    "environment": {
+      "enum": ["development", "staging", "production", "none"]
+    },
+    "release_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "migration_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "rollback_reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

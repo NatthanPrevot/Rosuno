@@ -1,0 +1,10 @@
+{
+  "environment": "staging",
+  "config_scope": "staging",
+  "secret_scope": "staging",
+  "inherits_from": [],
+  "values": {
+    "EXAMPLE_ONLY": "placeholder"
+  },
+  "secret_values_present": false
+}

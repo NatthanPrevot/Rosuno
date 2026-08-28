@@ -3,6 +3,56 @@ modules = ["nodejs-24"]
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "quality"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "controls"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "security"
+
+[[workflows.workflow]]
+name = "quality"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm install --frozen-lockfile && pnpm run format:check && pnpm run typecheck && pnpm run build"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "controls"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm run p0:validate && pnpm run p0:test"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "security"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm run secrets:check && pnpm run dependency:check"
+
+[workflows.workflow.metadata]
+isValidation = true
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
