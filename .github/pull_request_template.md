@@ -7,8 +7,8 @@
 
 ## Scope
 
-- [ ] This change is P0-only.
-- [ ] Product, domain, schema, UI, auth, provider workflow, demo, and P1 work are absent.
+- [ ] This change is limited to the authorized implementation phase and bounded work item.
+- [ ] Product/domain/schema changes outside the listed work item are absent.
 - [ ] Out-of-scope items are explicitly listed below.
 
 In scope:

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "product_migrations_present": false,
+  "product_migrations_present": true,
   "migrations": [
     {
       "migration_id": "20260828192126_p0_restrict_rls_auto_enable_execution",
@@ -19,6 +19,30 @@
       "drift_check": "clean",
       "rollback_plan": "Reapply the prior privilege state only through an independently reviewed non-production rollback.",
       "depends_on": []
+    },
+    {
+      "migration_id": "20260829000015_p1_platform_foundation",
+      "migration_kind": "product",
+      "sequence": 2,
+      "artifact_path": "supabase/migrations/20260829000015_p1_platform_foundation.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-001-PLATFORM-FOUNDATION"],
+      "decision_refs": ["DEC-20260829-P1-PLATFORM-FOUNDATION"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before persistent application, no rollback is required. After an approved non-production application, drop only public.users and public.set_updated_at() through a separately reviewed rollback migration if acceptance fails.",
+      "depends_on": ["20260828192126_p0_restrict_rls_auto_enable_execution"]
     }
   ]
 }

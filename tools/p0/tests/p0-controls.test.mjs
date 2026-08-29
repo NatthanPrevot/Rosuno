@@ -13,6 +13,8 @@ import {
   validateMigrationRegister,
   validateNeutralPaths,
   validatePackageJson,
+  validateP1PlatformEvidence,
+  validateP1PlatformMigration,
   validateReleaseRegister,
   validateRepository,
   validateRestoreEvidence,
@@ -79,6 +81,81 @@ function validWorkItem() {
 
 test("neutral P0 control foundation validates successfully", () => {
   assert.doesNotThrow(() => validateRepository());
+});
+
+test("authorized P1 platform migration stays inside Migration 1", () => {
+  const sql = readFileSync(
+    path.join(
+      ROOT,
+      "supabase/migrations/20260829000015_p1_platform_foundation.sql",
+    ),
+    "utf8",
+  );
+  const migration = readJson("governance/migrations/reviewed-migrations.json")
+    .migrations[1];
+  assert.doesNotThrow(() => validateP1PlatformMigration(sql, migration));
+
+  assert.throws(
+    () =>
+      validateP1PlatformMigration(
+        `${sql}\ncreate table public.client_profiles (id uuid);`,
+        migration,
+      ),
+    /only public.users|Migration 1 boundary/,
+  );
+  assert.throws(
+    () =>
+      validateP1PlatformMigration(
+        sql.replace("security invoker", "security definer"),
+        migration,
+      ),
+    /SECURITY DEFINER|missing/,
+  );
+  assert.throws(
+    () =>
+      validateP1PlatformMigration(
+        `${sql}\ncreate extension if not exists btree_gist;`,
+        migration,
+      ),
+    /extension dependency/,
+  );
+  assert.throws(
+    () =>
+      validateP1PlatformMigration(
+        sql.replace("revoke all on table public.users from service_role;", ""),
+        migration,
+      ),
+    /service_role/,
+  );
+});
+
+test("P1 evidence cannot claim application or weakened security", () => {
+  const sql = readFileSync(
+    path.join(
+      ROOT,
+      "supabase/migrations/20260829000015_p1_platform_foundation.sql",
+    ),
+    "utf8",
+  );
+  const evidence = readJson(
+    "governance/evidence/p1-001-platform-foundation.json",
+  );
+  assert.doesNotThrow(() => validateP1PlatformEvidence(evidence, sql));
+
+  evidence.migration.persistent_application = true;
+  assert.throws(
+    () => validateP1PlatformEvidence(evidence, sql),
+    /migration record/,
+  );
+
+  const weakened = readJson(
+    "governance/evidence/p1-001-platform-foundation.json",
+  );
+  weakened.security.anon_table_privileges = ["SELECT"];
+  assert.throws(
+    () => validateP1PlatformEvidence(weakened, sql),
+    /security state/,
+  );
 });
 
 test("configuration isolation rejects production inheritance", () => {
@@ -301,6 +378,7 @@ test("recorded migration provenance identifies Rosuno without a staging classifi
 
 test("security migration does not set the product-migration presence flag", () => {
   const register = readJson("governance/migrations/reviewed-migrations.json");
+  register.migrations = [register.migrations[0]];
   register.product_migrations_present = true;
   assert.throws(
     () =>
