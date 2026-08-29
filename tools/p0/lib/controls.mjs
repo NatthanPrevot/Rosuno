@@ -86,6 +86,17 @@ export const RELEASE_FIELDS = [
 
 const UNCLASSIFIED_EXTERNAL_PROJECT = "unclassified_external_project";
 
+export const P0_MIGRATION_ID =
+  "20260828192126_p0_restrict_rls_auto_enable_execution";
+export const P0_CLI_INVENTORY_PATH =
+  "supabase/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.sql";
+const P0_STORED_EXECUTABLE_STATEMENT =
+  "REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC, anon, authenticated;";
+const P0_STORED_STATEMENT_SHA256 =
+  "2ba591b2767c43a32731c8b74b5ffaa07c47a41d096eee6fb3672aad9278c49d";
+const P0_INVENTORY_RECONCILIATION_PATH =
+  "governance/evidence/p0-cli-inventory-reconciliation.json";
+
 const DIRECT_SECRET_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
   /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/i,
@@ -554,6 +565,13 @@ export function validateMigrationArtifact(artifact, migration, context) {
     fail(`${context}.version must be a 14-digit migration version`);
   }
   requireBoundedString(artifact.name, `${context}.name`, 200);
+  if (
+    artifact.migration_id !== `${artifact.version}_${artifact.name}` ||
+    artifact.version !== "20260828192126" ||
+    artifact.name !== "p0_restrict_rls_auto_enable_execution"
+  ) {
+    fail(`${context} historical P0 version and name are invalid`);
+  }
   if (artifact.migration_kind !== "security_control") {
     fail(`${context}.migration_kind must be security_control`);
   }
@@ -615,6 +633,132 @@ export function validateMigrationArtifact(artifact, migration, context) {
     fail(`${context}.schema_drift must be clean without database calls`);
   }
   if (scanSecretLikeText(JSON.stringify(artifact), context).length > 0) {
+    fail(`${context} contains a secret-like value`);
+  }
+}
+
+export function validateP0CliInventory(
+  sql,
+  artifactPath = P0_CLI_INVENTORY_PATH,
+  context = "P0 CLI inventory",
+) {
+  if (artifactPath !== P0_CLI_INVENTORY_PATH) {
+    fail(`${context} path is not the authorized historical P0 inventory path`);
+  }
+  if (sql !== P0_STORED_EXECUTABLE_STATEMENT) {
+    fail(
+      `${context} must contain exactly the stored single P0 executable statement`,
+    );
+  }
+}
+
+export function validateP0InventoryReconciliation(
+  evidence,
+  migration,
+  inventorySql,
+  context = "P0 inventory reconciliation",
+) {
+  requireExactFields(
+    evidence,
+    [
+      "version",
+      "reconciliation_id",
+      "migration_id",
+      "historical_authority",
+      "inventory_artifact",
+      "reconciliation",
+    ],
+    context,
+  );
+  if (
+    evidence.version !== 1 ||
+    evidence.reconciliation_id !== "P0-CLI-INVENTORY-20260828192126" ||
+    evidence.migration_id !== P0_MIGRATION_ID ||
+    migration?.migration_id !== P0_MIGRATION_ID ||
+    migration?.artifact_path !==
+      "governance/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.json"
+  ) {
+    fail(`${context} migration identity is invalid`);
+  }
+
+  const authority = evidence.historical_authority;
+  requireExactFields(
+    authority,
+    [
+      "environment",
+      "project_name",
+      "project_ref",
+      "history_schema",
+      "history_table",
+      "history_version",
+      "row_count",
+      "stored_statement_count",
+      "stored_statement_sha256",
+      "query_mode",
+    ],
+    `${context}.historical_authority`,
+  );
+  if (
+    authority.environment !== "staging" ||
+    authority.project_name !== "Rosuno Staging" ||
+    authority.project_ref !== "mxjlvmowmodzdtdfgqpb" ||
+    authority.history_schema !== "supabase_migrations" ||
+    authority.history_table !== "schema_migrations" ||
+    authority.history_version !== "20260828192126" ||
+    authority.row_count !== 1 ||
+    authority.stored_statement_count !== 1 ||
+    authority.stored_statement_sha256 !== P0_STORED_STATEMENT_SHA256 ||
+    authority.query_mode !== "read_only"
+  ) {
+    fail(`${context}.historical_authority does not prove the exact source row`);
+  }
+
+  const inventory = evidence.inventory_artifact;
+  requireExactFields(
+    inventory,
+    ["path", "version", "name", "statement_count", "statement_sha256"],
+    `${context}.inventory_artifact`,
+  );
+  if (
+    inventory.path !== P0_CLI_INVENTORY_PATH ||
+    inventory.version !== "20260828192126" ||
+    inventory.name !== "p0_restrict_rls_auto_enable_execution" ||
+    inventory.statement_count !== 1 ||
+    inventory.statement_sha256 !== P0_STORED_STATEMENT_SHA256
+  ) {
+    fail(`${context}.inventory_artifact is invalid`);
+  }
+  validateP0CliInventory(inventorySql, inventory.path, `${context}.inventory`);
+
+  const reconciliation = evidence.reconciliation;
+  requireExactFields(
+    reconciliation,
+    [
+      "purpose",
+      "reason",
+      "statement_semantics",
+      "authority_conflict",
+      "replay_authorized",
+      "remote_history_mutated",
+      "remote_schema_mutated",
+    ],
+    `${context}.reconciliation`,
+  );
+  if (
+    reconciliation.purpose !==
+      "repository inventory representation of an already-applied migration" ||
+    reconciliation.reason !==
+      "Rosuno Staging contains the historical P0 migration row while the local Supabase CLI inventory did not; representing its exact stored statement reconciles inventory without replay." ||
+    reconciliation.statement_semantics !==
+      "revoke direct EXECUTE from PUBLIC, anon, and authenticated while retaining postgres and service_role and changing nothing else" ||
+    reconciliation.authority_conflict !== "none" ||
+    reconciliation.replay_authorized !== false ||
+    reconciliation.remote_history_mutated !== false ||
+    reconciliation.remote_schema_mutated !== false
+  ) {
+    fail(`${context}.reconciliation is invalid`);
+  }
+  if (scanSecretLikeText(JSON.stringify(evidence), context).length > 0) {
     fail(`${context} contains a secret-like value`);
   }
 }
@@ -1482,6 +1626,14 @@ export function validateMigrationRegister(
         migration,
         `${context}.artifact`,
       );
+      if (migration.migration_id === P0_MIGRATION_ID) {
+        validateP0CliInventory(
+          readFileSync(path.join(ROOT, P0_CLI_INVENTORY_PATH), "utf8"),
+          P0_CLI_INVENTORY_PATH,
+          `${context}.inventory`,
+        );
+        registeredArtifacts.add(P0_CLI_INVENTORY_PATH);
+      }
     } else {
       const sql = readFileSync(
         path.join(ROOT, migration.artifact_path),
@@ -1876,6 +2028,7 @@ export function validateNeutralPaths(files, packageJson) {
     ".github/workflows/p0-controls.yml",
   ]);
   const allowedP1Files = new Set([
+    "supabase/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.sql",
     "supabase/migrations/20260829000015_p1_platform_foundation.sql",
     "supabase/migrations/20260829171701_p1_authorization_foundation.sql",
   ]);
@@ -1959,6 +2112,14 @@ export function validateRepository() {
   }
 
   validateMigrationRegister(migrations, references, files);
+  const p0Migration = migrations.migrations.find(
+    (migration) => migration.migration_id === P0_MIGRATION_ID,
+  );
+  validateP0InventoryReconciliation(
+    readJson(P0_INVENTORY_RECONCILIATION_PATH),
+    p0Migration,
+    readFileSync(path.join(ROOT, P0_CLI_INVENTORY_PATH), "utf8"),
+  );
   validateRestoreEvidence(
     readJson("governance/evidence/p0-restore-validation.json"),
   );

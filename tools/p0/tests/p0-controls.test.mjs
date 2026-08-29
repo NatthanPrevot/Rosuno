@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
@@ -13,6 +14,9 @@ import {
   validateMigrationRegister,
   validateNeutralPaths,
   validatePackageJson,
+  validateP0CliInventory,
+  validateP0InventoryReconciliation,
+  validateP1AuthorizationMigration,
   validateP1ApplicationTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
@@ -82,6 +86,106 @@ function validWorkItem() {
 
 test("neutral P0 control foundation validates successfully", () => {
   assert.doesNotThrow(() => validateRepository());
+});
+
+test("historical P0 CLI inventory is exact and bounded", () => {
+  const sql = readFileSync(
+    path.join(
+      ROOT,
+      "supabase/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.sql",
+    ),
+    "utf8",
+  );
+  const evidence = readJson(
+    "governance/evidence/p0-cli-inventory-reconciliation.json",
+  );
+  const migration = readJson("governance/migrations/reviewed-migrations.json")
+    .migrations[0];
+
+  assert.doesNotThrow(() =>
+    validateP0InventoryReconciliation(evidence, migration, sql),
+  );
+  assert.throws(
+    () => validateP0CliInventory(sql, "supabase/migrations/wrong.sql"),
+    /path/,
+  );
+  assert.throws(
+    () =>
+      validateP0CliInventory(`${sql}\nREVOKE ALL ON SCHEMA public FROM anon;`),
+    /exactly the stored single/,
+  );
+  assert.throws(
+    () =>
+      validateP0CliInventory(sql.replace("authenticated;", "service_role;")),
+    /exactly the stored single/,
+  );
+  assert.throws(
+    () =>
+      validateP0CliInventory(
+        sql.replace("REVOKE EXECUTE ON FUNCTION", "GRANT EXECUTE ON FUNCTION"),
+      ),
+    /exactly the stored single/,
+  );
+
+  const wrongVersion = structuredClone(evidence);
+  wrongVersion.inventory_artifact.version = "20260828192127";
+  assert.throws(
+    () => validateP0InventoryReconciliation(wrongVersion, migration, sql),
+    /inventory_artifact/,
+  );
+  const wrongName = structuredClone(evidence);
+  wrongName.inventory_artifact.name = "wrong_name";
+  assert.throws(
+    () => validateP0InventoryReconciliation(wrongName, migration, sql),
+    /inventory_artifact/,
+  );
+  const alteredIntent = structuredClone(evidence);
+  alteredIntent.reconciliation.statement_semantics =
+    "revoke direct EXECUTE from PUBLIC only";
+  assert.throws(
+    () => validateP0InventoryReconciliation(alteredIntent, migration, sql),
+    /reconciliation/,
+  );
+});
+
+test("P1 migration bytes remain exact and byte changes are rejected", () => {
+  const p1PlatformPath =
+    "supabase/migrations/20260829000015_p1_platform_foundation.sql";
+  const p1AuthorizationPath =
+    "supabase/migrations/20260829171701_p1_authorization_foundation.sql";
+  const p1PlatformSql = readFileSync(path.join(ROOT, p1PlatformPath), "utf8");
+  const p1AuthorizationSql = readFileSync(
+    path.join(ROOT, p1AuthorizationPath),
+    "utf8",
+  );
+  assert.equal(
+    createHash("sha256").update(p1PlatformSql).digest("hex"),
+    "67dfd44b2bd7525a588e6eb59c33a0056f3a5c67eec5f45dd93e6aab37f7afc8",
+  );
+  assert.equal(
+    createHash("sha256").update(p1AuthorizationSql).digest("hex"),
+    "6471ac68949234e29ae1cc492eaa2f77dc15ca010998f72898284b8c9a855fec",
+  );
+  const register = readJson("governance/migrations/reviewed-migrations.json");
+  assert.throws(
+    () =>
+      validateP1PlatformMigration(
+        p1PlatformSql.replace("public.users", "public.changed_users"),
+        register.migrations[1],
+      ),
+    /only public.users/,
+  );
+  assert.throws(
+    () =>
+      validateP1AuthorizationMigration(
+        p1AuthorizationSql.replace(
+          "public.client_profiles",
+          "public.changed_profiles",
+        ),
+        register.migrations[2],
+      ),
+    /six authorized Migration 2 tables|client_profiles/,
+  );
 });
 
 test("authorized P1 platform migration stays inside Migration 1", () => {
@@ -437,6 +541,25 @@ test("recorded migration privilege and invariant evidence cannot be weakened", (
         "migration artifact",
       ),
     /security_definer_unchanged/,
+  );
+
+  const wrongVersion = readJson(
+    "governance/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.json",
+  );
+  wrongVersion.version = "20260828192127";
+  assert.throws(
+    () =>
+      validateMigrationArtifact(wrongVersion, migration, "migration artifact"),
+    /version and name/,
+  );
+
+  const wrongName = readJson(
+    "governance/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.json",
+  );
+  wrongName.name = "p0_expanded_execution_change";
+  assert.throws(
+    () => validateMigrationArtifact(wrongName, migration, "migration artifact"),
+    /version and name/,
   );
 });
 

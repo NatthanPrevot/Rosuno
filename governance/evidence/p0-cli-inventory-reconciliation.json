@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "reconciliation_id": "P0-CLI-INVENTORY-20260828192126",
+  "migration_id": "20260828192126_p0_restrict_rls_auto_enable_execution",
+  "historical_authority": {
+    "environment": "staging",
+    "project_name": "Rosuno Staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "history_schema": "supabase_migrations",
+    "history_table": "schema_migrations",
+    "history_version": "20260828192126",
+    "row_count": 1,
+    "stored_statement_count": 1,
+    "stored_statement_sha256": "2ba591b2767c43a32731c8b74b5ffaa07c47a41d096eee6fb3672aad9278c49d",
+    "query_mode": "read_only"
+  },
+  "inventory_artifact": {
+    "path": "supabase/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.sql",
+    "version": "20260828192126",
+    "name": "p0_restrict_rls_auto_enable_execution",
+    "statement_count": 1,
+    "statement_sha256": "2ba591b2767c43a32731c8b74b5ffaa07c47a41d096eee6fb3672aad9278c49d"
+  },
+  "reconciliation": {
+    "purpose": "repository inventory representation of an already-applied migration",
+    "reason": "Rosuno Staging contains the historical P0 migration row while the local Supabase CLI inventory did not; representing its exact stored statement reconciles inventory without replay.",
+    "statement_semantics": "revoke direct EXECUTE from PUBLIC, anon, and authenticated while retaining postgres and service_role and changing nothing else",
+    "authority_conflict": "none",
+    "replay_authorized": false,
+    "remote_history_mutated": false,
+    "remote_schema_mutated": false
+  }
+}
