@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "evidence_id": "P1-002-AUTHORIZATION-FOUNDATION",
+  "work_item_id": "WI-P1-002-AUTHORIZATION-FOUNDATION",
+  "scope": "P1/1B physical Migration 2 authorization foundation only",
+  "authority_refs": [
+    "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+    "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+    "DOMAIN-MODEL-V1.4-LOCKED",
+    "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+    "SCHEMA-INVENTORY-V0.7-LOCKED"
+  ],
+  "preflight": {
+    "environment": "staging",
+    "migration_history": {
+      "p0_version": "20260828192126",
+      "p0_occurrences": 1,
+      "p1_001_version": "20260829000015",
+      "p1_001_occurrences": 1,
+      "p1_002_version": "20260829171701",
+      "p1_002_occurrences": 0
+    },
+    "public_users_row_count": 0,
+    "public_users_schema_exact": true,
+    "p0_invariants_unchanged": true,
+    "p1_001_invariants_unchanged": true,
+    "schema_drift": "clean",
+    "security_advisor_findings": 0
+  },
+  "migration": {
+    "migration_id": "20260829171701_p1_authorization_foundation",
+    "version": "20260829171701",
+    "path": "supabase/migrations/20260829171701_p1_authorization_foundation.sql",
+    "sha256": "6471ac68949234e29ae1cc492eaa2f77dc15ca010998f72898284b8c9a855fec",
+    "created_by_supabase_cli": "2.116.0",
+    "created_tables": [
+      "public.client_profiles",
+      "public.attorney_profiles",
+      "public.staff_profiles",
+      "public.capability_definitions",
+      "public.capability_grants",
+      "public.application_sessions"
+    ],
+    "created_indexes": ["public.capability_grants_user_capability_idx"],
+    "created_functions": [],
+    "seeded_rows": 0,
+    "persistent_application": false
+  },
+  "transactional_validation": {
+    "environment": "staging",
+    "completed_at": "2026-08-29T20:19:39Z",
+    "transaction": "single transaction",
+    "rollback_only": true,
+    "catalog_assertions": "passed",
+    "constraint_tests": "passed",
+    "cross_user_profile_denial": "passed",
+    "anon_denial": "passed",
+    "authenticated_write_denial": "passed",
+    "sensitive_capability_session_denial": "passed",
+    "service_role_acl": "passed",
+    "no_universal_capability_seed": true,
+    "p0_invariants_unchanged": true,
+    "p1_001_invariants_unchanged": true,
+    "zero_persistent_rows_after_rollback": true,
+    "zero_persistent_objects_after_rollback": true,
+    "migration_history_unchanged": true,
+    "source_unchanged": true,
+    "development_unchanged": true,
+    "production_accessed": false,
+    "old_project_accessed": false,
+    "security_advisor_findings": 0
+  },
+  "schema_contract": {
+    "new_tables": [
+      "public.client_profiles",
+      "public.attorney_profiles",
+      "public.staff_profiles",
+      "public.capability_definitions",
+      "public.capability_grants",
+      "public.application_sessions"
+    ],
+    "profile_user_unique_relationships": true,
+    "profile_user_foreign_keys_restrictive": true,
+    "attorney_lifecycle_states": [
+      "pending_verification",
+      "active",
+      "suspended",
+      "closed"
+    ],
+    "staff_lifecycle_states": [
+      "pending_verification",
+      "active",
+      "suspended",
+      "closed"
+    ],
+    "optional_numeric_constraints_nonnegative": true,
+    "capability_code_unique": true,
+    "grant_history_timestamps": true,
+    "grant_validity_constraints": true,
+    "required_capability_grant_index": true,
+    "jurisdiction_id_nullable_without_foreign_key": true,
+    "session_reference_unique_opaque_non_secret": true,
+    "session_time_constraints": true,
+    "all_new_tables_rls_enabled": true,
+    "no_capability_or_entity_seed": true
+  },
+  "privileges": {
+    "authenticated_profile_select_own": true,
+    "authenticated_profile_writes": false,
+    "anon_sensitive_access": false,
+    "authenticated_sensitive_access": false,
+    "service_role_select_insert_update": true,
+    "service_role_delete": false
+  },
+  "acceptance_state": "validated_not_applied",
+  "next_gate": "protected review and separate persistent-application authorization",
+  "sensitive_payloads_present": false
+}

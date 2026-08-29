@@ -55,6 +55,36 @@
         "governance/releases/traceability.json"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260829-P1-AUTHORIZATION-FOUNDATION",
+      "title": "Propose physical Migration 2 authorization foundation",
+      "status": "proposed",
+      "scope": "P1/1B authorization foundation only; rollback-only Staging validation",
+      "decision": "Create one ordered Migration 2 artifact containing only client, attorney, and staff profiles, a stable capability-definition catalog, capability grants, and application-session metadata. Reuse public.users and public.set_updated_at() unchanged; leave jurisdiction_id nullable without a foreign key until locked Migration 3.",
+      "rationale": "The locked physical sequence places profile identity, capability definitions and grants, and application session metadata after the applied application-identity foundation. This proposal deliberately excludes jurisdictions, authorization helpers, authentication workflows, secrets, seeds, production application, and later P1 relations.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-002-AUTHORIZATION-FOUNDATION"],
+      "owner": "P1 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "created_at": "2026-08-29T17:17:01Z",
+      "updated_at": "2026-08-29T17:17:01Z",
+      "supersedes": [],
+      "impact": "Adds only a proposed, unreviewed, rollback-only Migration 2 artifact and sanitized Staging validation evidence; it does not authorize persistent application, production release, or later P1 work.",
+      "evidence": [
+        "supabase/migrations/20260829171701_p1_authorization_foundation.sql",
+        "governance/evidence/p1-002-authorization-foundation.json"
+      ],
+      "expiry": null
     }
   ]
 }

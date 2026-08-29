@@ -43,6 +43,30 @@
       "drift_check": "clean",
       "rollback_plan": "If Staging acceptance fails, drop only public.users and public.set_updated_at() through a separately reviewed non-production rollback migration; do not alter P0 controls or migration history directly.",
       "depends_on": ["20260828192126_p0_restrict_rls_auto_enable_execution"]
+    },
+    {
+      "migration_id": "20260829171701_p1_authorization_foundation",
+      "migration_kind": "product",
+      "sequence": 3,
+      "artifact_path": "supabase/migrations/20260829171701_p1_authorization_foundation.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-002-AUTHORIZATION-FOUNDATION"],
+      "decision_refs": ["DEC-20260829-P1-AUTHORIZATION-FOUNDATION"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "This migration remains rollback-only and unapplied. If Staging validation fails after a separately authorized application, drop only the six Migration 2 tables and their capability-grant index through an independently reviewed non-production rollback; do not alter P0/P1-001 objects or migration history.",
+      "depends_on": ["20260829000015_p1_platform_foundation"]
     }
   ]
 }
