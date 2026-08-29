@@ -948,6 +948,7 @@ export function validateP1AuthorizationMigration(
     /constraint\s+capability_grants_granted_at_check[\s\S]*?granted_at\s*<=\s*valid_from/i,
     /constraint\s+capability_grants_revoked_at_check[\s\S]*?revoked_at\s+is\s+null\s+or\s+revoked_at\s*>=\s*granted_at/i,
     /constraint\s+application_sessions_session_reference_key\s+unique\s*\(\s*session_reference\s*\)/i,
+    /create\s+table\s+public\.application_sessions[\s\S]*?constraint\s+application_sessions_user_id_fkey\s+foreign\s+key\s*\(\s*user_id\s*\)[\s\S]*?references\s+public\.users\s*\(\s*id\s*\)[\s\S]*?on\s+update\s+restrict[\s\S]*?on\s+delete\s+restrict/i,
     /constraint\s+application_sessions_expiry_check[\s\S]*?expires_at\s*>\s*created_at/i,
     /constraint\s+application_sessions_revoked_at_check[\s\S]*?revoked_at\s+is\s+null\s+or\s+revoked_at\s*>=\s*created_at/i,
   ];
