@@ -97,6 +97,68 @@
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-08-29T00:04:49Z",
       "updated_at": "2026-08-29T15:16:33Z"
+    },
+    {
+      "work_item_id": "WI-P1-002-AUTHORIZATION-FOUNDATION",
+      "title": "Define the authorization foundation without granting access",
+      "objective": "Create the smallest locked 1B physical authorization foundation after P1-001 while keeping it unreviewed, unapplied, and rollback-only.",
+      "in_scope": [
+        "client_profiles, attorney_profiles, and staff_profiles",
+        "Stable capability definitions keyed by capability code",
+        "Capability grant history and nullable pre-jurisdiction reference",
+        "Application session metadata with opaque non-secret reference",
+        "Server-generated UUIDs/timestamps, restrictive relationships, lifecycle and validity constraints",
+        "Explicit RLS, relationship-based authenticated profile reads, and least-privilege ACLs",
+        "One CLI-generated ordered migration artifact and sanitized rollback-only Staging evidence"
+      ],
+      "out_of_scope": [
+        "Persistent application or production release",
+        "Jurisdictions or a jurisdiction foreign key",
+        "Authorization helper functions, SECURITY DEFINER functions, authentication workflows, account recovery, application code, UI, providers, seeds, and later P1 objects"
+      ],
+      "status": "proposed",
+      "owner": "P1 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260829-P1-AUTHORIZATION-FOUNDATION"],
+      "dependencies": ["WI-P1-001-PLATFORM-FOUNDATION"],
+      "acceptance_criteria": [
+        "The CLI-generated migration creates only the six bounded 1B tables and the required capability-grant index",
+        "Every profile has one restrictive unique relationship to public.users and attorney/staff lifecycle values are database-locked",
+        "Optional numeric values, capability grant history/validity, opaque session references, and session time constraints are database-enforced",
+        "RLS is enabled on every new table; authenticated may select only its own three profile rows and may not write",
+        "Anon and authenticated have no capability or session access; service_role has only SELECT, INSERT, UPDATE and no DELETE",
+        "capability_grants.jurisdiction_id remains nullable without a foreign key until locked Migration 3",
+        "No capability or entity rows are seeded and no P0/P1-001 object, ACL, policy, function, trigger, data, or history is changed",
+        "One rollback-only Staging transaction validates positive and negative constraints, privilege boundaries, rollback cleanup, unchanged migration history, unchanged non-target environments, and zero security-advisor findings",
+        "The migration remains unreviewed, unapplied, and validated_not_applied with no release record"
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check"
+      ],
+      "environment": "staging",
+      "release_refs": [],
+      "migration_refs": ["20260829171701_p1_authorization_foundation"],
+      "rollback_reference": "governance/rollback-recovery.md",
+      "created_at": "2026-08-29T17:17:01Z",
+      "updated_at": "2026-08-29T17:17:01Z"
     }
   ]
 }
