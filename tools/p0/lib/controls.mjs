@@ -703,6 +703,7 @@ export function validateP1PlatformEvidence(evidence, migrationSql) {
       "baseline",
       "migration",
       "transactional_validation",
+      "persistent_application_validation",
       "security",
       "integrity",
       "acceptance_state",
@@ -714,7 +715,8 @@ export function validateP1PlatformEvidence(evidence, migrationSql) {
   if (
     evidence.version !== 1 ||
     evidence.evidence_id !== "P1-001-PLATFORM-FOUNDATION" ||
-    evidence.work_item_id !== "WI-P1-001-PLATFORM-FOUNDATION"
+    evidence.work_item_id !== "WI-P1-001-PLATFORM-FOUNDATION" ||
+    evidence.scope !== "P1/1A physical Migration 1 application identity only"
   ) {
     fail("P1 platform evidence identity is invalid");
   }
@@ -744,7 +746,7 @@ export function validateP1PlatformEvidence(evidence, migrationSql) {
       "public.set_updated_at()" ||
     evidence.migration?.extension_changes?.length !== 0 ||
     evidence.migration?.later_migration_relations_created !== false ||
-    evidence.migration?.persistent_application !== false
+    evidence.migration?.persistent_application !== true
   ) {
     fail("P1 platform evidence migration record is invalid");
   }
@@ -764,12 +766,137 @@ export function validateP1PlatformEvidence(evidence, migrationSql) {
   ) {
     fail("P1 platform evidence transactional validation is invalid");
   }
+  const application = evidence.persistent_application_validation;
+  requireExactFields(
+    application,
+    [
+      "environment",
+      "project_ref",
+      "reviewed_by",
+      "reviewed_at",
+      "application_status",
+      "migration_history",
+      "history_reconciliation",
+      "catalog_validation",
+      "non_target_integrity",
+    ],
+    "P1 persistent application validation",
+  );
+  requireTimestamp(
+    application.reviewed_at,
+    "P1 persistent application validation.reviewed_at",
+  );
+  if (
+    application.environment !== "staging" ||
+    application.project_ref !== "mxjlvmowmodzdtdfgqpb" ||
+    application.reviewed_by !== "Rosuno" ||
+    application.reviewed_at !== "2026-08-29T15:16:33Z" ||
+    application.application_status !== "passed"
+  ) {
+    fail("P1 persistent application identity is invalid");
+  }
+  const history = application.migration_history;
+  requireExactFields(
+    history,
+    [
+      "p0_version",
+      "p0_occurrences",
+      "reviewed_version",
+      "reviewed_name",
+      "reviewed_occurrences",
+      "generated_version",
+      "generated_occurrences",
+    ],
+    "P1 persistent application migration history",
+  );
+  if (
+    history.p0_version !== "20260828192126" ||
+    history.p0_occurrences !== 1 ||
+    history.reviewed_version !== "20260829000015" ||
+    history.reviewed_name !== "p1_platform_foundation" ||
+    history.reviewed_occurrences !== 1 ||
+    history.generated_version !== "20260829153932" ||
+    history.generated_occurrences !== 0
+  ) {
+    fail("P1 persistent application migration history is invalid");
+  }
+  const reconciliation = application.history_reconciliation;
+  requireExactFields(
+    reconciliation,
+    [
+      "tool",
+      "version",
+      "exit_code",
+      "migration_sql_rerun",
+      "direct_history_edit",
+    ],
+    "P1 persistent application history reconciliation",
+  );
+  if (
+    reconciliation.tool !== "official Supabase CLI" ||
+    reconciliation.version !== "2.116.0" ||
+    reconciliation.exit_code !== 0 ||
+    reconciliation.migration_sql_rerun !== false ||
+    reconciliation.direct_history_edit !== false
+  ) {
+    fail("P1 persistent application history reconciliation is invalid");
+  }
+  const catalog = application.catalog_validation;
+  requireExactFields(
+    catalog,
+    [
+      "reviewed_schema_exact",
+      "drift_status",
+      "users_row_count",
+      "rls",
+      "policy",
+      "trigger",
+      "function",
+      "grants",
+      "security_advisor_findings",
+    ],
+    "P1 persistent application catalog validation",
+  );
+  if (
+    catalog.reviewed_schema_exact !== true ||
+    catalog.drift_status !== "clean" ||
+    catalog.users_row_count !== 0 ||
+    ["rls", "policy", "trigger", "function", "grants"].some(
+      (field) => catalog[field] !== "passed",
+    ) ||
+    catalog.security_advisor_findings !== 0
+  ) {
+    fail("P1 persistent application catalog validation is invalid");
+  }
+  const nonTarget = application.non_target_integrity;
+  requireExactFields(
+    nonTarget,
+    [
+      "source_unchanged",
+      "development_unchanged",
+      "production_accessed",
+      "old_project_accessed",
+      "repository_files_mutated_by_database_application",
+    ],
+    "P1 persistent application non-target integrity",
+  );
+  if (
+    nonTarget.source_unchanged !== true ||
+    nonTarget.development_unchanged !== true ||
+    nonTarget.production_accessed !== false ||
+    nonTarget.old_project_accessed !== false ||
+    nonTarget.repository_files_mutated_by_database_application !== false
+  ) {
+    fail("P1 persistent application non-target integrity is invalid");
+  }
   if (
     evidence.security?.users_rls_enabled !== true ||
     evidence.security?.anon_table_privileges?.length !== 0 ||
     evidence.security?.authenticated_table_privileges?.join("|") !== "SELECT" ||
     evidence.security?.service_role_table_privileges?.join("|") !==
       "SELECT|INSERT|UPDATE" ||
+    evidence.security?.service_role_delete !== false ||
+    evidence.security?.authenticated_select_policy !== "users_select_own" ||
     evidence.security?.authenticated_insert_denied_sqlstate !== "42501" ||
     evidence.security?.anon_select_denied_sqlstate !== "42501" ||
     evidence.security?.set_updated_at_security_definer !== false ||
@@ -781,7 +908,21 @@ export function validateP1PlatformEvidence(evidence, migrationSql) {
     fail("P1 platform evidence security state is invalid");
   }
   if (
-    evidence.acceptance_state !== "validated_not_applied" ||
+    evidence.integrity?.one_user_per_auth_identity !== true ||
+    evidence.integrity?.auth_identity_foreign_key !== true ||
+    evidence.integrity?.auth_identity_delete_restricted !== true ||
+    evidence.integrity?.account_states?.join("|") !==
+      "pending_verification|active|suspended|closed" ||
+    evidence.integrity?.server_uuid_default !== true ||
+    evidence.integrity?.server_timestamp_defaults !== true ||
+    evidence.integrity?.updated_at_trigger_enabled !== true
+  ) {
+    fail("P1 platform evidence integrity state is invalid");
+  }
+  if (
+    evidence.acceptance_state !== "applied_to_staging" ||
+    evidence.next_gate !==
+      "separate protected review before production or later P1 work" ||
     evidence.sensitive_payloads_present !== false
   ) {
     fail("P1 platform evidence acceptance gate is invalid");
@@ -790,6 +931,88 @@ export function validateP1PlatformEvidence(evidence, migrationSql) {
     scanSecretLikeText(JSON.stringify(evidence), "P1 platform evidence").length
   ) {
     fail("P1 platform evidence contains a secret-like value");
+  }
+}
+
+export function validateP1ApplicationTraceability(
+  migrationRegister,
+  workItemRegister,
+  decisionRegister,
+  releaseRegister,
+) {
+  const migration = migrationRegister.migrations.find(
+    (entry) => entry.migration_id === "20260829000015_p1_platform_foundation",
+  );
+  const workItem = workItemRegister.work_items.find(
+    (entry) => entry.work_item_id === "WI-P1-001-PLATFORM-FOUNDATION",
+  );
+  const decision = decisionRegister.decisions.find(
+    (entry) => entry.decision_id === "DEC-20260829-P1-PLATFORM-FOUNDATION",
+  );
+  const release = releaseRegister.releases.find(
+    (entry) => entry.release_id === "REL-20260829-P1-STAGING-APPLICATION",
+  );
+  const releaseId = "REL-20260829-P1-STAGING-APPLICATION";
+  const approvedAt = "2026-08-29T15:16:33Z";
+
+  if (
+    !migration ||
+    migration.reviewed !== true ||
+    migration.reviewed_by !== "Rosuno" ||
+    migration.reviewed_at !== approvedAt ||
+    migration.applied_environment !== "staging" ||
+    migration.non_production_validation !== true ||
+    migration.drift_check !== "clean" ||
+    migration.release_refs?.join("|") !== releaseId
+  ) {
+    fail("P1 applied migration traceability is invalid");
+  }
+  if (
+    !workItem ||
+    workItem.status !== "completed" ||
+    workItem.environment !== "staging" ||
+    workItem.reviewer?.identity !== "Rosuno" ||
+    workItem.reviewer?.status !== "approved" ||
+    workItem.updated_at !== approvedAt ||
+    workItem.release_refs?.join("|") !== releaseId
+  ) {
+    fail("P1 applied work-item traceability is invalid");
+  }
+  if (
+    !decision ||
+    decision.status !== "accepted" ||
+    decision.reviewer?.identity !== "Rosuno" ||
+    decision.reviewer?.status !== "approved" ||
+    decision.updated_at !== approvedAt ||
+    !decision.evidence?.includes(
+      "governance/evidence/p1-001-platform-foundation.json",
+    ) ||
+    !decision.evidence?.includes("governance/releases/traceability.json")
+  ) {
+    fail("P1 applied decision traceability is invalid");
+  }
+  if (
+    !release ||
+    release.commit_sha !== "0b08908621494476359bbbcdc173928bac8f4893" ||
+    release.artifact_digest !==
+      "sha256:67dfd44b2bd7525a588e6eb59c33a0056f3a5c67eec5f45dd93e6aab37f7afc8" ||
+    release.environment !== "staging" ||
+    release.reviewer?.identity !== "Rosuno" ||
+    release.reviewer?.status !== "approved" ||
+    release.created_at !== approvedAt ||
+    release.work_item_refs?.join("|") !== "WI-P1-001-PLATFORM-FOUNDATION" ||
+    release.decision_refs?.join("|") !==
+      "DEC-20260829-P1-PLATFORM-FOUNDATION" ||
+    release.migration_refs?.join("|") !==
+      "20260829000015_p1_platform_foundation" ||
+    !release.validation_evidence?.includes(
+      "governance/evidence/p1-001-platform-foundation.json",
+    ) ||
+    !release.validation_evidence?.includes(
+      "supabase/migrations/20260829000015_p1_platform_foundation.sql",
+    )
+  ) {
+    fail("P1 Staging traceability record is invalid");
   }
 }
 
@@ -1423,6 +1646,7 @@ export function validateRepository() {
       return false;
     }
   });
+  validateP1ApplicationTraceability(migrations, workItems, decisions, releases);
   validateTraceabilityConsistency(migrations, releases);
 
   return {
@@ -1434,7 +1658,7 @@ export function validateRepository() {
       "environment isolation",
       "migration inventory and clean drift baseline",
       "sanitized non-production restore evidence",
-      "validated-not-applied P1 platform migration evidence",
+      "reviewed and applied P1 Staging migration evidence",
       "release traceability",
     ],
   };

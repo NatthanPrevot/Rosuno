@@ -34,14 +34,14 @@
       ],
       "work_item_refs": ["WI-P1-001-PLATFORM-FOUNDATION"],
       "decision_refs": ["DEC-20260829-P1-PLATFORM-FOUNDATION"],
-      "release_refs": [],
-      "reviewed": false,
-      "reviewed_by": "pending designated human PR review",
-      "reviewed_at": null,
-      "applied_environment": "none",
+      "release_refs": ["REL-20260829-P1-STAGING-APPLICATION"],
+      "reviewed": true,
+      "reviewed_by": "Rosuno",
+      "reviewed_at": "2026-08-29T15:16:33Z",
+      "applied_environment": "staging",
       "non_production_validation": true,
       "drift_check": "clean",
-      "rollback_plan": "Before persistent application, no rollback is required. After an approved non-production application, drop only public.users and public.set_updated_at() through a separately reviewed rollback migration if acceptance fails.",
+      "rollback_plan": "If Staging acceptance fails, drop only public.users and public.set_updated_at() through a separately reviewed non-production rollback migration; do not alter P0 controls or migration history directly.",
       "depends_on": ["20260828192126_p0_restrict_rls_auto_enable_execution"]
     }
   ]
