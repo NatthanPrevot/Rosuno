@@ -4,7 +4,7 @@ Rosuno is a controlled implementation repository. P0 controls are accepted and P
 
 ## P0 execution-control foundation
 
-The accepted P0 foundation lives under `governance/`, with executable checks under `tools/p0/`. It governs authority references, bounded decisions and work items, environment and secret boundaries, migration and schema-drift review, release traceability, rollback/recovery, logging, and provider-security controls. The first proposed P1 artifact is the locked Physical Migration 1 application-identity migration under `supabase/migrations/`.
+The accepted P0 foundation lives under `governance/`, with executable checks under `tools/p0/`. It governs authority references, bounded decisions and work items, environment and secret boundaries, migration and schema-drift review, release traceability, rollback/recovery, logging, and provider-security controls. The reviewed P1-001 Physical Migration 1 artifact and its bounded Rosuno Staging application are recorded without adding application behavior.
 
 ## Run & validate
 
@@ -19,8 +19,8 @@ The accepted P0 foundation lives under `governance/`, with executable checks und
 
 ## Enforcement boundary
 
-Local validation is executable here. GitHub protected branches, required CI, and designated human approval remain external enforcement. The P1 migration has been tested only in a rollback-only Rosuno Staging transaction and is not yet persistently applied.
+Local validation is executable here. GitHub protected branches and required CI remain external enforcement. P1-001 records verified Rosuno approval and persistent application only to Rosuno Staging; production and later P1 work require separate authorization.
 
 ## Product boundary
 
-There is still no application source, UI, authentication workflow, provider workflow, demo data, or production deployment. The only product artifact is the proposed P1/1A `public.users` migration; later profiles, authorization, jurisdiction, scheduling, payment, consultation, and P2 work remain absent. The workspace package list remains empty and runtime dependencies remain absent.
+There is still no application source, UI, authentication workflow, provider workflow, demo data, or production deployment. The only product artifact is the reviewed P1/1A `public.users` migration; later profiles, authorization, jurisdiction, scheduling, payment, consultation, and P2 work remain absent. The workspace package list remains empty and runtime dependencies remain absent.

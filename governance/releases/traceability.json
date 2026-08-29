@@ -23,6 +23,29 @@
       },
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-08-28T19:21:26Z"
+    },
+    {
+      "release_id": "REL-20260829-P1-STAGING-APPLICATION",
+      "commit_sha": "0b08908621494476359bbbcdc173928bac8f4893",
+      "work_item_refs": ["WI-P1-001-PLATFORM-FOUNDATION"],
+      "decision_refs": ["DEC-20260829-P1-PLATFORM-FOUNDATION"],
+      "migration_refs": ["20260829000015_p1_platform_foundation"],
+      "validation_evidence": [
+        "governance/evidence/p1-001-platform-foundation.json",
+        "supabase/migrations/20260829000015_p1_platform_foundation.sql",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check"
+      ],
+      "artifact_digest": "sha256:67dfd44b2bd7525a588e6eb59c33a0056f3a5c67eec5f45dd93e6aab37f7afc8",
+      "environment": "staging",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "rollback_reference": "governance/rollback-recovery.md",
+      "created_at": "2026-08-29T15:16:33Z"
     }
   ]
 }

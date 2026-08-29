@@ -1,6 +1,6 @@
 # Rollback and recovery control
 
-No product release or deployment exists. This runbook defines the required evidence for a controlled migration/release and governs the proposed P1 migration before persistent application.
+No production release or deployment exists. This runbook defines the required evidence for a controlled migration/release and governs the reviewed P1 migration after its bounded persistent application to Rosuno Staging.
 
 Every release record must identify:
 

@@ -46,18 +46,19 @@
         "Server-generated UUID and timestamp behavior",
         "Restricted shared updated_at trigger function",
         "Explicit table grants and immediate RLS",
-        "Rollback-only validation on Rosuno Staging"
+        "Reviewed persistent application and sanitized validation evidence on Rosuno Staging",
+        "Official Supabase CLI migration-history reconciliation without rerunning migration SQL or directly editing history"
       ],
       "out_of_scope": [
         "Client, attorney, and staff profiles",
         "Capabilities, session binding, jurisdiction, policy, verification, intake, referrals, scheduling, consultation, communications, financial, compliance, and California regulatory-mode relations",
         "Authentication workflows, application code, product UI, providers, seeds, production deployment, and P2"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "owner": "P1 implementation owner",
       "reviewer": {
         "identity": "Rosuno",
-        "status": "pending"
+        "status": "approved"
       },
       "priority": "P1",
       "authority_refs": [
@@ -77,7 +78,9 @@
         "Authenticated access is limited to selecting the caller's own identity row",
         "Direct authenticated writes and direct execution of the trigger function are denied",
         "The P0 ensure_rls trigger and restricted rls_auto_enable grants remain unchanged",
-        "No persistent database change occurs before protected human review"
+        "Persistent Staging application occurs only after protected human review",
+        "P0 and reviewed P1 migration history is reconciled without retaining the generated migration version",
+        "Post-application schema, row count, RLS, policy, trigger, function, grants, drift, and security-advisor checks pass"
       ],
       "validation_commands": [
         "pnpm run format:check",
@@ -89,11 +92,11 @@
         "pnpm run dependency:check"
       ],
       "environment": "staging",
-      "release_refs": [],
+      "release_refs": ["REL-20260829-P1-STAGING-APPLICATION"],
       "migration_refs": ["20260829000015_p1_platform_foundation"],
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-08-29T00:04:49Z",
-      "updated_at": "2026-08-29T00:04:49Z"
+      "updated_at": "2026-08-29T15:16:33Z"
     }
   ]
 }

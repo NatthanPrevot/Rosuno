@@ -28,7 +28,7 @@
     {
       "decision_id": "DEC-20260829-P1-PLATFORM-FOUNDATION",
       "title": "Bound physical Migration 1 to application identity",
-      "status": "proposed",
+      "status": "accepted",
       "scope": "P1/1A platform foundation only",
       "decision": "Implement physical Migration 1 with the public users application-identity relation, server-generated UUID and timestamps, a restricted timestamp trigger function, explicit Data API grants, and immediate RLS. Add no profile, capability, jurisdiction, provider, or later-phase relation and no additional extension without a concrete locked dependency.",
       "rationale": "The locked physical sequence places auth/application identity in Migration 1. The users relation is the smallest locked application identity, while client, attorney, staff, capability, and session relations have explicit later migration owners. PostgreSQL 17 already provides gen_random_uuid and both active projects already contain the required Supabase platform extensions, so adding another extension would be speculative.",
@@ -43,15 +43,16 @@
       "owner": "P1 implementation owner",
       "reviewer": {
         "identity": "Rosuno",
-        "status": "pending"
+        "status": "approved"
       },
       "created_at": "2026-08-29T00:04:49Z",
-      "updated_at": "2026-08-29T00:04:49Z",
+      "updated_at": "2026-08-29T15:16:33Z",
       "supersedes": [],
-      "impact": "Adds the first product migration artifact only after rollback-only staging validation; persistent database application remains gated by protected review.",
+      "impact": "Records the protected-review-approved P1 Migration 1 application to Rosuno Staging only; it is not a production release or deployment and does not authorize later P1 work.",
       "evidence": [
         "supabase/migrations/20260829000015_p1_platform_foundation.sql",
-        "governance/evidence/p1-001-platform-foundation.json"
+        "governance/evidence/p1-001-platform-foundation.json",
+        "governance/releases/traceability.json"
       ],
       "expiry": null
     }

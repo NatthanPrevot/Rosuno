@@ -13,6 +13,7 @@ import {
   validateMigrationRegister,
   validateNeutralPaths,
   validatePackageJson,
+  validateP1ApplicationTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
   validateReleaseRegister,
@@ -129,7 +130,7 @@ test("authorized P1 platform migration stays inside Migration 1", () => {
   );
 });
 
-test("P1 evidence cannot claim application or weakened security", () => {
+test("P1 applied evidence is complete and cannot weaken history or security", () => {
   const sql = readFileSync(
     path.join(
       ROOT,
@@ -142,10 +143,44 @@ test("P1 evidence cannot claim application or weakened security", () => {
   );
   assert.doesNotThrow(() => validateP1PlatformEvidence(evidence, sql));
 
-  evidence.migration.persistent_application = true;
+  evidence.migration.persistent_application = false;
   assert.throws(
     () => validateP1PlatformEvidence(evidence, sql),
     /migration record/,
+  );
+
+  const duplicateHistory = readJson(
+    "governance/evidence/p1-001-platform-foundation.json",
+  );
+  duplicateHistory.persistent_application_validation.migration_history.reviewed_occurrences = 2;
+  assert.throws(
+    () => validateP1PlatformEvidence(duplicateHistory, sql),
+    /migration history/,
+  );
+
+  const generatedHistory = readJson(
+    "governance/evidence/p1-001-platform-foundation.json",
+  );
+  generatedHistory.persistent_application_validation.migration_history.generated_occurrences = 1;
+  assert.throws(
+    () => validateP1PlatformEvidence(generatedHistory, sql),
+    /migration history/,
+  );
+
+  const rerun = readJson("governance/evidence/p1-001-platform-foundation.json");
+  rerun.persistent_application_validation.history_reconciliation.migration_sql_rerun = true;
+  assert.throws(
+    () => validateP1PlatformEvidence(rerun, sql),
+    /history reconciliation/,
+  );
+
+  const production = readJson(
+    "governance/evidence/p1-001-platform-foundation.json",
+  );
+  production.persistent_application_validation.non_target_integrity.production_accessed = true;
+  assert.throws(
+    () => validateP1PlatformEvidence(production, sql),
+    /non-target integrity/,
   );
 
   const weakened = readJson(
@@ -155,6 +190,61 @@ test("P1 evidence cannot claim application or weakened security", () => {
   assert.throws(
     () => validateP1PlatformEvidence(weakened, sql),
     /security state/,
+  );
+});
+
+test("P1 applied records require bounded approved Staging traceability", () => {
+  const migrations = readJson("governance/migrations/reviewed-migrations.json");
+  const workItems = readJson("governance/work-items/index.json");
+  const decisions = readJson("governance/decision-log.json");
+  const releases = readJson("governance/releases/traceability.json");
+
+  assert.doesNotThrow(() =>
+    validateP1ApplicationTraceability(
+      migrations,
+      workItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  const wrongDigest = structuredClone(releases);
+  wrongDigest.releases[1].artifact_digest = `sha256:${"a".repeat(64)}`;
+  assert.throws(
+    () =>
+      validateP1ApplicationTraceability(
+        migrations,
+        workItems,
+        decisions,
+        wrongDigest,
+      ),
+    /Staging traceability/,
+  );
+
+  const pendingReview = structuredClone(decisions);
+  pendingReview.decisions[1].reviewer.status = "pending";
+  assert.throws(
+    () =>
+      validateP1ApplicationTraceability(
+        migrations,
+        workItems,
+        pendingReview,
+        releases,
+      ),
+    /decision traceability/,
+  );
+
+  const productionRelease = structuredClone(releases);
+  productionRelease.releases[1].environment = "production";
+  assert.throws(
+    () =>
+      validateP1ApplicationTraceability(
+        migrations,
+        workItems,
+        decisions,
+        productionRelease,
+      ),
+    /Staging traceability/,
   );
 });
 

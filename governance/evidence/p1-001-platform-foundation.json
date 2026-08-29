@@ -37,7 +37,7 @@
     "created_functions": ["public.set_updated_at()"],
     "extension_changes": [],
     "later_migration_relations_created": false,
-    "persistent_application": false
+    "persistent_application": true
   },
   "transactional_validation": {
     "environment": "staging",
@@ -48,6 +48,47 @@
     "function_absent_after_rollback": true,
     "migration_history_unchanged": true,
     "source_unchanged": true
+  },
+  "persistent_application_validation": {
+    "environment": "staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "reviewed_by": "Rosuno",
+    "reviewed_at": "2026-08-29T15:16:33Z",
+    "application_status": "passed",
+    "migration_history": {
+      "p0_version": "20260828192126",
+      "p0_occurrences": 1,
+      "reviewed_version": "20260829000015",
+      "reviewed_name": "p1_platform_foundation",
+      "reviewed_occurrences": 1,
+      "generated_version": "20260829153932",
+      "generated_occurrences": 0
+    },
+    "history_reconciliation": {
+      "tool": "official Supabase CLI",
+      "version": "2.116.0",
+      "exit_code": 0,
+      "migration_sql_rerun": false,
+      "direct_history_edit": false
+    },
+    "catalog_validation": {
+      "reviewed_schema_exact": true,
+      "drift_status": "clean",
+      "users_row_count": 0,
+      "rls": "passed",
+      "policy": "passed",
+      "trigger": "passed",
+      "function": "passed",
+      "grants": "passed",
+      "security_advisor_findings": 0
+    },
+    "non_target_integrity": {
+      "source_unchanged": true,
+      "development_unchanged": true,
+      "production_accessed": false,
+      "old_project_accessed": false,
+      "repository_files_mutated_by_database_application": false
+    }
   },
   "security": {
     "users_rls_enabled": true,
@@ -72,7 +113,7 @@
     "server_timestamp_defaults": true,
     "updated_at_trigger_enabled": true
   },
-  "acceptance_state": "validated_not_applied",
-  "next_gate": "protected human review before persistent database application",
+  "acceptance_state": "applied_to_staging",
+  "next_gate": "separate protected review before production or later P1 work",
   "sensitive_payloads_present": false
 }
