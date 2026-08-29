@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -369,7 +370,9 @@ export function validateWorkItem(
   references = {},
 ) {
   requireExactFields(record, WORK_ITEM_FIELDS, context);
-  if (record.priority !== "P0") fail(`${context}.priority must be P0`);
+  if (!["P0", "P1"].includes(record.priority)) {
+    fail(`${context}.priority must be P0 or P1`);
+  }
   if (
     ![
       "proposed",
@@ -393,8 +396,11 @@ export function validateWorkItem(
   ) {
     fail(`${context}.environment is not allowed`);
   }
-  if (!/^WI-P0-[A-Z0-9][A-Z0-9-]*$/.test(record.work_item_id)) {
+  if (!/^WI-P(?:0|1)-[A-Z0-9][A-Z0-9-]*$/.test(record.work_item_id)) {
     fail(`${context}.work_item_id has an invalid format`);
+  }
+  if (!record.work_item_id.startsWith(`WI-${record.priority}-`)) {
+    fail(`${context}.work_item_id must match its priority`);
   }
   requireBoundedString(record.title, `${context}.title`, 200);
   requireBoundedString(record.objective, `${context}.objective`);
@@ -613,6 +619,180 @@ export function validateMigrationArtifact(artifact, migration, context) {
   }
 }
 
+export function validateP1PlatformMigration(
+  sql,
+  migration,
+  context = "P1 platform migration",
+) {
+  if (migration.migration_id !== "20260829000015_p1_platform_foundation") {
+    fail(`${context}.migration_id is not the authorized first P1 migration`);
+  }
+  requireBoundedString(sql, context, 20000);
+  const createTables = [
+    ...sql.matchAll(/\bcreate\s+table\s+([a-z0-9_.]+)/gi),
+  ].map((match) => match[1].toLowerCase());
+  if (JSON.stringify(createTables) !== JSON.stringify(["public.users"])) {
+    fail(`${context} may create only public.users`);
+  }
+  const requiredPatterns = [
+    /create\s+function\s+public\.set_updated_at\s*\(\s*\)/i,
+    /security\s+invoker/i,
+    /set\s+search_path\s*=\s*pg_catalog/i,
+    /id\s+uuid\s+primary\s+key\s+default\s+gen_random_uuid\s*\(\s*\)/i,
+    /auth_user_id\s+uuid\s+not\s+null/i,
+    /references\s+auth\.users\s*\(\s*id\s*\)/i,
+    /on\s+delete\s+restrict/i,
+    /unique\s*\(\s*auth_user_id\s*\)/i,
+    /alter\s+table\s+public\.users\s+enable\s+row\s+level\s+security/i,
+    /revoke\s+all\s+on\s+table\s+public\.users\s+from\s+anon/i,
+    /revoke\s+all\s+on\s+table\s+public\.users\s+from\s+authenticated/i,
+    /grant\s+select\s+on\s+table\s+public\.users\s+to\s+authenticated/i,
+    /revoke\s+all\s+on\s+table\s+public\.users\s+from\s+service_role/i,
+    /grant\s+select\s*,\s*insert\s*,\s*update\s+on\s+table\s+public\.users\s+to\s+service_role/i,
+    /create\s+policy\s+users_select_own/i,
+    /to\s+authenticated\s+using\s*\(/i,
+    /auth\.uid\s*\(\s*\)/i,
+    /revoke\s+execute\s+on\s+function\s+public\.set_updated_at\s*\(\s*\)\s+from\s+public/i,
+    /grant\s+execute\s+on\s+function\s+public\.set_updated_at\s*\(\s*\)\s+to\s+service_role/i,
+    /create\s+trigger\s+users_set_updated_at/i,
+  ];
+  for (const pattern of requiredPatterns) {
+    if (!pattern.test(sql)) fail(`${context} is missing ${pattern}`);
+  }
+  for (const state of [
+    "pending_verification",
+    "active",
+    "suspended",
+    "closed",
+  ]) {
+    if (!sql.includes(`'${state}'`)) {
+      fail(`${context} is missing account state ${state}`);
+    }
+  }
+  if (/security\s+definer/i.test(sql)) {
+    fail(`${context} may not add a SECURITY DEFINER function`);
+  }
+  if (/\bcreate\s+extension\b/i.test(sql)) {
+    fail(`${context} may not add an unproven extension dependency`);
+  }
+  if (/grant\s+[^;]*delete[^;]*\s+to\s+service_role/i.test(sql)) {
+    fail(`${context} may not grant service_role identity deletion`);
+  }
+  if (
+    /\b(client_profiles|attorney_profiles|staff_profiles|capability_grants|jurisdictions|consultation_requests|bookings|payments?)\b/i.test(
+      sql,
+    )
+  ) {
+    fail(`${context} crosses the authorized Migration 1 boundary`);
+  }
+  if (scanSecretLikeText(sql, context).length > 0) {
+    fail(`${context} contains a secret-like value`);
+  }
+}
+
+export function validateP1PlatformEvidence(evidence, migrationSql) {
+  requireExactFields(
+    evidence,
+    [
+      "version",
+      "evidence_id",
+      "work_item_id",
+      "scope",
+      "authority_refs",
+      "projects",
+      "baseline",
+      "migration",
+      "transactional_validation",
+      "security",
+      "integrity",
+      "acceptance_state",
+      "next_gate",
+      "sensitive_payloads_present",
+    ],
+    "P1 platform evidence",
+  );
+  if (
+    evidence.version !== 1 ||
+    evidence.evidence_id !== "P1-001-PLATFORM-FOUNDATION" ||
+    evidence.work_item_id !== "WI-P1-001-PLATFORM-FOUNDATION"
+  ) {
+    fail("P1 platform evidence identity is invalid");
+  }
+  if (
+    evidence.projects?.development_ref !== "wwcwfbzwljbjlaifklaj" ||
+    evidence.projects?.staging_ref !== "mxjlvmowmodzdtdfgqpb" ||
+    evidence.projects?.old_project_accessed !== false
+  ) {
+    fail("P1 platform evidence project boundary is invalid");
+  }
+  if (
+    evidence.baseline?.development_public_table_count !== 0 ||
+    evidence.baseline?.staging_public_table_count !== 0 ||
+    evidence.baseline?.ensure_rls_enabled !== true ||
+    evidence.baseline?.rls_auto_enable_execute_roles?.join("|") !==
+      "postgres|service_role"
+  ) {
+    fail("P1 platform evidence baseline is invalid");
+  }
+  const digest = createHash("sha256").update(migrationSql).digest("hex");
+  if (
+    evidence.migration?.migration_id !==
+      "20260829000015_p1_platform_foundation" ||
+    evidence.migration?.sha256 !== digest ||
+    evidence.migration?.created_relations?.join("|") !== "public.users" ||
+    evidence.migration?.created_functions?.join("|") !==
+      "public.set_updated_at()" ||
+    evidence.migration?.extension_changes?.length !== 0 ||
+    evidence.migration?.later_migration_relations_created !== false ||
+    evidence.migration?.persistent_application !== false
+  ) {
+    fail("P1 platform evidence migration record is invalid");
+  }
+  requireTimestamp(
+    evidence.transactional_validation?.completed_at,
+    "P1 platform evidence transactional_validation.completed_at",
+  );
+  if (
+    evidence.transactional_validation?.environment !== "staging" ||
+    evidence.transactional_validation?.catalog_assertions !== "passed" ||
+    evidence.transactional_validation?.rollback !== "passed" ||
+    evidence.transactional_validation?.users_absent_after_rollback !== true ||
+    evidence.transactional_validation?.function_absent_after_rollback !==
+      true ||
+    evidence.transactional_validation?.migration_history_unchanged !== true ||
+    evidence.transactional_validation?.source_unchanged !== true
+  ) {
+    fail("P1 platform evidence transactional validation is invalid");
+  }
+  if (
+    evidence.security?.users_rls_enabled !== true ||
+    evidence.security?.anon_table_privileges?.length !== 0 ||
+    evidence.security?.authenticated_table_privileges?.join("|") !== "SELECT" ||
+    evidence.security?.service_role_table_privileges?.join("|") !==
+      "SELECT|INSERT|UPDATE" ||
+    evidence.security?.authenticated_insert_denied_sqlstate !== "42501" ||
+    evidence.security?.anon_select_denied_sqlstate !== "42501" ||
+    evidence.security?.set_updated_at_security_definer !== false ||
+    evidence.security?.set_updated_at_execute_roles?.join("|") !==
+      "postgres|service_role" ||
+    evidence.security?.development_security_advisor_findings !== 0 ||
+    evidence.security?.staging_security_advisor_findings !== 0
+  ) {
+    fail("P1 platform evidence security state is invalid");
+  }
+  if (
+    evidence.acceptance_state !== "validated_not_applied" ||
+    evidence.sensitive_payloads_present !== false
+  ) {
+    fail("P1 platform evidence acceptance gate is invalid");
+  }
+  if (
+    scanSecretLikeText(JSON.stringify(evidence), "P1 platform evidence").length
+  ) {
+    fail("P1 platform evidence contains a secret-like value");
+  }
+}
+
 export function validateRestoreEvidence(evidence) {
   requireExactFields(
     evidence,
@@ -732,8 +912,8 @@ export function validateMigrationRegister(
   for (const [index, migration] of register.migrations.entries()) {
     const context = `migration ${index + 1}`;
     requireExactFields(migration, MIGRATION_FIELDS, context);
-    if (migration.migration_kind !== "security_control") {
-      fail(`${context}.migration_kind must be security_control`);
+    if (!["security_control", "product"].includes(migration.migration_kind)) {
+      fail(`${context}.migration_kind is not allowed`);
     }
     if (migration.sequence !== index + 1) fail(`${context} is out of order`);
     requireNonEmptyString(migration.artifact_path, `${context}.artifact_path`);
@@ -741,28 +921,62 @@ export function validateMigrationRegister(
       fail(`${context}.artifact_path is duplicated`);
     }
     registeredArtifacts.add(migration.artifact_path);
-    if (
-      !migration.artifact_path.startsWith("governance/migrations/") ||
-      migration.artifact_path ===
-        "governance/migrations/reviewed-migrations.json"
-    ) {
-      fail(
-        `${context}.artifact_path must point to a governance migration artifact`,
+    if (migration.migration_kind === "security_control") {
+      if (
+        !migration.artifact_path.startsWith("governance/migrations/") ||
+        migration.artifact_path ===
+          "governance/migrations/reviewed-migrations.json"
+      ) {
+        fail(
+          `${context}.artifact_path must point to a governance migration artifact`,
+        );
+      }
+      validateMigrationArtifact(
+        readJson(migration.artifact_path),
+        migration,
+        `${context}.artifact`,
+      );
+    } else {
+      if (
+        migration.artifact_path !==
+        "supabase/migrations/20260829000015_p1_platform_foundation.sql"
+      ) {
+        fail(`${context}.artifact_path is outside the authorized P1 slice`);
+      }
+      validateP1PlatformMigration(
+        readFileSync(path.join(ROOT, migration.artifact_path), "utf8"),
+        migration,
+        `${context}.artifact`,
       );
     }
-    validateMigrationArtifact(
-      readJson(migration.artifact_path),
-      migration,
-      `${context}.artifact`,
-    );
-    if (migration.reviewed !== true) fail(`${context} is not reviewed`);
-    for (const field of ["reviewed_by", "reviewed_at", "rollback_plan"]) {
-      requireNonEmptyString(migration[field], `${context}.${field}`);
+    requireNonEmptyString(migration.rollback_plan, `${context}.rollback_plan`);
+    if (migration.migration_kind === "security_control") {
+      if (migration.reviewed !== true) fail(`${context} is not reviewed`);
+      for (const field of ["reviewed_by", "reviewed_at"]) {
+        requireNonEmptyString(migration[field], `${context}.${field}`);
+      }
+    } else if (migration.reviewed === false) {
+      if (
+        migration.reviewed_by !== "pending designated human PR review" ||
+        migration.reviewed_at !== null ||
+        migration.applied_environment !== "none" ||
+        migration.release_refs.length !== 0
+      ) {
+        fail(`${context} proposed product migration gate is invalid`);
+      }
+    } else if (migration.reviewed === true) {
+      requireNonEmptyString(migration.reviewed_by, `${context}.reviewed_by`);
+      requireTimestamp(migration.reviewed_at, `${context}.reviewed_at`);
+    } else {
+      fail(`${context}.reviewed must be boolean`);
     }
     if (
-      !["development", "staging", UNCLASSIFIED_EXTERNAL_PROJECT].includes(
-        migration.applied_environment,
-      )
+      ![
+        "development",
+        "staging",
+        "none",
+        UNCLASSIFIED_EXTERNAL_PROJECT,
+      ].includes(migration.applied_environment)
     ) {
       fail(`${context}.applied_environment is not recognized`);
     }
@@ -776,9 +990,17 @@ export function validateMigrationRegister(
     }
     if (
       migration.applied_environment !== UNCLASSIFIED_EXTERNAL_PROJECT &&
+      migration.applied_environment !== "none" &&
       migration.non_production_validation !== true
     ) {
       fail(`${context} must be validated in a non-production environment`);
+    }
+    if (
+      migration.applied_environment === "none" &&
+      (migration.migration_kind !== "product" ||
+        migration.non_production_validation !== true)
+    ) {
+      fail(`${context} unapplied migration lacks rollback-only validation`);
     }
     if (migration.drift_check !== "clean") {
       fail(`${context} lacks a clean drift check`);
@@ -805,7 +1027,7 @@ export function validateMigrationRegister(
       migration.release_refs,
       references.releaseIds,
       `${context}.release_refs`,
-      1,
+      migration.reviewed ? 1 : 0,
     );
     validateReferences(
       migration.depends_on,
@@ -1093,10 +1315,14 @@ export function validateNeutralPaths(files, packageJson) {
     ".github/pull_request_template.md",
     ".github/workflows/p0-controls.yml",
   ]);
+  const allowedP1Files = new Set([
+    "supabase/migrations/20260829000015_p1_platform_foundation.sql",
+  ]);
   const forbidden = files.filter(
     (file) =>
       !allowedRootFiles.has(file) &&
       !allowedGithubFiles.has(file) &&
+      !allowedP1Files.has(file) &&
       !file.startsWith("governance/") &&
       !file.startsWith("tools/p0/"),
   );
@@ -1175,6 +1401,16 @@ export function validateRepository() {
   validateRestoreEvidence(
     readJson("governance/evidence/p0-restore-validation.json"),
   );
+  validateP1PlatformEvidence(
+    readJson("governance/evidence/p1-001-platform-foundation.json"),
+    readFileSync(
+      path.join(
+        ROOT,
+        "supabase/migrations/20260829000015_p1_platform_foundation.sql",
+      ),
+      "utf8",
+    ),
+  );
   validateDriftReport(readJson("governance/schema-drift/baseline.json"));
   validateReleaseRegister(releases, references, (sha) => {
     try {
@@ -1192,12 +1428,13 @@ export function validateRepository() {
   return {
     status: "passed",
     checks: [
-      "neutral package, paths, and empty workspace",
+      "controlled package, authorized paths, and empty application workspace",
       "locked authority references",
       "relational decision and work-item registers",
       "environment isolation",
       "migration inventory and clean drift baseline",
       "sanitized non-production restore evidence",
+      "validated-not-applied P1 platform migration evidence",
       "release traceability",
     ],
   };

@@ -1,6 +1,6 @@
 # Rollback and recovery control
 
-No release or deployment exists in the neutral repository. This runbook defines the required evidence for a future controlled release without performing one.
+No product release or deployment exists. This runbook defines the required evidence for a controlled migration/release and governs the proposed P1 migration before persistent application.
 
 Every release record must identify:
 

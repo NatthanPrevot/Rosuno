@@ -11,6 +11,61 @@
       "integrity": "not_available",
       "usage": "reference-only",
       "status": "external_reference_pending"
+    },
+    {
+      "authority_id": "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+      "title": "Rosuno Implementation Master Plan V1.0 - LOCKED",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "verified during P1 authority review",
+      "usage": "reference-only",
+      "status": "active"
+    },
+    {
+      "authority_id": "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+      "title": "Rosuno Physical Supabase/PostgreSQL Specification V1.0 - LOCKED",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "verified during P1 authority review",
+      "usage": "reference-only",
+      "status": "active"
+    },
+    {
+      "authority_id": "DOMAIN-MODEL-V1.4-LOCKED",
+      "title": "Rosuno Domain Model V1.4 - LOCKED",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "verified during P1 authority review",
+      "usage": "reference-only",
+      "status": "active"
+    },
+    {
+      "authority_id": "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+      "title": "Rosuno Relational Object Specification V1.0 - LOCKED",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "verified during P1 authority review",
+      "usage": "reference-only",
+      "status": "active"
+    },
+    {
+      "authority_id": "SCHEMA-INVENTORY-V0.7-LOCKED",
+      "title": "Rosuno Schema Inventory V0.7 - APPROVED / LOCKED",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "verified during P1 authority review",
+      "usage": "reference-only",
+      "status": "active"
     }
   ]
 }

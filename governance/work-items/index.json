@@ -36,6 +36,64 @@
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-08-28T19:21:26Z",
       "updated_at": "2026-08-28T19:21:26Z"
+    },
+    {
+      "work_item_id": "WI-P1-001-PLATFORM-FOUNDATION",
+      "title": "Implement physical Migration 1 platform foundation",
+      "objective": "Create the smallest locked Supabase/PostgreSQL application-identity foundation without crossing into authorization profiles or later P1 migrations.",
+      "in_scope": [
+        "public.users application identity",
+        "Server-generated UUID and timestamp behavior",
+        "Restricted shared updated_at trigger function",
+        "Explicit table grants and immediate RLS",
+        "Rollback-only validation on Rosuno Staging"
+      ],
+      "out_of_scope": [
+        "Client, attorney, and staff profiles",
+        "Capabilities, session binding, jurisdiction, policy, verification, intake, referrals, scheduling, consultation, communications, financial, compliance, and California regulatory-mode relations",
+        "Authentication workflows, application code, product UI, providers, seeds, production deployment, and P2"
+      ],
+      "status": "in_progress",
+      "owner": "P1 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260829-P1-PLATFORM-FOUNDATION"],
+      "dependencies": ["WI-P0-SUPABASE-EXECUTE"],
+      "acceptance_criteria": [
+        "The migration creates only public.users and the shared timestamp trigger function",
+        "One application User per auth.users identity is enforced",
+        "Account lifecycle values, server UUIDs, server timestamps, and timestamp updates are database-enforced",
+        "RLS is enabled and anon has no table access",
+        "Authenticated access is limited to selecting the caller's own identity row",
+        "Direct authenticated writes and direct execution of the trigger function are denied",
+        "The P0 ensure_rls trigger and restricted rls_auto_enable grants remain unchanged",
+        "No persistent database change occurs before protected human review"
+      ],
+      "validation_commands": [
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check"
+      ],
+      "environment": "staging",
+      "release_refs": [],
+      "migration_refs": ["20260829000015_p1_platform_foundation"],
+      "rollback_reference": "governance/rollback-recovery.md",
+      "created_at": "2026-08-29T00:04:49Z",
+      "updated_at": "2026-08-29T00:04:49Z"
     }
   ]
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:rosuno:p0:bounded-work-item",
-  "title": "P0 bounded work item",
+  "$id": "urn:rosuno:bounded-work-item",
+  "title": "Rosuno bounded work item",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -29,7 +29,7 @@
   "properties": {
     "work_item_id": {
       "type": "string",
-      "pattern": "^WI-P0-[A-Z0-9][A-Z0-9-]*$"
+      "pattern": "^WI-P(?:0|1)-[A-Z0-9][A-Z0-9-]*$"
     },
     "title": { "type": "string", "minLength": 1, "maxLength": 200 },
     "objective": { "type": "string", "minLength": 1, "maxLength": 2000 },
@@ -80,7 +80,7 @@
         }
       ]
     },
-    "priority": { "const": "P0" },
+    "priority": { "enum": ["P0", "P1"] },
     "authority_refs": {
       "type": "array",
       "minItems": 1,
