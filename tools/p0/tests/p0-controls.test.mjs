@@ -20,6 +20,7 @@ import {
   validateP1ApplicationTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
+  validateP1RegulatoryMigration,
   validateReleaseRegister,
   validateRepository,
   validateRestoreEvidence,
@@ -228,6 +229,58 @@ test("P1-002 requires the restrictive application-session user foreign key", () 
       () => validateP1AuthorizationMigration(invalidSql, migration),
       /missing/,
     );
+  }
+});
+
+test("P1-003 remains inside the jurisdiction policy and launch boundary", () => {
+  const sql = readFileSync(
+    path.join(
+      ROOT,
+      "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql",
+    ),
+    "utf8",
+  );
+  const migration = readJson("governance/migrations/reviewed-migrations.json")
+    .migrations[3];
+  assert.doesNotThrow(() => validateP1RegulatoryMigration(sql, migration));
+
+  const invalidVariants = [
+    sql.replace(
+      "create table public.service_areas",
+      "create table public.changed_areas",
+    ),
+    sql.replace(
+      "constraint capability_grants_jurisdiction_id_fkey",
+      "constraint changed_capability_grants_jurisdiction_id_fkey",
+    ),
+    sql.replace(
+      "capability_grants_jurisdiction_id_fkey\n  foreign key (jurisdiction_id)\n  references public.jurisdictions (id)\n  on update restrict\n  on delete restrict",
+      "capability_grants_jurisdiction_id_fkey\n  foreign key (jurisdiction_id)\n  references public.jurisdictions (id)\n  on update restrict\n  on delete cascade",
+    ),
+    sql.replace(
+      "alter table public.launch_authorizations enable row level security;",
+      "",
+    ),
+    `${sql}\ncreate policy client_launch_read on public.launch_gates for select to authenticated using (true);`,
+    sql.replace(
+      "grant select, insert, update on table public.launch_authorizations to service_role;",
+      "grant select, insert, update, delete on table public.launch_authorizations to service_role;",
+    ),
+    sql.replace(
+      "approved policy version requires verified authority provenance",
+      "approval bypassed",
+    ),
+    sql.replace(
+      "live jurisdiction requires explicit active launch authorization",
+      "live allowed without authorization",
+    ),
+    `${sql}\ninsert into public.jurisdictions (code, name, region_type) values ('TEST', 'Test', 'test');`,
+    `${sql}\ncomment on schema public is 'California LRS';`,
+    `${sql}\ncreate table public.attorney_service_areas (id uuid primary key);`,
+  ];
+
+  for (const invalidSql of invalidVariants) {
+    assert.throws(() => validateP1RegulatoryMigration(invalidSql, migration));
   }
 });
 

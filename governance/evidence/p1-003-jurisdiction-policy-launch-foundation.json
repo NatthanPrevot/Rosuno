@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "evidence_id": "P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION",
+  "work_item_id": "WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION",
+  "scope": "P1/1C physical Migration 3 jurisdiction, policy, and launch-gate foundation only",
+  "authority_refs": [
+    "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+    "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+    "DOMAIN-MODEL-V1.4-LOCKED",
+    "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+    "SCHEMA-INVENTORY-V0.7-LOCKED",
+    "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+  ],
+  "preflight": {
+    "environment": "staging",
+    "project_name": "Rosuno Staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "region": "us-east-2",
+    "migration_versions": [
+      "20260828192126",
+      "20260829000015",
+      "20260829171701"
+    ],
+    "p0_p1_001_p1_002_catalog_exact": true,
+    "public_tables": 7,
+    "public_rows": 0,
+    "p1_002_constraints": 28,
+    "p1_002_structural_foreign_keys": 6,
+    "p1_update_triggers": 7,
+    "p1_003_objects_before_validation": 0
+  },
+  "migration": {
+    "migration_id": "20260830023823_p1_jurisdiction_policy_launch_foundation",
+    "path": "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql",
+    "sha256": "94e9b746cf303154790bc51e8160f9184b2e9765e82ec2702e03030f7a79b7ee",
+    "created_by_supabase_cli": "2.116.0",
+    "persistent_application": false,
+    "seeded_rows": 0,
+    "prior_migration_sha256": {
+      "20260828192126": "2ba591b2767c43a32731c8b74b5ffaa07c47a41d096eee6fb3672aad9278c49d",
+      "20260829000015": "67dfd44b2bd7525a588e6eb59c33a0056f3a5c67eec5f45dd93e6aab37f7afc8",
+      "20260829171701": "6471ac68949234e29ae1cc492eaa2f77dc15ca010998f72898284b8c9a855fec"
+    }
+  },
+  "transactional_validation": {
+    "environment": "staging",
+    "completed_at": "2026-08-30T02:50:55Z",
+    "transaction": "single BEGIN/ROLLBACK transaction",
+    "rollback_only": true,
+    "catalog_assertions": "passed",
+    "happy_path": "passed",
+    "failure_paths": "passed",
+    "failure_path_count": 6,
+    "security_assertions": "passed",
+    "rollback_verified": true,
+    "migration_history_unchanged": true,
+    "persistent_rows_after_rollback": 0,
+    "persistent_objects_after_rollback": 0,
+    "harness_diagnostic": {
+      "sqlstate": "42704",
+      "error_class": "undefined_object",
+      "affected_identifier": "PUBLIC pseudo-role",
+      "classification": "validation-harness-only",
+      "correction": "Inspect PUBLIC table ACLs through PostgreSQL ACL grantee OID 0; migration bytes unchanged",
+      "failed_transaction_rollback_verified": true
+    }
+  },
+  "schema_contract": {
+    "created_tables": 10,
+    "table_inventory": [
+      "public.jurisdictions",
+      "public.service_areas",
+      "public.regulatory_modes",
+      "public.jurisdiction_regulatory_modes",
+      "public.policy_types",
+      "public.policy_versions",
+      "public.policy_authority_references",
+      "public.launch_gates",
+      "public.launch_gate_evaluations",
+      "public.launch_authorizations"
+    ],
+    "created_functions": 2,
+    "function_inventory": [
+      "public.enforce_policy_authority_provenance()",
+      "public.enforce_jurisdiction_live_authorization()"
+    ],
+    "created_triggers": 9,
+    "trigger_inventory": [
+      "jurisdictions_set_updated_at",
+      "regulatory_modes_set_updated_at",
+      "policy_types_set_updated_at",
+      "policy_versions_set_updated_at",
+      "launch_gates_set_updated_at",
+      "policy_versions_require_authority",
+      "policy_authority_references_preserve_approval",
+      "jurisdictions_require_launch_authorization",
+      "launch_authorizations_preserve_live_boundary"
+    ],
+    "created_explicit_indexes": 0,
+    "capability_grants_jurisdiction_fk": true,
+    "policy_authority_provenance_enforced": true,
+    "live_requires_launch_authorization": true,
+    "prerequisites_imply_live": false,
+    "active_policy_history_reconstructible": true,
+    "counsel_values_seeded": false,
+    "california_specific_columns": 0,
+    "attorney_service_areas_created": false,
+    "later_p1_objects_created": false,
+    "financial_activity_rule": "No financial object exists in Migration 3; environment, LIVE jurisdiction, approved policy, and launch authorization remain mandatory inputs for later transaction enforcement."
+  },
+  "security": {
+    "rls_enabled_tables": 10,
+    "client_policies_created": 0,
+    "public_anon_authenticated_table_privileges": 0,
+    "service_role_privileges": ["SELECT", "INSERT", "UPDATE"],
+    "service_role_delete": false,
+    "enforcement_functions_security": "SECURITY INVOKER with search_path pg_catalog",
+    "enforcement_function_execute": {
+      "PUBLIC": false,
+      "anon": false,
+      "authenticated": false,
+      "postgres": true,
+      "service_role": true
+    },
+    "post_rollback_advisor": {
+      "unapproved_findings": 0,
+      "unchanged_approved_p1_002_info_findings": [
+        "rls_enabled_no_policy:public.application_sessions",
+        "rls_enabled_no_policy:public.capability_definitions",
+        "rls_enabled_no_policy:public.capability_grants"
+      ],
+      "remediation_reference": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+    }
+  },
+  "environment_integrity": {
+    "source_accessed": false,
+    "development_accessed": false,
+    "production_accessed": false,
+    "old_accessed": false,
+    "staging_persistently_mutated": false,
+    "staging_history_after_rollback": [
+      "20260828192126",
+      "20260829000015",
+      "20260829171701"
+    ],
+    "p0_invariants_after_rollback": "exact",
+    "p1_001_p1_002_table_inventory_after_rollback": "exact",
+    "p1_002_constraint_count_after_rollback": 28,
+    "p1_update_trigger_count_after_rollback": 7,
+    "rows_after_rollback": 0
+  },
+  "acceptance_state": "pending_protected_human_review",
+  "next_gate": "protected PR approval and explicit merge authorization",
+  "sensitive_payloads_present": false
+}

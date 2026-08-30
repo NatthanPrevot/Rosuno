@@ -1007,6 +1007,257 @@ export function validateP1AuthorizationMigration(
   }
 }
 
+export function validateP1RegulatoryMigration(
+  sql,
+  migration,
+  context = "P1 jurisdiction/policy/launch migration",
+) {
+  if (
+    migration.migration_id !==
+      "20260830023823_p1_jurisdiction_policy_launch_foundation" ||
+    migration.sequence !== 4 ||
+    migration.depends_on?.join("|") !==
+      "20260829171701_p1_authorization_foundation"
+  ) {
+    fail(`${context}.migration_id, sequence, or dependency is invalid`);
+  }
+  requireBoundedString(sql, context, 80000);
+  const tables = [
+    "jurisdictions",
+    "service_areas",
+    "regulatory_modes",
+    "jurisdiction_regulatory_modes",
+    "policy_types",
+    "policy_versions",
+    "policy_authority_references",
+    "launch_gates",
+    "launch_gate_evaluations",
+    "launch_authorizations",
+  ];
+  const createTables = [
+    ...sql.matchAll(/\bcreate\s+table\s+([a-z0-9_.]+)/gi),
+  ].map((match) => match[1].toLowerCase());
+  if (
+    JSON.stringify(createTables) !==
+    JSON.stringify(tables.map((table) => `public.${table}`))
+  ) {
+    fail(
+      `${context} must create exactly the ten authorized Migration 3 tables`,
+    );
+  }
+  for (const table of tables) {
+    for (const pattern of [
+      new RegExp(
+        `alter\\s+table\\s+public\\.${table}\\s+enable\\s+row\\s+level\\s+security`,
+        "i",
+      ),
+      new RegExp(
+        `revoke\\s+all\\s+on\\s+table\\s+public\\.${table}\\s+from\\s+public`,
+        "i",
+      ),
+      new RegExp(
+        `revoke\\s+all\\s+on\\s+table\\s+public\\.${table}\\s+from\\s+anon`,
+        "i",
+      ),
+      new RegExp(
+        `revoke\\s+all\\s+on\\s+table\\s+public\\.${table}\\s+from\\s+authenticated`,
+        "i",
+      ),
+      new RegExp(
+        `revoke\\s+all\\s+on\\s+table\\s+public\\.${table}\\s+from\\s+service_role`,
+        "i",
+      ),
+      new RegExp(
+        `grant\\s+select\\s*,\\s*insert\\s*,\\s*update\\s+on\\s+table\\s+public\\.${table}\\s+to\\s+service_role`,
+        "i",
+      ),
+    ]) {
+      if (!pattern.test(sql)) fail(`${context} is missing ${pattern}`);
+    }
+  }
+  const requiredPatterns = [
+    /constraint\s+jurisdictions_lifecycle_state_check[\s\S]*?'unsupported'[\s\S]*?'waitlist'[\s\S]*?'staged'[\s\S]*?'ready'[\s\S]*?'live'[\s\S]*?'restricted'[\s\S]*?'suspended'/i,
+    /constraint\s+service_areas_jurisdiction_id_fkey[\s\S]*?references\s+public\.jurisdictions\s*\(\s*id\s*\)[\s\S]*?on\s+update\s+restrict[\s\S]*?on\s+delete\s+restrict/i,
+    /constraint\s+jurisdiction_regulatory_modes_pkey\s+primary\s+key\s*\(\s*jurisdiction_id\s*,\s*regulatory_mode_id\s*,\s*active_from\s*\)/i,
+    /constraint\s+policy_versions_scope_version_key\s+unique\s+nulls\s+not\s+distinct/i,
+    /constraint\s+policy_versions_parameters_check[\s\S]*?jsonb_typeof\s*\(\s*parameters\s*\)\s*=\s*'object'/i,
+    /constraint\s+policy_versions_status_check[\s\S]*?'draft'[\s\S]*?'internal_review'[\s\S]*?'counsel_review'[\s\S]*?'approved'[\s\S]*?'scheduled'[\s\S]*?'active'[\s\S]*?'suspended'[\s\S]*?'retired'/i,
+    /constraint\s+policy_versions_approval_pair_check/i,
+    /constraint\s+policy_versions_approval_state_check/i,
+    /constraint\s+policy_authority_references_verified_actor_check/i,
+    /alter\s+table\s+public\.capability_grants[\s\S]*?add\s+constraint\s+capability_grants_jurisdiction_id_fkey[\s\S]*?references\s+public\.jurisdictions\s*\(\s*id\s*\)[\s\S]*?on\s+update\s+restrict[\s\S]*?on\s+delete\s+restrict/i,
+    /create\s+function\s+public\.enforce_policy_authority_provenance\s*\(\s*\)[\s\S]*?security\s+invoker[\s\S]*?set\s+search_path\s*=\s*pg_catalog/i,
+    /approved policy version requires verified authority provenance/i,
+    /create\s+function\s+public\.enforce_jurisdiction_live_authorization\s*\(\s*\)[\s\S]*?security\s+invoker[\s\S]*?set\s+search_path\s*=\s*pg_catalog/i,
+    /live jurisdiction requires explicit active launch authorization/i,
+    /create\s+constraint\s+trigger\s+policy_versions_require_authority/i,
+    /create\s+constraint\s+trigger\s+policy_authority_references_preserve_approval/i,
+    /create\s+constraint\s+trigger\s+jurisdictions_require_launch_authorization/i,
+    /create\s+constraint\s+trigger\s+launch_authorizations_preserve_live_boundary/i,
+  ];
+  for (const pattern of requiredPatterns) {
+    if (!pattern.test(sql)) fail(`${context} is missing ${pattern}`);
+  }
+  for (const functionName of [
+    "enforce_policy_authority_provenance",
+    "enforce_jurisdiction_live_authorization",
+  ]) {
+    for (const role of ["public", "anon", "authenticated"]) {
+      const pattern = new RegExp(
+        `revoke\\s+execute\\s+on\\s+function\\s+public\\.${functionName}\\s*\\(\\s*\\)\\s+from\\s+${role}`,
+        "i",
+      );
+      if (!pattern.test(sql)) fail(`${context} is missing ${pattern}`);
+    }
+    for (const role of ["postgres", "service_role"]) {
+      const pattern = new RegExp(
+        `grant\\s+execute\\s+on\\s+function\\s+public\\.${functionName}\\s*\\(\\s*\\)\\s+to\\s+${role}`,
+        "i",
+      );
+      if (!pattern.test(sql)) fail(`${context} is missing ${pattern}`);
+    }
+  }
+  if (
+    /\bcreate\s+policy\b/i.test(sql) ||
+    /grant\s+[^;]*\s+on\s+table\s+public\.(?:jurisdictions|service_areas|regulatory_modes|jurisdiction_regulatory_modes|policy_types|policy_versions|policy_authority_references|launch_gates|launch_gate_evaluations|launch_authorizations)\s+to\s+(?:public|anon|authenticated)/i.test(
+      sql,
+    )
+  ) {
+    fail(`${context} may not add a client-facing policy or table privilege`);
+  }
+  if (
+    /grant\s+[^;]*delete[^;]*\s+to\s+service_role/i.test(sql) ||
+    /security\s+definer/i.test(sql) ||
+    /\bcreate\s+extension\b/i.test(sql) ||
+    /\b(?:insert\s+into|copy)\b/i.test(sql)
+  ) {
+    fail(`${context} weakens security or adds an extension or seed data`);
+  }
+  if (/\b(?:california|ca_lrs|lrs)\b/i.test(sql)) {
+    fail(`${context} may not encode a California-specific core assumption`);
+  }
+  if (
+    /\bcreate\s+table\s+public\.(?:attorney_service_areas|licenses|attorney_licenses|insurance|discipline|verification|instant_availability_intents|consultation_requests|bookings|payments?|referrals?)\b/i.test(
+      sql,
+    )
+  ) {
+    fail(`${context} crosses the authorized Migration 3 boundary`);
+  }
+  if (/\b(?:drop|truncate)\s+(?:table|function)\b/i.test(sql)) {
+    fail(`${context} may not drop or truncate an existing object`);
+  }
+  if (scanSecretLikeText(sql, context).length > 0) {
+    fail(`${context} contains a secret-like value`);
+  }
+}
+
+export function validateP1RegulatoryEvidence(evidence, migrationSql) {
+  const context = "P1 jurisdiction/policy/launch evidence";
+  requireExactFields(
+    evidence,
+    [
+      "version",
+      "evidence_id",
+      "work_item_id",
+      "scope",
+      "authority_refs",
+      "preflight",
+      "migration",
+      "transactional_validation",
+      "schema_contract",
+      "security",
+      "environment_integrity",
+      "acceptance_state",
+      "next_gate",
+      "sensitive_payloads_present",
+    ],
+    context,
+  );
+  if (
+    evidence.version !== 1 ||
+    evidence.evidence_id !== "P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION" ||
+    evidence.work_item_id !==
+      "WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION" ||
+    evidence.scope !==
+      "P1/1C physical Migration 3 jurisdiction, policy, and launch-gate foundation only"
+  ) {
+    fail(`${context} identity is invalid`);
+  }
+  const digest = createHash("sha256").update(migrationSql).digest("hex");
+  if (
+    evidence.preflight?.environment !== "staging" ||
+    evidence.preflight?.project_ref !== "mxjlvmowmodzdtdfgqpb" ||
+    evidence.preflight?.migration_versions?.join("|") !==
+      "20260828192126|20260829000015|20260829171701" ||
+    evidence.preflight?.p0_p1_001_p1_002_catalog_exact !== true ||
+    evidence.migration?.migration_id !==
+      "20260830023823_p1_jurisdiction_policy_launch_foundation" ||
+    evidence.migration?.path !==
+      "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql" ||
+    evidence.migration?.sha256 !== digest ||
+    evidence.migration?.persistent_application !== false ||
+    evidence.migration?.seeded_rows !== 0
+  ) {
+    fail(`${context} preflight or migration record is invalid`);
+  }
+  const validation = evidence.transactional_validation;
+  requireTimestamp(validation?.completed_at, `${context}.completed_at`);
+  if (
+    validation?.environment !== "staging" ||
+    validation?.rollback_only !== true ||
+    validation?.catalog_assertions !== "passed" ||
+    validation?.happy_path !== "passed" ||
+    validation?.failure_paths !== "passed" ||
+    validation?.security_assertions !== "passed" ||
+    validation?.rollback_verified !== true ||
+    validation?.migration_history_unchanged !== true ||
+    validation?.persistent_rows_after_rollback !== 0 ||
+    validation?.persistent_objects_after_rollback !== 0
+  ) {
+    fail(`${context} transactional validation is invalid`);
+  }
+  if (
+    evidence.schema_contract?.created_tables !== 10 ||
+    evidence.schema_contract?.created_functions !== 2 ||
+    evidence.schema_contract?.capability_grants_jurisdiction_fk !== true ||
+    evidence.schema_contract?.policy_authority_provenance_enforced !== true ||
+    evidence.schema_contract?.live_requires_launch_authorization !== true ||
+    evidence.schema_contract?.counsel_values_seeded !== false ||
+    evidence.security?.rls_enabled_tables !== 10 ||
+    evidence.security?.client_policies_created !== 0 ||
+    evidence.security?.public_anon_authenticated_table_privileges !== 0 ||
+    evidence.security?.service_role_privileges?.join("|") !==
+      "SELECT|INSERT|UPDATE" ||
+    evidence.security?.service_role_delete !== false ||
+    evidence.environment_integrity?.source_accessed !== false ||
+    evidence.environment_integrity?.production_accessed !== false ||
+    evidence.environment_integrity?.old_accessed !== false ||
+    evidence.environment_integrity?.staging_persistently_mutated !== false ||
+    evidence.acceptance_state !== "pending_protected_human_review" ||
+    evidence.next_gate !==
+      "protected PR approval and explicit merge authorization" ||
+    evidence.sensitive_payloads_present !== false
+  ) {
+    fail(`${context} schema, security, environment, or gate state is invalid`);
+  }
+  validateReferences(
+    evidence.authority_refs,
+    new Set([
+      "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+      "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+      "DOMAIN-MODEL-V1.4-LOCKED",
+      "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+      "SCHEMA-INVENTORY-V0.7-LOCKED",
+      "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+    ]),
+    `${context}.authority_refs`,
+    5,
+  );
+  if (scanSecretLikeText(JSON.stringify(evidence), context).length > 0) {
+    fail(`${context} contains secret-like content`);
+  }
+}
+
 export function validateP1AuthorizationEvidence(
   evidence,
   migrationSql,
@@ -1748,6 +1999,17 @@ export function validateMigrationRegister(
           fail(`${context}.artifact_path is invalid for P1-002`);
         }
         validateP1AuthorizationMigration(sql, migration, `${context}.artifact`);
+      } else if (
+        migration.migration_id ===
+        "20260830023823_p1_jurisdiction_policy_launch_foundation"
+      ) {
+        if (
+          migration.artifact_path !==
+          "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql"
+        ) {
+          fail(`${context}.artifact_path is invalid for P1-003`);
+        }
+        validateP1RegulatoryMigration(sql, migration, `${context}.artifact`);
       } else {
         fail(`${context}.artifact_path is outside the authorized P1 slice`);
       }
@@ -2135,6 +2397,7 @@ export function validateNeutralPaths(files, packageJson) {
     "supabase/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.sql",
     "supabase/migrations/20260829000015_p1_platform_foundation.sql",
     "supabase/migrations/20260829171701_p1_authorization_foundation.sql",
+    "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql",
   ]);
   const forbidden = files.filter(
     (file) =>
@@ -2248,6 +2511,18 @@ export function validateRepository() {
     ),
     readJson("governance/evidence/p1-002-catalog-fingerprint.json"),
   );
+  validateP1RegulatoryEvidence(
+    readJson(
+      "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json",
+    ),
+    readFileSync(
+      path.join(
+        ROOT,
+        "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql",
+      ),
+      "utf8",
+    ),
+  );
   validateDriftReport(readJson("governance/schema-drift/baseline.json"));
   validateReleaseRegister(releases, references, (sha) => {
     try {
@@ -2274,6 +2549,7 @@ export function validateRepository() {
       "sanitized non-production restore evidence",
       "reviewed and applied P1 Staging migration evidence",
       "P1-002 Staging evidence pending protected human review",
+      "P1-003 rollback-only Staging evidence pending protected human review",
       "release traceability",
     ],
   };
