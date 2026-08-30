@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "evidence_id": "P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION",
   "work_item_id": "WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION",
   "scope": "P1/1C physical Migration 3 jurisdiction, policy, and launch-gate foundation only",
@@ -31,10 +31,13 @@
   },
   "migration": {
     "migration_id": "20260830023823_p1_jurisdiction_policy_launch_foundation",
+    "version": "20260830023823",
+    "name": "p1_jurisdiction_policy_launch_foundation",
     "path": "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql",
     "sha256": "94e9b746cf303154790bc51e8160f9184b2e9765e82ec2702e03030f7a79b7ee",
     "created_by_supabase_cli": "2.116.0",
-    "persistent_application": false,
+    "persistent_application": true,
+    "application_count": 1,
     "seeded_rows": 0,
     "prior_migration_sha256": {
       "20260828192126": "2ba591b2767c43a32731c8b74b5ffaa07c47a41d096eee6fb3672aad9278c49d",
@@ -64,6 +67,42 @@
       "correction": "Inspect PUBLIC table ACLs through PostgreSQL ACL grantee OID 0; migration bytes unchanged",
       "failed_transaction_rollback_verified": true
     }
+  },
+  "persistent_application_validation": {
+    "completed_at": "2026-08-30T20:29:17Z",
+    "environment": "staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "application_status": "passed",
+    "migration_history": [
+      {
+        "version": "20260828192126",
+        "name": "p0_restrict_rls_auto_enable_execution",
+        "occurrences": 1
+      },
+      {
+        "version": "20260829000015",
+        "name": "p1_platform_foundation",
+        "occurrences": 1
+      },
+      {
+        "version": "20260829171701",
+        "name": "p1_authorization_foundation",
+        "occurrences": 1
+      },
+      {
+        "version": "20260830023823",
+        "name": "p1_jurisdiction_policy_launch_foundation",
+        "occurrences": 1
+      }
+    ],
+    "pending_versions": 0,
+    "remote_only_versions": 0,
+    "duplicate_versions": 0,
+    "generated_or_unexpected_versions": 0,
+    "local_remote_reconciliation": "exact",
+    "migration_sql_reapplied": false,
+    "migration_history_repaired": false,
+    "direct_history_edit": false
   },
   "schema_contract": {
     "created_tables": 10,
@@ -108,6 +147,40 @@
     "later_p1_objects_created": false,
     "financial_activity_rule": "No financial object exists in Migration 3; environment, LIVE jurisdiction, approved policy, and launch authorization remain mandatory inputs for later transaction enforcement."
   },
+  "catalog_acceptance": {
+    "status": "passed",
+    "p1_003_tables": 10,
+    "p1_003_columns": 77,
+    "constraint_rows": 53,
+    "ordinary_constraints": 49,
+    "constraint_trigger_rows": 4,
+    "constraint_backed_indexes": 15,
+    "standalone_indexes": 0,
+    "new_table_foreign_keys": 15,
+    "capability_grants_foreign_keys": 1,
+    "total_p1_003_foreign_keys": 16,
+    "capability_grants_jurisdiction_id_fkey": {
+      "constraint": "capability_grants_jurisdiction_id_fkey",
+      "source": "public.capability_grants(jurisdiction_id)",
+      "target": "public.jurisdictions(id)",
+      "on_update": "RESTRICT",
+      "on_delete": "RESTRICT",
+      "deferrable": false,
+      "initially_deferred": false,
+      "validated": true,
+      "structural_match": true
+    },
+    "reviewed_enforcement_functions": 2,
+    "reviewed_enabled_triggers": 9,
+    "rls_enabled_tables": 10,
+    "client_facing_policies": 0,
+    "reviewed_privilege_model": "passed",
+    "p1_003_rows": 0,
+    "unexpected_objects_or_grants": 0,
+    "california_specific_objects": 0,
+    "later_p1_objects": 0,
+    "p0_p1_001_p1_002_controls": "intact"
+  },
   "security": {
     "rls_enabled_tables": 10,
     "client_policies_created": 0,
@@ -122,34 +195,110 @@
       "postgres": true,
       "service_role": true
     },
-    "post_rollback_advisor": {
-      "unapproved_findings": 0,
-      "unchanged_approved_p1_002_info_findings": [
-        "rls_enabled_no_policy:public.application_sessions",
-        "rls_enabled_no_policy:public.capability_definitions",
-        "rls_enabled_no_policy:public.capability_grants"
-      ],
-      "remediation_reference": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+    "advisor_gate": "zero_unapproved_findings",
+    "approved_info_findings": [
+      "rls_enabled_no_policy:public.application_sessions",
+      "rls_enabled_no_policy:public.capability_definitions",
+      "rls_enabled_no_policy:public.capability_grants",
+      "rls_enabled_no_policy:public.jurisdictions",
+      "rls_enabled_no_policy:public.service_areas",
+      "rls_enabled_no_policy:public.regulatory_modes",
+      "rls_enabled_no_policy:public.jurisdiction_regulatory_modes",
+      "rls_enabled_no_policy:public.policy_types",
+      "rls_enabled_no_policy:public.policy_versions",
+      "rls_enabled_no_policy:public.policy_authority_references",
+      "rls_enabled_no_policy:public.launch_gates",
+      "rls_enabled_no_policy:public.launch_gate_evaluations",
+      "rls_enabled_no_policy:public.launch_authorizations"
+    ],
+    "approved_p1_002_findings": 3,
+    "approved_p1_003_findings": 10,
+    "unapproved_findings": 0,
+    "remediation_reference": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+  },
+  "catalog_fingerprint": {
+    "scope": "P1-001 and P1-002 approved Staging catalog surface",
+    "algorithm": "SHA-256",
+    "sha256": "1d8e6182902d3c40d1b99c87bc80be2f146ef6a85f512b117e5c55b52878c12c",
+    "canonical_byte_length": 50602,
+    "expected_p1_003_delta_rows": [
+      "constraint:public.capability_grants.capability_grants_jurisdiction_id_fkey",
+      "foreign_key:public.capability_grants.capability_grants_jurisdiction_id_fkey"
+    ],
+    "reproduced_after_expected_delta_exclusion": true
+  },
+  "tooling_exceptions": {
+    "supabase_cli_schema_drift": {
+      "tool": "official Supabase CLI",
+      "version": "2.116.0",
+      "environment": "Replit",
+      "failure": "OCI namespace entry for pg_isready failed: setns exit status 1",
+      "postgresql_initialized_and_ready": true,
+      "p1_003_sql_or_schema_comparison_reached": false,
+      "drift_sql_produced": false,
+      "classification": "environment-specific tooling exception",
+      "compensating_direct_catalog_validation": "passed",
+      "persisted_schema_defect": false
+    },
+    "catalog_validator": {
+      "classification": "validator classification/predicate defect",
+      "persisted_schema_defect": false,
+      "corrected_commit": "8e3795663372ecac3641078d0271ddeb800d609b",
+      "protected_merge_commit": "615e293c15897da5b4e39aabea568c5cf90bf9cf",
+      "correction_reviewed_by": "Rosuno",
+      "correction_approved_at": "2026-08-30T19:51:17Z",
+      "database_repair_required": false
+    }
+  },
+  "repository_validation": {
+    "completed_at": "2026-08-30T20:29:17Z",
+    "protected_main_commit": "615e293c15897da5b4e39aabea568c5cf90bf9cf",
+    "ahead_behind": "0/0",
+    "working_tree_clean": true,
+    "frozen_lockfile_install": "passed",
+    "formatting": "passed",
+    "typecheck": "passed",
+    "build": "passed",
+    "repository_controls": "passed",
+    "tests_passed": 43,
+    "tests_failed": 0,
+    "secret_scan": "passed",
+    "secret_scan_files": 52,
+    "dependency_security_audit": "no known vulnerabilities",
+    "migration_hashes_unchanged": true
+  },
+  "review_traceability": {
+    "implementation": {
+      "pull_request": 7,
+      "approved_head": "279742dbacc06d09050a6f8bb5c57cdca9142b23",
+      "merge_commit": "0ba2331b88fd5f045573b3e2d140f03e240b6a77",
+      "reviewer": "Rosuno",
+      "approved_at": "2026-08-30T05:02:26Z"
+    },
+    "validator_correction": {
+      "pull_request": 8,
+      "approved_head": "8e3795663372ecac3641078d0271ddeb800d609b",
+      "merge_commit": "615e293c15897da5b4e39aabea568c5cf90bf9cf",
+      "reviewer": "Rosuno",
+      "approved_at": "2026-08-30T19:51:17Z"
     }
   },
   "environment_integrity": {
-    "source_accessed": false,
-    "development_accessed": false,
-    "production_accessed": false,
-    "old_accessed": false,
-    "staging_persistently_mutated": false,
-    "staging_history_after_rollback": [
-      "20260828192126",
-      "20260829000015",
-      "20260829171701"
-    ],
-    "p0_invariants_after_rollback": "exact",
-    "p1_001_p1_002_table_inventory_after_rollback": "exact",
-    "p1_002_constraint_count_after_rollback": 28,
-    "p1_update_trigger_count_after_rollback": 7,
-    "rows_after_rollback": 0
+    "source_read_only_history": ["20260828192126"],
+    "source_mutated": false,
+    "development_mutated": false,
+    "production_contacted_or_mutated": false,
+    "old_project_status": "INACTIVE",
+    "old_read_only_listing": "timed_out",
+    "old_mutated": false,
+    "old_inspection_limitation": "The final read-only OLD migration listing timed out; no successful final OLD catalog or history inspection is claimed.",
+    "staging_persistently_mutated": true,
+    "staging_migration_history_exact": true,
+    "p0_p1_001_p1_002_controls_unchanged": true,
+    "migration_repair_or_reapplication": false,
+    "seed_or_fake_business_data_introduced": false
   },
-  "acceptance_state": "pending_protected_human_review",
-  "next_gate": "protected PR approval and explicit merge authorization",
+  "acceptance_state": "accepted_staging_application",
+  "next_gate": "separate protected review before production or P1-004",
   "sensitive_payloads_present": false
 }

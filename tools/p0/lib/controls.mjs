@@ -101,6 +101,22 @@ const P0_STORED_STATEMENT_SHA256 =
 const P0_INVENTORY_RECONCILIATION_PATH =
   "governance/evidence/p0-cli-inventory-reconciliation.json";
 
+const P1_REGULATORY_APPROVED_ADVISOR_FINDINGS = [
+  "rls_enabled_no_policy:public.application_sessions",
+  "rls_enabled_no_policy:public.capability_definitions",
+  "rls_enabled_no_policy:public.capability_grants",
+  "rls_enabled_no_policy:public.jurisdictions",
+  "rls_enabled_no_policy:public.service_areas",
+  "rls_enabled_no_policy:public.regulatory_modes",
+  "rls_enabled_no_policy:public.jurisdiction_regulatory_modes",
+  "rls_enabled_no_policy:public.policy_types",
+  "rls_enabled_no_policy:public.policy_versions",
+  "rls_enabled_no_policy:public.policy_authority_references",
+  "rls_enabled_no_policy:public.launch_gates",
+  "rls_enabled_no_policy:public.launch_gate_evaluations",
+  "rls_enabled_no_policy:public.launch_authorizations",
+];
+
 const DIRECT_SECRET_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
   /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/i,
@@ -1898,8 +1914,14 @@ export function validateP1RegulatoryEvidence(evidence, migrationSql) {
       "preflight",
       "migration",
       "transactional_validation",
+      "persistent_application_validation",
       "schema_contract",
+      "catalog_acceptance",
       "security",
+      "catalog_fingerprint",
+      "tooling_exceptions",
+      "repository_validation",
+      "review_traceability",
       "environment_integrity",
       "acceptance_state",
       "next_gate",
@@ -1908,7 +1930,7 @@ export function validateP1RegulatoryEvidence(evidence, migrationSql) {
     context,
   );
   if (
-    evidence.version !== 1 ||
+    evidence.version !== 2 ||
     evidence.evidence_id !== "P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION" ||
     evidence.work_item_id !==
       "WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION" ||
@@ -1918,19 +1940,30 @@ export function validateP1RegulatoryEvidence(evidence, migrationSql) {
     fail(`${context} identity is invalid`);
   }
   const digest = createHash("sha256").update(migrationSql).digest("hex");
+  const migration = evidence.migration;
   if (
     evidence.preflight?.environment !== "staging" ||
     evidence.preflight?.project_ref !== "mxjlvmowmodzdtdfgqpb" ||
     evidence.preflight?.migration_versions?.join("|") !==
       "20260828192126|20260829000015|20260829171701" ||
     evidence.preflight?.p0_p1_001_p1_002_catalog_exact !== true ||
-    evidence.migration?.migration_id !==
+    migration?.migration_id !==
       "20260830023823_p1_jurisdiction_policy_launch_foundation" ||
-    evidence.migration?.path !==
+    migration?.version !== "20260830023823" ||
+    migration?.name !== "p1_jurisdiction_policy_launch_foundation" ||
+    migration?.path !==
       "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql" ||
-    evidence.migration?.sha256 !== digest ||
-    evidence.migration?.persistent_application !== false ||
-    evidence.migration?.seeded_rows !== 0
+    migration?.sha256 !== digest ||
+    migration?.created_by_supabase_cli !== "2.116.0" ||
+    migration?.persistent_application !== true ||
+    migration?.application_count !== 1 ||
+    migration?.seeded_rows !== 0 ||
+    migration?.prior_migration_sha256?.["20260828192126"] !==
+      "2ba591b2767c43a32731c8b74b5ffaa07c47a41d096eee6fb3672aad9278c49d" ||
+    migration?.prior_migration_sha256?.["20260829000015"] !==
+      "67dfd44b2bd7525a588e6eb59c33a0056f3a5c67eec5f45dd93e6aab37f7afc8" ||
+    migration?.prior_migration_sha256?.["20260829171701"] !==
+      "6471ac68949234e29ae1cc492eaa2f77dc15ca010998f72898284b8c9a855fec"
   ) {
     fail(`${context} preflight or migration record is invalid`);
   }
@@ -1950,29 +1983,313 @@ export function validateP1RegulatoryEvidence(evidence, migrationSql) {
   ) {
     fail(`${context} transactional validation is invalid`);
   }
+
+  const persistent = evidence.persistent_application_validation;
+  requireExactFields(
+    persistent,
+    [
+      "completed_at",
+      "environment",
+      "project_ref",
+      "application_status",
+      "migration_history",
+      "pending_versions",
+      "remote_only_versions",
+      "duplicate_versions",
+      "generated_or_unexpected_versions",
+      "local_remote_reconciliation",
+      "migration_sql_reapplied",
+      "migration_history_repaired",
+      "direct_history_edit",
+    ],
+    `${context}.persistent_application_validation`,
+  );
+  requireTimestamp(
+    persistent.completed_at,
+    `${context}.persistent_application_validation.completed_at`,
+  );
+  const expectedHistory = [
+    ["20260828192126", "p0_restrict_rls_auto_enable_execution"],
+    ["20260829000015", "p1_platform_foundation"],
+    ["20260829171701", "p1_authorization_foundation"],
+    ["20260830023823", "p1_jurisdiction_policy_launch_foundation"],
+  ];
+  requireCatalogArray(
+    persistent.migration_history,
+    expectedHistory.length,
+    `${context}.persistent_application_validation.migration_history`,
+  );
+  for (const [index, [version, name]] of expectedHistory.entries()) {
+    const row = persistent.migration_history[index];
+    requireExactFields(
+      row,
+      ["version", "name", "occurrences"],
+      `${context}.persistent_application_validation.migration_history[${index}]`,
+    );
+    if (row.version !== version || row.name !== name || row.occurrences !== 1) {
+      fail(`${context} migration history is invalid`);
+    }
+  }
+  if (
+    persistent.environment !== "staging" ||
+    persistent.project_ref !== "mxjlvmowmodzdtdfgqpb" ||
+    persistent.application_status !== "passed" ||
+    persistent.pending_versions !== 0 ||
+    persistent.remote_only_versions !== 0 ||
+    persistent.duplicate_versions !== 0 ||
+    persistent.generated_or_unexpected_versions !== 0 ||
+    persistent.local_remote_reconciliation !== "exact" ||
+    persistent.migration_sql_reapplied !== false ||
+    persistent.migration_history_repaired !== false ||
+    persistent.direct_history_edit !== false
+  ) {
+    fail(`${context} persistent application state is invalid`);
+  }
+
+  const expectedTables = P1_REGULATORY_TABLES.map((table) => `public.${table}`);
+  const expectedFunctions = [
+    "public.enforce_policy_authority_provenance()",
+    "public.enforce_jurisdiction_live_authorization()",
+  ];
+  const expectedTriggers = [
+    "jurisdictions_set_updated_at",
+    "regulatory_modes_set_updated_at",
+    "policy_types_set_updated_at",
+    "policy_versions_set_updated_at",
+    "launch_gates_set_updated_at",
+    "policy_versions_require_authority",
+    "policy_authority_references_preserve_approval",
+    "jurisdictions_require_launch_authorization",
+    "launch_authorizations_preserve_live_boundary",
+  ];
   if (
     evidence.schema_contract?.created_tables !== 10 ||
+    evidence.schema_contract?.table_inventory?.join("|") !==
+      expectedTables.join("|") ||
     evidence.schema_contract?.created_functions !== 2 ||
+    evidence.schema_contract?.function_inventory?.join("|") !==
+      expectedFunctions.join("|") ||
+    evidence.schema_contract?.created_triggers !== 9 ||
+    evidence.schema_contract?.trigger_inventory?.join("|") !==
+      expectedTriggers.join("|") ||
+    evidence.schema_contract?.created_explicit_indexes !== 0 ||
     evidence.schema_contract?.capability_grants_jurisdiction_fk !== true ||
     evidence.schema_contract?.policy_authority_provenance_enforced !== true ||
     evidence.schema_contract?.live_requires_launch_authorization !== true ||
+    evidence.schema_contract?.prerequisites_imply_live !== false ||
+    evidence.schema_contract?.active_policy_history_reconstructible !== true ||
     evidence.schema_contract?.counsel_values_seeded !== false ||
+    evidence.schema_contract?.california_specific_columns !== 0 ||
+    evidence.schema_contract?.attorney_service_areas_created !== false ||
+    evidence.schema_contract?.later_p1_objects_created !== false ||
+    !evidence.schema_contract?.financial_activity_rule?.includes(
+      "environment, LIVE jurisdiction, approved policy, and launch authorization",
+    )
+  ) {
+    fail(`${context} schema contract is invalid`);
+  }
+
+  const catalog = evidence.catalog_acceptance;
+  const capabilityGrantForeignKey =
+    catalog?.capability_grants_jurisdiction_id_fkey;
+  requireExactFields(
+    capabilityGrantForeignKey,
+    [
+      "constraint",
+      "source",
+      "target",
+      "on_update",
+      "on_delete",
+      "deferrable",
+      "initially_deferred",
+      "validated",
+      "structural_match",
+    ],
+    `${context}.catalog_acceptance.capability_grants_jurisdiction_id_fkey`,
+  );
+  if (
+    catalog?.status !== "passed" ||
+    catalog?.p1_003_tables !== 10 ||
+    catalog?.p1_003_columns !== 77 ||
+    catalog?.constraint_rows !== 53 ||
+    catalog?.ordinary_constraints !== 49 ||
+    catalog?.constraint_trigger_rows !== 4 ||
+    catalog?.constraint_backed_indexes !== 15 ||
+    catalog?.standalone_indexes !== 0 ||
+    catalog?.new_table_foreign_keys !== 15 ||
+    catalog?.capability_grants_foreign_keys !== 1 ||
+    catalog?.total_p1_003_foreign_keys !== 16 ||
+    capabilityGrantForeignKey.constraint !==
+      "capability_grants_jurisdiction_id_fkey" ||
+    capabilityGrantForeignKey.source !==
+      "public.capability_grants(jurisdiction_id)" ||
+    capabilityGrantForeignKey.target !== "public.jurisdictions(id)" ||
+    capabilityGrantForeignKey.on_update !== "RESTRICT" ||
+    capabilityGrantForeignKey.on_delete !== "RESTRICT" ||
+    capabilityGrantForeignKey.deferrable !== false ||
+    capabilityGrantForeignKey.initially_deferred !== false ||
+    capabilityGrantForeignKey.validated !== true ||
+    capabilityGrantForeignKey.structural_match !== true ||
+    catalog?.reviewed_enforcement_functions !== 2 ||
+    catalog?.reviewed_enabled_triggers !== 9 ||
+    catalog?.rls_enabled_tables !== 10 ||
+    catalog?.client_facing_policies !== 0 ||
+    catalog?.reviewed_privilege_model !== "passed" ||
+    catalog?.p1_003_rows !== 0 ||
+    catalog?.unexpected_objects_or_grants !== 0 ||
+    catalog?.california_specific_objects !== 0 ||
+    catalog?.later_p1_objects !== 0 ||
+    catalog?.p0_p1_001_p1_002_controls !== "intact"
+  ) {
+    fail(`${context} catalog acceptance is invalid`);
+  }
+
+  if (
     evidence.security?.rls_enabled_tables !== 10 ||
     evidence.security?.client_policies_created !== 0 ||
     evidence.security?.public_anon_authenticated_table_privileges !== 0 ||
     evidence.security?.service_role_privileges?.join("|") !==
       "SELECT|INSERT|UPDATE" ||
     evidence.security?.service_role_delete !== false ||
-    evidence.environment_integrity?.source_accessed !== false ||
-    evidence.environment_integrity?.production_accessed !== false ||
-    evidence.environment_integrity?.old_accessed !== false ||
-    evidence.environment_integrity?.staging_persistently_mutated !== false ||
-    evidence.acceptance_state !== "pending_protected_human_review" ||
+    evidence.security?.enforcement_functions_security !==
+      "SECURITY INVOKER with search_path pg_catalog" ||
+    evidence.security?.enforcement_function_execute?.PUBLIC !== false ||
+    evidence.security?.enforcement_function_execute?.anon !== false ||
+    evidence.security?.enforcement_function_execute?.authenticated !== false ||
+    evidence.security?.enforcement_function_execute?.postgres !== true ||
+    evidence.security?.enforcement_function_execute?.service_role !== true ||
+    evidence.security?.advisor_gate !== "zero_unapproved_findings" ||
+    evidence.security?.approved_info_findings?.join("|") !==
+      P1_REGULATORY_APPROVED_ADVISOR_FINDINGS.join("|") ||
+    evidence.security?.approved_p1_002_findings !== 3 ||
+    evidence.security?.approved_p1_003_findings !== 10 ||
+    evidence.security?.unapproved_findings !== 0
+  ) {
+    fail(`${context} security acceptance is invalid`);
+  }
+
+  const fingerprint = evidence.catalog_fingerprint;
+  if (
+    fingerprint?.scope !==
+      "P1-001 and P1-002 approved Staging catalog surface" ||
+    fingerprint?.algorithm !== "SHA-256" ||
+    fingerprint?.sha256 !==
+      "1d8e6182902d3c40d1b99c87bc80be2f146ef6a85f512b117e5c55b52878c12c" ||
+    fingerprint?.canonical_byte_length !== 50602 ||
+    fingerprint?.expected_p1_003_delta_rows?.join("|") !==
+      "constraint:public.capability_grants.capability_grants_jurisdiction_id_fkey|foreign_key:public.capability_grants.capability_grants_jurisdiction_id_fkey" ||
+    fingerprint?.reproduced_after_expected_delta_exclusion !== true
+  ) {
+    fail(`${context} catalog fingerprint is invalid`);
+  }
+
+  const cli = evidence.tooling_exceptions?.supabase_cli_schema_drift;
+  const validator = evidence.tooling_exceptions?.catalog_validator;
+  requireTimestamp(
+    validator?.correction_approved_at,
+    `${context}.tooling_exceptions.catalog_validator.correction_approved_at`,
+  );
+  if (
+    cli?.tool !== "official Supabase CLI" ||
+    cli?.version !== "2.116.0" ||
+    cli?.environment !== "Replit" ||
+    cli?.failure !==
+      "OCI namespace entry for pg_isready failed: setns exit status 1" ||
+    cli?.postgresql_initialized_and_ready !== true ||
+    cli?.p1_003_sql_or_schema_comparison_reached !== false ||
+    cli?.drift_sql_produced !== false ||
+    cli?.classification !== "environment-specific tooling exception" ||
+    cli?.compensating_direct_catalog_validation !== "passed" ||
+    cli?.persisted_schema_defect !== false ||
+    validator?.classification !== "validator classification/predicate defect" ||
+    validator?.persisted_schema_defect !== false ||
+    validator?.corrected_commit !==
+      "8e3795663372ecac3641078d0271ddeb800d609b" ||
+    validator?.protected_merge_commit !==
+      "615e293c15897da5b4e39aabea568c5cf90bf9cf" ||
+    validator?.correction_reviewed_by !== "Rosuno" ||
+    validator?.correction_approved_at !== "2026-08-30T19:51:17Z" ||
+    validator?.database_repair_required !== false
+  ) {
+    fail(`${context} tooling exception is invalid`);
+  }
+
+  const repository = evidence.repository_validation;
+  requireTimestamp(
+    repository?.completed_at,
+    `${context}.repository_validation.completed_at`,
+  );
+  if (
+    repository?.protected_main_commit !==
+      "615e293c15897da5b4e39aabea568c5cf90bf9cf" ||
+    repository?.ahead_behind !== "0/0" ||
+    repository?.working_tree_clean !== true ||
+    repository?.frozen_lockfile_install !== "passed" ||
+    repository?.formatting !== "passed" ||
+    repository?.typecheck !== "passed" ||
+    repository?.build !== "passed" ||
+    repository?.repository_controls !== "passed" ||
+    repository?.tests_passed !== 43 ||
+    repository?.tests_failed !== 0 ||
+    repository?.secret_scan !== "passed" ||
+    repository?.secret_scan_files !== 52 ||
+    repository?.dependency_security_audit !== "no known vulnerabilities" ||
+    repository?.migration_hashes_unchanged !== true
+  ) {
+    fail(`${context} repository acceptance is invalid`);
+  }
+
+  const implementationReview = evidence.review_traceability?.implementation;
+  const validatorReview = evidence.review_traceability?.validator_correction;
+  requireTimestamp(
+    implementationReview?.approved_at,
+    `${context}.review_traceability.implementation.approved_at`,
+  );
+  requireTimestamp(
+    validatorReview?.approved_at,
+    `${context}.review_traceability.validator_correction.approved_at`,
+  );
+  if (
+    implementationReview?.pull_request !== 7 ||
+    implementationReview?.approved_head !==
+      "279742dbacc06d09050a6f8bb5c57cdca9142b23" ||
+    implementationReview?.merge_commit !==
+      "0ba2331b88fd5f045573b3e2d140f03e240b6a77" ||
+    implementationReview?.reviewer !== "Rosuno" ||
+    implementationReview?.approved_at !== "2026-08-30T05:02:26Z" ||
+    validatorReview?.pull_request !== 8 ||
+    validatorReview?.approved_head !==
+      "8e3795663372ecac3641078d0271ddeb800d609b" ||
+    validatorReview?.merge_commit !==
+      "615e293c15897da5b4e39aabea568c5cf90bf9cf" ||
+    validatorReview?.reviewer !== "Rosuno" ||
+    validatorReview?.approved_at !== "2026-08-30T19:51:17Z"
+  ) {
+    fail(`${context} protected review traceability is invalid`);
+  }
+
+  const integrity = evidence.environment_integrity;
+  if (
+    integrity?.source_read_only_history?.join("|") !== "20260828192126" ||
+    integrity?.source_mutated !== false ||
+    integrity?.development_mutated !== false ||
+    integrity?.production_contacted_or_mutated !== false ||
+    integrity?.old_project_status !== "INACTIVE" ||
+    integrity?.old_read_only_listing !== "timed_out" ||
+    integrity?.old_mutated !== false ||
+    integrity?.old_inspection_limitation !==
+      "The final read-only OLD migration listing timed out; no successful final OLD catalog or history inspection is claimed." ||
+    integrity?.staging_persistently_mutated !== true ||
+    integrity?.staging_migration_history_exact !== true ||
+    integrity?.p0_p1_001_p1_002_controls_unchanged !== true ||
+    integrity?.migration_repair_or_reapplication !== false ||
+    integrity?.seed_or_fake_business_data_introduced !== false ||
+    evidence.acceptance_state !== "accepted_staging_application" ||
     evidence.next_gate !==
-      "protected PR approval and explicit merge authorization" ||
+      "separate protected review before production or P1-004" ||
     evidence.sensitive_payloads_present !== false
   ) {
-    fail(`${context} schema, security, environment, or gate state is invalid`);
+    fail(`${context} environment or acceptance state is invalid`);
   }
   validateReferences(
     evidence.authority_refs,
@@ -2559,6 +2876,91 @@ export function validateP1ApplicationTraceability(
   }
 }
 
+export function validateP1RegulatoryTraceability(
+  migrationRegister,
+  workItemRegister,
+  decisionRegister,
+  releaseRegister,
+) {
+  const migrationId = "20260830023823_p1_jurisdiction_policy_launch_foundation";
+  const workItemId = "WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION";
+  const decisionId = "DEC-20260830-P1-JURISDICTION-POLICY-LAUNCH-FOUNDATION";
+  const releaseId = "REL-20260830-P1-003-STAGING-APPLICATION";
+  const reviewedAt = "2026-08-30T05:02:26Z";
+  const acceptedAt = "2026-08-30T20:29:17Z";
+  const migration = migrationRegister.migrations.find(
+    (entry) => entry.migration_id === migrationId,
+  );
+  const workItem = workItemRegister.work_items.find(
+    (entry) => entry.work_item_id === workItemId,
+  );
+  const decision = decisionRegister.decisions.find(
+    (entry) => entry.decision_id === decisionId,
+  );
+  const release = releaseRegister.releases.find(
+    (entry) => entry.release_id === releaseId,
+  );
+
+  if (
+    !migration ||
+    migration.reviewed !== true ||
+    migration.reviewed_by !== "Rosuno" ||
+    migration.reviewed_at !== reviewedAt ||
+    migration.applied_environment !== "staging" ||
+    migration.non_production_validation !== true ||
+    migration.drift_check !==
+      "Supabase CLI shadow comparison unavailable because Replit OCI setns failed during pg_isready before P1-003 SQL or schema comparison; compensating corrected direct-catalog validation passed and no clean CLI drift result is claimed." ||
+    migration.release_refs?.join("|") !== releaseId
+  ) {
+    fail("P1-003 applied migration traceability is invalid");
+  }
+  if (
+    !workItem ||
+    workItem.status !== "completed" ||
+    workItem.environment !== "staging" ||
+    workItem.reviewer?.identity !== "Rosuno" ||
+    workItem.reviewer?.status !== "approved" ||
+    workItem.updated_at !== acceptedAt ||
+    workItem.release_refs?.join("|") !== releaseId
+  ) {
+    fail("P1-003 applied work-item traceability is invalid");
+  }
+  if (
+    !decision ||
+    decision.status !== "accepted" ||
+    decision.reviewer?.identity !== "Rosuno" ||
+    decision.reviewer?.status !== "approved" ||
+    decision.updated_at !== acceptedAt ||
+    !decision.evidence?.includes(
+      "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json",
+    ) ||
+    !decision.evidence?.includes("governance/releases/traceability.json")
+  ) {
+    fail("P1-003 applied decision traceability is invalid");
+  }
+  if (
+    !release ||
+    release.commit_sha !== "0ba2331b88fd5f045573b3e2d140f03e240b6a77" ||
+    release.artifact_digest !==
+      "sha256:94e9b746cf303154790bc51e8160f9184b2e9765e82ec2702e03030f7a79b7ee" ||
+    release.environment !== "staging" ||
+    release.reviewer?.identity !== "Rosuno" ||
+    release.reviewer?.status !== "approved" ||
+    release.created_at !== acceptedAt ||
+    release.work_item_refs?.join("|") !== workItemId ||
+    release.decision_refs?.join("|") !== decisionId ||
+    release.migration_refs?.join("|") !== migrationId ||
+    !release.validation_evidence?.includes(
+      "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json",
+    ) ||
+    !release.validation_evidence?.includes(
+      "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql",
+    )
+  ) {
+    fail("P1-003 Staging traceability record is invalid");
+  }
+}
+
 export function validateRestoreEvidence(evidence) {
   requireExactFields(
     evidence,
@@ -2811,9 +3213,15 @@ export function validateMigrationRegister(
       migration.migration_id === "20260829171701_p1_authorization_foundation" &&
       migration.drift_check ===
         "Supabase CLI shadow comparison unavailable after PostgreSQL readiness because OCI setns failed before pg_isready; compensating deterministic direct-catalog validation passed and no clean CLI drift result is claimed.";
+    const acceptedP1RegulatoryToolingException =
+      migration.migration_id ===
+        "20260830023823_p1_jurisdiction_policy_launch_foundation" &&
+      migration.drift_check ===
+        "Supabase CLI shadow comparison unavailable because Replit OCI setns failed during pg_isready before P1-003 SQL or schema comparison; compensating corrected direct-catalog validation passed and no clean CLI drift result is claimed.";
     if (
       migration.drift_check !== "clean" &&
-      !acceptedP1AuthorizationToolingException
+      !acceptedP1AuthorizationToolingException &&
+      !acceptedP1RegulatoryToolingException
     ) {
       fail(`${context} lacks a clean drift check`);
     }
@@ -3270,6 +3678,7 @@ export function validateRepository() {
     }
   });
   validateP1ApplicationTraceability(migrations, workItems, decisions, releases);
+  validateP1RegulatoryTraceability(migrations, workItems, decisions, releases);
   validateTraceabilityConsistency(migrations, releases);
 
   return {
@@ -3283,7 +3692,7 @@ export function validateRepository() {
       "sanitized non-production restore evidence",
       "reviewed and applied P1 Staging migration evidence",
       "P1-002 Staging evidence pending protected human review",
-      "P1-003 rollback-only Staging evidence pending protected human review",
+      "P1-003 accepted persistent Staging application evidence",
       "release traceability",
     ],
   };

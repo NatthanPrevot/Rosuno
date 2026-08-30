@@ -1,6 +1,6 @@
 # Rollback and recovery control
 
-No production release or deployment exists. This runbook defines the required evidence for a controlled migration/release and governs the reviewed P1 migration after its bounded persistent application to Rosuno Staging.
+No production release or deployment exists. This runbook defines the required evidence for a controlled migration/release and governs reviewed P1 migrations after bounded persistent application to Rosuno Staging. Any P1-003 rollback requires a separately reviewed migration limited to Migration 3 objects; direct history edits and changes to P0/P1-001/P1-002 controls remain prohibited.
 
 Every release record must identify:
 

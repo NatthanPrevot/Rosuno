@@ -88,11 +88,11 @@
     },
     {
       "decision_id": "DEC-20260830-P1-JURISDICTION-POLICY-LAUNCH-FOUNDATION",
-      "title": "Propose physical Migration 3 regulatory control foundation",
-      "status": "proposed",
-      "scope": "P1/1C jurisdiction, policy, and launch-gate foundation only; rollback-only Staging validation",
-      "decision": "Create one ordered Migration 3 artifact containing only jurisdiction-neutral jurisdictions and service areas, regulatory modes and their effective-dated jurisdiction relationships, versioned policy configuration with authority provenance, and launch gates, evaluations, and explicit launch authorizations. Complete the deferred capability-grant jurisdiction foreign key without adding a later-migration object or seeded regulatory value.",
-      "rationale": "Locked Physical Migration 3 owns this regulatory control plane. Counsel-gated codes and values remain unseeded configuration, verified authority provenance is required before policy approval, and a LIVE jurisdiction requires an independent active launch authorization rather than inheriting authorization from prerequisites or gate evaluations.",
+      "title": "Accept physical Migration 3 regulatory control foundation",
+      "status": "accepted",
+      "scope": "P1/1C jurisdiction, policy, and launch-gate foundation only; accepted Rosuno Staging application",
+      "decision": "Accept the protected-review-approved Migration 3 artifact and its one-time persistent Rosuno Staging application. The accepted boundary contains only jurisdiction-neutral jurisdictions and service areas, regulatory modes and their effective-dated jurisdiction relationships, versioned policy configuration with authority provenance, launch gates, evaluations, explicit launch authorizations, and the deferred restrictive capability-grant jurisdiction foreign key.",
+      "rationale": "Locked Physical Migration 3 owns this regulatory control plane. Final acceptance confirmed exact migration history and catalog structure, default-deny client security, zero seed data, intact prior controls, and no unapproved advisor finding. Counsel-gated values remain unseeded, verified authority provenance remains mandatory before policy approval, and LIVE jurisdiction status still requires an independent active launch authorization.",
       "authority_refs": [
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
@@ -104,16 +104,17 @@
       "work_item_refs": ["WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION"],
       "owner": "P1 implementation owner",
       "reviewer": {
-        "identity": "pending designated human PR review",
-        "status": "pending"
+        "identity": "Rosuno",
+        "status": "approved"
       },
       "created_at": "2026-08-30T02:38:23Z",
-      "updated_at": "2026-08-30T02:38:23Z",
+      "updated_at": "2026-08-30T20:29:17Z",
       "supersedes": [],
-      "impact": "Adds only a proposed, unreviewed Migration 3 artifact and sanitized rollback-only Staging evidence; it does not authorize persistent application, production release, counsel-gated configuration, or later P1 work.",
+      "impact": "Records the accepted non-production application of Migration 3 to Rosuno Staging only; it is not a production release, does not authorize counsel-gated configuration, and does not authorize P1-004 or later work.",
       "evidence": [
         "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql",
-        "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json"
+        "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json",
+        "governance/releases/traceability.json"
       ],
       "expiry": null
     }

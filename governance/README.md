@@ -6,25 +6,25 @@ This directory contains the accepted P0 controls and bounded P1 implementation e
 
 - The locked P0-001 requirement set remains the authority. This repository stores references to it only; it does not copy, amend, or reinterpret locked text.
 - Every decision, bounded work item, release record, and reviewed migration must link to an authority reference and its supporting evidence.
-- Unknown human reviewer identity remains an explicit external dependency unless verified review evidence exists. P1-001 records the verified Rosuno approval; an identity must never be silently invented.
+- Unknown human reviewer identity remains an explicit external dependency unless verified review evidence exists. P1-001 and P1-003 record verified Rosuno approvals; an identity must never be silently invented.
 
 ## Control map
 
-| Area              | Local control                                                                                                                          | External dependency                                |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Branches          | `main` is the integration branch; release branches are created only for a traced release                                               | GitHub protected-branch/ruleset configuration      |
-| Pull requests     | The PR template requires scope, authority, work item, validation, release, migration, and rollback evidence                            | GitHub required review and required-check rules    |
-| Ownership         | `CODEOWNERS` names the repository owner, `@NatthanPrevot`, as the owner of repository content                                          | Reviewer state remains explicit per bounded record |
-| Commits           | One logical P0 change per commit; commit messages reference a bounded work item                                                        | Remote merge enforcement                           |
-| Traceability      | Authority → decision → work item → commit/PR → release artifact → migration evidence                                                   | Release hosting and PR metadata                    |
-| Environments      | Development, staging/test, and production have distinct scopes and no implicit inheritance                                             | Replit/GitHub environment configuration            |
-| Secrets           | Values never belong in source, examples, logs, decisions, work items, or release records                                               | Secret store policy and CI secret scanning         |
-| Migrations        | The applied P0 security control, its inventory-only CLI representation, and reviewed Staging P1 Migration 1 are ordered and registered | Future protected review and migration execution    |
-| Schema drift      | The pre-application baseline stays empty; P1 evidence records exact post-application Staging drift checks                              | Future baseline transition approval                |
-| Releases          | A release is not traceable until all required references and validation evidence exist                                                 | Remote release artifact and approval               |
-| Rollback/recovery | Every future release records a reversible action and recovery owner/status                                                             | Runtime operator and production controls           |
-| Logging           | Structured, minimal, redacted logs are required; credentials and sensitive payloads are prohibited                                     | Runtime log sink and retention controls            |
-| Provider security | Least privilege, server-side credentials, no raw tokens, and explicit provider ownership are required                                  | Provider account and scope configuration           |
+| Area              | Local control                                                                                                         | External dependency                                |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Branches          | `main` is the integration branch; release branches are created only for a traced release                              | GitHub protected-branch/ruleset configuration      |
+| Pull requests     | The PR template requires scope, authority, work item, validation, release, migration, and rollback evidence           | GitHub required review and required-check rules    |
+| Ownership         | `CODEOWNERS` names the repository owner, `@NatthanPrevot`, as the owner of repository content                         | Reviewer state remains explicit per bounded record |
+| Commits           | One logical P0 change per commit; commit messages reference a bounded work item                                       | Remote merge enforcement                           |
+| Traceability      | Authority → decision → work item → commit/PR → release artifact → migration evidence                                  | Release hosting and PR metadata                    |
+| Environments      | Development, staging/test, and production have distinct scopes and no implicit inheritance                            | Replit/GitHub environment configuration            |
+| Secrets           | Values never belong in source, examples, logs, decisions, work items, or release records                              | Secret store policy and CI secret scanning         |
+| Migrations        | The applied P0 control, its inventory-only CLI representation, and ordered P1/1A–1C Staging migrations are registered | Future protected review and migration execution    |
+| Schema drift      | The pre-application baseline stays empty; P1 evidence records exact post-application Staging drift checks             | Future baseline transition approval                |
+| Releases          | A release is not traceable until all required references and validation evidence exist                                | Remote release artifact and approval               |
+| Rollback/recovery | Every future release records a reversible action and recovery owner/status                                            | Runtime operator and production controls           |
+| Logging           | Structured, minimal, redacted logs are required; credentials and sensitive payloads are prohibited                    | Runtime log sink and retention controls            |
+| Provider security | Least privilege, server-side credentials, no raw tokens, and explicit provider ownership are required                 | Provider account and scope configuration           |
 
 ## Branch and pull-request controls
 
@@ -52,13 +52,13 @@ The examples under `governance/environments/` contain placeholders only. Develop
 
 ## Migration and schema-drift review
 
-The reviewed-migration register contains the applied P0 security control and the protected-review-approved P1/1A platform migration applied only to Rosuno Staging. The P1 evidence records official CLI history reconciliation, exact reviewed catalog state, zero rows, restricted grants, clean drift, unchanged non-target environments, and no retained secrets. Any ordering gap, duplicate, scope expansion, drift item, unregistered file, generated history entry, or false review/application claim fails local validation.
+The reviewed-migration register contains the applied P0 security control and the ordered P1/1A–1C migrations applied only to Rosuno Staging. P1-003 closure records protected review, exact four-version history, corrected direct-catalog acceptance, zero rows, restricted grants, 13 explicitly approved default-deny INFO findings with zero others, tooling limitations, unchanged migration bytes, and no retained secrets. Any ordering gap, duplicate, scope expansion, unregistered file, generated history entry, unapproved security finding, or false review/application claim fails local validation.
 
 The P0 CLI migration file is an inventory representation of the already-applied historical Staging row. It was sourced from one read-only stored statement, does not authorize replay, and does not represent a remote history or schema mutation.
 
 ## Release, rollback, and recovery
 
-The P0 security-control record and one bounded P1 Staging application record are present; neither represents a production release or repository deployment. A traceability artifact must include its immutable commit, bounded work items, decisions, migration references, validation evidence, artifact digest, environment, reviewer state, rollback reference, and recovery evidence. Rollback is a controlled action with an explicit trigger, last-known-good reference, owner, verification, and recovery path.
+The P0 security-control record and two bounded P1 Staging application records are present; none represents a production release or repository deployment. A traceability artifact must include its immutable commit, bounded work items, decisions, migration references, validation evidence, artifact digest, environment, reviewer state, rollback reference, and recovery evidence. Rollback is a controlled action with an explicit trigger, last-known-good reference, owner, verification, and recovery path.
 
 ## Logging and provider security
 
