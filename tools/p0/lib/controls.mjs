@@ -3,6 +3,10 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  validateAdvisorFindings,
+  validateCatalogBaseline,
+} from "./catalog-fingerprint.mjs";
 
 const ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -1003,7 +1007,11 @@ export function validateP1AuthorizationMigration(
   }
 }
 
-export function validateP1AuthorizationEvidence(evidence, migrationSql) {
+export function validateP1AuthorizationEvidence(
+  evidence,
+  migrationSql,
+  catalogBaseline,
+) {
   const context = "P1 authorization evidence";
   requireExactFields(
     evidence,
@@ -1016,8 +1024,13 @@ export function validateP1AuthorizationEvidence(evidence, migrationSql) {
       "preflight",
       "migration",
       "transactional_validation",
+      "persistent_application_validation",
       "schema_contract",
       "privileges",
+      "catalog_fingerprint",
+      "security_advisor",
+      "drift_tooling_exception",
+      "environment_integrity",
       "acceptance_state",
       "next_gate",
       "sensitive_payloads_present",
@@ -1025,7 +1038,7 @@ export function validateP1AuthorizationEvidence(evidence, migrationSql) {
     context,
   );
   if (
-    evidence.version !== 1 ||
+    evidence.version !== 2 ||
     evidence.evidence_id !== "P1-002-AUTHORIZATION-FOUNDATION" ||
     evidence.work_item_id !== "WI-P1-002-AUTHORIZATION-FOUNDATION" ||
     evidence.scope !==
@@ -1041,13 +1054,13 @@ export function validateP1AuthorizationEvidence(evidence, migrationSql) {
     history?.p1_001_version !== "20260829000015" ||
     history?.p1_001_occurrences !== 1 ||
     history?.p1_002_version !== "20260829171701" ||
-    history?.p1_002_occurrences !== 0 ||
+    history?.p1_002_occurrences !== 1 ||
     evidence.preflight?.public_users_row_count !== 0 ||
     evidence.preflight?.public_users_schema_exact !== true ||
     evidence.preflight?.p0_invariants_unchanged !== true ||
     evidence.preflight?.p1_001_invariants_unchanged !== true ||
-    evidence.preflight?.schema_drift !== "clean" ||
-    evidence.preflight?.security_advisor_findings !== 0
+    evidence.preflight?.schema_drift !==
+      "cli_unavailable_compensating_catalog_passed"
   ) {
     fail(`${context} preflight is invalid`);
   }
@@ -1073,7 +1086,7 @@ export function validateP1AuthorizationEvidence(evidence, migrationSql) {
       "public.capability_grants_user_capability_idx" ||
     migration?.created_functions?.length !== 0 ||
     migration?.seeded_rows !== 0 ||
-    migration?.persistent_application !== false
+    migration?.persistent_application !== true
   ) {
     fail(`${context} migration record is invalid`);
   }
@@ -1145,10 +1158,87 @@ export function validateP1AuthorizationEvidence(evidence, migrationSql) {
   ) {
     fail(`${context} privilege boundary is invalid`);
   }
+  const persistent = evidence.persistent_application_validation;
+  requireTimestamp(
+    persistent?.completed_at,
+    `${context}.persistent_application_validation.completed_at`,
+  );
   if (
-    evidence.acceptance_state !== "validated_not_applied" ||
+    persistent?.environment !== "staging" ||
+    persistent?.migration_history_exact !== true ||
+    persistent?.public_table_count !== 7 ||
+    persistent?.p1_002_table_count !== 6 ||
+    persistent?.p1_002_column_count !== 41 ||
+    persistent?.p1_002_constraint_count !== 28 ||
+    persistent?.p1_002_index_count !== 12 ||
+    persistent?.p1_002_foreign_key_count !== 6 ||
+    persistent?.p1_002_policy_count !== 3 ||
+    persistent?.p1_002_trigger_count !== 6 ||
+    persistent?.p1_002_row_count !== 0 ||
+    persistent?.application_sessions_user_id_fkey_exact !== true ||
+    persistent?.p1_001_preserved !== true ||
+    persistent?.unexpected_objects_grants_or_policies !== 0 ||
+    persistent?.database_repair_required !== false
+  ) {
+    fail(`${context} persistent application validation is invalid`);
+  }
+  const baseline = validateCatalogBaseline(catalogBaseline);
+  if (
+    evidence.catalog_fingerprint?.baseline_path !==
+      "governance/evidence/p1-002-catalog-fingerprint.json" ||
+    evidence.catalog_fingerprint?.algorithm !== "SHA-256" ||
+    evidence.catalog_fingerprint?.sha256 !== baseline.sha256 ||
+    evidence.catalog_fingerprint?.canonical_byte_length !==
+      baseline.canonical_byte_length ||
+    evidence.catalog_fingerprint?.independent_read_only_runs !== 3 ||
+    evidence.catalog_fingerprint?.all_runs_identical !== true ||
+    evidence.catalog_fingerprint?.supplements_explicit_assertions !== true
+  ) {
+    fail(`${context} catalog fingerprint evidence is invalid`);
+  }
+  const advisor = evidence.security_advisor;
+  validateAdvisorFindings(advisor?.findings);
+  if (
+    advisor?.gate !== "zero_unapproved_findings" ||
+    advisor?.approved_findings !== 3 ||
+    advisor?.unapproved_findings !== 0 ||
+    advisor?.accepted_reason?.join("|") !==
+      "PUBLIC, anon, and authenticated have no table privileges|the tables are server-controlled|service_role has exactly SELECT, INSERT, UPDATE and no DELETE or other table privileges|no client-facing policy is required by locked authority|no-policy RLS deliberately applies PostgreSQL default denial|allow policies would alter the boundary|USING(false) policies would be redundant lint suppression, not improvement"
+  ) {
+    fail(`${context} security advisor exception is invalid`);
+  }
+  const drift = evidence.drift_tooling_exception;
+  if (
+    drift?.tool !== "official Supabase CLI" ||
+    drift?.version !== "2.116.0" ||
+    drift?.environment !== "Replit" ||
+    drift?.postgresql_initialized_and_ready !== true ||
+    drift?.failure !==
+      "OCI namespace entry for pg_isready failed: setns exit status 1" ||
+    drift?.shadow_migration_or_schema_comparison_reached !== false ||
+    drift?.drift_sql_produced !== false ||
+    drift?.clean_cli_drift_claimed !== false ||
+    drift?.compensating_direct_catalog_validation !== "passed" ||
+    drift?.database_repair_required !== false
+  ) {
+    fail(`${context} drift tooling exception is invalid`);
+  }
+  if (
+    evidence.environment_integrity?.source_contacted_or_mutated !== false ||
+    evidence.environment_integrity?.development_contacted_or_mutated !==
+      false ||
+    evidence.environment_integrity?.production_contacted_or_mutated !== false ||
+    evidence.environment_integrity?.old_contacted_or_mutated !== false ||
+    evidence.environment_integrity?.authority !==
+      "existing repository target and environment configuration evidence"
+  ) {
+    fail(`${context} environment integrity is invalid`);
+  }
+  if (
+    evidence.acceptance_state !==
+      "applied_to_staging_pending_protected_review" ||
     evidence.next_gate !==
-      "protected review and separate persistent-application authorization" ||
+      "protected human review before merge, production, or later P1 work" ||
     evidence.sensitive_payloads_present !== false
   ) {
     fail(`${context} acceptance gate is invalid`);
@@ -1669,10 +1759,16 @@ export function validateMigrationRegister(
         requireNonEmptyString(migration[field], `${context}.${field}`);
       }
     } else if (migration.reviewed === false) {
+      const pendingP1AuthorizationEvidence =
+        migration.migration_id ===
+          "20260829171701_p1_authorization_foundation" &&
+        migration.applied_environment === "staging" &&
+        migration.release_refs.length === 0;
       if (
         migration.reviewed_by !== "pending designated human PR review" ||
         migration.reviewed_at !== null ||
-        migration.applied_environment !== "none" ||
+        (migration.applied_environment !== "none" &&
+          !pendingP1AuthorizationEvidence) ||
         migration.release_refs.length !== 0
       ) {
         fail(`${context} proposed product migration gate is invalid`);
@@ -1715,7 +1811,14 @@ export function validateMigrationRegister(
     ) {
       fail(`${context} unapplied migration lacks rollback-only validation`);
     }
-    if (migration.drift_check !== "clean") {
+    const acceptedP1AuthorizationToolingException =
+      migration.migration_id === "20260829171701_p1_authorization_foundation" &&
+      migration.drift_check ===
+        "Supabase CLI shadow comparison unavailable after PostgreSQL readiness because OCI setns failed before pg_isready; compensating deterministic direct-catalog validation passed and no clean CLI drift result is claimed.";
+    if (
+      migration.drift_check !== "clean" &&
+      !acceptedP1AuthorizationToolingException
+    ) {
       fail(`${context} lacks a clean drift check`);
     }
     validateReferences(
@@ -2143,6 +2246,7 @@ export function validateRepository() {
       ),
       "utf8",
     ),
+    readJson("governance/evidence/p1-002-catalog-fingerprint.json"),
   );
   validateDriftReport(readJson("governance/schema-drift/baseline.json"));
   validateReleaseRegister(releases, references, (sha) => {
@@ -2169,7 +2273,7 @@ export function validateRepository() {
       "migration inventory and clean drift baseline",
       "sanitized non-production restore evidence",
       "reviewed and applied P1 Staging migration evidence",
-      "unreviewed rollback-only P1-002 Staging validation evidence",
+      "P1-002 Staging evidence pending protected human review",
       "release traceability",
     ],
   };

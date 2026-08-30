@@ -62,10 +62,10 @@
       "reviewed": false,
       "reviewed_by": "pending designated human PR review",
       "reviewed_at": null,
-      "applied_environment": "none",
+      "applied_environment": "staging",
       "non_production_validation": true,
-      "drift_check": "clean",
-      "rollback_plan": "This migration remains rollback-only and unapplied. If Staging validation fails after a separately authorized application, drop only the six Migration 2 tables and their capability-grant index through an independently reviewed non-production rollback; do not alter P0/P1-001 objects or migration history.",
+      "drift_check": "Supabase CLI shadow comparison unavailable after PostgreSQL readiness because OCI setns failed before pg_isready; compensating deterministic direct-catalog validation passed and no clean CLI drift result is claimed.",
+      "rollback_plan": "If protected review rejects the persistent Staging state, drop only the six Migration 2 tables and their capability-grant index through an independently reviewed non-production rollback migration; do not alter P0/P1-001 objects or migration history.",
       "depends_on": ["20260829000015_p1_platform_foundation"]
     }
   ]

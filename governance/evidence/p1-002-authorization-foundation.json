@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "evidence_id": "P1-002-AUTHORIZATION-FOUNDATION",
   "work_item_id": "WI-P1-002-AUTHORIZATION-FOUNDATION",
   "scope": "P1/1B physical Migration 2 authorization foundation only",
@@ -18,14 +18,13 @@
       "p1_001_version": "20260829000015",
       "p1_001_occurrences": 1,
       "p1_002_version": "20260829171701",
-      "p1_002_occurrences": 0
+      "p1_002_occurrences": 1
     },
     "public_users_row_count": 0,
     "public_users_schema_exact": true,
     "p0_invariants_unchanged": true,
     "p1_001_invariants_unchanged": true,
-    "schema_drift": "clean",
-    "security_advisor_findings": 0
+    "schema_drift": "cli_unavailable_compensating_catalog_passed"
   },
   "migration": {
     "migration_id": "20260829171701_p1_authorization_foundation",
@@ -44,7 +43,7 @@
     "created_indexes": ["public.capability_grants_user_capability_idx"],
     "created_functions": [],
     "seeded_rows": 0,
-    "persistent_application": false
+    "persistent_application": true
   },
   "transactional_validation": {
     "environment": "staging",
@@ -69,6 +68,24 @@
     "production_accessed": false,
     "old_project_accessed": false,
     "security_advisor_findings": 0
+  },
+  "persistent_application_validation": {
+    "completed_at": "2026-08-30T00:20:26Z",
+    "environment": "staging",
+    "migration_history_exact": true,
+    "public_table_count": 7,
+    "p1_002_table_count": 6,
+    "p1_002_column_count": 41,
+    "p1_002_constraint_count": 28,
+    "p1_002_index_count": 12,
+    "p1_002_foreign_key_count": 6,
+    "p1_002_policy_count": 3,
+    "p1_002_trigger_count": 6,
+    "p1_002_row_count": 0,
+    "application_sessions_user_id_fkey_exact": true,
+    "p1_001_preserved": true,
+    "unexpected_objects_grants_or_policies": 0,
+    "database_repair_required": false
   },
   "schema_contract": {
     "new_tables": [
@@ -112,7 +129,75 @@
     "service_role_select_insert_update": true,
     "service_role_delete": false
   },
-  "acceptance_state": "validated_not_applied",
-  "next_gate": "protected review and separate persistent-application authorization",
+  "catalog_fingerprint": {
+    "baseline_path": "governance/evidence/p1-002-catalog-fingerprint.json",
+    "algorithm": "SHA-256",
+    "sha256": "1d8e6182902d3c40d1b99c87bc80be2f146ef6a85f512b117e5c55b52878c12c",
+    "canonical_byte_length": 50602,
+    "independent_read_only_runs": 3,
+    "all_runs_identical": true,
+    "supplements_explicit_assertions": true
+  },
+  "security_advisor": {
+    "gate": "zero_unapproved_findings",
+    "approved_findings": 3,
+    "unapproved_findings": 0,
+    "findings": [
+      {
+        "identity": "rls_enabled_no_policy_public_application_sessions",
+        "name": "rls_enabled_no_policy",
+        "level": "INFO",
+        "schema": "public",
+        "table": "application_sessions",
+        "type": "table"
+      },
+      {
+        "identity": "rls_enabled_no_policy_public_capability_definitions",
+        "name": "rls_enabled_no_policy",
+        "level": "INFO",
+        "schema": "public",
+        "table": "capability_definitions",
+        "type": "table"
+      },
+      {
+        "identity": "rls_enabled_no_policy_public_capability_grants",
+        "name": "rls_enabled_no_policy",
+        "level": "INFO",
+        "schema": "public",
+        "table": "capability_grants",
+        "type": "table"
+      }
+    ],
+    "accepted_reason": [
+      "PUBLIC, anon, and authenticated have no table privileges",
+      "the tables are server-controlled",
+      "service_role has exactly SELECT, INSERT, UPDATE and no DELETE or other table privileges",
+      "no client-facing policy is required by locked authority",
+      "no-policy RLS deliberately applies PostgreSQL default denial",
+      "allow policies would alter the boundary",
+      "USING(false) policies would be redundant lint suppression, not improvement"
+    ]
+  },
+  "drift_tooling_exception": {
+    "tool": "official Supabase CLI",
+    "version": "2.116.0",
+    "environment": "Replit",
+    "postgresql_initialized_and_ready": true,
+    "failure": "OCI namespace entry for pg_isready failed: setns exit status 1",
+    "shadow_migration_or_schema_comparison_reached": false,
+    "drift_sql_produced": false,
+    "clean_cli_drift_claimed": false,
+    "compensating_direct_catalog_validation": "passed",
+    "database_repair_required": false
+  },
+  "environment_integrity": {
+    "source_contacted_or_mutated": false,
+    "development_contacted_or_mutated": false,
+    "production_contacted_or_mutated": false,
+    "old_contacted_or_mutated": false,
+    "authority": "existing repository target and environment configuration evidence"
+  },
+  "acceptance_state": "applied_to_staging_pending_protected_review",
+  "next_gate": "protected human review before merge, production, or later P1 work",
   "sensitive_payloads_present": false
 }
