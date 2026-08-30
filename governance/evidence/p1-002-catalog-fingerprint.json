@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "scope": "P1-001 and P1-002 approved Staging catalog surface",
+  "query_contract": "tools/p0/lib/catalog-fingerprint.mjs#CATALOG_SQL",
+  "normalization_contract": "rosuno-p1-catalog-v1",
+  "encoding": "UTF-8",
+  "line_ending": "LF",
+  "hashing_algorithm": "SHA-256",
+  "canonical_byte_length": 50602,
+  "excluded_metadata": [
+    "object identifiers",
+    "transaction identifiers",
+    "timestamps",
+    "physical storage identifiers and locations",
+    "generated execution ordering",
+    "backend and session values",
+    "environment-specific connection values"
+  ],
+  "historical_diagnostic": {
+    "value": "9984150cd18477095c120c4a38115ff7",
+    "status": "non-canonical; derivation was not retained"
+  },
+  "expected_category_counts": {
+    "table": 7,
+    "column": 46,
+    "constraint": 32,
+    "index": 14,
+    "foreign_key": 7,
+    "rls": 7,
+    "policy": 4,
+    "trigger": 7,
+    "function": 2,
+    "table_privilege": 35,
+    "function_privilege": 10
+  },
+  "sha256": "1d8e6182902d3c40d1b99c87bc80be2f146ef6a85f512b117e5c55b52878c12c"
+}

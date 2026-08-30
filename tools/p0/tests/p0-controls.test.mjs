@@ -188,6 +188,49 @@ test("P1 migration bytes remain exact and byte changes are rejected", () => {
   );
 });
 
+test("P1-002 requires the restrictive application-session user foreign key", () => {
+  const sql = readFileSync(
+    path.join(
+      ROOT,
+      "supabase/migrations/20260829171701_p1_authorization_foundation.sql",
+    ),
+    "utf8",
+  );
+  const migration = readJson("governance/migrations/reviewed-migrations.json")
+    .migrations[2];
+  const sessionUserForeignKey = `constraint application_sessions_user_id_fkey
+    foreign key (user_id)
+    references public.users (id)
+    on update restrict
+    on delete restrict`;
+
+  assert.doesNotThrow(() => validateP1AuthorizationMigration(sql, migration));
+  assert.ok(sql.includes(sessionUserForeignKey));
+
+  const invalidVariants = [
+    sql.replace(sessionUserForeignKey, ""),
+    sql.replace(
+      "application_sessions_user_id_fkey",
+      "application_sessions_account_id_fkey",
+    ),
+    sql.replace(
+      sessionUserForeignKey,
+      sessionUserForeignKey.replace("public.users", "public.changed_users"),
+    ),
+    sql.replace(
+      sessionUserForeignKey,
+      sessionUserForeignKey.replace("on delete restrict", "on delete cascade"),
+    ),
+  ];
+
+  for (const invalidSql of invalidVariants) {
+    assert.throws(
+      () => validateP1AuthorizationMigration(invalidSql, migration),
+      /missing/,
+    );
+  }
+});
+
 test("authorized P1 platform migration stays inside Migration 1", () => {
   const sql = readFileSync(
     path.join(

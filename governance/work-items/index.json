@@ -101,7 +101,7 @@
     {
       "work_item_id": "WI-P1-002-AUTHORIZATION-FOUNDATION",
       "title": "Define the authorization foundation without granting access",
-      "objective": "Create the smallest locked 1B physical authorization foundation after P1-001 while keeping it unreviewed, unapplied, and rollback-only.",
+      "objective": "Record the smallest locked 1B authorization foundation and its persistent Staging validation while preserving protected human review before merge.",
       "in_scope": [
         "client_profiles, attorney_profiles, and staff_profiles",
         "Stable capability definitions keyed by capability code",
@@ -109,10 +109,11 @@
         "Application session metadata with opaque non-secret reference",
         "Server-generated UUIDs/timestamps, restrictive relationships, lifecycle and validity constraints",
         "Explicit RLS, relationship-based authenticated profile reads, and least-privilege ACLs",
-        "One CLI-generated ordered migration artifact and sanitized rollback-only Staging evidence"
+        "One CLI-generated ordered migration artifact and sanitized persistent Staging evidence",
+        "Deterministic read-only catalog fingerprinting and exact advisor-exception enforcement"
       ],
       "out_of_scope": [
-        "Persistent application or production release",
+        "Production application or release",
         "Jurisdictions or a jurisdiction foreign key",
         "Authorization helper functions, SECURITY DEFINER functions, authentication workflows, account recovery, application code, UI, providers, seeds, and later P1 objects"
       ],
@@ -140,8 +141,11 @@
         "Anon and authenticated have no capability or session access; service_role has only SELECT, INSERT, UPDATE and no DELETE",
         "capability_grants.jurisdiction_id remains nullable without a foreign key until locked Migration 3",
         "No capability or entity rows are seeded and no P0/P1-001 object, ACL, policy, function, trigger, data, or history is changed",
-        "One rollback-only Staging transaction validates positive and negative constraints, privilege boundaries, rollback cleanup, unchanged migration history, unchanged non-target environments, and zero security-advisor findings",
-        "The migration remains unreviewed, unapplied, and validated_not_applied with no release record"
+        "Persistent Staging evidence validates constraints, privilege boundaries, exact migration history, unchanged non-target environments, and no database repair",
+        "The advisor gate accepts exactly three stable default-deny findings and rejects every unapproved finding",
+        "Three independent read-only catalog runs reproduce the deterministic SHA-256 baseline",
+        "The Supabase CLI OCI limitation is documented without claiming a clean CLI drift result",
+        "The migration remains pending protected human review with no release record"
       ],
       "validation_commands": [
         "pnpm install --frozen-lockfile",
