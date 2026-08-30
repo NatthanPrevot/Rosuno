@@ -1151,6 +1151,740 @@ export function validateP1RegulatoryMigration(
   }
 }
 
+const P1_REGULATORY_TABLES = [
+  "jurisdictions",
+  "service_areas",
+  "regulatory_modes",
+  "jurisdiction_regulatory_modes",
+  "policy_types",
+  "policy_versions",
+  "policy_authority_references",
+  "launch_gates",
+  "launch_gate_evaluations",
+  "launch_authorizations",
+];
+
+const P1_REGULATORY_CONSTRAINTS = [
+  ["jurisdictions", "jurisdictions_pkey", "p"],
+  ["jurisdictions", "jurisdictions_code_key", "u"],
+  ["jurisdictions", "jurisdictions_code_check", "c"],
+  ["jurisdictions", "jurisdictions_lifecycle_state_check", "c"],
+  ["jurisdictions", "jurisdictions_require_launch_authorization", "t"],
+  ["service_areas", "service_areas_pkey", "p"],
+  ["service_areas", "service_areas_jurisdiction_id_code_key", "u"],
+  ["service_areas", "service_areas_jurisdiction_id_fkey", "f"],
+  ["service_areas", "service_areas_code_check", "c"],
+  ["service_areas", "service_areas_effective_period_check", "c"],
+  ["regulatory_modes", "regulatory_modes_pkey", "p"],
+  ["regulatory_modes", "regulatory_modes_code_key", "u"],
+  ["regulatory_modes", "regulatory_modes_code_check", "c"],
+  ["jurisdiction_regulatory_modes", "jurisdiction_regulatory_modes_pkey", "p"],
+  [
+    "jurisdiction_regulatory_modes",
+    "jurisdiction_regulatory_modes_jurisdiction_id_fkey",
+    "f",
+  ],
+  [
+    "jurisdiction_regulatory_modes",
+    "jurisdiction_regulatory_modes_regulatory_mode_id_fkey",
+    "f",
+  ],
+  [
+    "jurisdiction_regulatory_modes",
+    "jurisdiction_regulatory_modes_effective_period_check",
+    "c",
+  ],
+  ["policy_types", "policy_types_pkey", "p"],
+  ["policy_types", "policy_types_code_check", "c"],
+  ["policy_versions", "policy_versions_pkey", "p"],
+  ["policy_versions", "policy_versions_scope_version_key", "u"],
+  ["policy_versions", "policy_versions_policy_type_code_fkey", "f"],
+  ["policy_versions", "policy_versions_jurisdiction_id_fkey", "f"],
+  ["policy_versions", "policy_versions_regulatory_mode_id_fkey", "f"],
+  ["policy_versions", "policy_versions_approved_by_user_id_fkey", "f"],
+  ["policy_versions", "policy_versions_supersedes_policy_version_id_fkey", "f"],
+  ["policy_versions", "policy_versions_parameters_check", "c"],
+  ["policy_versions", "policy_versions_status_check", "c"],
+  ["policy_versions", "policy_versions_effective_period_check", "c"],
+  ["policy_versions", "policy_versions_approval_pair_check", "c"],
+  ["policy_versions", "policy_versions_approval_state_check", "c"],
+  ["policy_versions", "policy_versions_effective_state_check", "c"],
+  ["policy_versions", "policy_versions_not_self_superseding_check", "c"],
+  ["policy_versions", "policy_versions_require_authority", "t"],
+  ["policy_authority_references", "policy_authority_references_pkey", "p"],
+  [
+    "policy_authority_references",
+    "policy_authority_references_policy_version_id_fkey",
+    "f",
+  ],
+  [
+    "policy_authority_references",
+    "policy_authority_references_verified_by_user_id_fkey",
+    "f",
+  ],
+  [
+    "policy_authority_references",
+    "policy_authority_references_verified_actor_check",
+    "c",
+  ],
+  [
+    "policy_authority_references",
+    "policy_authority_references_preserve_approval",
+    "t",
+  ],
+  ["launch_gates", "launch_gates_pkey", "p"],
+  ["launch_gates", "launch_gates_jurisdiction_id_gate_code_key", "u"],
+  ["launch_gates", "launch_gates_jurisdiction_id_fkey", "f"],
+  ["launch_gates", "launch_gates_gate_code_check", "c"],
+  ["launch_gate_evaluations", "launch_gate_evaluations_pkey", "p"],
+  [
+    "launch_gate_evaluations",
+    "launch_gate_evaluations_launch_gate_id_fkey",
+    "f",
+  ],
+  [
+    "launch_gate_evaluations",
+    "launch_gate_evaluations_evaluated_by_user_id_fkey",
+    "f",
+  ],
+  [
+    "launch_gate_evaluations",
+    "launch_gate_evaluations_evidence_reference_check",
+    "c",
+  ],
+  ["launch_authorizations", "launch_authorizations_pkey", "p"],
+  ["launch_authorizations", "launch_authorizations_jurisdiction_id_fkey", "f"],
+  [
+    "launch_authorizations",
+    "launch_authorizations_authorized_by_user_id_fkey",
+    "f",
+  ],
+  ["launch_authorizations", "launch_authorizations_reason_check", "c"],
+  ["launch_authorizations", "launch_authorizations_revoked_at_check", "c"],
+  [
+    "launch_authorizations",
+    "launch_authorizations_preserve_live_boundary",
+    "t",
+  ],
+];
+
+const P1_REGULATORY_INDEXES = [
+  [
+    "jurisdiction_regulatory_modes",
+    "jurisdiction_regulatory_modes_pkey",
+    ["jurisdiction_id", "regulatory_mode_id", "active_from"],
+    true,
+    "jurisdiction_regulatory_modes_pkey",
+    "p",
+  ],
+  [
+    "jurisdictions",
+    "jurisdictions_code_key",
+    ["code"],
+    false,
+    "jurisdictions_code_key",
+    "u",
+  ],
+  [
+    "jurisdictions",
+    "jurisdictions_pkey",
+    ["id"],
+    true,
+    "jurisdictions_pkey",
+    "p",
+  ],
+  [
+    "launch_authorizations",
+    "launch_authorizations_pkey",
+    ["id"],
+    true,
+    "launch_authorizations_pkey",
+    "p",
+  ],
+  [
+    "launch_gate_evaluations",
+    "launch_gate_evaluations_pkey",
+    ["id"],
+    true,
+    "launch_gate_evaluations_pkey",
+    "p",
+  ],
+  [
+    "launch_gates",
+    "launch_gates_jurisdiction_id_gate_code_key",
+    ["jurisdiction_id", "gate_code"],
+    false,
+    "launch_gates_jurisdiction_id_gate_code_key",
+    "u",
+  ],
+  ["launch_gates", "launch_gates_pkey", ["id"], true, "launch_gates_pkey", "p"],
+  [
+    "policy_authority_references",
+    "policy_authority_references_pkey",
+    ["id"],
+    true,
+    "policy_authority_references_pkey",
+    "p",
+  ],
+  [
+    "policy_types",
+    "policy_types_pkey",
+    ["code"],
+    true,
+    "policy_types_pkey",
+    "p",
+  ],
+  [
+    "policy_versions",
+    "policy_versions_pkey",
+    ["id"],
+    true,
+    "policy_versions_pkey",
+    "p",
+  ],
+  [
+    "policy_versions",
+    "policy_versions_scope_version_key",
+    [
+      "policy_type_code",
+      "jurisdiction_id",
+      "regulatory_mode_id",
+      "version_label",
+    ],
+    false,
+    "policy_versions_scope_version_key",
+    "u",
+  ],
+  [
+    "regulatory_modes",
+    "regulatory_modes_code_key",
+    ["code"],
+    false,
+    "regulatory_modes_code_key",
+    "u",
+  ],
+  [
+    "regulatory_modes",
+    "regulatory_modes_pkey",
+    ["id"],
+    true,
+    "regulatory_modes_pkey",
+    "p",
+  ],
+  [
+    "service_areas",
+    "service_areas_jurisdiction_id_code_key",
+    ["jurisdiction_id", "code"],
+    false,
+    "service_areas_jurisdiction_id_code_key",
+    "u",
+  ],
+  [
+    "service_areas",
+    "service_areas_pkey",
+    ["id"],
+    true,
+    "service_areas_pkey",
+    "p",
+  ],
+];
+
+const P1_REGULATORY_FOREIGN_KEYS = [
+  [
+    "service_areas",
+    "service_areas_jurisdiction_id_fkey",
+    ["jurisdiction_id"],
+    "jurisdictions",
+    ["id"],
+  ],
+  [
+    "jurisdiction_regulatory_modes",
+    "jurisdiction_regulatory_modes_jurisdiction_id_fkey",
+    ["jurisdiction_id"],
+    "jurisdictions",
+    ["id"],
+  ],
+  [
+    "jurisdiction_regulatory_modes",
+    "jurisdiction_regulatory_modes_regulatory_mode_id_fkey",
+    ["regulatory_mode_id"],
+    "regulatory_modes",
+    ["id"],
+  ],
+  [
+    "policy_versions",
+    "policy_versions_policy_type_code_fkey",
+    ["policy_type_code"],
+    "policy_types",
+    ["code"],
+  ],
+  [
+    "policy_versions",
+    "policy_versions_jurisdiction_id_fkey",
+    ["jurisdiction_id"],
+    "jurisdictions",
+    ["id"],
+  ],
+  [
+    "policy_versions",
+    "policy_versions_regulatory_mode_id_fkey",
+    ["regulatory_mode_id"],
+    "regulatory_modes",
+    ["id"],
+  ],
+  [
+    "policy_versions",
+    "policy_versions_approved_by_user_id_fkey",
+    ["approved_by_user_id"],
+    "users",
+    ["id"],
+  ],
+  [
+    "policy_versions",
+    "policy_versions_supersedes_policy_version_id_fkey",
+    ["supersedes_policy_version_id"],
+    "policy_versions",
+    ["id"],
+  ],
+  [
+    "policy_authority_references",
+    "policy_authority_references_policy_version_id_fkey",
+    ["policy_version_id"],
+    "policy_versions",
+    ["id"],
+  ],
+  [
+    "policy_authority_references",
+    "policy_authority_references_verified_by_user_id_fkey",
+    ["verified_by_user_id"],
+    "users",
+    ["id"],
+  ],
+  [
+    "launch_gates",
+    "launch_gates_jurisdiction_id_fkey",
+    ["jurisdiction_id"],
+    "jurisdictions",
+    ["id"],
+  ],
+  [
+    "launch_gate_evaluations",
+    "launch_gate_evaluations_launch_gate_id_fkey",
+    ["launch_gate_id"],
+    "launch_gates",
+    ["id"],
+  ],
+  [
+    "launch_gate_evaluations",
+    "launch_gate_evaluations_evaluated_by_user_id_fkey",
+    ["evaluated_by_user_id"],
+    "users",
+    ["id"],
+  ],
+  [
+    "launch_authorizations",
+    "launch_authorizations_jurisdiction_id_fkey",
+    ["jurisdiction_id"],
+    "jurisdictions",
+    ["id"],
+  ],
+  [
+    "launch_authorizations",
+    "launch_authorizations_authorized_by_user_id_fkey",
+    ["authorized_by_user_id"],
+    "users",
+    ["id"],
+  ],
+  [
+    "capability_grants",
+    "capability_grants_jurisdiction_id_fkey",
+    ["jurisdiction_id"],
+    "jurisdictions",
+    ["id"],
+  ],
+];
+
+export const P1_REGULATORY_CATALOG_SQL = String.raw`
+WITH target_tables(schema_name, table_name) AS (
+  VALUES
+    ('public','jurisdictions'),
+    ('public','service_areas'),
+    ('public','regulatory_modes'),
+    ('public','jurisdiction_regulatory_modes'),
+    ('public','policy_types'),
+    ('public','policy_versions'),
+    ('public','policy_authority_references'),
+    ('public','launch_gates'),
+    ('public','launch_gate_evaluations'),
+    ('public','launch_authorizations')
+),
+constraint_rows AS (
+  SELECT
+    n.nspname::text AS "schema",
+    tbl.relname::text AS "table",
+    con.conname::text AS name,
+    con.contype::text AS type,
+    pg_get_constraintdef(con.oid, true) AS definition,
+    ref_ns.nspname::text AS referenced_schema,
+    ref.relname::text AS referenced_table
+  FROM pg_constraint con
+  JOIN pg_class tbl ON tbl.oid = con.conrelid
+  JOIN pg_namespace n ON n.oid = tbl.relnamespace
+  JOIN target_tables target
+    ON target.schema_name = n.nspname
+   AND target.table_name = tbl.relname
+  LEFT JOIN pg_class ref ON ref.oid = con.confrelid
+  LEFT JOIN pg_namespace ref_ns ON ref_ns.oid = ref.relnamespace
+),
+index_rows AS (
+  SELECT
+    n.nspname::text AS "schema",
+    tbl.relname::text AS "table",
+    idx.relname::text AS name,
+    COALESCE((
+      SELECT jsonb_agg(pg_get_indexdef(idx.oid, item.ordinal, true) ORDER BY item.ordinal)
+      FROM generate_series(1, ind.indnkeyatts) item(ordinal)
+    ), '[]'::jsonb) AS columns,
+    ind.indisunique AS is_unique,
+    ind.indisprimary AS is_primary,
+    own_constraint.oid IS NOT NULL AS constraint_backed,
+    own_constraint.conname::text AS associated_constraint_name,
+    own_constraint.contype::text AS associated_constraint_type,
+    pg_get_indexdef(idx.oid) AS definition
+  FROM pg_index ind
+  JOIN pg_class tbl ON tbl.oid = ind.indrelid
+  JOIN pg_namespace n ON n.oid = tbl.relnamespace
+  JOIN pg_class idx ON idx.oid = ind.indexrelid
+  JOIN target_tables target
+    ON target.schema_name = n.nspname
+   AND target.table_name = tbl.relname
+  LEFT JOIN pg_constraint own_constraint
+    ON own_constraint.conindid = idx.oid
+   AND own_constraint.conrelid = tbl.oid
+   AND own_constraint.contype IN ('p', 'u', 'x')
+),
+foreign_key_rows AS (
+  SELECT
+    n.nspname::text AS "schema",
+    src.relname::text AS "table",
+    con.conname::text AS name,
+    COALESCE((
+      SELECT jsonb_agg(attr.attname ORDER BY item.ordinal)
+      FROM unnest(con.conkey) WITH ORDINALITY item(attnum, ordinal)
+      JOIN pg_attribute attr
+        ON attr.attrelid = con.conrelid
+       AND attr.attnum = item.attnum
+    ), '[]'::jsonb) AS columns,
+    ref_ns.nspname::text AS referenced_schema,
+    ref.relname::text AS referenced_table,
+    COALESCE((
+      SELECT jsonb_agg(attr.attname ORDER BY item.ordinal)
+      FROM unnest(con.confkey) WITH ORDINALITY item(attnum, ordinal)
+      JOIN pg_attribute attr
+        ON attr.attrelid = con.confrelid
+       AND attr.attnum = item.attnum
+    ), '[]'::jsonb) AS referenced_columns,
+    pg_get_constraintdef(con.oid, true) AS definition,
+    CASE con.confupdtype
+      WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
+      WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
+      WHEN 'd' THEN 'SET DEFAULT'
+    END AS update_action,
+    CASE con.confdeltype
+      WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
+      WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
+      WHEN 'd' THEN 'SET DEFAULT'
+    END AS delete_action,
+    con.condeferrable AS deferrable,
+    con.condeferred AS initially_deferred,
+    con.convalidated AS validated
+  FROM pg_constraint con
+  JOIN pg_class src ON src.oid = con.conrelid
+  JOIN pg_namespace n ON n.oid = src.relnamespace
+  JOIN pg_class ref ON ref.oid = con.confrelid
+  JOIN pg_namespace ref_ns ON ref_ns.oid = ref.relnamespace
+  LEFT JOIN target_tables target
+    ON target.schema_name = n.nspname
+   AND target.table_name = src.relname
+  WHERE con.contype = 'f'
+    AND (
+      target.table_name IS NOT NULL
+      OR (
+        n.nspname = 'public'
+        AND src.relname = 'capability_grants'
+        AND con.conname = 'capability_grants_jurisdiction_id_fkey'
+      )
+    )
+)
+SELECT jsonb_build_object(
+  'constraints', COALESCE((
+    SELECT jsonb_agg(to_jsonb(item) ORDER BY item."schema", item."table", item.name)
+    FROM constraint_rows item
+  ), '[]'::jsonb),
+  'indexes', COALESCE((
+    SELECT jsonb_agg(to_jsonb(item) ORDER BY item."schema", item."table", item.name)
+    FROM index_rows item
+  ), '[]'::jsonb),
+  'foreign_keys', COALESCE((
+    SELECT jsonb_agg(to_jsonb(item) ORDER BY item."schema", item."table", item.name)
+    FROM foreign_key_rows item
+  ), '[]'::jsonb)
+)::text;
+`;
+
+function catalogRowIdentity(row) {
+  return `${row.schema}.${row.table}.${row.name}`;
+}
+
+function requireCatalogArray(value, expectedLength, context) {
+  requireArray(value, context);
+  if (value.length !== expectedLength) {
+    fail(`${context} must contain exactly ${expectedLength} rows`);
+  }
+}
+
+function requireStringArrayExact(value, expected, context) {
+  if (
+    !Array.isArray(value) ||
+    JSON.stringify(value) !== JSON.stringify(expected)
+  ) {
+    fail(`${context} is structurally different`);
+  }
+}
+
+export function validateP1RegulatoryCatalog(
+  catalog,
+  context = "P1 jurisdiction/policy/launch catalog",
+) {
+  requireExactFields(
+    catalog,
+    ["constraints", "indexes", "foreign_keys"],
+    context,
+  );
+
+  const expectedConstraints = new Map(
+    P1_REGULATORY_CONSTRAINTS.map(([table, name, type]) => [
+      `public.${table}.${name}`,
+      type,
+    ]),
+  );
+  requireCatalogArray(
+    catalog.constraints,
+    expectedConstraints.size,
+    `${context}.constraints`,
+  );
+  const observedConstraints = new Set();
+  for (const [index, row] of catalog.constraints.entries()) {
+    const rowContext = `${context}.constraints[${index}]`;
+    requireExactFields(
+      row,
+      [
+        "schema",
+        "table",
+        "name",
+        "type",
+        "definition",
+        "referenced_schema",
+        "referenced_table",
+      ],
+      rowContext,
+    );
+    const identity = catalogRowIdentity(row);
+    if (observedConstraints.has(identity)) {
+      fail(`${rowContext} duplicates ${identity}`);
+    }
+    observedConstraints.add(identity);
+    const expectedType = expectedConstraints.get(identity);
+    if (expectedType === undefined) {
+      fail(`${rowContext} is an unexpected constraint ${identity}`);
+    }
+    if (row.type !== expectedType) {
+      fail(`${rowContext} has the wrong constraint type`);
+    }
+    requireBoundedString(row.definition, `${rowContext}.definition`, 4000);
+    if (row.type === "t" && row.definition !== "TRIGGER") {
+      fail(`${rowContext} is not the reviewed constraint-trigger row`);
+    }
+  }
+  for (const identity of expectedConstraints.keys()) {
+    if (!observedConstraints.has(identity)) {
+      fail(`${context}.constraints is missing ${identity}`);
+    }
+  }
+  const constraintTriggerCount = catalog.constraints.filter(
+    (row) => row.type === "t",
+  ).length;
+  const ordinaryConstraintCount =
+    catalog.constraints.length - constraintTriggerCount;
+  if (constraintTriggerCount !== 4 || ordinaryConstraintCount !== 49) {
+    fail(
+      `${context}.constraints has an invalid ordinary/trigger classification`,
+    );
+  }
+
+  const expectedIndexes = new Map(
+    P1_REGULATORY_INDEXES.map(
+      ([table, name, columns, primary, constraintName, constraintType]) => [
+        `public.${table}.${name}`,
+        { columns, primary, constraintName, constraintType },
+      ],
+    ),
+  );
+  requireCatalogArray(
+    catalog.indexes,
+    expectedIndexes.size,
+    `${context}.indexes`,
+  );
+  const observedIndexes = new Set();
+  for (const [index, row] of catalog.indexes.entries()) {
+    const rowContext = `${context}.indexes[${index}]`;
+    requireExactFields(
+      row,
+      [
+        "schema",
+        "table",
+        "name",
+        "columns",
+        "is_unique",
+        "is_primary",
+        "constraint_backed",
+        "associated_constraint_name",
+        "associated_constraint_type",
+        "definition",
+      ],
+      rowContext,
+    );
+    const identity = catalogRowIdentity(row);
+    if (observedIndexes.has(identity))
+      fail(`${rowContext} duplicates ${identity}`);
+    observedIndexes.add(identity);
+    const expected = expectedIndexes.get(identity);
+    if (expected === undefined) {
+      fail(
+        `${rowContext} is an unexpected standalone or constraint-backed index ${identity}`,
+      );
+    }
+    requireStringArrayExact(
+      row.columns,
+      expected.columns,
+      `${rowContext}.columns`,
+    );
+    requireBoundedString(row.definition, `${rowContext}.definition`, 4000);
+    if (
+      row.is_unique !== true ||
+      row.is_primary !== expected.primary ||
+      row.constraint_backed !== true ||
+      row.associated_constraint_name !== expected.constraintName ||
+      row.associated_constraint_type !== expected.constraintType
+    ) {
+      fail(`${rowContext} is not the reviewed constraint-backed index`);
+    }
+  }
+  for (const identity of expectedIndexes.keys()) {
+    if (!observedIndexes.has(identity))
+      fail(`${context}.indexes is missing ${identity}`);
+  }
+
+  const expectedForeignKeys = new Map(
+    P1_REGULATORY_FOREIGN_KEYS.map(
+      ([table, name, columns, referencedTable, referencedColumns]) => [
+        `public.${table}.${name}`,
+        { columns, referencedTable, referencedColumns },
+      ],
+    ),
+  );
+  requireCatalogArray(
+    catalog.foreign_keys,
+    expectedForeignKeys.size,
+    `${context}.foreign_keys`,
+  );
+  const observedForeignKeys = new Set();
+  for (const [index, row] of catalog.foreign_keys.entries()) {
+    const rowContext = `${context}.foreign_keys[${index}]`;
+    requireExactFields(
+      row,
+      [
+        "schema",
+        "table",
+        "name",
+        "columns",
+        "referenced_schema",
+        "referenced_table",
+        "referenced_columns",
+        "definition",
+        "update_action",
+        "delete_action",
+        "deferrable",
+        "initially_deferred",
+        "validated",
+      ],
+      rowContext,
+    );
+    const identity = catalogRowIdentity(row);
+    if (observedForeignKeys.has(identity))
+      fail(`${rowContext} duplicates ${identity}`);
+    observedForeignKeys.add(identity);
+    const expected = expectedForeignKeys.get(identity);
+    if (expected === undefined) {
+      fail(`${rowContext} is an unexpected foreign key ${identity}`);
+    }
+    requireStringArrayExact(
+      row.columns,
+      expected.columns,
+      `${rowContext}.columns`,
+    );
+    requireStringArrayExact(
+      row.referenced_columns,
+      expected.referencedColumns,
+      `${rowContext}.referenced_columns`,
+    );
+    requireBoundedString(row.definition, `${rowContext}.definition`, 4000);
+    if (
+      row.referenced_schema !== "public" ||
+      row.referenced_table !== expected.referencedTable ||
+      row.update_action !== "RESTRICT" ||
+      row.delete_action !== "RESTRICT" ||
+      row.deferrable !== false ||
+      row.initially_deferred !== false ||
+      row.validated !== true
+    ) {
+      fail(
+        `${rowContext} is structurally different from the reviewed foreign key`,
+      );
+    }
+  }
+  for (const identity of expectedForeignKeys.keys()) {
+    if (!observedForeignKeys.has(identity)) {
+      fail(`${context}.foreign_keys is missing ${identity}`);
+    }
+  }
+  const newTableForeignKeys = catalog.foreign_keys.filter((row) =>
+    P1_REGULATORY_TABLES.includes(row.table),
+  ).length;
+  const capabilityGrantForeignKeys = catalog.foreign_keys.filter(
+    (row) =>
+      row.table === "capability_grants" &&
+      row.name === "capability_grants_jurisdiction_id_fkey",
+  ).length;
+  if (newTableForeignKeys !== 15 || capabilityGrantForeignKeys !== 1) {
+    fail(`${context}.foreign_keys has an invalid scope classification`);
+  }
+
+  return {
+    total_constraint_rows: catalog.constraints.length,
+    ordinary_constraints: ordinaryConstraintCount,
+    constraint_triggers: constraintTriggerCount,
+    constraint_backed_indexes: catalog.indexes.filter(
+      (row) => row.constraint_backed,
+    ).length,
+    standalone_indexes: catalog.indexes.filter((row) => !row.constraint_backed)
+      .length,
+    new_table_foreign_keys: newTableForeignKeys,
+    capability_grants_foreign_keys: capabilityGrantForeignKeys,
+    total_p1_003_foreign_keys: catalog.foreign_keys.length,
+  };
+}
+
 export function validateP1RegulatoryEvidence(evidence, migrationSql) {
   const context = "P1 jurisdiction/policy/launch evidence";
   requireExactFields(
