@@ -85,6 +85,37 @@
         "governance/evidence/p1-002-authorization-foundation.json"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260830-P1-JURISDICTION-POLICY-LAUNCH-FOUNDATION",
+      "title": "Propose physical Migration 3 regulatory control foundation",
+      "status": "proposed",
+      "scope": "P1/1C jurisdiction, policy, and launch-gate foundation only; rollback-only Staging validation",
+      "decision": "Create one ordered Migration 3 artifact containing only jurisdiction-neutral jurisdictions and service areas, regulatory modes and their effective-dated jurisdiction relationships, versioned policy configuration with authority provenance, and launch gates, evaluations, and explicit launch authorizations. Complete the deferred capability-grant jurisdiction foreign key without adding a later-migration object or seeded regulatory value.",
+      "rationale": "Locked Physical Migration 3 owns this regulatory control plane. Counsel-gated codes and values remain unseeded configuration, verified authority provenance is required before policy approval, and a LIVE jurisdiction requires an independent active launch authorization rather than inheriting authorization from prerequisites or gate evaluations.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION"],
+      "owner": "P1 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "created_at": "2026-08-30T02:38:23Z",
+      "updated_at": "2026-08-30T02:38:23Z",
+      "supersedes": [],
+      "impact": "Adds only a proposed, unreviewed Migration 3 artifact and sanitized rollback-only Staging evidence; it does not authorize persistent application, production release, counsel-gated configuration, or later P1 work.",
+      "evidence": [
+        "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql",
+        "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json"
+      ],
+      "expiry": null
     }
   ]
 }

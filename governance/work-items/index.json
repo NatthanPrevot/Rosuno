@@ -163,6 +163,74 @@
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-08-29T17:17:01Z",
       "updated_at": "2026-08-29T17:17:01Z"
+    },
+    {
+      "work_item_id": "WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION",
+      "title": "Define the jurisdiction-neutral regulatory control plane",
+      "objective": "Implement locked Physical Migration 3 without inventing counsel-gated values, making gate completion equivalent to launch authorization, or crossing into a later P1 group.",
+      "in_scope": [
+        "Jurisdictions and jurisdiction-scoped service areas",
+        "Regulatory modes and effective-dated jurisdiction relationships",
+        "Policy types, effective-dated policy versions, and verified authority provenance",
+        "Launch gates, evaluation history, and explicit launch-authorization history",
+        "Deferred restrictive capability_grants jurisdiction foreign key",
+        "Explicit RLS, default-deny client boundary, and least-privilege server ACLs",
+        "One CLI-generated ordered migration artifact and sanitized rollback-only Staging evidence"
+      ],
+      "out_of_scope": [
+        "California-specific columns, regulatory-mode rows, policy rows, launch-gate rows, or other counsel-gated values",
+        "Attorney service-area participation, attorney verification, eligibility, referrals, intake, scheduling, consultations, communications, financial objects, and every Migration 4 or later object",
+        "Authentication workflows, application code, product UI, providers, fake data, production deployment, and persistent P1-003 application"
+      ],
+      "status": "proposed",
+      "owner": "P1 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20260830-P1-JURISDICTION-POLICY-LAUNCH-FOUNDATION"
+      ],
+      "dependencies": ["WI-P1-002-AUTHORIZATION-FOUNDATION"],
+      "acceptance_criteria": [
+        "The migration creates exactly the ten bounded Migration 3 tables and the deferred restrictive capability-grant jurisdiction foreign key",
+        "No California-specific schema element, counsel-gated configuration value, policy, jurisdiction, capability, launch gate, or other business row is seeded",
+        "Jurisdiction lifecycle is jurisdiction-neutral and LIVE requires a separate active human launch authorization",
+        "Policy history remains reconstructible by explicit version, scope, status, and effective period rather than a latest-row shortcut",
+        "A policy cannot enter an approved-or-later state without an approving user and at least one verified human authority reference",
+        "RLS is enabled on every new relation; PUBLIC, anon, and authenticated have no table privileges or client-facing policy",
+        "service_role has only SELECT, INSERT, UPDATE and no DELETE on every new relation",
+        "Rollback-only Staging tests cover valid configuration, invalid lifecycle/effective periods, missing policy provenance, and missing launch authorization",
+        "Rollback leaves migration history, P0, P1-001, P1-002, rows, objects, grants, functions, and triggers exactly unchanged",
+        "Persistent application remains blocked until protected human review and separate post-merge authorization"
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check"
+      ],
+      "environment": "staging",
+      "release_refs": [],
+      "migration_refs": [
+        "20260830023823_p1_jurisdiction_policy_launch_foundation"
+      ],
+      "rollback_reference": "governance/rollback-recovery.md",
+      "created_at": "2026-08-30T02:38:23Z",
+      "updated_at": "2026-08-30T02:38:23Z"
     }
   ]
 }

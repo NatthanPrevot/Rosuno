@@ -66,6 +66,17 @@
       "integrity": "verified during P1 authority review",
       "usage": "reference-only",
       "status": "active"
+    },
+    {
+      "authority_id": "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+      "title": "Rosuno Technical Architecture V0.2 - CONSOLIDATED / LOCKED",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "verified during P1-003 authority review",
+      "usage": "reference-only",
+      "status": "active"
     }
   ]
 }
