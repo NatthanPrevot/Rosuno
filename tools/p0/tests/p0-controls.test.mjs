@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  P1_REGULATORY_CATALOG_SQL,
   ROOT,
   scanSecretLikeText,
   validateCiWorkflow,
@@ -20,6 +21,7 @@ import {
   validateP1ApplicationTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
+  validateP1RegulatoryCatalog,
   validateP1RegulatoryMigration,
   validateReleaseRegister,
   validateRepository,
@@ -82,6 +84,206 @@ function validWorkItem() {
     rollback_reference: "governance/rollback-recovery.md",
     created_at: "2026-08-28T10:00:00Z",
     updated_at: "2026-08-28T10:00:00Z",
+  };
+}
+
+const p1RegulatoryConstraintSpecifications = `
+jurisdictions|jurisdictions_pkey|p
+jurisdictions|jurisdictions_code_key|u
+jurisdictions|jurisdictions_code_check|c
+jurisdictions|jurisdictions_lifecycle_state_check|c
+jurisdictions|jurisdictions_require_launch_authorization|t
+service_areas|service_areas_pkey|p
+service_areas|service_areas_jurisdiction_id_code_key|u
+service_areas|service_areas_jurisdiction_id_fkey|f
+service_areas|service_areas_code_check|c
+service_areas|service_areas_effective_period_check|c
+regulatory_modes|regulatory_modes_pkey|p
+regulatory_modes|regulatory_modes_code_key|u
+regulatory_modes|regulatory_modes_code_check|c
+jurisdiction_regulatory_modes|jurisdiction_regulatory_modes_pkey|p
+jurisdiction_regulatory_modes|jurisdiction_regulatory_modes_jurisdiction_id_fkey|f
+jurisdiction_regulatory_modes|jurisdiction_regulatory_modes_regulatory_mode_id_fkey|f
+jurisdiction_regulatory_modes|jurisdiction_regulatory_modes_effective_period_check|c
+policy_types|policy_types_pkey|p
+policy_types|policy_types_code_check|c
+policy_versions|policy_versions_pkey|p
+policy_versions|policy_versions_scope_version_key|u
+policy_versions|policy_versions_policy_type_code_fkey|f
+policy_versions|policy_versions_jurisdiction_id_fkey|f
+policy_versions|policy_versions_regulatory_mode_id_fkey|f
+policy_versions|policy_versions_approved_by_user_id_fkey|f
+policy_versions|policy_versions_supersedes_policy_version_id_fkey|f
+policy_versions|policy_versions_parameters_check|c
+policy_versions|policy_versions_status_check|c
+policy_versions|policy_versions_effective_period_check|c
+policy_versions|policy_versions_approval_pair_check|c
+policy_versions|policy_versions_approval_state_check|c
+policy_versions|policy_versions_effective_state_check|c
+policy_versions|policy_versions_not_self_superseding_check|c
+policy_versions|policy_versions_require_authority|t
+policy_authority_references|policy_authority_references_pkey|p
+policy_authority_references|policy_authority_references_policy_version_id_fkey|f
+policy_authority_references|policy_authority_references_verified_by_user_id_fkey|f
+policy_authority_references|policy_authority_references_verified_actor_check|c
+policy_authority_references|policy_authority_references_preserve_approval|t
+launch_gates|launch_gates_pkey|p
+launch_gates|launch_gates_jurisdiction_id_gate_code_key|u
+launch_gates|launch_gates_jurisdiction_id_fkey|f
+launch_gates|launch_gates_gate_code_check|c
+launch_gate_evaluations|launch_gate_evaluations_pkey|p
+launch_gate_evaluations|launch_gate_evaluations_launch_gate_id_fkey|f
+launch_gate_evaluations|launch_gate_evaluations_evaluated_by_user_id_fkey|f
+launch_gate_evaluations|launch_gate_evaluations_evidence_reference_check|c
+launch_authorizations|launch_authorizations_pkey|p
+launch_authorizations|launch_authorizations_jurisdiction_id_fkey|f
+launch_authorizations|launch_authorizations_authorized_by_user_id_fkey|f
+launch_authorizations|launch_authorizations_reason_check|c
+launch_authorizations|launch_authorizations_revoked_at_check|c
+launch_authorizations|launch_authorizations_preserve_live_boundary|t
+`
+  .trim()
+  .split("\n")
+  .map((line) => line.split("|"));
+
+const p1RegulatoryForeignKeySpecifications = `
+service_areas|service_areas_jurisdiction_id_fkey|jurisdiction_id|jurisdictions|id
+jurisdiction_regulatory_modes|jurisdiction_regulatory_modes_jurisdiction_id_fkey|jurisdiction_id|jurisdictions|id
+jurisdiction_regulatory_modes|jurisdiction_regulatory_modes_regulatory_mode_id_fkey|regulatory_mode_id|regulatory_modes|id
+policy_versions|policy_versions_policy_type_code_fkey|policy_type_code|policy_types|code
+policy_versions|policy_versions_jurisdiction_id_fkey|jurisdiction_id|jurisdictions|id
+policy_versions|policy_versions_regulatory_mode_id_fkey|regulatory_mode_id|regulatory_modes|id
+policy_versions|policy_versions_approved_by_user_id_fkey|approved_by_user_id|users|id
+policy_versions|policy_versions_supersedes_policy_version_id_fkey|supersedes_policy_version_id|policy_versions|id
+policy_authority_references|policy_authority_references_policy_version_id_fkey|policy_version_id|policy_versions|id
+policy_authority_references|policy_authority_references_verified_by_user_id_fkey|verified_by_user_id|users|id
+launch_gates|launch_gates_jurisdiction_id_fkey|jurisdiction_id|jurisdictions|id
+launch_gate_evaluations|launch_gate_evaluations_launch_gate_id_fkey|launch_gate_id|launch_gates|id
+launch_gate_evaluations|launch_gate_evaluations_evaluated_by_user_id_fkey|evaluated_by_user_id|users|id
+launch_authorizations|launch_authorizations_jurisdiction_id_fkey|jurisdiction_id|jurisdictions|id
+launch_authorizations|launch_authorizations_authorized_by_user_id_fkey|authorized_by_user_id|users|id
+capability_grants|capability_grants_jurisdiction_id_fkey|jurisdiction_id|jurisdictions|id
+`
+  .trim()
+  .split("\n")
+  .map((line) => line.split("|"));
+
+const p1RegulatoryIndexSpecifications = [
+  [
+    "jurisdiction_regulatory_modes",
+    "jurisdiction_regulatory_modes_pkey",
+    ["jurisdiction_id", "regulatory_mode_id", "active_from"],
+    true,
+    "p",
+  ],
+  ["jurisdictions", "jurisdictions_code_key", ["code"], false, "u"],
+  ["jurisdictions", "jurisdictions_pkey", ["id"], true, "p"],
+  ["launch_authorizations", "launch_authorizations_pkey", ["id"], true, "p"],
+  [
+    "launch_gate_evaluations",
+    "launch_gate_evaluations_pkey",
+    ["id"],
+    true,
+    "p",
+  ],
+  [
+    "launch_gates",
+    "launch_gates_jurisdiction_id_gate_code_key",
+    ["jurisdiction_id", "gate_code"],
+    false,
+    "u",
+  ],
+  ["launch_gates", "launch_gates_pkey", ["id"], true, "p"],
+  [
+    "policy_authority_references",
+    "policy_authority_references_pkey",
+    ["id"],
+    true,
+    "p",
+  ],
+  ["policy_types", "policy_types_pkey", ["code"], true, "p"],
+  ["policy_versions", "policy_versions_pkey", ["id"], true, "p"],
+  [
+    "policy_versions",
+    "policy_versions_scope_version_key",
+    [
+      "policy_type_code",
+      "jurisdiction_id",
+      "regulatory_mode_id",
+      "version_label",
+    ],
+    false,
+    "u",
+  ],
+  ["regulatory_modes", "regulatory_modes_code_key", ["code"], false, "u"],
+  ["regulatory_modes", "regulatory_modes_pkey", ["id"], true, "p"],
+  [
+    "service_areas",
+    "service_areas_jurisdiction_id_code_key",
+    ["jurisdiction_id", "code"],
+    false,
+    "u",
+  ],
+  ["service_areas", "service_areas_pkey", ["id"], true, "p"],
+];
+
+function p1RegulatoryCatalogFixture() {
+  const foreignKeys = p1RegulatoryForeignKeySpecifications.map(
+    ([table, name, column, referencedTable, referencedColumn]) => ({
+      schema: "public",
+      table,
+      name,
+      columns: [column],
+      referenced_schema: "public",
+      referenced_table: referencedTable,
+      referenced_columns: [referencedColumn],
+      definition: `FOREIGN KEY (${column}) REFERENCES ${referencedTable}(${referencedColumn}) ON UPDATE RESTRICT ON DELETE RESTRICT`,
+      update_action: "RESTRICT",
+      delete_action: "RESTRICT",
+      deferrable: false,
+      initially_deferred: false,
+      validated: true,
+    }),
+  );
+  const foreignKeysByIdentity = new Map(
+    foreignKeys.map((foreignKey) => [
+      `${foreignKey.table}.${foreignKey.name}`,
+      foreignKey,
+    ]),
+  );
+  return {
+    constraints: p1RegulatoryConstraintSpecifications.map(
+      ([table, name, type]) => {
+        const foreignKey = foreignKeysByIdentity.get(`${table}.${name}`);
+        return {
+          schema: "public",
+          table,
+          name,
+          type,
+          definition:
+            type === "t"
+              ? "TRIGGER"
+              : foreignKey?.definition || `${type.toUpperCase()} (${name})`,
+          referenced_schema: foreignKey?.referenced_schema || null,
+          referenced_table: foreignKey?.referenced_table || null,
+        };
+      },
+    ),
+    indexes: p1RegulatoryIndexSpecifications.map(
+      ([table, name, columns, isPrimary, constraintType]) => ({
+        schema: "public",
+        table,
+        name,
+        columns,
+        is_unique: true,
+        is_primary: isPrimary,
+        constraint_backed: true,
+        associated_constraint_name: name,
+        associated_constraint_type: constraintType,
+        definition: `CREATE UNIQUE INDEX ${name} ON public.${table} (${columns.join(", ")})`,
+      }),
+    ),
+    foreign_keys: foreignKeys,
   };
 }
 
@@ -282,6 +484,131 @@ test("P1-003 remains inside the jurisdiction policy and launch boundary", () => 
   for (const invalidSql of invalidVariants) {
     assert.throws(() => validateP1RegulatoryMigration(invalidSql, migration));
   }
+});
+
+test("P1-003 catalog validator accepts the exact reviewed classifications", () => {
+  const result = validateP1RegulatoryCatalog(p1RegulatoryCatalogFixture());
+  assert.deepEqual(result, {
+    total_constraint_rows: 53,
+    ordinary_constraints: 49,
+    constraint_triggers: 4,
+    constraint_backed_indexes: 15,
+    standalone_indexes: 0,
+    new_table_foreign_keys: 15,
+    capability_grants_foreign_keys: 1,
+    total_p1_003_foreign_keys: 16,
+  });
+  assert.match(
+    P1_REGULATORY_CATALOG_SQL,
+    /own_constraint\.conindid\s*=\s*idx\.oid[\s\S]*?own_constraint\.conrelid\s*=\s*tbl\.oid[\s\S]*?own_constraint\.contype\s+IN\s*\(\s*'p'\s*,\s*'u'\s*,\s*'x'\s*\)/i,
+  );
+});
+
+test("P1-003 catalog validator classifies constraint triggers without weakening extras", () => {
+  const wrongTriggerType = p1RegulatoryCatalogFixture();
+  wrongTriggerType.constraints.find(
+    (constraint) => constraint.name === "policy_versions_require_authority",
+  ).type = "c";
+  assert.throws(
+    () => validateP1RegulatoryCatalog(wrongTriggerType),
+    /wrong constraint type|ordinary\/trigger classification/,
+  );
+
+  const missingTrigger = p1RegulatoryCatalogFixture();
+  missingTrigger.constraints = missingTrigger.constraints.filter(
+    (constraint) =>
+      constraint.name !== "jurisdictions_require_launch_authorization",
+  );
+  assert.throws(
+    () => validateP1RegulatoryCatalog(missingTrigger),
+    /exactly 53 rows|missing/,
+  );
+
+  const unexpectedConstraint = p1RegulatoryCatalogFixture();
+  unexpectedConstraint.constraints.find(
+    (constraint) => constraint.name === "jurisdictions_code_check",
+  ).name = "jurisdictions_unreviewed_check";
+  assert.throws(
+    () => validateP1RegulatoryCatalog(unexpectedConstraint),
+    /unexpected constraint/,
+  );
+});
+
+test("P1-003 catalog validator accepts only the 15 constraint-backed indexes", () => {
+  const wrongBacking = p1RegulatoryCatalogFixture();
+  wrongBacking.indexes[0].constraint_backed = false;
+  wrongBacking.indexes[0].associated_constraint_name = null;
+  wrongBacking.indexes[0].associated_constraint_type = null;
+  assert.throws(
+    () => validateP1RegulatoryCatalog(wrongBacking),
+    /reviewed constraint-backed index/,
+  );
+
+  const unexpectedStandalone = p1RegulatoryCatalogFixture();
+  Object.assign(unexpectedStandalone.indexes[0], {
+    name: "jurisdictions_unreviewed_idx",
+    columns: ["name"],
+    is_unique: false,
+    is_primary: false,
+    constraint_backed: false,
+    associated_constraint_name: null,
+    associated_constraint_type: null,
+    definition:
+      "CREATE INDEX jurisdictions_unreviewed_idx ON public.jurisdictions (name)",
+  });
+  assert.throws(
+    () => validateP1RegulatoryCatalog(unexpectedStandalone),
+    /unexpected standalone/,
+  );
+});
+
+test("P1-003 capability-grant FK validation is structural and fails closed", () => {
+  const renderedVariants = [
+    "FOREIGN KEY (jurisdiction_id) REFERENCES jurisdictions(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+    "FOREIGN KEY (jurisdiction_id) REFERENCES public.jurisdictions (id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+  ];
+  for (const definition of renderedVariants) {
+    const catalog = p1RegulatoryCatalogFixture();
+    catalog.foreign_keys.find(
+      (foreignKey) =>
+        foreignKey.name === "capability_grants_jurisdiction_id_fkey",
+    ).definition = definition;
+    assert.doesNotThrow(() => validateP1RegulatoryCatalog(catalog));
+  }
+
+  const structuralMutations = [
+    (foreignKey) => (foreignKey.referenced_table = "changed_jurisdictions"),
+    (foreignKey) => (foreignKey.referenced_columns = ["changed_id"]),
+    (foreignKey) => (foreignKey.update_action = "CASCADE"),
+    (foreignKey) => (foreignKey.delete_action = "CASCADE"),
+    (foreignKey) => (foreignKey.validated = false),
+    (foreignKey) => (foreignKey.deferrable = true),
+    (foreignKey) => (foreignKey.initially_deferred = true),
+  ];
+  for (const mutate of structuralMutations) {
+    const catalog = p1RegulatoryCatalogFixture();
+    mutate(
+      catalog.foreign_keys.find(
+        (foreignKey) =>
+          foreignKey.name === "capability_grants_jurisdiction_id_fkey",
+      ),
+    );
+    assert.throws(
+      () => validateP1RegulatoryCatalog(catalog),
+      /structurally different/,
+    );
+  }
+
+  const missingCapabilityGrantForeignKey = p1RegulatoryCatalogFixture();
+  missingCapabilityGrantForeignKey.foreign_keys =
+    missingCapabilityGrantForeignKey.foreign_keys.filter(
+      (foreignKey) =>
+        foreignKey.name !== "capability_grants_jurisdiction_id_fkey",
+    );
+  assert.throws(
+    () => validateP1RegulatoryCatalog(missingCapabilityGrantForeignKey),
+    /exactly 16 rows|missing/,
+  );
 });
 
 test("authorized P1 platform migration stays inside Migration 1", () => {
