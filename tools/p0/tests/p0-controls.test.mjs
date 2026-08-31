@@ -22,7 +22,9 @@ import {
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
   validateP1RegulatoryCatalog,
+  validateP1RegulatoryEvidence,
   validateP1RegulatoryMigration,
+  validateP1RegulatoryTraceability,
   validateReleaseRegister,
   validateRepository,
   validateRestoreEvidence,
@@ -484,6 +486,34 @@ test("P1-003 remains inside the jurisdiction policy and launch boundary", () => 
   for (const invalidSql of invalidVariants) {
     assert.throws(() => validateP1RegulatoryMigration(invalidSql, migration));
   }
+
+  const evidencePath =
+    "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json";
+  const evidence = readJson(evidencePath);
+  assert.doesNotThrow(() => validateP1RegulatoryEvidence(evidence, sql));
+
+  const duplicateHistory = readJson(evidencePath);
+  duplicateHistory.persistent_application_validation.migration_history[3].occurrences = 2;
+  assert.throws(
+    () => validateP1RegulatoryEvidence(duplicateHistory, sql),
+    /migration history/,
+  );
+
+  const unapprovedAdvisorFinding = readJson(evidencePath);
+  unapprovedAdvisorFinding.security.approved_info_findings.push(
+    "rls_enabled_no_policy:public.unapproved_table",
+  );
+  assert.throws(
+    () => validateP1RegulatoryEvidence(unapprovedAdvisorFinding, sql),
+    /security acceptance/,
+  );
+
+  const falseOldInspection = readJson(evidencePath);
+  falseOldInspection.environment_integrity.old_read_only_listing = "passed";
+  assert.throws(
+    () => validateP1RegulatoryEvidence(falseOldInspection, sql),
+    /environment or acceptance state/,
+  );
 });
 
 test("P1-003 catalog validator accepts the exact reviewed classifications", () => {
@@ -733,6 +763,30 @@ test("P1 applied records require bounded approved Staging traceability", () => {
       decisions,
       releases,
     ),
+  );
+  assert.doesNotThrow(() =>
+    validateP1RegulatoryTraceability(
+      migrations,
+      workItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  const weakenedP1RegulatoryRelease = structuredClone(releases);
+  weakenedP1RegulatoryRelease.releases.find(
+    (release) =>
+      release.release_id === "REL-20260830-P1-003-STAGING-APPLICATION",
+  ).artifact_digest = `sha256:${"b".repeat(64)}`;
+  assert.throws(
+    () =>
+      validateP1RegulatoryTraceability(
+        migrations,
+        workItems,
+        decisions,
+        weakenedP1RegulatoryRelease,
+      ),
+    /P1-003 Staging traceability/,
   );
 
   const wrongDigest = structuredClone(releases);

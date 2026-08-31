@@ -85,14 +85,14 @@
       "decision_refs": [
         "DEC-20260830-P1-JURISDICTION-POLICY-LAUNCH-FOUNDATION"
       ],
-      "release_refs": [],
-      "reviewed": false,
-      "reviewed_by": "pending designated human PR review",
-      "reviewed_at": null,
-      "applied_environment": "none",
+      "release_refs": ["REL-20260830-P1-003-STAGING-APPLICATION"],
+      "reviewed": true,
+      "reviewed_by": "Rosuno",
+      "reviewed_at": "2026-08-30T05:02:26Z",
+      "applied_environment": "staging",
       "non_production_validation": true,
-      "drift_check": "clean",
-      "rollback_plan": "Rollback-only validation is the sole authorized database execution before protected review. If later persistent Staging acceptance fails, remove only Migration 3 objects through a separately reviewed rollback migration; never edit migration history directly or alter P0/P1-001/P1-002 controls.",
+      "drift_check": "Supabase CLI shadow comparison unavailable because Replit OCI setns failed during pg_isready before P1-003 SQL or schema comparison; compensating corrected direct-catalog validation passed and no clean CLI drift result is claimed.",
+      "rollback_plan": "If a later independently verified defect requires Staging rollback, remove only Migration 3 objects through a separately reviewed rollback migration; never edit migration history directly or alter P0/P1-001/P1-002 controls.",
       "depends_on": ["20260829171701_p1_authorization_foundation"]
     }
   ]
