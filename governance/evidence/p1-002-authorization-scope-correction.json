@@ -72,8 +72,8 @@
   "pr_created": false,
   "catalog_fingerprint": {
     "evidence_path": "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json",
-    "evidence_sha256": "619abf73a0071f32613e7e959d7b0eb2726c90104a038128fcafcb12ac2390a8",
-    "evidence_bytes": 41897,
+    "evidence_sha256": "c5bb94594f8a82915ad5a9faabbee00ad90bf782914de072bee8a6a5fa333e6f",
+    "evidence_bytes": 62644,
     "normalized_content_reference": "#/normalized_outputs/snapshot",
     "category_counts": {
       "table": 4,
