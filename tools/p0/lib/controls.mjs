@@ -159,6 +159,53 @@ const P1_AUTHORIZATION_CORRECTION_CATEGORY_COUNTS = {
   table_privilege: 20,
   function_privilege: 10,
 };
+const P1_AUTHORIZATION_CORRECTION_CHRONOLOGY = [
+  {
+    commit: "6dfb6a5a98e0456c7f1b6876f0441aa1f0299429",
+    description: "premature empty migration",
+  },
+  {
+    commit: "4fe3ea3651643410e1e2dcc6ce1585736e64b866",
+    description: "explicit revert",
+  },
+  {
+    commit: "17c2025c4b0eacc78d2926b8acb3fd26ecee89f5",
+    description: "premature migration checkpoint",
+  },
+  {
+    commit: "4261b2d716e25bcc858918cb391bd826de3b234e",
+    description: "explicit revert",
+  },
+  {
+    commit: "fc687c9736f81265b66de3905d278114edf13d61",
+    description: "fresh authorized implementation",
+  },
+  {
+    commit: "c64e403420850689b163bf0d6e37a12ab590b805",
+    description: "authorized dependency-guard correction",
+  },
+  {
+    commit: "b7b862f4d03eb7c3686f539fdedf33e6e6812300",
+    description: "out-of-scope .replit Python module addition",
+  },
+  {
+    commit: "b90f697164723be80029a8756b5dde79bd5f2c6c",
+    description: "explicit forward-only revert restoring canonical .replit",
+  },
+  {
+    commit: "7ddf5426cc870f417ff4c91f239906fc0f348cd2",
+    description:
+      "separate non-ancestor internal Replit checkpoint carrying the same out-of-scope .replit tree; preserved but never imported",
+  },
+  {
+    commit: "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34",
+    description: "authorized v2 evidence checkpoint",
+  },
+  {
+    commit: "ba58456e757c0c330b13f846685546f480626923",
+    description: "authorized governance/control checkpoint",
+  },
+];
 
 const DIRECT_SECRET_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
@@ -2906,6 +2953,15 @@ export function validateP1AuthorizationCorrectionEvidence(
       "test_results",
       "rollback_validation",
       "staging_preservation",
+      "source_dev_mutation",
+      "source_dev_scope_observation",
+      "old_mutation",
+      "old_reactivation",
+      "old_scope_observation",
+      "staging_persistent_correction_applied",
+      "protected_review_completed",
+      "merged",
+      "pr_created",
       "catalog_fingerprint",
       "governance_state",
       "checkpoint_and_revert_history",
@@ -3002,6 +3058,21 @@ export function validateP1AuthorizationCorrectionEvidence(
   ) {
     fail(`${context} Staging preservation summary is invalid`);
   }
+  if (
+    evidence.source_dev_mutation !== false ||
+    evidence.source_dev_scope_observation !==
+      "source/dev wwcwfbzwljbjlaifklaj remains exactly P0 with zero public tables" ||
+    evidence.old_mutation !== false ||
+    evidence.old_reactivation !== false ||
+    evidence.old_scope_observation !==
+      "OLD ddltrtkunctovnjuyluk remains INACTIVE" ||
+    evidence.staging_persistent_correction_applied !== false ||
+    evidence.protected_review_completed !== false ||
+    evidence.merged !== false ||
+    evidence.pr_created !== false
+  ) {
+    fail(`${context} environment and publication observations are invalid`);
+  }
 
   validateP1AuthorizationCorrectionFingerprint(
     fingerprint,
@@ -3021,6 +3092,8 @@ export function validateP1AuthorizationCorrectionEvidence(
     catalog?.evidence_bytes !==
       P1_AUTHORIZATION_CORRECTION_FINGERPRINT_FILE_BYTES ||
     catalog?.normalized_content_reference !== "#/normalized_outputs/snapshot" ||
+    JSON.stringify(catalog?.category_counts) !==
+      JSON.stringify(P1_AUTHORIZATION_CORRECTION_CATEGORY_COUNTS) ||
     JSON.stringify(catalog?.run1) !== JSON.stringify(expectedRunSummary) ||
     JSON.stringify(catalog?.run2) !== JSON.stringify(expectedRunSummary) ||
     catalog?.runs_identical !== true
@@ -3065,7 +3138,21 @@ export function validateP1AuthorizationCorrectionEvidence(
       "separate non-ancestor merge checkpoint; not the correction evidence commit and not imported into this branch" ||
     history?.canonical_configuration_restored_at !==
       "b90f697164723be80029a8756b5dde79bd5f2c6c" ||
-    history?.v2_evidence_commit !== "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34"
+    history?.v2_evidence_commit !==
+      "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34" ||
+    JSON.stringify(history?.chronology) !==
+      JSON.stringify(P1_AUTHORIZATION_CORRECTION_CHRONOLOGY) ||
+    history?.internal_ledger_evidence?.commit !==
+      "7ddf5426cc870f417ff4c91f239906fc0f348cd2" ||
+    history?.internal_ledger_evidence?.description !==
+      "separate non-ancestor internal Replit checkpoint carrying the same out-of-scope .replit tree" ||
+    history?.internal_ledger_evidence?.preserved !== true ||
+    history?.internal_ledger_evidence?.imported_into_active_branch !== false ||
+    history?.history_integrity?.records_erased !== false ||
+    history?.history_integrity?.history_rewritten !== false ||
+    history?.history_integrity?.commits_merged !== false ||
+    history?.history_integrity?.commits_released !== false ||
+    history?.history_integrity?.commits_persistently_applied !== false
   ) {
     fail(`${context} checkpoint or revert history is invalid`);
   }

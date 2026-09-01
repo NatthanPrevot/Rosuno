@@ -61,11 +61,33 @@
     "security_advisor_unapproved_findings": 0,
     "persistent_mutation": false
   },
+  "source_dev_mutation": false,
+  "source_dev_scope_observation": "source/dev wwcwfbzwljbjlaifklaj remains exactly P0 with zero public tables",
+  "old_mutation": false,
+  "old_reactivation": false,
+  "old_scope_observation": "OLD ddltrtkunctovnjuyluk remains INACTIVE",
+  "staging_persistent_correction_applied": false,
+  "protected_review_completed": false,
+  "merged": false,
+  "pr_created": false,
   "catalog_fingerprint": {
     "evidence_path": "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json",
     "evidence_sha256": "619abf73a0071f32613e7e959d7b0eb2726c90104a038128fcafcb12ac2390a8",
     "evidence_bytes": 41897,
     "normalized_content_reference": "#/normalized_outputs/snapshot",
+    "category_counts": {
+      "table": 4,
+      "column": 25,
+      "constraint": 20,
+      "index": 8,
+      "foreign_key": 7,
+      "rls": 4,
+      "policy": 1,
+      "trigger": 1,
+      "function": 2,
+      "table_privilege": 20,
+      "function_privilege": 10
+    },
     "run1": {
       "sha256": "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e",
       "canonical_byte_length": 31443,
@@ -109,7 +131,66 @@
       "relationship": "separate non-ancestor merge checkpoint; not the correction evidence commit and not imported into this branch"
     },
     "canonical_configuration_restored_at": "b90f697164723be80029a8756b5dde79bd5f2c6c",
-    "v2_evidence_commit": "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34"
+    "v2_evidence_commit": "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34",
+    "chronology": [
+      {
+        "commit": "6dfb6a5a98e0456c7f1b6876f0441aa1f0299429",
+        "description": "premature empty migration"
+      },
+      {
+        "commit": "4fe3ea3651643410e1e2dcc6ce1585736e64b866",
+        "description": "explicit revert"
+      },
+      {
+        "commit": "17c2025c4b0eacc78d2926b8acb3fd26ecee89f5",
+        "description": "premature migration checkpoint"
+      },
+      {
+        "commit": "4261b2d716e25bcc858918cb391bd826de3b234e",
+        "description": "explicit revert"
+      },
+      {
+        "commit": "fc687c9736f81265b66de3905d278114edf13d61",
+        "description": "fresh authorized implementation"
+      },
+      {
+        "commit": "c64e403420850689b163bf0d6e37a12ab590b805",
+        "description": "authorized dependency-guard correction"
+      },
+      {
+        "commit": "b7b862f4d03eb7c3686f539fdedf33e6e6812300",
+        "description": "out-of-scope .replit Python module addition"
+      },
+      {
+        "commit": "b90f697164723be80029a8756b5dde79bd5f2c6c",
+        "description": "explicit forward-only revert restoring canonical .replit"
+      },
+      {
+        "commit": "7ddf5426cc870f417ff4c91f239906fc0f348cd2",
+        "description": "separate non-ancestor internal Replit checkpoint carrying the same out-of-scope .replit tree; preserved but never imported"
+      },
+      {
+        "commit": "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34",
+        "description": "authorized v2 evidence checkpoint"
+      },
+      {
+        "commit": "ba58456e757c0c330b13f846685546f480626923",
+        "description": "authorized governance/control checkpoint"
+      }
+    ],
+    "internal_ledger_evidence": {
+      "commit": "7ddf5426cc870f417ff4c91f239906fc0f348cd2",
+      "description": "separate non-ancestor internal Replit checkpoint carrying the same out-of-scope .replit tree",
+      "preserved": true,
+      "imported_into_active_branch": false
+    },
+    "history_integrity": {
+      "records_erased": false,
+      "history_rewritten": false,
+      "commits_merged": false,
+      "commits_released": false,
+      "commits_persistently_applied": false
+    }
   },
   "acceptance_state": "implemented_and_rollback_validated_pending_protected_review",
   "next_gate": "protected human review before merge, persistent application, release, or final closure",

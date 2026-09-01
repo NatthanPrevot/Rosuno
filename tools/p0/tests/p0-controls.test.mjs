@@ -630,6 +630,43 @@ test("P1-002 authorization correction is exact, rollback-only, and pending revie
       ),
     /migration traceability/,
   );
+
+  const missingCategoryCounts = structuredClone(evidence);
+  delete missingCategoryCounts.catalog_fingerprint.category_counts;
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionEvidence(
+        missingCategoryCounts,
+        sql,
+        fingerprint,
+      ),
+    /catalog reference/,
+  );
+
+  const missingEnvironmentObservation = structuredClone(evidence);
+  delete missingEnvironmentObservation.source_dev_mutation;
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionEvidence(
+        missingEnvironmentObservation,
+        sql,
+        fingerprint,
+      ),
+    /missing required field source_dev_mutation|environment and publication observations/,
+  );
+
+  const alteredChronology = structuredClone(evidence);
+  alteredChronology.checkpoint_and_revert_history.chronology[6].description =
+    "in-scope configuration change";
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionEvidence(
+        alteredChronology,
+        sql,
+        fingerprint,
+      ),
+    /checkpoint or revert history/,
+  );
 });
 
 test("P1-003 catalog validator accepts the exact reviewed classifications", () => {
