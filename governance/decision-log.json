@@ -117,6 +117,37 @@
         "governance/releases/traceability.json"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260831-P1-002-AUTHORIZATION-SCOPE-CORRECTION",
+      "title": "Propose the bounded P1-002 authorization scope correction",
+      "status": "proposed",
+      "scope": "P1-002 authorization scope correction only; implemented and rollback-validated against the post-P1-003 Rosuno Staging baseline",
+      "decision": "Submit the exact sequence-5 product schema correction for protected review. The correction removes the two unauthorized profile tables, narrows the retained authorization surface to staff_profiles, capability_definitions, capability_grants, and application_sessions, preserves the P1-003 capability-grant jurisdiction contract, and remains unapplied outside rollback-only validation.",
+      "rationale": "The rollback-only correction completed all 30 structural, security, and failure checks and all 7 authorization observations. Two independent deterministic catalog runs reproduced the same 102-row normalized result and restored the exact post-P1-003 baseline after explicit rollback. These results support protected review but do not constitute acceptance, merge, release, persistent application, or final closure.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
+      "owner": "P1 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "created_at": "2026-08-31T21:49:51Z",
+      "updated_at": "2026-09-01T13:34:19Z",
+      "supersedes": [],
+      "impact": "Registers only an implemented, rollback-validated correction candidate and its deterministic evidence. It does not claim protected approval, merge, release, persistent database application, production activity, or final closure.",
+      "evidence": [
+        "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql",
+        "governance/evidence/p1-002-authorization-scope-correction.json",
+        "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json"
+      ],
+      "expiry": null
     }
   ]
 }

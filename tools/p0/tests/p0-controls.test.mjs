@@ -17,6 +17,9 @@ import {
   validatePackageJson,
   validateP0CliInventory,
   validateP0InventoryReconciliation,
+  validateP1AuthorizationCorrectionEvidence,
+  validateP1AuthorizationCorrectionMigration,
+  validateP1AuthorizationCorrectionTraceability,
   validateP1AuthorizationMigration,
   validateP1ApplicationTraceability,
   validateP1PlatformEvidence,
@@ -513,6 +516,119 @@ test("P1-003 remains inside the jurisdiction policy and launch boundary", () => 
   assert.throws(
     () => validateP1RegulatoryEvidence(falseOldInspection, sql),
     /environment or acceptance state/,
+  );
+});
+
+test("P1-002 authorization correction is exact, rollback-only, and pending review", () => {
+  const migrationPath =
+    "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql";
+  const evidencePath =
+    "governance/evidence/p1-002-authorization-scope-correction.json";
+  const fingerprintPath =
+    "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json";
+  const sql = readFileSync(path.join(ROOT, migrationPath), "utf8");
+  const evidence = readJson(evidencePath);
+  const fingerprintText = readFileSync(
+    path.join(ROOT, fingerprintPath),
+    "utf8",
+  );
+  const fingerprint = JSON.parse(fingerprintText);
+  const migrations = readJson("governance/migrations/reviewed-migrations.json");
+  const workItems = readJson("governance/work-items/index.json");
+  const decisions = readJson("governance/decision-log.json");
+  const migration = migrations.migrations.find(
+    (entry) =>
+      entry.migration_id === "20260901012518_p1_authorization_scope_correction",
+  );
+
+  assert.doesNotThrow(() =>
+    validateP1AuthorizationCorrectionMigration(sql, migration),
+  );
+  assert.doesNotThrow(() =>
+    validateP1AuthorizationCorrectionEvidence(
+      evidence,
+      sql,
+      fingerprint,
+      fingerprintText,
+    ),
+  );
+  assert.doesNotThrow(() =>
+    validateP1AuthorizationCorrectionTraceability(
+      migrations,
+      workItems,
+      decisions,
+    ),
+  );
+
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionMigration(
+        `${sql}\nalter table public.bookings add column correction_leak text;`,
+        migration,
+      ),
+    /authorized P1-002 correction table boundary/,
+  );
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionMigration(
+        sql.replace(
+          "drop table public.attorney_profiles restrict;",
+          "drop table public.attorney_profiles cascade;",
+        ),
+        migration,
+      ),
+    /RESTRICT.*CASCADE/,
+  );
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionMigration(
+        `${sql}\ndrop table public.capability_grants restrict;`,
+        migration,
+      ),
+    /drop exactly|in place/,
+  );
+
+  const changedRows = structuredClone(fingerprint);
+  changedRows.normalized_outputs.snapshot.rows[0].identity =
+    "public.unauthorized_table";
+  assert.throws(
+    () => validateP1AuthorizationCorrectionEvidence(evidence, sql, changedRows),
+    /normalized snapshot/,
+  );
+
+  const falseRestoration = structuredClone(fingerprint);
+  falseRestoration.runs[0].after.state_sha256 = "a".repeat(64);
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionEvidence(
+        evidence,
+        sql,
+        falseRestoration,
+      ),
+    /rollback or restoration/,
+  );
+
+  const falseClosure = structuredClone(evidence);
+  falseClosure.governance_state.reviewed = true;
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionEvidence(falseClosure, sql, fingerprint),
+    /falsely claims review, application, release, or closure/,
+  );
+
+  const falseTraceability = structuredClone(migrations);
+  falseTraceability.migrations.find(
+    (entry) =>
+      entry.migration_id === "20260901012518_p1_authorization_scope_correction",
+  ).reviewed = true;
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionTraceability(
+        falseTraceability,
+        workItems,
+        decisions,
+      ),
+    /migration traceability/,
   );
 });
 

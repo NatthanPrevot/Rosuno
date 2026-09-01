@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "evidence_id": "P1-002-AUTHORIZATION-SCOPE-CORRECTION",
+  "work_item_id": "WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION",
+  "decision_id": "DEC-20260831-P1-002-AUTHORIZATION-SCOPE-CORRECTION",
+  "scope": "P1-002 authorization scope correction implemented and rollback-validated against the post-P1-003 Rosuno Staging baseline; pending protected review",
+  "authority_refs": [
+    "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+    "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+    "DOMAIN-MODEL-V1.4-LOCKED",
+    "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+    "SCHEMA-INVENTORY-V0.7-LOCKED"
+  ],
+  "migration": {
+    "migration_id": "20260901012518_p1_authorization_scope_correction",
+    "filename": "20260901012518_p1_authorization_scope_correction.sql",
+    "path": "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql",
+    "sha256": "bf0cdabed8ffa41a65e793b9041c00dc7d2ca47eeef40c2750770e195b47d6c5",
+    "bytes": 10339,
+    "sequence": 5,
+    "depends_on": ["20260830023823_p1_jurisdiction_policy_launch_foundation"],
+    "reviewed": false,
+    "persistently_applied": false
+  },
+  "repository": {
+    "branch": "p1-002-authorization-scope-correction",
+    "base_commit": "b90f697164723be80029a8756b5dde79bd5f2c6c",
+    "validated_v2_evidence_commit": "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34",
+    "remote_correction_branch_present": false
+  },
+  "test_results": {
+    "structural_security_failure": {
+      "passed": 30,
+      "total": 30,
+      "result": "passed"
+    },
+    "authorization_observations": {
+      "passed": 7,
+      "total": 7,
+      "result": "passed"
+    }
+  },
+  "rollback_validation": {
+    "rollback_only": true,
+    "run1_marker": "V2_RUN1_ROLLBACK_COMPLETE",
+    "run2_marker": "V2_RUN2_ROLLBACK_COMPLETE",
+    "run1_restored_before_run2": true,
+    "explicit_rollback_each_run": true,
+    "exact_catalog_restoration": true,
+    "exact_persistent_state_restoration": true,
+    "baseline_catalog_sha256": "dd8e1c374e29f92578a1f10892991a4eaeaa1cb329f688d017c7d7a040632030",
+    "persistent_state_sha256": "29e71a548176a97251d8b61ddbd4acd21a50fedd865f29c41e557ebddc336ad6",
+    "migration_history_unchanged": true
+  },
+  "staging_preservation": {
+    "p1_003_preserved": true,
+    "migration_count": 4,
+    "public_table_count": 17,
+    "public_row_count": 0,
+    "security_advisor_info_findings": 13,
+    "security_advisor_unapproved_findings": 0,
+    "persistent_mutation": false
+  },
+  "catalog_fingerprint": {
+    "evidence_path": "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json",
+    "evidence_sha256": "619abf73a0071f32613e7e959d7b0eb2726c90104a038128fcafcb12ac2390a8",
+    "evidence_bytes": 41897,
+    "normalized_content_reference": "#/normalized_outputs/snapshot",
+    "run1": {
+      "sha256": "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e",
+      "canonical_byte_length": 31443,
+      "row_count": 102
+    },
+    "run2": {
+      "sha256": "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e",
+      "canonical_byte_length": 31443,
+      "row_count": 102
+    },
+    "runs_identical": true
+  },
+  "governance_state": {
+    "decision_status": "proposed",
+    "work_item_status": "in_progress",
+    "reviewer_identity": "pending designated human PR review",
+    "reviewer_status": "pending",
+    "reviewed": false,
+    "merged": false,
+    "released": false,
+    "persistently_applied": false,
+    "finally_closed": false
+  },
+  "checkpoint_and_revert_history": {
+    "reverted_attempts": [
+      {
+        "attempt_commit": "6dfb6a5a98e0456c7f1b6876f0441aa1f0299429",
+        "revert_commit": "4fe3ea3651643410e1e2dcc6ce1585736e64b866"
+      },
+      {
+        "attempt_commit": "17c2025c4b0eacc78d2926b8acb3fd26ecee89f5",
+        "revert_commit": "4261b2d716e25bcc858918cb391bd826de3b234e"
+      }
+    ],
+    "authorized_correction_commits": [
+      "fc687c9736f81265b66de3905d278114edf13d61",
+      "c64e403420850689b163bf0d6e37a12ab590b805"
+    ],
+    "configuration_checkpoint": {
+      "commit": "7ddf5426cc870f417ff4c91f239906fc0f348cd2",
+      "relationship": "separate non-ancestor merge checkpoint; not the correction evidence commit and not imported into this branch"
+    },
+    "canonical_configuration_restored_at": "b90f697164723be80029a8756b5dde79bd5f2c6c",
+    "v2_evidence_commit": "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34"
+  },
+  "acceptance_state": "implemented_and_rollback_validated_pending_protected_review",
+  "next_gate": "protected human review before merge, persistent application, release, or final closure",
+  "sensitive_payloads_present": false
+}
