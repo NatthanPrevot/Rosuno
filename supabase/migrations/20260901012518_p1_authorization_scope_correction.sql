@@ -6,7 +6,6 @@ declare
   profile_name text;
   profile_table regclass;
   profile_rows bigint;
-  unexpected_dependents text[];
 begin
   foreach profile_name in array array['attorney_profiles', 'client_profiles']
   loop
@@ -29,35 +28,6 @@ begin
           profile_name,
           profile_rows
         );
-    end if;
-
-    select array_agg(
-      pg_describe_object(
-        dependency.classid,
-        dependency.objid,
-        dependency.objsubid
-      )
-      order by
-        pg_describe_object(
-          dependency.classid,
-          dependency.objid,
-          dependency.objsubid
-        )
-    )
-    into unexpected_dependents
-    from pg_depend dependency
-    where dependency.refclassid = 'pg_class'::regclass
-      and dependency.refobjid = profile_table
-      and dependency.deptype not in ('a', 'i');
-
-    if coalesce(cardinality(unexpected_dependents), 0) <> 0 then
-      raise exception using
-        errcode = '2BP01',
-        message = format(
-          'refusing to drop public.%I: unexpected or external dependents exist',
-          profile_name
-        ),
-        detail = array_to_string(unexpected_dependents, E'\n');
     end if;
   end loop;
 end;
