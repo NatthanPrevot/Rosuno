@@ -77,6 +77,34 @@
       },
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-08-30T20:29:17Z"
+    },
+    {
+      "release_id": "REL-20260901-P1-002-CORRECTION-STAGING-APPLICATION",
+      "commit_sha": "eaf6204a64ac6c9e9666775b2a1e6c3ec31e0b3a",
+      "work_item_refs": ["WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
+      "decision_refs": ["DEC-20260831-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
+      "migration_refs": ["20260901012518_p1_authorization_scope_correction"],
+      "validation_evidence": [
+        "governance/evidence/p1-002-authorization-scope-correction.json",
+        "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json",
+        "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql",
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check"
+      ],
+      "artifact_digest": "sha256:bf0cdabed8ffa41a65e793b9041c00dc7d2ca47eeef40c2750770e195b47d6c5",
+      "environment": "staging",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "rollback_reference": "governance/evidence/p1-002-authorization-scope-correction.json",
+      "created_at": "2026-09-01T18:27:41Z"
     }
   ]
 }

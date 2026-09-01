@@ -519,7 +519,7 @@ test("P1-003 remains inside the jurisdiction policy and launch boundary", () => 
   );
 });
 
-test("P1-002 authorization correction is exact, rollback-only, and pending review", () => {
+test("P1-002 authorization correction preserves rollback evidence and validates accepted Staging closure", () => {
   const migrationPath =
     "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql";
   const evidencePath =
@@ -536,6 +536,7 @@ test("P1-002 authorization correction is exact, rollback-only, and pending revie
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
+  const releases = readJson("governance/releases/traceability.json");
   const migration = migrations.migrations.find(
     (entry) =>
       entry.migration_id === "20260901012518_p1_authorization_scope_correction",
@@ -557,6 +558,7 @@ test("P1-002 authorization correction is exact, rollback-only, and pending revie
       migrations,
       workItems,
       decisions,
+      releases,
     ),
   );
 
@@ -609,26 +611,79 @@ test("P1-002 authorization correction is exact, rollback-only, and pending revie
   );
 
   const falseClosure = structuredClone(evidence);
-  falseClosure.governance_state.reviewed = true;
+  falseClosure.governance_state.finally_closed = false;
   assert.throws(
     () =>
       validateP1AuthorizationCorrectionEvidence(falseClosure, sql, fingerprint),
-    /falsely claims review, application, release, or closure/,
+    /accepted closure state/,
   );
 
   const falseTraceability = structuredClone(migrations);
   falseTraceability.migrations.find(
     (entry) =>
       entry.migration_id === "20260901012518_p1_authorization_scope_correction",
-  ).reviewed = true;
+  ).release_refs = [];
   assert.throws(
     () =>
       validateP1AuthorizationCorrectionTraceability(
         falseTraceability,
         workItems,
         decisions,
+        releases,
       ),
     /migration traceability/,
+  );
+
+  const missingRelease = structuredClone(releases);
+  missingRelease.releases = missingRelease.releases.filter(
+    (entry) =>
+      entry.release_id !== "REL-20260901-P1-002-CORRECTION-STAGING-APPLICATION",
+  );
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionTraceability(
+        migrations,
+        workItems,
+        decisions,
+        missingRelease,
+      ),
+    /Staging traceability/,
+  );
+
+  const falsePersistentHistory = structuredClone(evidence);
+  falsePersistentHistory.persistent_application_validation.migration_history[4].occurrences = 2;
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionEvidence(
+        falsePersistentHistory,
+        sql,
+        fingerprint,
+      ),
+    /persistent migration history/,
+  );
+
+  const falsePersistentCatalog = structuredClone(evidence);
+  falsePersistentCatalog.persistent_application_validation.catalog_validation.row_count = 101;
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionEvidence(
+        falsePersistentCatalog,
+        sql,
+        fingerprint,
+      ),
+    /persistent catalog validation/,
+  );
+
+  const falseOldAccess = structuredClone(evidence);
+  falseOldAccess.persistent_application_validation.non_target_integrity.old_accessed = true;
+  assert.throws(
+    () =>
+      validateP1AuthorizationCorrectionEvidence(
+        falseOldAccess,
+        sql,
+        fingerprint,
+      ),
+    /persistent non-target integrity/,
   );
 
   const missingCategoryCounts = structuredClone(evidence);

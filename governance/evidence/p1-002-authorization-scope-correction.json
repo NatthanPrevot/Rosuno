@@ -1,9 +1,9 @@
 {
-  "version": 1,
+  "version": 2,
   "evidence_id": "P1-002-AUTHORIZATION-SCOPE-CORRECTION",
   "work_item_id": "WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION",
   "decision_id": "DEC-20260831-P1-002-AUTHORIZATION-SCOPE-CORRECTION",
-  "scope": "P1-002 authorization scope correction implemented and rollback-validated against the post-P1-003 Rosuno Staging baseline; pending protected review",
+  "scope": "P1-002 authorization scope correction implemented, reviewed, and accepted after one-time Rosuno Staging application; rollback evidence retained",
   "authority_refs": [
     "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
     "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
@@ -19,14 +19,14 @@
     "bytes": 10339,
     "sequence": 5,
     "depends_on": ["20260830023823_p1_jurisdiction_policy_launch_foundation"],
-    "reviewed": false,
-    "persistently_applied": false
+    "reviewed": true,
+    "persistently_applied": true
   },
   "repository": {
     "branch": "p1-002-authorization-scope-correction",
     "base_commit": "b90f697164723be80029a8756b5dde79bd5f2c6c",
     "validated_v2_evidence_commit": "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34",
-    "remote_correction_branch_present": false
+    "remote_correction_branch_present": true
   },
   "test_results": {
     "structural_security_failure": {
@@ -66,10 +66,138 @@
   "old_mutation": false,
   "old_reactivation": false,
   "old_scope_observation": "OLD ddltrtkunctovnjuyluk remains INACTIVE",
-  "staging_persistent_correction_applied": false,
-  "protected_review_completed": false,
-  "merged": false,
-  "pr_created": false,
+  "staging_persistent_correction_applied": true,
+  "protected_review_completed": true,
+  "merged": true,
+  "pr_created": true,
+  "persistent_application_validation": {
+    "completed_at": "2026-09-01T18:27:41.110779Z",
+    "environment": "staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "reviewed_by": "Rosuno",
+    "reviewed_at": "2026-09-01T16:33:32Z",
+    "application_status": "passed",
+    "validation_checks_passed": 39,
+    "validation_checks_total": 39,
+    "migration_history": [
+      {
+        "version": "20260828192126",
+        "name": "p0_restrict_rls_auto_enable_execution",
+        "occurrences": 1
+      },
+      {
+        "version": "20260829000015",
+        "name": "p1_platform_foundation",
+        "occurrences": 1
+      },
+      {
+        "version": "20260829171701",
+        "name": "p1_authorization_foundation",
+        "occurrences": 1
+      },
+      {
+        "version": "20260830023823",
+        "name": "p1_jurisdiction_policy_launch_foundation",
+        "occurrences": 1
+      },
+      {
+        "version": "20260901012518",
+        "name": "p1_authorization_scope_correction",
+        "occurrences": 1
+      }
+    ],
+    "pending_versions": 0,
+    "remote_only_versions": 0,
+    "duplicate_versions": 0,
+    "generated_or_unexpected_versions": 0,
+    "local_remote_reconciliation": "exact",
+    "migration_sql_reapplied": false,
+    "migration_history_repaired": false,
+    "direct_history_edit": false,
+    "final_surface": {
+      "retained_tables": [
+        "public.staff_profiles",
+        "public.capability_definitions",
+        "public.capability_grants",
+        "public.application_sessions"
+      ],
+      "absent_tables": ["public.attorney_profiles", "public.client_profiles"],
+      "retained_table_row_counts": {
+        "public.staff_profiles": 0,
+        "public.capability_definitions": 0,
+        "public.capability_grants": 0,
+        "public.application_sessions": 0
+      },
+      "all_relevant_rows_zero": true
+    },
+    "catalog_validation": {
+      "fingerprint": "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e",
+      "canonical_byte_length": 31443,
+      "row_count": 102,
+      "matches_retained_normalized_snapshot": true,
+      "category_counts": {
+        "table": 4,
+        "column": 25,
+        "constraint": 20,
+        "index": 8,
+        "foreign_key": 7,
+        "rls": 4,
+        "policy": 1,
+        "trigger": 1,
+        "function": 2,
+        "table_privilege": 20,
+        "function_privilege": 10
+      }
+    },
+    "p1_003_foreign_key": {
+      "constraint": "capability_grants_jurisdiction_id_fkey",
+      "definition": "FOREIGN KEY (jurisdiction_id) REFERENCES jurisdictions(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+      "on_update": "RESTRICT",
+      "on_delete": "RESTRICT",
+      "deferrable": false,
+      "initially_deferred": false,
+      "validated": true,
+      "jurisdiction_id_comment": "Optional jurisdiction scope enforced by locked physical Migration 3."
+    },
+    "security_advisor": {
+      "level": "INFO",
+      "approved_identities": [
+        "rls_enabled_no_policy_public_application_sessions",
+        "rls_enabled_no_policy_public_capability_definitions",
+        "rls_enabled_no_policy_public_capability_grants",
+        "rls_enabled_no_policy_public_jurisdiction_regulatory_modes",
+        "rls_enabled_no_policy_public_jurisdictions",
+        "rls_enabled_no_policy_public_launch_authorizations",
+        "rls_enabled_no_policy_public_launch_gate_evaluations",
+        "rls_enabled_no_policy_public_launch_gates",
+        "rls_enabled_no_policy_public_policy_authority_references",
+        "rls_enabled_no_policy_public_policy_types",
+        "rls_enabled_no_policy_public_policy_versions",
+        "rls_enabled_no_policy_public_regulatory_modes",
+        "rls_enabled_no_policy_public_service_areas"
+      ],
+      "additional_findings": 0
+    },
+    "non_target_integrity": {
+      "source_dev_project_ref": "wwcwfbzwljbjlaifklaj",
+      "source_dev_migration_history": ["20260828192126"],
+      "source_dev_public_table_count": 0,
+      "source_dev_unchanged": true,
+      "production_accessed": false,
+      "old_quarantined": true,
+      "old_accessed": false,
+      "old_mutated": false
+    }
+  },
+  "review_traceability": {
+    "pull_request": 10,
+    "pull_request_url": "https://github.com/NatthanPrevot/Rosuno/pull/10",
+    "approved_head": "fb5e281bc003fa3e79d06111d451be2eedfd40bf",
+    "merge_commit": "eaf6204a64ac6c9e9666775b2a1e6c3ec31e0b3a",
+    "reviewer": "Rosuno",
+    "approved_at": "2026-09-01T16:33:32Z",
+    "merged_at": "2026-09-01T16:35:53Z"
+  },
   "catalog_fingerprint": {
     "evidence_path": "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json",
     "evidence_sha256": "c5bb94594f8a82915ad5a9faabbee00ad90bf782914de072bee8a6a5fa333e6f",
@@ -101,15 +229,15 @@
     "runs_identical": true
   },
   "governance_state": {
-    "decision_status": "proposed",
-    "work_item_status": "in_progress",
-    "reviewer_identity": "pending designated human PR review",
-    "reviewer_status": "pending",
-    "reviewed": false,
-    "merged": false,
+    "decision_status": "accepted",
+    "work_item_status": "completed",
+    "reviewer_identity": "Rosuno",
+    "reviewer_status": "approved",
+    "reviewed": true,
+    "merged": true,
     "released": false,
-    "persistently_applied": false,
-    "finally_closed": false
+    "persistently_applied": true,
+    "finally_closed": true
   },
   "checkpoint_and_revert_history": {
     "reverted_attempts": [
@@ -192,7 +320,7 @@
       "commits_persistently_applied": false
     }
   },
-  "acceptance_state": "implemented_and_rollback_validated_pending_protected_review",
-  "next_gate": "protected human review before merge, persistent application, release, or final closure",
+  "acceptance_state": "accepted_staging_application",
+  "next_gate": "separate protected review before production or P1-004",
   "sensitive_payloads_present": false
 }
