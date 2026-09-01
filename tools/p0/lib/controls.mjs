@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  canonicalizeCatalogRows,
   validateAdvisorFindings,
   validateCatalogBaseline,
 } from "./catalog-fingerprint.mjs";
@@ -115,6 +116,95 @@ const P1_REGULATORY_APPROVED_ADVISOR_FINDINGS = [
   "rls_enabled_no_policy:public.launch_gates",
   "rls_enabled_no_policy:public.launch_gate_evaluations",
   "rls_enabled_no_policy:public.launch_authorizations",
+];
+
+const P1_AUTHORIZATION_CORRECTION_MIGRATION_ID =
+  "20260901012518_p1_authorization_scope_correction";
+const P1_AUTHORIZATION_CORRECTION_MIGRATION_PATH =
+  "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql";
+const P1_AUTHORIZATION_CORRECTION_MIGRATION_SHA256 =
+  "bf0cdabed8ffa41a65e793b9041c00dc7d2ca47eeef40c2750770e195b47d6c5";
+const P1_AUTHORIZATION_CORRECTION_MIGRATION_BYTES = 10339;
+const P1_AUTHORIZATION_CORRECTION_WORK_ITEM_ID =
+  "WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION";
+const P1_AUTHORIZATION_CORRECTION_DECISION_ID =
+  "DEC-20260831-P1-002-AUTHORIZATION-SCOPE-CORRECTION";
+const P1_AUTHORIZATION_CORRECTION_EVIDENCE_PATH =
+  "governance/evidence/p1-002-authorization-scope-correction.json";
+const P1_AUTHORIZATION_CORRECTION_FINGERPRINT_PATH =
+  "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json";
+const P1_AUTHORIZATION_CORRECTION_FINGERPRINT_FILE_SHA256 =
+  "c5bb94594f8a82915ad5a9faabbee00ad90bf782914de072bee8a6a5fa333e6f";
+const P1_AUTHORIZATION_CORRECTION_FINGERPRINT_FILE_BYTES = 62644;
+const P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256 =
+  "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e";
+const P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES = 31443;
+const P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS = 102;
+const P1_AUTHORIZATION_CORRECTION_BASELINE_SHA256 =
+  "dd8e1c374e29f92578a1f10892991a4eaeaa1cb329f688d017c7d7a040632030";
+const P1_AUTHORIZATION_CORRECTION_STATE_SHA256 =
+  "29e71a548176a97251d8b61ddbd4acd21a50fedd865f29c41e557ebddc336ad6";
+const P1_AUTHORIZATION_CORRECTION_DRIFT_CHECK =
+  "Rollback-only Rosuno Staging correction validation passed with exact before/after catalog and persistent-state restoration; no clean persistent-application drift result is claimed.";
+const P1_AUTHORIZATION_CORRECTION_CATEGORY_COUNTS = {
+  table: 4,
+  column: 25,
+  constraint: 20,
+  index: 8,
+  foreign_key: 7,
+  rls: 4,
+  policy: 1,
+  trigger: 1,
+  function: 2,
+  table_privilege: 20,
+  function_privilege: 10,
+};
+const P1_AUTHORIZATION_CORRECTION_CHRONOLOGY = [
+  {
+    commit: "6dfb6a5a98e0456c7f1b6876f0441aa1f0299429",
+    description: "premature empty migration",
+  },
+  {
+    commit: "4fe3ea3651643410e1e2dcc6ce1585736e64b866",
+    description: "explicit revert",
+  },
+  {
+    commit: "17c2025c4b0eacc78d2926b8acb3fd26ecee89f5",
+    description: "premature migration checkpoint",
+  },
+  {
+    commit: "4261b2d716e25bcc858918cb391bd826de3b234e",
+    description: "explicit revert",
+  },
+  {
+    commit: "fc687c9736f81265b66de3905d278114edf13d61",
+    description: "fresh authorized implementation",
+  },
+  {
+    commit: "c64e403420850689b163bf0d6e37a12ab590b805",
+    description: "authorized dependency-guard correction",
+  },
+  {
+    commit: "b7b862f4d03eb7c3686f539fdedf33e6e6812300",
+    description: "out-of-scope .replit Python module addition",
+  },
+  {
+    commit: "b90f697164723be80029a8756b5dde79bd5f2c6c",
+    description: "explicit forward-only revert restoring canonical .replit",
+  },
+  {
+    commit: "7ddf5426cc870f417ff4c91f239906fc0f348cd2",
+    description:
+      "separate non-ancestor internal Replit checkpoint carrying the same out-of-scope .replit tree; preserved but never imported",
+  },
+  {
+    commit: "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34",
+    description: "authorized v2 evidence checkpoint",
+  },
+  {
+    commit: "ba58456e757c0c330b13f846685546f480626923",
+    description: "authorized governance/control checkpoint",
+  },
 ];
 
 const DIRECT_SECRET_PATTERNS = [
@@ -1017,6 +1107,102 @@ export function validateP1AuthorizationMigration(
     )
   ) {
     fail(`${context} may not alter P1-001 objects`);
+  }
+  if (scanSecretLikeText(sql, context).length > 0) {
+    fail(`${context} contains a secret-like value`);
+  }
+}
+
+export function validateP1AuthorizationCorrectionMigration(
+  sql,
+  migration,
+  context = "P1 authorization scope correction migration",
+) {
+  if (
+    migration.migration_id !== P1_AUTHORIZATION_CORRECTION_MIGRATION_ID ||
+    migration.sequence !== 5 ||
+    migration.depends_on?.join("|") !==
+      "20260830023823_p1_jurisdiction_policy_launch_foundation"
+  ) {
+    fail(`${context}.migration_id, sequence, or dependency is invalid`);
+  }
+  requireBoundedString(sql, context, 20000);
+
+  const droppedTables = [
+    ...sql.matchAll(/\bdrop\s+table\s+public\.([a-z0-9_]+)/gi),
+  ].map((match) => match[1].toLowerCase());
+  if (
+    JSON.stringify(droppedTables) !==
+    JSON.stringify(["attorney_profiles", "client_profiles"])
+  ) {
+    fail(`${context} must drop exactly attorney_profiles and client_profiles`);
+  }
+  if (
+    !/drop\s+table\s+public\.attorney_profiles\s+restrict\s*;/i.test(sql) ||
+    !/drop\s+table\s+public\.client_profiles\s+restrict\s*;/i.test(sql) ||
+    /\bcascade\b/i.test(sql)
+  ) {
+    fail(`${context} drops must be RESTRICT and may not use CASCADE`);
+  }
+
+  const allowedMutationTables = new Set([
+    "attorney_profiles",
+    "client_profiles",
+    "staff_profiles",
+    "capability_definitions",
+    "capability_grants",
+    "application_sessions",
+  ]);
+  const mutationTablePatterns = [
+    /\b(?:alter\s+table|drop\s+table|comment\s+on\s+table|revoke\s+all\s+on\s+table)\s+public\.([a-z0-9_]+)/gi,
+    /\bgrant\s+[^;]*?\s+on\s+table\s+public\.([a-z0-9_]+)/gi,
+    /\bcomment\s+on\s+column\s+public\.([a-z0-9_]+)\.[a-z0-9_]+/gi,
+    /\bdrop\s+trigger\s+[a-z0-9_]+\s+on\s+public\.([a-z0-9_]+)/gi,
+  ];
+  const mutationTables = mutationTablePatterns.flatMap((pattern) =>
+    [...sql.matchAll(pattern)].map((match) => match[1].toLowerCase()),
+  );
+  const unauthorizedMutationTables = mutationTables.filter(
+    (table) => !allowedMutationTables.has(table),
+  );
+  if (unauthorizedMutationTables.length > 0 || /\bbookings?\b/i.test(sql)) {
+    fail(`${context} crosses the authorized P1-002 correction table boundary`);
+  }
+
+  for (const table of [
+    "staff_profiles",
+    "capability_definitions",
+    "capability_grants",
+    "application_sessions",
+  ]) {
+    if (!new RegExp(`alter\\s+table\\s+public\\.${table}\\b`, "i").test(sql)) {
+      fail(`${context} does not retain and correct public.${table}`);
+    }
+  }
+  if (
+    /\b(?:drop|create)\s+table\s+public\.capability_grants\b/i.test(sql) ||
+    !/alter\s+table\s+public\.capability_grants\b/i.test(sql)
+  ) {
+    fail(`${context} must correct capability_grants in place`);
+  }
+  if (
+    !/capability_grants_jurisdiction_id_fkey/i.test(sql) ||
+    !/foreign\s+key\s*\(\s*jurisdiction_id\s*\)\s+references\s+(?:public\.)?jurisdictions\s*\(\s*id\s*\)\s+on\s+update\s+restrict\s+on\s+delete\s+restrict/i.test(
+      sql,
+    ) ||
+    !/Optional jurisdiction scope enforced by locked physical Migration 3\./.test(
+      sql,
+    )
+  ) {
+    fail(`${context} does not preserve the exact P1-003 jurisdiction contract`);
+  }
+  const digest = createHash("sha256").update(sql).digest("hex");
+  if (
+    digest !== P1_AUTHORIZATION_CORRECTION_MIGRATION_SHA256 ||
+    Buffer.byteLength(sql, "utf8") !==
+      P1_AUTHORIZATION_CORRECTION_MIGRATION_BYTES
+  ) {
+    fail(`${context} bytes differ from the authorized correction`);
   }
   if (scanSecretLikeText(sql, context).length > 0) {
     fail(`${context} contains a secret-like value`);
@@ -2550,6 +2736,431 @@ export function validateP1AuthorizationEvidence(
   }
 }
 
+function validateP1AuthorizationCorrectionFingerprint(
+  fingerprint,
+  migrationSql,
+  sourceText = null,
+) {
+  const context = "P1 authorization correction fingerprint evidence";
+  requireExactFields(
+    fingerprint,
+    [
+      "version",
+      "evidence_id",
+      "work_item_id",
+      "scope",
+      "environment",
+      "historical_fingerprints",
+      "current_post_p1_003_baseline",
+      "derivation",
+      "migration",
+      "canonicalization",
+      "runs",
+      "exact_equality",
+      "rollback_and_restoration",
+      "no_other_environments_contacted",
+      "database_persistent_mutation",
+      "migration_history_mutation",
+      "authorized_tracked_mutation",
+      "retention",
+      "normalized_outputs",
+    ],
+    context,
+  );
+  if (
+    fingerprint.version !== 2 ||
+    fingerprint.evidence_id !== "P1-002-CORRECTED-CATALOG-FINGERPRINT-V2" ||
+    fingerprint.work_item_id !== P1_AUTHORIZATION_CORRECTION_WORK_ITEM_ID ||
+    fingerprint.scope !==
+      "rollback-only corrected P1-002 four-table authorization catalog fingerprint against Rosuno Staging post-P1-003 baseline"
+  ) {
+    fail(`${context} identity is invalid`);
+  }
+  if (sourceText !== null) {
+    const digest = createHash("sha256").update(sourceText).digest("hex");
+    if (
+      digest !== P1_AUTHORIZATION_CORRECTION_FINGERPRINT_FILE_SHA256 ||
+      Buffer.byteLength(sourceText, "utf8") !==
+        P1_AUTHORIZATION_CORRECTION_FINGERPRINT_FILE_BYTES ||
+      JSON.stringify(JSON.parse(sourceText)) !== JSON.stringify(fingerprint)
+    ) {
+      fail(`${context} file bytes are not the authorized immutable evidence`);
+    }
+  }
+
+  const migrationDigest = createHash("sha256")
+    .update(migrationSql)
+    .digest("hex");
+  if (
+    fingerprint.migration?.path !==
+      P1_AUTHORIZATION_CORRECTION_MIGRATION_PATH ||
+    fingerprint.migration?.sha256 !== migrationDigest ||
+    fingerprint.migration?.sha256 !==
+      P1_AUTHORIZATION_CORRECTION_MIGRATION_SHA256 ||
+    fingerprint.migration?.bytes !==
+      P1_AUTHORIZATION_CORRECTION_MIGRATION_BYTES ||
+    fingerprint.migration?.executed_inside_transaction_only !== true ||
+    fingerprint.migration?.persisted !== false
+  ) {
+    fail(`${context} migration evidence is invalid`);
+  }
+
+  const baseline = fingerprint.current_post_p1_003_baseline;
+  if (
+    baseline?.sha256 !== P1_AUTHORIZATION_CORRECTION_BASELINE_SHA256 ||
+    baseline?.canonical_byte_length !== 51494 ||
+    baseline?.row_count !== 173 ||
+    baseline?.migration_history_exact !== true ||
+    baseline?.public_table_count !== 17 ||
+    baseline?.public_rows_zero !== true ||
+    baseline?.correction_history_occurrences !== 0 ||
+    baseline?.jurisdiction_fk_exact !== true ||
+    baseline?.jurisdiction_comment_exact !== true ||
+    baseline?.security_advisor_findings !== 13 ||
+    baseline?.security_advisor_level !== "INFO"
+  ) {
+    fail(`${context} post-P1-003 baseline is invalid`);
+  }
+  const historical = fingerprint.historical_fingerprints;
+  if (
+    !Array.isArray(historical) ||
+    historical.length !== 1 ||
+    historical[0]?.label !==
+      "preserved historical pre-P1-003 scoped baseline" ||
+    historical[0]?.sha256 !==
+      "1d8e6182902d3c40d1b99c87bc80be2f146ef6a85f512b117e5c55b52878c12c" ||
+    historical[0]?.canonical_byte_length !== 50602 ||
+    historical[0]?.retained_as_historical !== true
+  ) {
+    fail(`${context} historical fingerprint labeling is invalid`);
+  }
+  if (
+    fingerprint.derivation?.source_query !==
+      "tools/p0/lib/catalog-fingerprint.mjs#CATALOG_SQL" ||
+    fingerprint.derivation?.source_sha256 !==
+      "cedcca81b2604192f596c0e3a3f34a31aa4bfba86134a36d31595af42f5fdbb1" ||
+    fingerprint.derivation?.retained_target_tables?.join("|") !==
+      "public.staff_profiles|public.capability_definitions|public.capability_grants|public.application_sessions" ||
+    fingerprint.derivation?.semantic_contract !== "rosuno-p1-catalog-v1" ||
+    fingerprint.derivation?.reverse_derivation_exact !== true
+  ) {
+    fail(`${context} mechanical derivation proof is invalid`);
+  }
+
+  const snapshot = fingerprint.normalized_outputs?.snapshot;
+  const canonical = canonicalizeCatalogRows(snapshot?.rows);
+  if (
+    snapshot?.format !== "rosuno-p1-catalog-v1" ||
+    snapshot?.encoding !== "UTF-8" ||
+    snapshot?.line_ending !== "LF" ||
+    JSON.stringify(snapshot) !== JSON.stringify(canonical.snapshot) ||
+    canonical.sha256 !== P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256 ||
+    canonical.canonicalBytes.length !==
+      P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES ||
+    canonical.snapshot.rows.length !==
+      P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS ||
+    JSON.stringify(canonical.categoryCounts) !==
+      JSON.stringify(P1_AUTHORIZATION_CORRECTION_CATEGORY_COUNTS)
+  ) {
+    fail(`${context} normalized snapshot is invalid`);
+  }
+
+  const expectedFingerprint = {
+    sha256: P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256,
+    canonical_byte_length: P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES,
+    row_count: P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS,
+    category_counts: P1_AUTHORIZATION_CORRECTION_CATEGORY_COUNTS,
+  };
+  requireArray(fingerprint.runs, `${context}.runs`, 2);
+  if (fingerprint.runs.length !== 2) {
+    fail(`${context} must contain exactly two runs`);
+  }
+  for (const [index, run] of fingerprint.runs.entries()) {
+    const runId = `RUN${index + 1}`;
+    if (
+      run.run_id !== runId ||
+      run.independent_psql_session !== true ||
+      run.rollback_marker_text !== `V2_${runId}_ROLLBACK_COMPLETE` ||
+      run.rollback_exit_status !== 0 ||
+      run.before?.catalog_sha256 !==
+        P1_AUTHORIZATION_CORRECTION_BASELINE_SHA256 ||
+      run.after?.catalog_sha256 !==
+        P1_AUTHORIZATION_CORRECTION_BASELINE_SHA256 ||
+      run.before?.state_sha256 !== P1_AUTHORIZATION_CORRECTION_STATE_SHA256 ||
+      run.after?.state_sha256 !== P1_AUTHORIZATION_CORRECTION_STATE_SHA256 ||
+      JSON.stringify(run.before) !== JSON.stringify(run.after) ||
+      run.restoration?.exact_catalog_canonical_bytes !== true ||
+      run.restoration?.exact_persistent_state_bytes !== true ||
+      run.restoration?.proven !== true ||
+      JSON.stringify(run.fingerprint) !== JSON.stringify(expectedFingerprint)
+    ) {
+      fail(`${context} ${runId} rollback or restoration is invalid`);
+    }
+  }
+  const runReferences = fingerprint.normalized_outputs?.run_references;
+  if (
+    !Array.isArray(runReferences) ||
+    runReferences.length !== 2 ||
+    runReferences.some(
+      (reference, index) =>
+        reference.run_id !== `RUN${index + 1}` ||
+        reference.json_pointer !== "#/normalized_outputs/snapshot" ||
+        reference.canonical_sha256 !==
+          P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256 ||
+        reference.canonical_byte_length !==
+          P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES ||
+        reference.row_count !== P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS,
+    )
+  ) {
+    fail(`${context} run references are invalid`);
+  }
+  if (
+    Object.values(fingerprint.exact_equality).some((value) => value !== true) ||
+    Object.values(fingerprint.rollback_and_restoration).some(
+      (value) => value !== true,
+    ) ||
+    fingerprint.no_other_environments_contacted !== true ||
+    fingerprint.database_persistent_mutation !== false ||
+    fingerprint.migration_history_mutation !== false ||
+    fingerprint.authorized_tracked_mutation?.join("|") !==
+      P1_AUTHORIZATION_CORRECTION_FINGERPRINT_PATH
+  ) {
+    fail(`${context} equality, restoration, or mutation boundary is invalid`);
+  }
+  if (scanSecretLikeText(JSON.stringify(fingerprint), context).length > 0) {
+    fail(`${context} contains secret-like content`);
+  }
+}
+
+export function validateP1AuthorizationCorrectionEvidence(
+  evidence,
+  migrationSql,
+  fingerprint,
+  fingerprintSourceText = null,
+) {
+  const context = "P1 authorization scope correction evidence";
+  requireExactFields(
+    evidence,
+    [
+      "version",
+      "evidence_id",
+      "work_item_id",
+      "decision_id",
+      "scope",
+      "authority_refs",
+      "migration",
+      "repository",
+      "test_results",
+      "rollback_validation",
+      "staging_preservation",
+      "source_dev_mutation",
+      "source_dev_scope_observation",
+      "old_mutation",
+      "old_reactivation",
+      "old_scope_observation",
+      "staging_persistent_correction_applied",
+      "protected_review_completed",
+      "merged",
+      "pr_created",
+      "catalog_fingerprint",
+      "governance_state",
+      "checkpoint_and_revert_history",
+      "acceptance_state",
+      "next_gate",
+      "sensitive_payloads_present",
+    ],
+    context,
+  );
+  if (
+    evidence.version !== 1 ||
+    evidence.evidence_id !== "P1-002-AUTHORIZATION-SCOPE-CORRECTION" ||
+    evidence.work_item_id !== P1_AUTHORIZATION_CORRECTION_WORK_ITEM_ID ||
+    evidence.decision_id !== P1_AUTHORIZATION_CORRECTION_DECISION_ID ||
+    evidence.scope !==
+      "P1-002 authorization scope correction implemented and rollback-validated against the post-P1-003 Rosuno Staging baseline; pending protected review"
+  ) {
+    fail(`${context} identity is invalid`);
+  }
+  const expectedAuthorities =
+    "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED|PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED|DOMAIN-MODEL-V1.4-LOCKED|RELATIONAL-OBJECT-SPEC-V1.0-LOCKED|SCHEMA-INVENTORY-V0.7-LOCKED";
+  if (evidence.authority_refs?.join("|") !== expectedAuthorities) {
+    fail(`${context} authority boundary is invalid`);
+  }
+
+  const migrationDigest = createHash("sha256")
+    .update(migrationSql)
+    .digest("hex");
+  const migration = evidence.migration;
+  if (
+    migration?.migration_id !== P1_AUTHORIZATION_CORRECTION_MIGRATION_ID ||
+    migration?.filename !==
+      "20260901012518_p1_authorization_scope_correction.sql" ||
+    migration?.path !== P1_AUTHORIZATION_CORRECTION_MIGRATION_PATH ||
+    migration?.sha256 !== migrationDigest ||
+    migration?.sha256 !== P1_AUTHORIZATION_CORRECTION_MIGRATION_SHA256 ||
+    migration?.bytes !== P1_AUTHORIZATION_CORRECTION_MIGRATION_BYTES ||
+    migration?.sequence !== 5 ||
+    migration?.depends_on?.join("|") !==
+      "20260830023823_p1_jurisdiction_policy_launch_foundation" ||
+    migration?.reviewed !== false ||
+    migration?.persistently_applied !== false
+  ) {
+    fail(`${context} migration summary is invalid`);
+  }
+  if (
+    evidence.repository?.branch !== "p1-002-authorization-scope-correction" ||
+    evidence.repository?.base_commit !==
+      "b90f697164723be80029a8756b5dde79bd5f2c6c" ||
+    evidence.repository?.validated_v2_evidence_commit !==
+      "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34" ||
+    evidence.repository?.remote_correction_branch_present !== false
+  ) {
+    fail(`${context} repository baseline is invalid`);
+  }
+  const structural = evidence.test_results?.structural_security_failure;
+  const observations = evidence.test_results?.authorization_observations;
+  if (
+    structural?.passed !== 30 ||
+    structural?.total !== 30 ||
+    structural?.result !== "passed" ||
+    observations?.passed !== 7 ||
+    observations?.total !== 7 ||
+    observations?.result !== "passed"
+  ) {
+    fail(`${context} completed validation totals are invalid`);
+  }
+  const rollback = evidence.rollback_validation;
+  if (
+    rollback?.rollback_only !== true ||
+    rollback?.run1_marker !== "V2_RUN1_ROLLBACK_COMPLETE" ||
+    rollback?.run2_marker !== "V2_RUN2_ROLLBACK_COMPLETE" ||
+    rollback?.run1_restored_before_run2 !== true ||
+    rollback?.explicit_rollback_each_run !== true ||
+    rollback?.exact_catalog_restoration !== true ||
+    rollback?.exact_persistent_state_restoration !== true ||
+    rollback?.baseline_catalog_sha256 !==
+      P1_AUTHORIZATION_CORRECTION_BASELINE_SHA256 ||
+    rollback?.persistent_state_sha256 !==
+      P1_AUTHORIZATION_CORRECTION_STATE_SHA256 ||
+    rollback?.migration_history_unchanged !== true
+  ) {
+    fail(`${context} rollback restoration summary is invalid`);
+  }
+  const staging = evidence.staging_preservation;
+  if (
+    staging?.p1_003_preserved !== true ||
+    staging?.migration_count !== 4 ||
+    staging?.public_table_count !== 17 ||
+    staging?.public_row_count !== 0 ||
+    staging?.security_advisor_info_findings !== 13 ||
+    staging?.security_advisor_unapproved_findings !== 0 ||
+    staging?.persistent_mutation !== false
+  ) {
+    fail(`${context} Staging preservation summary is invalid`);
+  }
+  if (
+    evidence.source_dev_mutation !== false ||
+    evidence.source_dev_scope_observation !==
+      "source/dev wwcwfbzwljbjlaifklaj remains exactly P0 with zero public tables" ||
+    evidence.old_mutation !== false ||
+    evidence.old_reactivation !== false ||
+    evidence.old_scope_observation !==
+      "OLD ddltrtkunctovnjuyluk remains INACTIVE" ||
+    evidence.staging_persistent_correction_applied !== false ||
+    evidence.protected_review_completed !== false ||
+    evidence.merged !== false ||
+    evidence.pr_created !== false
+  ) {
+    fail(`${context} environment and publication observations are invalid`);
+  }
+
+  validateP1AuthorizationCorrectionFingerprint(
+    fingerprint,
+    migrationSql,
+    fingerprintSourceText,
+  );
+  const catalog = evidence.catalog_fingerprint;
+  const expectedRunSummary = {
+    sha256: P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256,
+    canonical_byte_length: P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES,
+    row_count: P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS,
+  };
+  if (
+    catalog?.evidence_path !== P1_AUTHORIZATION_CORRECTION_FINGERPRINT_PATH ||
+    catalog?.evidence_sha256 !==
+      P1_AUTHORIZATION_CORRECTION_FINGERPRINT_FILE_SHA256 ||
+    catalog?.evidence_bytes !==
+      P1_AUTHORIZATION_CORRECTION_FINGERPRINT_FILE_BYTES ||
+    catalog?.normalized_content_reference !== "#/normalized_outputs/snapshot" ||
+    JSON.stringify(catalog?.category_counts) !==
+      JSON.stringify(P1_AUTHORIZATION_CORRECTION_CATEGORY_COUNTS) ||
+    JSON.stringify(catalog?.run1) !== JSON.stringify(expectedRunSummary) ||
+    JSON.stringify(catalog?.run2) !== JSON.stringify(expectedRunSummary) ||
+    catalog?.runs_identical !== true
+  ) {
+    fail(`${context} catalog reference is invalid`);
+  }
+
+  const governance = evidence.governance_state;
+  if (
+    governance?.decision_status !== "proposed" ||
+    governance?.work_item_status !== "in_progress" ||
+    governance?.reviewer_identity !== "pending designated human PR review" ||
+    governance?.reviewer_status !== "pending" ||
+    governance?.reviewed !== false ||
+    governance?.merged !== false ||
+    governance?.released !== false ||
+    governance?.persistently_applied !== false ||
+    governance?.finally_closed !== false ||
+    evidence.acceptance_state !==
+      "implemented_and_rollback_validated_pending_protected_review" ||
+    evidence.next_gate !==
+      "protected human review before merge, persistent application, release, or final closure" ||
+    evidence.sensitive_payloads_present !== false
+  ) {
+    fail(`${context} falsely claims review, application, release, or closure`);
+  }
+  const history = evidence.checkpoint_and_revert_history;
+  if (
+    history?.reverted_attempts?.[0]?.attempt_commit !==
+      "6dfb6a5a98e0456c7f1b6876f0441aa1f0299429" ||
+    history?.reverted_attempts?.[0]?.revert_commit !==
+      "4fe3ea3651643410e1e2dcc6ce1585736e64b866" ||
+    history?.reverted_attempts?.[1]?.attempt_commit !==
+      "17c2025c4b0eacc78d2926b8acb3fd26ecee89f5" ||
+    history?.reverted_attempts?.[1]?.revert_commit !==
+      "4261b2d716e25bcc858918cb391bd826de3b234e" ||
+    history?.authorized_correction_commits?.join("|") !==
+      "fc687c9736f81265b66de3905d278114edf13d61|c64e403420850689b163bf0d6e37a12ab590b805" ||
+    history?.configuration_checkpoint?.commit !==
+      "7ddf5426cc870f417ff4c91f239906fc0f348cd2" ||
+    history?.configuration_checkpoint?.relationship !==
+      "separate non-ancestor merge checkpoint; not the correction evidence commit and not imported into this branch" ||
+    history?.canonical_configuration_restored_at !==
+      "b90f697164723be80029a8756b5dde79bd5f2c6c" ||
+    history?.v2_evidence_commit !==
+      "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34" ||
+    JSON.stringify(history?.chronology) !==
+      JSON.stringify(P1_AUTHORIZATION_CORRECTION_CHRONOLOGY) ||
+    history?.internal_ledger_evidence?.commit !==
+      "7ddf5426cc870f417ff4c91f239906fc0f348cd2" ||
+    history?.internal_ledger_evidence?.description !==
+      "separate non-ancestor internal Replit checkpoint carrying the same out-of-scope .replit tree" ||
+    history?.internal_ledger_evidence?.preserved !== true ||
+    history?.internal_ledger_evidence?.imported_into_active_branch !== false ||
+    history?.history_integrity?.records_erased !== false ||
+    history?.history_integrity?.history_rewritten !== false ||
+    history?.history_integrity?.commits_merged !== false ||
+    history?.history_integrity?.commits_released !== false ||
+    history?.history_integrity?.commits_persistently_applied !== false
+  ) {
+    fail(`${context} checkpoint or revert history is invalid`);
+  }
+  if (scanSecretLikeText(JSON.stringify(evidence), context).length > 0) {
+    fail(`${context} contains secret-like content`);
+  }
+}
+
 export function validateP1PlatformEvidence(evidence, migrationSql) {
   requireExactFields(
     evidence,
@@ -2961,6 +3572,70 @@ export function validateP1RegulatoryTraceability(
   }
 }
 
+export function validateP1AuthorizationCorrectionTraceability(
+  migrationRegister,
+  workItemRegister,
+  decisionRegister,
+) {
+  const migration = migrationRegister.migrations.find(
+    (entry) => entry.migration_id === P1_AUTHORIZATION_CORRECTION_MIGRATION_ID,
+  );
+  const workItem = workItemRegister.work_items.find(
+    (entry) => entry.work_item_id === P1_AUTHORIZATION_CORRECTION_WORK_ITEM_ID,
+  );
+  const decision = decisionRegister.decisions.find(
+    (entry) => entry.decision_id === P1_AUTHORIZATION_CORRECTION_DECISION_ID,
+  );
+  if (
+    !migration ||
+    migration.migration_kind !== "product" ||
+    migration.sequence !== 5 ||
+    migration.artifact_path !== P1_AUTHORIZATION_CORRECTION_MIGRATION_PATH ||
+    migration.work_item_refs?.join("|") !==
+      P1_AUTHORIZATION_CORRECTION_WORK_ITEM_ID ||
+    migration.decision_refs?.join("|") !==
+      P1_AUTHORIZATION_CORRECTION_DECISION_ID ||
+    migration.release_refs?.length !== 0 ||
+    migration.reviewed !== false ||
+    migration.reviewed_by !== "pending designated human PR review" ||
+    migration.reviewed_at !== null ||
+    migration.applied_environment !== "none" ||
+    migration.non_production_validation !== true ||
+    migration.drift_check !== P1_AUTHORIZATION_CORRECTION_DRIFT_CHECK ||
+    migration.depends_on?.join("|") !==
+      "20260830023823_p1_jurisdiction_policy_launch_foundation"
+  ) {
+    fail("P1 authorization correction migration traceability is invalid");
+  }
+  if (
+    !workItem ||
+    workItem.status !== "in_progress" ||
+    workItem.environment !== "staging" ||
+    workItem.reviewer?.identity !== "pending designated human PR review" ||
+    workItem.reviewer?.status !== "pending" ||
+    workItem.decision_refs?.join("|") !==
+      P1_AUTHORIZATION_CORRECTION_DECISION_ID ||
+    workItem.migration_refs?.join("|") !==
+      P1_AUTHORIZATION_CORRECTION_MIGRATION_ID ||
+    workItem.release_refs?.length !== 0
+  ) {
+    fail("P1 authorization correction work-item traceability is invalid");
+  }
+  if (
+    !decision ||
+    decision.status !== "proposed" ||
+    decision.reviewer?.identity !== "pending designated human PR review" ||
+    decision.reviewer?.status !== "pending" ||
+    decision.work_item_refs?.join("|") !==
+      P1_AUTHORIZATION_CORRECTION_WORK_ITEM_ID ||
+    !decision.evidence?.includes(P1_AUTHORIZATION_CORRECTION_MIGRATION_PATH) ||
+    !decision.evidence?.includes(P1_AUTHORIZATION_CORRECTION_EVIDENCE_PATH) ||
+    !decision.evidence?.includes(P1_AUTHORIZATION_CORRECTION_FINGERPRINT_PATH)
+  ) {
+    fail("P1 authorization correction decision traceability is invalid");
+  }
+}
+
 export function validateRestoreEvidence(evidence) {
   requireExactFields(
     evidence,
@@ -3146,6 +3821,19 @@ export function validateMigrationRegister(
           fail(`${context}.artifact_path is invalid for P1-003`);
         }
         validateP1RegulatoryMigration(sql, migration, `${context}.artifact`);
+      } else if (
+        migration.migration_id === P1_AUTHORIZATION_CORRECTION_MIGRATION_ID
+      ) {
+        if (
+          migration.artifact_path !== P1_AUTHORIZATION_CORRECTION_MIGRATION_PATH
+        ) {
+          fail(`${context}.artifact_path is invalid for the P1-002 correction`);
+        }
+        validateP1AuthorizationCorrectionMigration(
+          sql,
+          migration,
+          `${context}.artifact`,
+        );
       } else {
         fail(`${context}.artifact_path is outside the authorized P1 slice`);
       }
@@ -3218,10 +3906,16 @@ export function validateMigrationRegister(
         "20260830023823_p1_jurisdiction_policy_launch_foundation" &&
       migration.drift_check ===
         "Supabase CLI shadow comparison unavailable because Replit OCI setns failed during pg_isready before P1-003 SQL or schema comparison; compensating corrected direct-catalog validation passed and no clean CLI drift result is claimed.";
+    const acceptedP1AuthorizationCorrectionValidation =
+      migration.migration_id === P1_AUTHORIZATION_CORRECTION_MIGRATION_ID &&
+      migration.applied_environment === "none" &&
+      migration.non_production_validation === true &&
+      migration.drift_check === P1_AUTHORIZATION_CORRECTION_DRIFT_CHECK;
     if (
       migration.drift_check !== "clean" &&
       !acceptedP1AuthorizationToolingException &&
-      !acceptedP1RegulatoryToolingException
+      !acceptedP1RegulatoryToolingException &&
+      !acceptedP1AuthorizationCorrectionValidation
     ) {
       fail(`${context} lacks a clean drift check`);
     }
@@ -3540,6 +4234,7 @@ export function validateNeutralPaths(files, packageJson) {
     "supabase/migrations/20260829000015_p1_platform_foundation.sql",
     "supabase/migrations/20260829171701_p1_authorization_foundation.sql",
     "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql",
+    "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql",
   ]);
   const forbidden = files.filter(
     (file) =>
@@ -3573,6 +4268,15 @@ export function validateRepository() {
   const workItems = readJson("governance/work-items/index.json");
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const releases = readJson("governance/releases/traceability.json");
+  const correctionMigrationSql = readFileSync(
+    path.join(ROOT, P1_AUTHORIZATION_CORRECTION_MIGRATION_PATH),
+    "utf8",
+  );
+  const correctionFingerprintText = readFileSync(
+    path.join(ROOT, P1_AUTHORIZATION_CORRECTION_FINGERPRINT_PATH),
+    "utf8",
+  );
+  const correctionFingerprint = JSON.parse(correctionFingerprintText);
 
   validateAuthorityReferences(authorityData);
   validateFieldRegistry(readJson("governance/control-fields.json"));
@@ -3665,6 +4369,12 @@ export function validateRepository() {
       "utf8",
     ),
   );
+  validateP1AuthorizationCorrectionEvidence(
+    readJson(P1_AUTHORIZATION_CORRECTION_EVIDENCE_PATH),
+    correctionMigrationSql,
+    correctionFingerprint,
+    correctionFingerprintText,
+  );
   validateDriftReport(readJson("governance/schema-drift/baseline.json"));
   validateReleaseRegister(releases, references, (sha) => {
     try {
@@ -3679,6 +4389,11 @@ export function validateRepository() {
   });
   validateP1ApplicationTraceability(migrations, workItems, decisions, releases);
   validateP1RegulatoryTraceability(migrations, workItems, decisions, releases);
+  validateP1AuthorizationCorrectionTraceability(
+    migrations,
+    workItems,
+    decisions,
+  );
   validateTraceabilityConsistency(migrations, releases);
 
   return {
@@ -3693,6 +4408,7 @@ export function validateRepository() {
       "reviewed and applied P1 Staging migration evidence",
       "P1-002 Staging evidence pending protected human review",
       "P1-003 accepted persistent Staging application evidence",
+      "P1-002 correction pending protected review with rollback-only evidence",
       "release traceability",
     ],
   };

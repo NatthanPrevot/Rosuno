@@ -232,6 +232,60 @@
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-08-30T02:38:23Z",
       "updated_at": "2026-08-30T20:29:17Z"
+    },
+    {
+      "work_item_id": "WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION",
+      "title": "Correct the bounded P1-002 authorization surface",
+      "objective": "Implement and rollback-validate the smallest forward-only correction that removes unauthorized P1-002 profile scope, preserves the post-P1-003 contract, and remains pending protected review without persistent application.",
+      "in_scope": [
+        "Remove only public.attorney_profiles and public.client_profiles after exact zero-row preconditions",
+        "Retain and correct only public.staff_profiles, public.capability_definitions, public.capability_grants, and public.application_sessions",
+        "Preserve the exact P1-003 capability_grants jurisdiction foreign key and comment",
+        "Preserve restrictive drops, least-privilege grants, RLS, and the in-place capability_grants relation",
+        "Record the completed 30 structural, security, and failure checks and 7 authorization observations",
+        "Record two byte-identical deterministic catalog runs and exact post-rollback restoration"
+      ],
+      "out_of_scope": [
+        "Protected approval, merge, release, persistent Staging application, production activity, or final closure",
+        "Booking currentness, Booking schema, application code, UI, providers, seeds, fake data, and later P1 work",
+        "Changes to P0, P1-001, P1-003, historical evidence, release traceability, or migration history"
+      ],
+      "status": "in_progress",
+      "owner": "P1 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260831-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
+      "dependencies": ["WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION"],
+      "acceptance_criteria": [
+        "The correction migration is sequence 5 and depends on the accepted P1-003 migration",
+        "The correction retains exactly the four authorized P1-002 tables and keeps capability_grants in place",
+        "Every table or column drop is restrictive and no CASCADE operation is present",
+        "All 30 structural, security, and failure checks and all 7 authorization observations pass",
+        "Two independent corrected-state catalog runs reproduce the exact canonical fingerprint",
+        "Each validation transaction rolls back explicitly and restores the exact post-P1-003 catalog and persistent state",
+        "The original P1-002 and P1-003 records and historical evidence remain unchanged",
+        "The correction remains pending protected review with no merge, release, persistent application, or final closure"
+      ],
+      "validation_commands": [
+        "pnpm exec prettier --check governance/decision-log.json governance/work-items/index.json governance/migrations/reviewed-migrations.json governance/evidence/p1-002-authorization-scope-correction.json tools/p0/lib/controls.mjs tools/p0/tests/p0-controls.test.mjs",
+        "node --test tools/p0/tests/p0-controls.test.mjs"
+      ],
+      "environment": "staging",
+      "release_refs": [],
+      "migration_refs": ["20260901012518_p1_authorization_scope_correction"],
+      "rollback_reference": "governance/evidence/p1-002-authorization-scope-correction.json",
+      "created_at": "2026-08-31T21:49:51Z",
+      "updated_at": "2026-09-01T13:34:19Z"
     }
   ]
 }

@@ -1,0 +1,198 @@
+{
+  "version": 1,
+  "evidence_id": "P1-002-AUTHORIZATION-SCOPE-CORRECTION",
+  "work_item_id": "WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION",
+  "decision_id": "DEC-20260831-P1-002-AUTHORIZATION-SCOPE-CORRECTION",
+  "scope": "P1-002 authorization scope correction implemented and rollback-validated against the post-P1-003 Rosuno Staging baseline; pending protected review",
+  "authority_refs": [
+    "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+    "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+    "DOMAIN-MODEL-V1.4-LOCKED",
+    "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+    "SCHEMA-INVENTORY-V0.7-LOCKED"
+  ],
+  "migration": {
+    "migration_id": "20260901012518_p1_authorization_scope_correction",
+    "filename": "20260901012518_p1_authorization_scope_correction.sql",
+    "path": "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql",
+    "sha256": "bf0cdabed8ffa41a65e793b9041c00dc7d2ca47eeef40c2750770e195b47d6c5",
+    "bytes": 10339,
+    "sequence": 5,
+    "depends_on": ["20260830023823_p1_jurisdiction_policy_launch_foundation"],
+    "reviewed": false,
+    "persistently_applied": false
+  },
+  "repository": {
+    "branch": "p1-002-authorization-scope-correction",
+    "base_commit": "b90f697164723be80029a8756b5dde79bd5f2c6c",
+    "validated_v2_evidence_commit": "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34",
+    "remote_correction_branch_present": false
+  },
+  "test_results": {
+    "structural_security_failure": {
+      "passed": 30,
+      "total": 30,
+      "result": "passed"
+    },
+    "authorization_observations": {
+      "passed": 7,
+      "total": 7,
+      "result": "passed"
+    }
+  },
+  "rollback_validation": {
+    "rollback_only": true,
+    "run1_marker": "V2_RUN1_ROLLBACK_COMPLETE",
+    "run2_marker": "V2_RUN2_ROLLBACK_COMPLETE",
+    "run1_restored_before_run2": true,
+    "explicit_rollback_each_run": true,
+    "exact_catalog_restoration": true,
+    "exact_persistent_state_restoration": true,
+    "baseline_catalog_sha256": "dd8e1c374e29f92578a1f10892991a4eaeaa1cb329f688d017c7d7a040632030",
+    "persistent_state_sha256": "29e71a548176a97251d8b61ddbd4acd21a50fedd865f29c41e557ebddc336ad6",
+    "migration_history_unchanged": true
+  },
+  "staging_preservation": {
+    "p1_003_preserved": true,
+    "migration_count": 4,
+    "public_table_count": 17,
+    "public_row_count": 0,
+    "security_advisor_info_findings": 13,
+    "security_advisor_unapproved_findings": 0,
+    "persistent_mutation": false
+  },
+  "source_dev_mutation": false,
+  "source_dev_scope_observation": "source/dev wwcwfbzwljbjlaifklaj remains exactly P0 with zero public tables",
+  "old_mutation": false,
+  "old_reactivation": false,
+  "old_scope_observation": "OLD ddltrtkunctovnjuyluk remains INACTIVE",
+  "staging_persistent_correction_applied": false,
+  "protected_review_completed": false,
+  "merged": false,
+  "pr_created": false,
+  "catalog_fingerprint": {
+    "evidence_path": "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json",
+    "evidence_sha256": "c5bb94594f8a82915ad5a9faabbee00ad90bf782914de072bee8a6a5fa333e6f",
+    "evidence_bytes": 62644,
+    "normalized_content_reference": "#/normalized_outputs/snapshot",
+    "category_counts": {
+      "table": 4,
+      "column": 25,
+      "constraint": 20,
+      "index": 8,
+      "foreign_key": 7,
+      "rls": 4,
+      "policy": 1,
+      "trigger": 1,
+      "function": 2,
+      "table_privilege": 20,
+      "function_privilege": 10
+    },
+    "run1": {
+      "sha256": "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e",
+      "canonical_byte_length": 31443,
+      "row_count": 102
+    },
+    "run2": {
+      "sha256": "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e",
+      "canonical_byte_length": 31443,
+      "row_count": 102
+    },
+    "runs_identical": true
+  },
+  "governance_state": {
+    "decision_status": "proposed",
+    "work_item_status": "in_progress",
+    "reviewer_identity": "pending designated human PR review",
+    "reviewer_status": "pending",
+    "reviewed": false,
+    "merged": false,
+    "released": false,
+    "persistently_applied": false,
+    "finally_closed": false
+  },
+  "checkpoint_and_revert_history": {
+    "reverted_attempts": [
+      {
+        "attempt_commit": "6dfb6a5a98e0456c7f1b6876f0441aa1f0299429",
+        "revert_commit": "4fe3ea3651643410e1e2dcc6ce1585736e64b866"
+      },
+      {
+        "attempt_commit": "17c2025c4b0eacc78d2926b8acb3fd26ecee89f5",
+        "revert_commit": "4261b2d716e25bcc858918cb391bd826de3b234e"
+      }
+    ],
+    "authorized_correction_commits": [
+      "fc687c9736f81265b66de3905d278114edf13d61",
+      "c64e403420850689b163bf0d6e37a12ab590b805"
+    ],
+    "configuration_checkpoint": {
+      "commit": "7ddf5426cc870f417ff4c91f239906fc0f348cd2",
+      "relationship": "separate non-ancestor merge checkpoint; not the correction evidence commit and not imported into this branch"
+    },
+    "canonical_configuration_restored_at": "b90f697164723be80029a8756b5dde79bd5f2c6c",
+    "v2_evidence_commit": "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34",
+    "chronology": [
+      {
+        "commit": "6dfb6a5a98e0456c7f1b6876f0441aa1f0299429",
+        "description": "premature empty migration"
+      },
+      {
+        "commit": "4fe3ea3651643410e1e2dcc6ce1585736e64b866",
+        "description": "explicit revert"
+      },
+      {
+        "commit": "17c2025c4b0eacc78d2926b8acb3fd26ecee89f5",
+        "description": "premature migration checkpoint"
+      },
+      {
+        "commit": "4261b2d716e25bcc858918cb391bd826de3b234e",
+        "description": "explicit revert"
+      },
+      {
+        "commit": "fc687c9736f81265b66de3905d278114edf13d61",
+        "description": "fresh authorized implementation"
+      },
+      {
+        "commit": "c64e403420850689b163bf0d6e37a12ab590b805",
+        "description": "authorized dependency-guard correction"
+      },
+      {
+        "commit": "b7b862f4d03eb7c3686f539fdedf33e6e6812300",
+        "description": "out-of-scope .replit Python module addition"
+      },
+      {
+        "commit": "b90f697164723be80029a8756b5dde79bd5f2c6c",
+        "description": "explicit forward-only revert restoring canonical .replit"
+      },
+      {
+        "commit": "7ddf5426cc870f417ff4c91f239906fc0f348cd2",
+        "description": "separate non-ancestor internal Replit checkpoint carrying the same out-of-scope .replit tree; preserved but never imported"
+      },
+      {
+        "commit": "7802140d20b9e8cc05dadb9c4c9d1a6556dddd34",
+        "description": "authorized v2 evidence checkpoint"
+      },
+      {
+        "commit": "ba58456e757c0c330b13f846685546f480626923",
+        "description": "authorized governance/control checkpoint"
+      }
+    ],
+    "internal_ledger_evidence": {
+      "commit": "7ddf5426cc870f417ff4c91f239906fc0f348cd2",
+      "description": "separate non-ancestor internal Replit checkpoint carrying the same out-of-scope .replit tree",
+      "preserved": true,
+      "imported_into_active_branch": false
+    },
+    "history_integrity": {
+      "records_erased": false,
+      "history_rewritten": false,
+      "commits_merged": false,
+      "commits_released": false,
+      "commits_persistently_applied": false
+    }
+  },
+  "acceptance_state": "implemented_and_rollback_validated_pending_protected_review",
+  "next_gate": "protected human review before merge, persistent application, release, or final closure",
+  "sensitive_payloads_present": false
+}

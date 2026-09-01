@@ -94,6 +94,30 @@
       "drift_check": "Supabase CLI shadow comparison unavailable because Replit OCI setns failed during pg_isready before P1-003 SQL or schema comparison; compensating corrected direct-catalog validation passed and no clean CLI drift result is claimed.",
       "rollback_plan": "If a later independently verified defect requires Staging rollback, remove only Migration 3 objects through a separately reviewed rollback migration; never edit migration history directly or alter P0/P1-001/P1-002 controls.",
       "depends_on": ["20260829171701_p1_authorization_foundation"]
+    },
+    {
+      "migration_id": "20260901012518_p1_authorization_scope_correction",
+      "migration_kind": "product",
+      "sequence": 5,
+      "artifact_path": "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
+      "decision_refs": ["DEC-20260831-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "Rollback-only Rosuno Staging correction validation passed with exact before/after catalog and persistent-state restoration; no clean persistent-application drift result is claimed.",
+      "rollback_plan": "The correction remains unapplied. Protected review must precede any persistent application; rollback-only validation already restored the exact post-P1-003 Staging catalog, migration history, and zero-row state after each run.",
+      "depends_on": ["20260830023823_p1_jurisdiction_policy_launch_foundation"]
     }
   ]
 }
