@@ -109,14 +109,14 @@
       ],
       "work_item_refs": ["WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
       "decision_refs": ["DEC-20260831-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
-      "release_refs": [],
-      "reviewed": false,
-      "reviewed_by": "pending designated human PR review",
-      "reviewed_at": null,
-      "applied_environment": "none",
+      "release_refs": ["REL-20260901-P1-002-CORRECTION-STAGING-APPLICATION"],
+      "reviewed": true,
+      "reviewed_by": "Rosuno",
+      "reviewed_at": "2026-09-01T16:33:32Z",
+      "applied_environment": "staging",
       "non_production_validation": true,
-      "drift_check": "Rollback-only Rosuno Staging correction validation passed with exact before/after catalog and persistent-state restoration; no clean persistent-application drift result is claimed.",
-      "rollback_plan": "The correction remains unapplied. Protected review must precede any persistent application; rollback-only validation already restored the exact post-P1-003 Staging catalog, migration history, and zero-row state after each run.",
+      "drift_check": "Rosuno Staging persistent application passed 39/39 post-application checks with exact five-version history, corrected catalog fingerprint, retained P1-003 contract, zero relevant rows, and zero additional advisor findings.",
+      "rollback_plan": "If a later independently verified defect requires Staging rollback, remove only the sequence-5 correction through a separately reviewed non-production rollback migration; never edit migration history directly or alter P0/P1-001/P1-003 controls.",
       "depends_on": ["20260830023823_p1_jurisdiction_policy_launch_foundation"]
     }
   ]
