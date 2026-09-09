@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "evidence_id": "P1-002-GOVERNANCE-LIFECYCLE-CORRECTION",
+  "work_item_id": "WI-P1-002-GOVERNANCE-CONTROL-CORRECTION",
+  "decision_id": "DEC-20260902-P1-002-GOVERNANCE-CONTROL-CORRECTION",
+  "scope": "Current P1-002 governance lifecycle and deterministic foundation baseline correction only",
+  "authority_refs": [
+    "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+    "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+    "DOMAIN-MODEL-V1.4-LOCKED",
+    "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+    "SCHEMA-INVENTORY-V0.7-LOCKED"
+  ],
+  "historical_records_preserved": {
+    "migration_path": "supabase/migrations/20260829171701_p1_authorization_foundation.sql",
+    "migration_sha256": "6471ac68949234e29ae1cc492eaa2f77dc15ca010998f72898284b8c9a855fec",
+    "pre_review_evidence_path": "governance/evidence/p1-002-authorization-foundation.json",
+    "pre_review_evidence_sha256": "29b6a33820e559557b8f3fd94f70762b5383a38833e3810486344a300eded43d",
+    "historical_catalog_path": "governance/evidence/p1-002-catalog-fingerprint.json",
+    "migration_unchanged": true,
+    "pre_review_evidence_unchanged": true,
+    "historical_catalog_unchanged": true
+  },
+  "proposal": {
+    "decision_id": "DEC-20260829-P1-AUTHORIZATION-FOUNDATION",
+    "work_item_id": "WI-P1-002-AUTHORIZATION-FOUNDATION",
+    "migration_id": "20260829171701_p1_authorization_foundation",
+    "proposed_at": "2026-08-29T17:17:01Z"
+  },
+  "implementation_review": {
+    "pull_request": 4,
+    "pull_request_url": "https://github.com/NatthanPrevot/Rosuno/pull/4",
+    "approved_head": "f2a2fcbd10bf9c7a7e6484cc2f5e545d0065d5e4",
+    "merge_commit": "6b279d56e8314abd7b7a7bf393e4de1e8a864235",
+    "reviewer": "Rosuno",
+    "approved_at": "2026-08-29T20:38:38Z",
+    "merged_at": "2026-08-29T20:44:47Z"
+  },
+  "persistent_application": {
+    "environment": "staging",
+    "project_name": "Rosuno Staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "migration_id": "20260829171701_p1_authorization_foundation",
+    "completed_at": "2026-08-30T00:20:26Z",
+    "validation_status": "passed",
+    "migration_history_exact": true
+  },
+  "validation_evidence_review": {
+    "pull_request": 6,
+    "pull_request_url": "https://github.com/NatthanPrevot/Rosuno/pull/6",
+    "approved_head": "be3de0daf91fad05fb76659149395040879748ea",
+    "merge_commit": "42fe78ee56e5dd599d3d600928f1c0d993141efe",
+    "reviewer": "Rosuno",
+    "approved_at": "2026-08-30T01:32:02Z",
+    "merged_at": "2026-08-30T01:39:16Z"
+  },
+  "defect_discovery": {
+    "reopened": true,
+    "finding": "client_profiles and attorney_profiles exceeded the authorized P1-002 scope",
+    "historical_records_rewritten": false,
+    "forward_only_correction_required": true
+  },
+  "forward_only_correction": {
+    "migration_id": "20260901012518_p1_authorization_scope_correction",
+    "migration_sha256": "bf0cdabed8ffa41a65e793b9041c00dc7d2ca47eeef40c2750770e195b47d6c5",
+    "pull_request": 10,
+    "pull_request_url": "https://github.com/NatthanPrevot/Rosuno/pull/10",
+    "approved_head": "fb5e281bc003fa3e79d06111d451be2eedfd40bf",
+    "merge_commit": "eaf6204a64ac6c9e9666775b2a1e6c3ec31e0b3a",
+    "reviewer": "Rosuno",
+    "approved_at": "2026-09-01T16:33:32Z",
+    "merged_at": "2026-09-01T16:35:53Z",
+    "staging_validation_completed_at": "2026-09-01T18:27:41.110779Z",
+    "staging_checks_passed": 39,
+    "staging_checks_total": 39,
+    "p1_003_contract_preserved": "capability_grants_jurisdiction_id_fkey",
+    "corrected_catalog_sha256": "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e"
+  },
+  "final_closure": {
+    "pull_request": 11,
+    "pull_request_url": "https://github.com/NatthanPrevot/Rosuno/pull/11",
+    "approved_head": "7b5ac880604596cc1c8dcb89ae61cff04fd4b84e",
+    "merge_commit": "b6970c23a5f64d118545d1a544965bf072cba1f6",
+    "reviewer": "Rosuno",
+    "approved_at": "2026-09-01T19:19:35Z",
+    "merged_at": "2026-09-01T19:26:31Z"
+  },
+  "current_governance": {
+    "original_decision_status": "accepted",
+    "original_work_item_status": "completed",
+    "original_migration_reviewed": true,
+    "original_migration_applied_environment": "staging",
+    "original_release_id": "REL-20260830-P1-002-STAGING-APPLICATION",
+    "correction_decision_status": "accepted",
+    "correction_work_item_status": "completed",
+    "governance_correction_decision_status": "proposed",
+    "governance_correction_work_item_status": "proposed",
+    "governance_correction_reviewer": "pending designated human PR review",
+    "protected_review_pending": true
+  },
+  "boundaries": {
+    "database_accessed": false,
+    "database_mutated": false,
+    "production_accessed": false,
+    "old_accessed": false,
+    "p1_004_work": false,
+    "push_or_pr_created": false
+  },
+  "sensitive_payloads_present": false
+}

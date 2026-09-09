@@ -48,6 +48,34 @@
       "created_at": "2026-08-29T15:16:33Z"
     },
     {
+      "release_id": "REL-20260830-P1-002-STAGING-APPLICATION",
+      "commit_sha": "6b279d56e8314abd7b7a7bf393e4de1e8a864235",
+      "work_item_refs": ["WI-P1-002-AUTHORIZATION-FOUNDATION"],
+      "decision_refs": ["DEC-20260829-P1-AUTHORIZATION-FOUNDATION"],
+      "migration_refs": ["20260829171701_p1_authorization_foundation"],
+      "validation_evidence": [
+        "governance/evidence/p1-002-authorization-foundation.json",
+        "governance/evidence/p1-002-governance-lifecycle-correction.json",
+        "supabase/migrations/20260829171701_p1_authorization_foundation.sql",
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check"
+      ],
+      "artifact_digest": "sha256:6471ac68949234e29ae1cc492eaa2f77dc15ca010998f72898284b8c9a855fec",
+      "environment": "staging",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "rollback_reference": "governance/rollback-recovery.md",
+      "created_at": "2026-08-30T01:32:02Z"
+    },
+    {
       "release_id": "REL-20260830-P1-003-STAGING-APPLICATION",
       "commit_sha": "0ba2331b88fd5f045573b3e2d140f03e240b6a77",
       "work_item_refs": ["WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION"],

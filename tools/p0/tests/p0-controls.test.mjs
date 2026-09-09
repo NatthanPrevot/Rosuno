@@ -1317,6 +1317,47 @@ test("schema drift findings are rejected", () => {
   assert.throws(() => validateDriftReport(report), /drift status/);
 });
 
+test("reviewed and persistently applied P1-002 cannot remain pending", () => {
+  const register = readJson("governance/migrations/reviewed-migrations.json");
+  const migration = register.migrations.find(
+    (entry) =>
+      entry.migration_id === "20260829171701_p1_authorization_foundation",
+  );
+  migration.reviewed = false;
+  migration.reviewed_by = "pending designated human PR review";
+  migration.reviewed_at = null;
+  migration.release_refs = [];
+
+  assert.throws(
+    () => validateMigrationRegister(register),
+    /reviewed or persistently applied migration may not remain pending/,
+  );
+});
+
+test("former empty schema-drift baseline is rejected", () => {
+  const report = readJson("governance/schema-drift/baseline.json");
+  report.product_schema_present = false;
+
+  assert.throws(
+    () => validateDriftReport(report),
+    /product_schema_present must be true/,
+  );
+});
+
+test("schema-drift baseline digest and migration inventory are immutable", () => {
+  const badDigest = readJson("governance/schema-drift/baseline.json");
+  badDigest.baseline_digest = `sha256:${"0".repeat(64)}`;
+  assert.throws(() => validateDriftReport(badDigest), /identity\/digest/);
+
+  const badInventory = readJson("governance/schema-drift/baseline.json");
+  badInventory.migration_inventory[2].migration_id =
+    "20260829171701_pending_migration";
+  assert.throws(
+    () => validateDriftReport(badInventory),
+    /inventory contradicts/,
+  );
+});
+
 test("sanitized restore evidence validates and rejects weakened recovery", () => {
   const evidence = readJson("governance/evidence/p0-restore-validation.json");
   assert.doesNotThrow(() => validateRestoreEvidence(evidence));

@@ -58,11 +58,11 @@
     },
     {
       "decision_id": "DEC-20260829-P1-AUTHORIZATION-FOUNDATION",
-      "title": "Propose physical Migration 2 authorization foundation",
-      "status": "proposed",
-      "scope": "P1/1B authorization foundation only; rollback-only Staging validation",
-      "decision": "Create one ordered Migration 2 artifact containing only client, attorney, and staff profiles, a stable capability-definition catalog, capability grants, and application-session metadata. Reuse public.users and public.set_updated_at() unchanged; leave jurisdiction_id nullable without a foreign key until locked Migration 3.",
-      "rationale": "The locked physical sequence places profile identity, capability definitions and grants, and application session metadata after the applied application-identity foundation. This proposal deliberately excludes jurisdictions, authorization helpers, authentication workflows, secrets, seeds, production application, and later P1 relations.",
+      "title": "Accept physical Migration 2 authorization foundation",
+      "status": "accepted",
+      "scope": "P1/1B authorization foundation only; reviewed Rosuno Staging application",
+      "decision": "Accept the protected-review-approved Migration 2 artifact and its persistent Rosuno Staging application as the historical authorization foundation. The original six-table scope and pre-review evidence remain historical records; the later sequence-5 correction is the forward-only authority for the current four-table P1-002 surface.",
+      "rationale": "PR #4 approved and merged the original migration before persistent Staging application, and PR #6 separately approved and merged its validation evidence. The later scope defect does not erase that lifecycle: it was reopened and corrected forward-only through the accepted sequence-5 migration without rewriting the original SQL or pre-review evidence.",
       "authority_refs": [
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
@@ -73,16 +73,18 @@
       "work_item_refs": ["WI-P1-002-AUTHORIZATION-FOUNDATION"],
       "owner": "P1 implementation owner",
       "reviewer": {
-        "identity": "pending designated human PR review",
-        "status": "pending"
+        "identity": "Rosuno",
+        "status": "approved"
       },
       "created_at": "2026-08-29T17:17:01Z",
-      "updated_at": "2026-08-29T17:17:01Z",
+      "updated_at": "2026-08-30T01:32:02Z",
       "supersedes": [],
-      "impact": "Adds only a proposed, unreviewed, rollback-only Migration 2 artifact and sanitized Staging validation evidence; it does not authorize persistent application, production release, or later P1 work.",
+      "impact": "Records the reviewed historical P1-002 Staging application and its later forward-only correction. It does not authorize production activity, OLD access, P1-004, or restoration of the removed profile tables.",
       "evidence": [
         "supabase/migrations/20260829171701_p1_authorization_foundation.sql",
-        "governance/evidence/p1-002-authorization-foundation.json"
+        "governance/evidence/p1-002-authorization-foundation.json",
+        "governance/evidence/p1-002-governance-lifecycle-correction.json",
+        "governance/releases/traceability.json"
       ],
       "expiry": null
     },
@@ -147,6 +149,36 @@
         "governance/evidence/p1-002-authorization-scope-correction.json",
         "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json",
         "governance/releases/traceability.json"
+      ],
+      "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260902-P1-002-GOVERNANCE-CONTROL-CORRECTION",
+      "title": "Propose P1-002 governance and baseline control correction",
+      "status": "proposed",
+      "scope": "Repository governance lifecycle and deterministic foundation baseline only",
+      "decision": "Correct the current P1-002 governance records to reflect the protected review, persistent Staging application, later defect discovery, forward-only scope correction, and final closure. Replace the false empty schema-drift baseline with a source-controlled Rosuno Staging foundation manifest tied to the exact five reviewed migrations and accepted evidence.",
+      "rationale": "The canonical repository records the accepted sequence-5 correction but still represents the original reviewed and persistently applied P1-002 migration as pending, and it still accepts an empty pre-application drift baseline despite five registered migrations. These contradictions must fail deterministically while historical SQL and pre-review evidence remain unchanged.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-002-GOVERNANCE-CONTROL-CORRECTION"],
+      "owner": "P1 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "created_at": "2026-09-02T00:00:00Z",
+      "updated_at": "2026-09-02T00:00:00Z",
+      "supersedes": [],
+      "impact": "Locally pending governance-only correction. It performs no database operation, release, production activity, OLD access, or P1-004 work.",
+      "evidence": [
+        "governance/evidence/p1-002-governance-lifecycle-correction.json",
+        "governance/schema-drift/baseline.json"
       ],
       "expiry": null
     }

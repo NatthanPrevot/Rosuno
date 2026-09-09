@@ -100,8 +100,8 @@
     },
     {
       "work_item_id": "WI-P1-002-AUTHORIZATION-FOUNDATION",
-      "title": "Define the authorization foundation without granting access",
-      "objective": "Record the smallest locked 1B authorization foundation and its persistent Staging validation while preserving protected human review before merge.",
+      "title": "Implement the historical authorization foundation without granting access",
+      "objective": "Record the protected-review-approved Migration 2 and its persistent Rosuno Staging validation as historical lifecycle truth while leaving the later sequence-5 correction authoritative for the current surface.",
       "in_scope": [
         "client_profiles, attorney_profiles, and staff_profiles",
         "Stable capability definitions keyed by capability code",
@@ -117,11 +117,11 @@
         "Jurisdictions or a jurisdiction foreign key",
         "Authorization helper functions, SECURITY DEFINER functions, authentication workflows, account recovery, application code, UI, providers, seeds, and later P1 objects"
       ],
-      "status": "proposed",
+      "status": "completed",
       "owner": "P1 implementation owner",
       "reviewer": {
-        "identity": "pending designated human PR review",
-        "status": "pending"
+        "identity": "Rosuno",
+        "status": "approved"
       },
       "priority": "P1",
       "authority_refs": [
@@ -145,7 +145,8 @@
         "The advisor gate accepts exactly three stable default-deny findings and rejects every unapproved finding",
         "Three independent read-only catalog runs reproduce the deterministic SHA-256 baseline",
         "The Supabase CLI OCI limitation is documented without claiming a clean CLI drift result",
-        "The migration remains pending protected human review with no release record"
+        "PR #4 protected approval and merge preceded persistent Staging application, and PR #6 separately approved and merged the validation evidence",
+        "The original SQL and pre-review evidence remain unchanged after the later defect was corrected forward-only"
       ],
       "validation_commands": [
         "pnpm install --frozen-lockfile",
@@ -158,11 +159,11 @@
         "pnpm run dependency:check"
       ],
       "environment": "staging",
-      "release_refs": [],
+      "release_refs": ["REL-20260830-P1-002-STAGING-APPLICATION"],
       "migration_refs": ["20260829171701_p1_authorization_foundation"],
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-08-29T17:17:01Z",
-      "updated_at": "2026-08-29T17:17:01Z"
+      "updated_at": "2026-08-30T01:32:02Z"
     },
     {
       "work_item_id": "WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION",
@@ -292,6 +293,63 @@
       "rollback_reference": "governance/evidence/p1-002-authorization-scope-correction.json",
       "created_at": "2026-08-31T21:49:51Z",
       "updated_at": "2026-09-01T18:27:41Z"
+    },
+    {
+      "work_item_id": "WI-P1-002-GOVERNANCE-CONTROL-CORRECTION",
+      "title": "Correct P1-002 governance lifecycle and foundation baseline",
+      "objective": "Remove the two audit contradictions from current source-controlled governance without changing historical migration SQL, historical pre-review evidence, any database, or later P1 scope.",
+      "in_scope": [
+        "Truthful current lifecycle for the original P1-002 decision, work item, migration review, and Staging traceability",
+        "A superseding lifecycle evidence record with exact protected-review metadata for PRs #4, #6, #10, and #11",
+        "A deterministic Rosuno Staging foundation baseline tied to the exact five reviewed migrations, accepted P1-003 and P1-002 correction evidence, and corrected V2 catalog fingerprint",
+        "Deterministic controls and negative tests rejecting the former pending migration and empty baseline states"
+      ],
+      "out_of_scope": [
+        "Any migration execution, Supabase mutation, production activity, OLD access, source or development database access, or P1-004 work",
+        "Changes to original P1-002 or P1-003 migration SQL, original P1-002 pre-review evidence, original catalog fingerprint evidence, or other historical migration artifacts",
+        "Push, pull request, merge, force push, or protected-branch mutation"
+      ],
+      "status": "proposed",
+      "owner": "P1 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260902-P1-002-GOVERNANCE-CONTROL-CORRECTION"],
+      "dependencies": ["WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
+      "acceptance_criteria": [
+        "Current records no longer represent the reviewed and persistently applied original P1-002 migration as pending",
+        "Historical SQL and pre-review evidence remain byte-for-byte unchanged",
+        "The source-controlled baseline identifies Rosuno Staging and the exact five reviewed migration artifacts by immutable digest",
+        "The baseline binds accepted P1-003 evidence, accepted P1-002 correction evidence, and the corrected V2 catalog fingerprint",
+        "Former pending-review and empty-baseline states fail deterministic negative tests",
+        "This governance correction remains locally pending protected review with no release or database action"
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Revert only this locally pending governance-control commit; do not alter migration history or any database.",
+      "created_at": "2026-09-02T00:00:00Z",
+      "updated_at": "2026-09-02T00:00:00Z"
     }
   ]
 }
