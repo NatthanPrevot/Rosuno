@@ -154,8 +154,8 @@
     },
     {
       "decision_id": "DEC-20260902-P1-002-GOVERNANCE-CONTROL-CORRECTION",
-      "title": "Propose P1-002 governance and baseline control correction",
-      "status": "proposed",
+      "title": "Accept P1-002 governance and baseline control correction",
+      "status": "accepted",
       "scope": "Repository governance lifecycle and deterministic foundation baseline only",
       "decision": "Correct the current P1-002 governance records to reflect the protected review, persistent Staging application, later defect discovery, forward-only scope correction, and final closure. Replace the false empty schema-drift baseline with a source-controlled Rosuno Staging foundation manifest tied to the exact five reviewed migrations and accepted evidence.",
       "rationale": "The canonical repository records the accepted sequence-5 correction but still represents the original reviewed and persistently applied P1-002 migration as pending, and it still accepts an empty pre-application drift baseline despite five registered migrations. These contradictions must fail deterministically while historical SQL and pre-review evidence remain unchanged.",
@@ -169,13 +169,13 @@
       "work_item_refs": ["WI-P1-002-GOVERNANCE-CONTROL-CORRECTION"],
       "owner": "P1 implementation owner",
       "reviewer": {
-        "identity": "pending designated human PR review",
-        "status": "pending"
+        "identity": "Rosuno",
+        "status": "approved"
       },
       "created_at": "2026-09-02T00:00:00Z",
-      "updated_at": "2026-09-02T00:00:00Z",
+      "updated_at": "2026-09-09T18:09:50Z",
       "supersedes": [],
-      "impact": "Locally pending governance-only correction. It performs no database operation, release, production activity, OLD access, or P1-004 work.",
+      "impact": "Accepted governance-only correction after Rosuno approval, successful required CI, and protected merge in PR #12. It performs no database operation, production activity, OLD access, or P1-004 work.",
       "evidence": [
         "governance/evidence/p1-002-governance-lifecycle-correction.json",
         "governance/schema-drift/baseline.json"

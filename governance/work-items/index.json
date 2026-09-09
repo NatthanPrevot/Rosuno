@@ -300,7 +300,7 @@
       "objective": "Remove the two audit contradictions from current source-controlled governance without changing historical migration SQL, historical pre-review evidence, any database, or later P1 scope.",
       "in_scope": [
         "Truthful current lifecycle for the original P1-002 decision, work item, migration review, and Staging traceability",
-        "A superseding lifecycle evidence record with exact protected-review metadata for PRs #4, #6, #10, and #11",
+        "A superseding lifecycle evidence record with exact protected-review metadata for PRs #4, #6, #10, #11, and #12",
         "A deterministic Rosuno Staging foundation baseline tied to the exact five reviewed migrations, accepted P1-003 and P1-002 correction evidence, and corrected V2 catalog fingerprint",
         "Deterministic controls and negative tests rejecting the former pending migration and empty baseline states"
       ],
@@ -309,11 +309,11 @@
         "Changes to original P1-002 or P1-003 migration SQL, original P1-002 pre-review evidence, original catalog fingerprint evidence, or other historical migration artifacts",
         "Push, pull request, merge, force push, or protected-branch mutation"
       ],
-      "status": "proposed",
+      "status": "completed",
       "owner": "P1 implementation owner",
       "reviewer": {
-        "identity": "pending designated human PR review",
-        "status": "pending"
+        "identity": "Rosuno",
+        "status": "approved"
       },
       "priority": "P1",
       "authority_refs": [
@@ -331,7 +331,7 @@
         "The source-controlled baseline identifies Rosuno Staging and the exact five reviewed migration artifacts by immutable digest",
         "The baseline binds accepted P1-003 evidence, accepted P1-002 correction evidence, and the corrected V2 catalog fingerprint",
         "Former pending-review and empty-baseline states fail deterministic negative tests",
-        "This governance correction remains locally pending protected review with no release or database action"
+        "PR #12 protected review, Rosuno approval, successful required CI, exact merge topology, and merge tree are recorded; the governance correction is finally accepted"
       ],
       "validation_commands": [
         "pnpm install --frozen-lockfile",
@@ -347,9 +347,9 @@
       "environment": "none",
       "release_refs": [],
       "migration_refs": [],
-      "rollback_reference": "Revert only this locally pending governance-control commit; do not alter migration history or any database.",
+      "rollback_reference": "Revert only the governance-closure commit; do not alter migration history or any database.",
       "created_at": "2026-09-02T00:00:00Z",
-      "updated_at": "2026-09-02T00:00:00Z"
+      "updated_at": "2026-09-09T18:09:50Z"
     }
   ]
 }
