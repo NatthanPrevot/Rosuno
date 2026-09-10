@@ -35,6 +35,8 @@ import {
   validateP1AuthorizationLifecycleTraceability,
   validateP1AuthorizationMigration,
   validateP1ApplicationTraceability,
+  validateP1AttorneyClosure,
+  validateP1AttorneyClosureTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
   validateP1RegulatoryCatalog,
@@ -48,6 +50,36 @@ import {
   validateTraceabilityConsistency,
   validateWorkItem,
 } from "../lib/controls.mjs";
+
+test("P1-004 accepted closure requires exact lifecycle evidence and traceability", () => {
+  const migration = readJson(
+    "governance/migrations/reviewed-migrations.json",
+  ).migrations.at(-1);
+  const evidence = readJson(
+    "governance/evidence/p1-004-governance-lifecycle-closure.json",
+  );
+  const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+  assert.doesNotThrow(() =>
+    validateP1AttorneyClosure(migration, sql, evidence),
+  );
+  const stale = structuredClone(evidence);
+  stale.release.application_exit = 1;
+  assert.throws(() => validateP1AttorneyClosure(migration, sql, stale));
+  const registers = {
+    migrations: readJson("governance/migrations/reviewed-migrations.json"),
+    workItems: readJson("governance/work-items/index.json"),
+    decisions: readJson("governance/decision-log.json"),
+    releases: readJson("governance/releases/traceability.json"),
+  };
+  assert.doesNotThrow(() =>
+    validateP1AttorneyClosureTraceability(
+      registers.migrations,
+      registers.workItems,
+      registers.decisions,
+      registers.releases,
+    ),
+  );
+});
 
 function readJson(relativePath) {
   return JSON.parse(readFileSync(path.join(ROOT, relativePath), "utf8"));
@@ -1608,6 +1640,22 @@ test("P1-004 local overlay preserves the exact five-migration foundation", async
         rollback_validation: null,
       };
       const report = readJson("governance/schema-drift/baseline.json");
+      // Historical candidate fixtures intentionally validate against the
+      // retained five-migration baseline, not the live accepted closure.
+      report.baseline_id = "rosuno-staging-foundation-20260901-v1";
+      report.baseline_digest =
+        "sha256:6bb6920c2d418d27d0c406399c79ad1be2d9705f30ca2d6d364e54211d3156e8";
+      report.checked_at = "2026-09-01T18:27:41.110779Z";
+      report.migration_inventory = report.migration_inventory.slice(0, 5);
+      report.accepted_evidence = report.accepted_evidence.slice(0, 3);
+      report.evidence = report.evidence.slice(0, 3);
+      report.catalog_fingerprint = {
+        format: "rosuno-p1-catalog-v1",
+        sha256:
+          "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e",
+        canonical_byte_length: 31443,
+        row_count: 102,
+      };
       const validate = () => {
         writeFileSync(
           path.join(
@@ -1623,7 +1671,14 @@ test("P1-004 local overlay preserves the exact five-migration foundation", async
         )
           .trim()
           .split("\n");
-        controls.validateMigrationRegister(register, {}, files);
+        // Keep the fixture's discovered inventory limited to migration
+        // artifacts; the disposable checkout intentionally has no index.
+        const migrationFiles = files.filter(
+          (file) =>
+            file.startsWith("governance/migrations/") ||
+            file.startsWith("supabase/migrations/"),
+        );
+        controls.validateMigrationRegister(register, {}, migrationFiles);
         controls.validateDriftReport(report, register);
       };
       await run({

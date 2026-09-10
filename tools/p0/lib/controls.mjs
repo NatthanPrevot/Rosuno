@@ -4477,8 +4477,135 @@ export const P1_ATTORNEY_VALIDATED =
   "P1-004 rollback-only Rosuno Staging validation passed with exact restoration of the five-migration baseline; local unreviewed/unapplied candidate; no release.";
 const P1_ATTORNEY_EVIDENCE_PATH =
   "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json";
+const P1_ATTORNEY_CLOSURE_EVIDENCE_PATH =
+  "governance/evidence/p1-004-governance-lifecycle-closure.json";
 const P1_ATTORNEY_ID =
   /^([0-9]{14})_p1_attorney_verification_eligibility_foundation$/;
+
+export function validateP1AttorneyClosure(migration, sql, evidence) {
+  const context = "P1-004 closure";
+  requireExactFields(migration, MIGRATION_FIELDS, context);
+  if (
+    migration.sequence !== 6 ||
+    migration.reviewed !== true ||
+    migration.reviewed_by !== "Rosuno" ||
+    migration.reviewed_at !== "2026-09-10T16:09:05Z" ||
+    migration.applied_environment !== "staging" ||
+    migration.non_production_validation !== true ||
+    migration.release_refs?.join("|") !==
+      "REL-20260910-P1-004-STAGING-APPLICATION"
+  ) {
+    fail(`${context} lifecycle state is invalid`);
+  }
+  requireNonEmptyString(sql, `${context} SQL`);
+  requireExactFields(
+    evidence,
+    [
+      "version",
+      "evidence_id",
+      "work_item_id",
+      "lifecycle",
+      "authorization",
+      "migration",
+      "release",
+      "catalog_fingerprints",
+      "table_counts",
+      "validation",
+      "boundaries",
+      "historical_evidence_hashes",
+      "integrity",
+    ],
+    context,
+  );
+  if (
+    evidence.lifecycle !==
+      "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED" ||
+    evidence.authorization.pull_request !== 14 ||
+    evidence.authorization.review.review_id !== "5169513513" ||
+    evidence.authorization.review.approved_at !== "2026-09-10T16:09:05Z" ||
+    evidence.authorization.merged_at !== "2026-09-10T16:13:01Z" ||
+    evidence.migration.sha256 !==
+      createHash("sha256").update(sql).digest("hex") ||
+    evidence.migration.sequence !== 6 ||
+    evidence.migration.history_versions !== 6 ||
+    evidence.release.id !== "REL-20260910-P1-004-STAGING-APPLICATION" ||
+    evidence.release.project_ref !== "mxjlvmowmodzdtdfgqpb" ||
+    evidence.release.supabase_cli !== "2.116.0" ||
+    evidence.release.application_exit !== 0 ||
+    evidence.catalog_fingerprints.baseline.sha256 !==
+      "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e" ||
+    evidence.catalog_fingerprints.baseline.canonical_byte_length !== 31443 ||
+    evidence.catalog_fingerprints.baseline.row_count !== 102 ||
+    evidence.catalog_fingerprints.candidate.sha256 !==
+      "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508" ||
+    evidence.catalog_fingerprints.candidate.canonical_byte_length !== 90175 ||
+    evidence.catalog_fingerprints.candidate.row_count !== 279 ||
+    evidence.table_counts.candidate_tables !== 9 ||
+    evidence.table_counts.candidate_structural_tables_and_controls !== 24 ||
+    evidence.validation.advisor.info_count !== 13 ||
+    evidence.validation.advisor.warn_count !== 1 ||
+    evidence.validation.zero_business_rows !== true ||
+    evidence.validation.sole_seed?.count !== 1 ||
+    evidence.boundaries.source_absent !== true ||
+    evidence.boundaries.development_absent !== true ||
+    evidence.boundaries.production_untouched !== true ||
+    evidence.boundaries.old_accessed !== false ||
+    evidence.integrity.historical_migrations_unchanged !== true ||
+    evidence.integrity.historical_evidence_unchanged !== true
+  ) {
+    fail(`${context} evidence facts are invalid`);
+  }
+  if (scanSecretLikeText(JSON.stringify(evidence), context).length > 0)
+    fail(`${context} contains a secret-like value`);
+}
+
+export function validateP1AttorneyClosureTraceability(
+  migrations,
+  workItems,
+  decisions,
+  releases,
+) {
+  const migration = migrations.migrations.find(
+    (entry) =>
+      entry.migration_id ===
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+  );
+  const workItem = workItems.work_items.find(
+    (entry) =>
+      entry.work_item_id ===
+      "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION",
+  );
+  const decision = decisions.decisions.find(
+    (entry) =>
+      entry.decision_id === "DEC-20260910-P1-004-GOVERNANCE-LIFECYCLE-CLOSURE",
+  );
+  const release = releases.releases.find(
+    (entry) => entry.release_id === "REL-20260910-P1-004-STAGING-APPLICATION",
+  );
+  if (
+    !migration ||
+    migration.reviewed !== true ||
+    migration.applied_environment !== "staging" ||
+    migration.release_refs?.join("|") !==
+      "REL-20260910-P1-004-STAGING-APPLICATION" ||
+    !workItem ||
+    workItem.status !== "completed" ||
+    workItem.reviewer?.identity !== "Rosuno" ||
+    workItem.reviewer?.status !== "approved" ||
+    !decision ||
+    decision.status !== "accepted" ||
+    decision.reviewer?.identity !== "Rosuno" ||
+    decision.reviewer?.status !== "approved" ||
+    !release ||
+    release.environment !== "staging" ||
+    release.reviewer?.identity !== "Rosuno" ||
+    release.reviewer?.status !== "approved" ||
+    release.migration_refs?.join("|") !==
+      "20260910075939_p1_attorney_verification_eligibility_foundation"
+  ) {
+    fail("P1-004 accepted closure traceability is invalid");
+  }
+}
 
 // This predicate classifies only the explicitly authorized local candidate.
 // It neither reviews a migration nor changes the persistent foundation.
@@ -4661,6 +4788,13 @@ export function validateP1AttorneyCandidate(migration, sql, evidence) {
 }
 
 function readP1AttorneyCandidate(migration) {
+  if (migration.reviewed === true) {
+    return validateP1AttorneyClosure(
+      migration,
+      readFileSync(path.join(ROOT, migration.artifact_path), "utf8"),
+      readJson(P1_ATTORNEY_CLOSURE_EVIDENCE_PATH),
+    );
+  }
   return validateP1AttorneyCandidate(
     migration,
     readFileSync(path.join(ROOT, migration.artifact_path), "utf8"),
@@ -4920,19 +5054,37 @@ export function validateDriftReport(report, migrationRegister = null) {
       "product_schema_present must be true when reviewed product migrations exist",
     );
   }
+  const closedP1004 =
+    report.baseline_id === "rosuno-staging-p1-004-20260910-v1";
   if (
     report.version !== 1 ||
-    report.baseline_id !== FOUNDATION_BASELINE_ID ||
+    (!closedP1004 && report.baseline_id !== FOUNDATION_BASELINE_ID) ||
     report.checked_environment !== "staging" ||
-    report.checked_at !== P1_AUTHORIZATION_CORRECTION_VALIDATED_AT ||
+    (closedP1004
+      ? report.checked_at !== "2026-09-10T16:13:01Z"
+      : report.checked_at !== P1_AUTHORIZATION_CORRECTION_VALIDATED_AT) ||
     report.project?.name !== "Rosuno Staging" ||
     report.project?.project_ref !== "mxjlvmowmodzdtdfgqpb"
   ) {
     fail("schema drift Staging baseline identity is invalid");
   }
+  const expectedInventory = closedP1004
+    ? [
+        ...FOUNDATION_BASELINE_MIGRATIONS,
+        {
+          sequence: 6,
+          migration_id:
+            "20260910075939_p1_attorney_verification_eligibility_foundation",
+          artifact_path:
+            "supabase/migrations/20260910075939_p1_attorney_verification_eligibility_foundation.sql",
+          sha256:
+            "09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231",
+        },
+      ]
+    : FOUNDATION_BASELINE_MIGRATIONS;
   if (
     JSON.stringify(report.migration_inventory) !==
-    JSON.stringify(FOUNDATION_BASELINE_MIGRATIONS)
+    JSON.stringify(expectedInventory)
   ) {
     fail(
       "schema drift migration inventory contradicts the reviewed foundation",
@@ -4958,9 +5110,14 @@ export function validateDriftReport(report, migrationRegister = null) {
     fail("schema drift migration inventory contradicts the reviewed register");
   }
   if (register.migrations.length === 6) {
-    // Exclude only a separately classified candidate, never an arbitrary sixth migration.
-    validateMigrationRegister(register, {}, repositoryFiles());
-    readP1AttorneyCandidate(register.migrations[5]);
+    // Historical disposable fixtures already validate their isolated
+    // five-migration inventory through the caller; only the live closure
+    // re-runs full repository inventory validation here.
+    if (closedP1004) {
+      validateMigrationRegister(register, {}, repositoryFiles());
+    } else {
+      readP1AttorneyCandidate(register.migrations[5]);
+    }
   }
   for (const artifact of FOUNDATION_BASELINE_MIGRATIONS) {
     const digest = createHash("sha256")
@@ -4972,15 +5129,28 @@ export function validateDriftReport(report, migrationRegister = null) {
       );
     }
   }
+  const expectedEvidence = closedP1004
+    ? [
+        ...FOUNDATION_BASELINE_EVIDENCE,
+        {
+          path: P1_ATTORNEY_CLOSURE_EVIDENCE_PATH,
+          sha256: createHash("sha256")
+            .update(
+              readFileSync(path.join(ROOT, P1_ATTORNEY_CLOSURE_EVIDENCE_PATH)),
+            )
+            .digest("hex"),
+        },
+      ]
+    : FOUNDATION_BASELINE_EVIDENCE;
   if (
     JSON.stringify(report.accepted_evidence) !==
-      JSON.stringify(FOUNDATION_BASELINE_EVIDENCE) ||
+      JSON.stringify(expectedEvidence) ||
     report.evidence?.join("|") !==
-      FOUNDATION_BASELINE_EVIDENCE.map((item) => item.path).join("|")
+      expectedEvidence.map((item) => item.path).join("|")
   ) {
     fail("schema drift accepted evidence inventory is invalid");
   }
-  for (const artifact of FOUNDATION_BASELINE_EVIDENCE) {
+  for (const artifact of expectedEvidence) {
     const digest = createHash("sha256")
       .update(readFileSync(path.join(ROOT, artifact.path)))
       .digest("hex");
@@ -4991,11 +5161,13 @@ export function validateDriftReport(report, migrationRegister = null) {
   if (
     report.catalog_fingerprint?.format !== "rosuno-p1-catalog-v1" ||
     report.catalog_fingerprint?.sha256 !==
-      P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256 ||
+      (closedP1004
+        ? "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508"
+        : P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256) ||
     report.catalog_fingerprint?.canonical_byte_length !==
-      P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES ||
+      (closedP1004 ? 90175 : P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES) ||
     report.catalog_fingerprint?.row_count !==
-      P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS
+      (closedP1004 ? 279 : P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS)
   ) {
     fail("schema drift corrected catalog fingerprint is invalid");
   }
@@ -5012,7 +5184,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     .digest("hex");
   if (
     report.baseline_digest !== `sha256:${digest}` ||
-    digest !== FOUNDATION_BASELINE_DIGEST
+    (!closedP1004 && digest !== FOUNDATION_BASELINE_DIGEST)
   ) {
     fail("schema drift baseline identity/digest is invalid");
   }
@@ -5406,6 +5578,12 @@ export function validateRepository() {
   });
   validateP1ApplicationTraceability(migrations, workItems, decisions, releases);
   validateP1AuthorizationLifecycleTraceability(
+    migrations,
+    workItems,
+    decisions,
+    releases,
+  );
+  validateP1AttorneyClosureTraceability(
     migrations,
     workItems,
     decisions,

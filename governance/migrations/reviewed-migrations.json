@@ -135,15 +135,15 @@
       "work_item_refs": [
         "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION"
       ],
-      "decision_refs": ["DEC-20260910-P1-004-BOUNDED-CANDIDATE"],
-      "release_refs": [],
-      "reviewed": false,
-      "reviewed_by": "pending designated human PR review",
-      "reviewed_at": null,
-      "applied_environment": "none",
+      "decision_refs": ["DEC-20260910-P1-004-GOVERNANCE-LIFECYCLE-CLOSURE"],
+      "release_refs": ["REL-20260910-P1-004-STAGING-APPLICATION"],
+      "reviewed": true,
+      "reviewed_by": "Rosuno",
+      "reviewed_at": "2026-09-10T16:09:05Z",
+      "applied_environment": "staging",
       "non_production_validation": true,
-      "drift_check": "P1-004 rollback-only Rosuno Staging validation passed with exact restoration of the five-migration baseline; local unreviewed/unapplied candidate; no release.",
-      "rollback_plan": "Execute all candidate DDL and validation fixtures in one Rosuno Staging transaction ending explicitly in ROLLBACK; independently prove exact five-migration baseline restoration. Persistent application is prohibited.",
+      "drift_check": "Rosuno Staging persistent application passed exact six-version history, both catalog fingerprint scopes, zero business rows, exact Advisor state, and bounded closure checks.",
+      "rollback_plan": "If a later independently verified defect requires Staging rollback, remove only the sequence-6 migration through a separately reviewed non-production rollback migration; never edit migration history directly or alter P0/P1-001/P1-002/P1-003 controls.",
       "depends_on": ["20260901012518_p1_authorization_scope_correction"]
     }
   ]

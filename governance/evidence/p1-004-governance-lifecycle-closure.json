@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "evidence_id": "P1-004-GOVERNANCE-LIFECYCLE-CLOSURE-20260910",
+  "work_item_id": "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION",
+  "lifecycle": "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED",
+  "authorization": {
+    "merge_base": "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667",
+    "tree": "18b8e9031474201e274924664b2c3cb81a452a3c",
+    "head": "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04",
+    "pull_request": 14,
+    "title": "P1-004: attorney verification and eligibility foundation",
+    "review": {
+      "identity": "Rosuno",
+      "status": "approved",
+      "review_id": "5169513513",
+      "approved_at": "2026-09-10T16:09:05Z"
+    },
+    "merged_at": "2026-09-10T16:13:01Z"
+  },
+  "migration": {
+    "id": "20260910075939_p1_attorney_verification_eligibility_foundation",
+    "sha256": "09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231",
+    "sequence": 6,
+    "history_versions": 6
+  },
+  "release": {
+    "id": "REL-20260910-P1-004-STAGING-APPLICATION",
+    "environment": "staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "supabase_cli": "2.116.0",
+    "application_exit": 0
+  },
+  "catalog_fingerprints": {
+    "baseline": {
+      "sha256": "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e",
+      "canonical_byte_length": 31443,
+      "row_count": 102
+    },
+    "candidate": {
+      "sha256": "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508",
+      "canonical_byte_length": 90175,
+      "row_count": 279
+    },
+    "scope": "baseline is the retained four-table foundation; candidate is exactly nine P1-004 relations and one approved helper"
+  },
+  "table_counts": {
+    "candidate_tables": 9,
+    "candidate_structural_tables_and_controls": 24
+  },
+  "validation": {
+    "retained_rollback_only_evidence": "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
+    "zero_business_rows": true,
+    "sole_seed": {
+      "count": 1,
+      "description": "one capability seed only"
+    },
+    "advisor": {
+      "info_count": 13,
+      "warn_count": 1,
+      "warn_bound": "bounded expected migration/application observation",
+      "unexplained_local_event": true,
+      "additional_findings": 0
+    },
+    "helper_contract": {
+      "identity": "public.has_manage_attorney_verification_scope(uuid, boolean)",
+      "security_definer": true,
+      "stable": true,
+      "search_path": "pg_catalog",
+      "anon_execute": false,
+      "authenticated_execute": true,
+      "service_execute": false,
+      "diagnosis": "The helper false-negative was diagnosed as an authenticated caller lacking a live manage_attorney_verification grant; no caller/user or capability-code parameter is accepted and the predicate does not grant table access."
+    },
+    "dry_run_reproduction": {
+      "cli": "2.116.0",
+      "exit": 0,
+      "up_to_date": false,
+      "migrations": [
+        "20260910075939_p1_attorney_verification_eligibility_foundation.sql"
+      ],
+      "persistent_change": false,
+      "output_sha256": "77b9d667679a58132daf4233942a61b669cb53e748d108e9c2b38a54baf7e08b"
+    },
+    "checks": [
+      "exact six-version migration history",
+      "both fingerprint scopes",
+      "24/9 tables",
+      "zero business rows",
+      "sole seed",
+      "exact Advisor state",
+      "helper contract and false-negative diagnosis",
+      "zero-change dry-run reproduction"
+    ]
+  },
+  "boundaries": {
+    "source_absent": true,
+    "development_absent": true,
+    "production_untouched": true,
+    "old_accessed": false,
+    "database_contacted_for_closure": true,
+    "one_application_exit": 0,
+    "unexplained_local_event": "retained evidence records an unexplained .local event; no attribution or authorization is inferred"
+  },
+  "historical_evidence_hashes": {
+    "candidate_rollback": "sha256:d7bce5ae1957543a8e3f6d21476b570f90bb7ceb0b39c8d7f55850a21fb428df",
+    "validation_details": "sha256:9c5944113486a56321ffb42d214399df57e883504cccf5f77985c2a77130c49d",
+    "p1_003": "sha256:59f4facdc8115606cedf517b17f690f050b8203287289ca6735ddaa26d7c6f34",
+    "p1_002_correction": "sha256:4f63b0d550d5a1a589549d031a7184ec7072cd96fdbd20a47918613e0fc6136f",
+    "p1_002_fingerprint": "sha256:c5bb94594f8a82915ad5a9faabbee00ad90bf782914de072bee8a6a5fa333e6f"
+  },
+  "integrity": {
+    "historical_migrations_unchanged": true,
+    "historical_evidence_unchanged": true,
+    "production_untouched": true,
+    "old_not_accessed": true,
+    "sensitive_payloads_present": false
+  }
+}
