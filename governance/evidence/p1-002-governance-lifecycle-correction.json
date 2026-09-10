@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "evidence_id": "P1-002-GOVERNANCE-LIFECYCLE-CORRECTION",
   "work_item_id": "WI-P1-002-GOVERNANCE-CONTROL-CORRECTION",
   "decision_id": "DEC-20260902-P1-002-GOVERNANCE-CONTROL-CORRECTION",
@@ -85,6 +85,49 @@
     "approved_at": "2026-09-01T19:19:35Z",
     "merged_at": "2026-09-01T19:26:31Z"
   },
+  "governance_closure": {
+    "pull_request": 12,
+    "pull_request_url": "https://github.com/NatthanPrevot/Rosuno/pull/12",
+    "correction_head": "1c7b051489b3f7f936f8b3a57e651bfbe96e4701",
+    "prior_main": "b6970c23a5f64d118545d1a544965bf072cba1f6",
+    "merge_commit": "affcf955c3253fa8a6faeefe494de8891f94e64f",
+    "merge_parents": [
+      "b6970c23a5f64d118545d1a544965bf072cba1f6",
+      "1c7b051489b3f7f936f8b3a57e651bfbe96e4701"
+    ],
+    "merge_tree": "e869df2a1bbb4fa383a259fd1a15788a501f7d96",
+    "reviewer": "Rosuno",
+    "review_status": "approved",
+    "approved_at": "2026-09-09T18:03:36Z",
+    "merged_at": "2026-09-09T18:09:50Z",
+    "required_ci": [
+      {
+        "name": "deterministic install",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-09-09T17:52:52Z",
+        "completed_at": "2026-09-09T17:53:09Z",
+        "details_url": "https://github.com/NatthanPrevot/Rosuno/actions/runs/34385608722/job/102580967834"
+      },
+      {
+        "name": "dependency and security checks",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-09-09T17:53:12Z",
+        "completed_at": "2026-09-09T17:53:23Z",
+        "details_url": "https://github.com/NatthanPrevot/Rosuno/actions/runs/34385608722/job/102581080288"
+      },
+      {
+        "name": "format, typecheck, build, controls",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-09-09T17:53:12Z",
+        "completed_at": "2026-09-09T17:53:27Z",
+        "details_url": "https://github.com/NatthanPrevot/Rosuno/actions/runs/34385608722/job/102581080316"
+      }
+    ],
+    "required_ci_all_passed": true
+  },
   "current_governance": {
     "original_decision_status": "accepted",
     "original_work_item_status": "completed",
@@ -93,10 +136,10 @@
     "original_release_id": "REL-20260830-P1-002-STAGING-APPLICATION",
     "correction_decision_status": "accepted",
     "correction_work_item_status": "completed",
-    "governance_correction_decision_status": "proposed",
-    "governance_correction_work_item_status": "proposed",
-    "governance_correction_reviewer": "pending designated human PR review",
-    "protected_review_pending": true
+    "governance_correction_decision_status": "accepted",
+    "governance_correction_work_item_status": "completed",
+    "governance_correction_reviewer": "Rosuno",
+    "protected_review_pending": false
   },
   "boundaries": {
     "database_accessed": false,

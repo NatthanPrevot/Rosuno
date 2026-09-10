@@ -20,6 +20,8 @@ import {
   validateP1AuthorizationCorrectionEvidence,
   validateP1AuthorizationCorrectionMigration,
   validateP1AuthorizationCorrectionTraceability,
+  validateP1AuthorizationLifecycleEvidence,
+  validateP1AuthorizationLifecycleTraceability,
   validateP1AuthorizationMigration,
   validateP1ApplicationTraceability,
   validateP1PlatformEvidence,
@@ -1331,6 +1333,62 @@ test("reviewed and persistently applied P1-002 cannot remain pending", () => {
   assert.throws(
     () => validateMigrationRegister(register),
     /reviewed or persistently applied migration may not remain pending/,
+  );
+});
+
+test("merged PR #12 governance closure rejects inaccurate review and CI state", () => {
+  const evidence = readJson(
+    "governance/evidence/p1-002-governance-lifecycle-correction.json",
+  );
+  assert.doesNotThrow(() => validateP1AuthorizationLifecycleEvidence(evidence));
+
+  const inaccurateReview = structuredClone(evidence);
+  inaccurateReview.governance_closure.reviewer = "not Rosuno";
+  assert.throws(
+    () => validateP1AuthorizationLifecycleEvidence(inaccurateReview),
+    /PR #12 governance closure/,
+  );
+
+  const unsuccessfulCi = structuredClone(evidence);
+  unsuccessfulCi.governance_closure.required_ci[0].conclusion = "failure";
+  assert.throws(
+    () => validateP1AuthorizationLifecycleEvidence(unsuccessfulCi),
+    /PR #12 governance closure/,
+  );
+});
+
+test("merged PR #12 governance correction cannot return to pending", () => {
+  const migrations = readJson("governance/migrations/reviewed-migrations.json");
+  const workItems = readJson("governance/work-items/index.json");
+  const decisions = readJson("governance/decision-log.json");
+  const releases = readJson("governance/releases/traceability.json");
+  const workItem = workItems.work_items.find(
+    (entry) => entry.work_item_id === "WI-P1-002-GOVERNANCE-CONTROL-CORRECTION",
+  );
+  const decision = decisions.decisions.find(
+    (entry) =>
+      entry.decision_id === "DEC-20260902-P1-002-GOVERNANCE-CONTROL-CORRECTION",
+  );
+  workItem.status = "proposed";
+  workItem.reviewer = {
+    identity: "pending designated human PR review",
+    status: "pending",
+  };
+  decision.status = "proposed";
+  decision.reviewer = {
+    identity: "pending designated human PR review",
+    status: "pending",
+  };
+
+  assert.throws(
+    () =>
+      validateP1AuthorizationLifecycleTraceability(
+        migrations,
+        workItems,
+        decisions,
+        releases,
+      ),
+    /accepted after PR #12 protected review/,
   );
 });
 

@@ -2859,6 +2859,7 @@ export function validateP1AuthorizationLifecycleEvidence(evidence) {
       "defect_discovery",
       "forward_only_correction",
       "final_closure",
+      "governance_closure",
       "current_governance",
       "boundaries",
       "sensitive_payloads_present",
@@ -2866,7 +2867,7 @@ export function validateP1AuthorizationLifecycleEvidence(evidence) {
     context,
   );
   if (
-    evidence.version !== 1 ||
+    evidence.version !== 2 ||
     evidence.evidence_id !== "P1-002-GOVERNANCE-LIFECYCLE-CORRECTION" ||
     evidence.work_item_id !== P1_GOVERNANCE_CORRECTION_WORK_ITEM_ID ||
     evidence.decision_id !== P1_GOVERNANCE_CORRECTION_DECISION_ID ||
@@ -2938,6 +2939,79 @@ export function validateP1AuthorizationLifecycleEvidence(evidence) {
       fail(`${context} PR #${number} traceability is invalid`);
     }
   }
+  const governanceClosure = evidence.governance_closure;
+  requireExactFields(
+    governanceClosure,
+    [
+      "pull_request",
+      "pull_request_url",
+      "correction_head",
+      "prior_main",
+      "merge_commit",
+      "merge_parents",
+      "merge_tree",
+      "reviewer",
+      "review_status",
+      "approved_at",
+      "merged_at",
+      "required_ci",
+      "required_ci_all_passed",
+    ],
+    `${context}.governance_closure`,
+  );
+  const expectedGovernanceCi = [
+    {
+      name: "deterministic install",
+      status: "completed",
+      conclusion: "success",
+      started_at: "2026-09-09T17:52:52Z",
+      completed_at: "2026-09-09T17:53:09Z",
+      details_url:
+        "https://github.com/NatthanPrevot/Rosuno/actions/runs/34385608722/job/102580967834",
+    },
+    {
+      name: "dependency and security checks",
+      status: "completed",
+      conclusion: "success",
+      started_at: "2026-09-09T17:53:12Z",
+      completed_at: "2026-09-09T17:53:23Z",
+      details_url:
+        "https://github.com/NatthanPrevot/Rosuno/actions/runs/34385608722/job/102581080288",
+    },
+    {
+      name: "format, typecheck, build, controls",
+      status: "completed",
+      conclusion: "success",
+      started_at: "2026-09-09T17:53:12Z",
+      completed_at: "2026-09-09T17:53:27Z",
+      details_url:
+        "https://github.com/NatthanPrevot/Rosuno/actions/runs/34385608722/job/102581080316",
+    },
+  ];
+  if (
+    governanceClosure.pull_request !== 12 ||
+    governanceClosure.pull_request_url !==
+      "https://github.com/NatthanPrevot/Rosuno/pull/12" ||
+    governanceClosure.correction_head !==
+      "1c7b051489b3f7f936f8b3a57e651bfbe96e4701" ||
+    governanceClosure.prior_main !==
+      "b6970c23a5f64d118545d1a544965bf072cba1f6" ||
+    governanceClosure.merge_commit !==
+      "affcf955c3253fa8a6faeefe494de8891f94e64f" ||
+    governanceClosure.merge_parents?.join("|") !==
+      "b6970c23a5f64d118545d1a544965bf072cba1f6|1c7b051489b3f7f936f8b3a57e651bfbe96e4701" ||
+    governanceClosure.merge_tree !==
+      "e869df2a1bbb4fa383a259fd1a15788a501f7d96" ||
+    governanceClosure.reviewer !== "Rosuno" ||
+    governanceClosure.review_status !== "approved" ||
+    governanceClosure.approved_at !== "2026-09-09T18:03:36Z" ||
+    governanceClosure.merged_at !== "2026-09-09T18:09:50Z" ||
+    JSON.stringify(governanceClosure.required_ci) !==
+      JSON.stringify(expectedGovernanceCi) ||
+    governanceClosure.required_ci_all_passed !== true
+  ) {
+    fail(`${context} PR #12 governance closure is invalid`);
+  }
   const application = evidence.persistent_application;
   if (
     application?.environment !== "staging" ||
@@ -2993,15 +3067,14 @@ export function validateP1AuthorizationLifecycleEvidence(evidence) {
     governance?.original_release_id !== P1_AUTHORIZATION_RELEASE_ID ||
     governance?.correction_decision_status !== "accepted" ||
     governance?.correction_work_item_status !== "completed" ||
-    governance?.governance_correction_decision_status !== "proposed" ||
-    governance?.governance_correction_work_item_status !== "proposed" ||
-    governance?.governance_correction_reviewer !==
-      "pending designated human PR review" ||
-    governance?.protected_review_pending !== true ||
+    governance?.governance_correction_decision_status !== "accepted" ||
+    governance?.governance_correction_work_item_status !== "completed" ||
+    governance?.governance_correction_reviewer !== "Rosuno" ||
+    governance?.protected_review_pending !== false ||
     Object.values(evidence.boundaries ?? {}).some((value) => value !== false) ||
     evidence.sensitive_payloads_present !== false
   ) {
-    fail(`${context} current pending governance boundary is invalid`);
+    fail(`${context} accepted governance closure boundary is invalid`);
   }
   if (scanSecretLikeText(JSON.stringify(evidence), context).length > 0) {
     fail(`${context} contains secret-like content`);
@@ -4070,19 +4143,36 @@ export function validateP1AuthorizationLifecycleTraceability(
   }
   if (
     !governanceDecision ||
-    governanceDecision.status !== "proposed" ||
-    governanceDecision.reviewer?.identity !==
-      "pending designated human PR review" ||
-    governanceDecision.reviewer?.status !== "pending" ||
+    governanceDecision.title !==
+      "Accept P1-002 governance and baseline control correction" ||
+    governanceDecision.status !== "accepted" ||
+    governanceDecision.reviewer?.identity !== "Rosuno" ||
+    governanceDecision.reviewer?.status !== "approved" ||
+    governanceDecision.updated_at !== "2026-09-09T18:09:50Z" ||
+    governanceDecision.impact !==
+      "Accepted governance-only correction after Rosuno approval, successful required CI, and protected merge in PR #12. It performs no database operation, production activity, OLD access, or P1-004 work." ||
+    !governanceDecision.evidence?.includes(
+      P1_AUTHORIZATION_LIFECYCLE_EVIDENCE_PATH,
+    ) ||
     !governanceWorkItem ||
-    governanceWorkItem.status !== "proposed" ||
-    governanceWorkItem.reviewer?.identity !==
-      "pending designated human PR review" ||
-    governanceWorkItem.reviewer?.status !== "pending" ||
+    governanceWorkItem.status !== "completed" ||
+    governanceWorkItem.reviewer?.identity !== "Rosuno" ||
+    governanceWorkItem.reviewer?.status !== "approved" ||
+    governanceWorkItem.updated_at !== "2026-09-09T18:09:50Z" ||
+    !governanceWorkItem.acceptance_criteria?.includes(
+      "PR #12 protected review, Rosuno approval, successful required CI, exact merge topology, and merge tree are recorded; the governance correction is finally accepted",
+    ) ||
+    governanceWorkItem.acceptance_criteria?.some((criterion) =>
+      criterion.includes("remains locally pending"),
+    ) ||
+    governanceWorkItem.rollback_reference !==
+      "Revert only the governance-closure commit; do not alter migration history or any database." ||
     governanceWorkItem.release_refs?.length !== 0 ||
     governanceWorkItem.migration_refs?.length !== 0
   ) {
-    fail("P1-002 governance correction must remain pending protected review");
+    fail(
+      "P1-002 governance correction must be accepted after PR #12 protected review",
+    );
   }
 }
 
@@ -5126,7 +5216,7 @@ export function validateRepository() {
       "migration inventory and clean drift baseline",
       "sanitized non-production restore evidence",
       "reviewed and applied P1 Staging migration evidence",
-      "P1-002 reviewed historical Staging lifecycle and pending governance correction",
+      "P1-002 reviewed historical Staging lifecycle and accepted governance correction",
       "P1-003 accepted persistent Staging application evidence",
       "P1-002 correction accepted persistent Staging application with preserved rollback evidence",
       "release traceability",
