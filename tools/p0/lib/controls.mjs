@@ -4505,6 +4505,7 @@ export function validateP1AttorneyClosure(migration, sql, evidence) {
       "evidence_id",
       "work_item_id",
       "lifecycle",
+      "lifecycle_state",
       "authorization",
       "migration",
       "release",
@@ -4520,7 +4521,24 @@ export function validateP1AttorneyClosure(migration, sql, evidence) {
   if (
     evidence.lifecycle !==
       "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED" ||
+    evidence.lifecycle_state?.repository_closure !== false ||
+    evidence.lifecycle_state?.staging_application !== true ||
+    evidence.lifecycle_state?.postapplication_readonly_verification !== true ||
+    evidence.work_item_id !==
+      "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION" ||
     evidence.authorization.pull_request !== 14 ||
+    evidence.authorization.merge_base !==
+      "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667" ||
+    evidence.authorization.tree !==
+      "18b8e9031474201e274924664b2c3cb81a452a3c" ||
+    evidence.authorization.review.identity !== "Rosuno" ||
+    evidence.authorization.review.status !== "approved" ||
+    evidence.authorization.approved_head !==
+      "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04" ||
+    evidence.authorization.merge_commit !==
+      "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667" ||
+    evidence.authorization.ordered_parents?.join("|") !==
+      "06fb7b6fe0616f724ac5cbe048b8a4a2964c6f60|a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04" ||
     evidence.authorization.review.review_id !== "5169513513" ||
     evidence.authorization.review.approved_at !== "2026-09-10T16:09:05Z" ||
     evidence.authorization.merged_at !== "2026-09-10T16:13:01Z" ||
@@ -4529,9 +4547,18 @@ export function validateP1AttorneyClosure(migration, sql, evidence) {
     evidence.migration.sequence !== 6 ||
     evidence.migration.history_versions !== 6 ||
     evidence.release.id !== "REL-20260910-P1-004-STAGING-APPLICATION" ||
+    evidence.release.commit_sha !==
+      "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04" ||
+    evidence.release.migration_id !==
+      "20260910075939_p1_attorney_verification_eligibility_foundation" ||
+    evidence.release.migration_digest !==
+      "sha256:09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231" ||
+    evidence.release.evidence_link !== P1_ATTORNEY_CLOSURE_EVIDENCE_PATH ||
     evidence.release.project_ref !== "mxjlvmowmodzdtdfgqpb" ||
     evidence.release.supabase_cli !== "2.116.0" ||
     evidence.release.application_exit !== 0 ||
+    evidence.migration.id !==
+      "20260910075939_p1_attorney_verification_eligibility_foundation" ||
     evidence.catalog_fingerprints.baseline.sha256 !==
       "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e" ||
     evidence.catalog_fingerprints.baseline.canonical_byte_length !== 31443 ||
@@ -4540,16 +4567,69 @@ export function validateP1AttorneyClosure(migration, sql, evidence) {
       "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508" ||
     evidence.catalog_fingerprints.candidate.canonical_byte_length !== 90175 ||
     evidence.catalog_fingerprints.candidate.row_count !== 279 ||
+    evidence.catalog_fingerprints.scope !==
+      "baseline is the retained four-table foundation; candidate is exactly nine P1-004 relations and one approved helper" ||
+    evidence.catalog_fingerprints.membership?.foundation?.join("|") !==
+      "public.staff_profiles|public.capability_definitions|public.capability_grants|public.application_sessions" ||
+    evidence.catalog_fingerprints.membership?.candidate?.join("|") !==
+      "public.attorney_profiles|public.licenses|public.insurance_records|public.discipline_records|public.practice_areas|public.practice_area_authorisations|public.verification_evidence|public.eligibility_evaluations|public.verification_evidence_subjects" ||
     evidence.table_counts.candidate_tables !== 9 ||
     evidence.table_counts.candidate_structural_tables_and_controls !== 24 ||
     evidence.validation.advisor.info_count !== 13 ||
     evidence.validation.advisor.warn_count !== 1 ||
+    evidence.validation.advisor_findings?.info?.join("|") !==
+      "rls_enabled_no_policy:public.application_sessions|rls_enabled_no_policy:public.capability_definitions|rls_enabled_no_policy:public.capability_grants|rls_enabled_no_policy:public.jurisdiction_regulatory_modes|rls_enabled_no_policy:public.jurisdictions|rls_enabled_no_policy:public.launch_authorizations|rls_enabled_no_policy:public.launch_gate_evaluations|rls_enabled_no_policy:public.launch_gates|rls_enabled_no_policy:public.policy_authority_references|rls_enabled_no_policy:public.policy_types|rls_enabled_no_policy:public.policy_versions|rls_enabled_no_policy:public.regulatory_modes|rls_enabled_no_policy:public.service_areas" ||
+    evidence.validation.advisor_findings?.warn?.code !==
+      "authenticated_security_definer_function_executable" ||
+    evidence.validation.advisor_findings?.warn?.target?.schema !== "public" ||
+    evidence.validation.advisor_findings?.warn?.target?.function !==
+      "has_manage_attorney_verification_scope" ||
+    evidence.validation.advisor_findings?.warn?.target?.arguments?.join("|") !==
+      "required_jurisdiction uuid|allow_any_jurisdiction boolean" ||
+    evidence.validation.advisor_findings?.warn?.target?.language !== "sql" ||
+    evidence.validation.advisor_findings?.warn?.target?.security_definer !== true ||
+    evidence.validation.advisor_findings?.unapproved?.length !== 0 ||
+    evidence.validation.helper_contract?.count !== 1 ||
+    evidence.validation.helper_contract?.callable !==
+      "public.has_manage_attorney_verification_scope(uuid,boolean)" ||
+    evidence.validation.helper_contract?.named_arguments?.join("|") !==
+      "required_jurisdiction|allow_any_jurisdiction" ||
+    evidence.validation.helper_contract?.return_type !== "boolean" ||
+    evidence.validation.helper_contract?.language !== "sql" ||
+    evidence.validation.helper_contract?.volatility !== "STABLE" ||
+    evidence.validation.helper_contract?.security_definer !== true ||
+    evidence.validation.helper_contract?.owner !== "postgres" ||
+    evidence.validation.helper_contract?.search_path !== "pg_catalog" ||
+    evidence.validation.helper_contract?.execute?.auth !== true ||
+    evidence.validation.helper_contract?.execute?.PUBLIC !== false ||
+    evidence.validation.helper_contract?.execute?.anon !== false ||
+    evidence.validation.helper_contract?.execute?.service_role !== false ||
+    evidence.validation.helper_contract?.authenticated_select_capability_grants !== false ||
+    evidence.validation.helper_contract?.diagnosis?.pg_get_function_identity_arguments !==
+      "required_jurisdiction uuid, allow_any_jurisdiction boolean" ||
+    evidence.validation.helper_contract?.diagnosis?.named_argument_mismatch !== true ||
+    evidence.validation.helper_contract?.diagnosis?.regprocedure_namespace_name_exactly_one !== true ||
+    evidence.validation.helper_contract?.diagnosis?.database_discrepancy !== false ||
+    evidence.validation.controlled_reproduction?.metadata_changes !== 0 ||
+    evidence.validation.controlled_reproduction?.content_changes !== 0 ||
+    evidence.validation.controlled_reproduction?.failed_to_reproduce !== true ||
+    evidence.boundaries.local_state?.explained !== false ||
     evidence.validation.zero_business_rows !== true ||
     evidence.validation.sole_seed?.count !== 1 ||
     evidence.boundaries.source_absent !== true ||
     evidence.boundaries.development_absent !== true ||
     evidence.boundaries.production_untouched !== true ||
     evidence.boundaries.old_accessed !== false ||
+    evidence.boundaries.database_contacted_for_closure !== false ||
+    evidence.boundaries.database_discrepancy !== false ||
+    evidence.boundaries.local_state?.explained !== false ||
+    evidence.boundaries.local_state?.attribution !== null ||
+    evidence.boundaries.local_state?.cause !== null ||
+    evidence.boundaries.local_state?.erased !== false ||
+    evidence.historical_evidence_hashes?.candidate_rollback !==
+      "sha256:d7bce5ae1957543a8e3f6d21476b570f90bb7ceb0b39c8d7f55850a21fb428df" ||
+    evidence.historical_evidence_hashes?.validation_details !==
+      "sha256:9c5944113486a56321ffb42d214399df57e883504cccf5f77985c2a77130c49d" ||
     evidence.integrity.historical_migrations_unchanged !== true ||
     evidence.integrity.historical_evidence_unchanged !== true
   ) {

@@ -81,6 +81,69 @@ test("P1-004 accepted closure requires exact lifecycle evidence and traceability
   );
 });
 
+test("P1-004 closure rejects each independently mutated governed fact", () => {
+  const migration = readJson("governance/migrations/reviewed-migrations.json").migrations.at(-1);
+  const evidence = readJson("governance/evidence/p1-004-governance-lifecycle-closure.json");
+  const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+  const mutations = [
+    ["decision", e => { e.lifecycle = "ACCEPTED"; }],
+    ["work item", e => { e.work_item_id = "stale"; }],
+    ["reviewer", e => { e.authorization.review.identity = "other"; }],
+    ["reviewed", e => { e.lifecycle_state.postapplication_readonly_verification = false; }],
+    ["reviewed_by", e => { e.authorization.review.status = "pending"; }],
+    ["review id", e => { e.authorization.review.review_id = "x"; }],
+    ["review time", e => { e.authorization.review.approved_at = "2026-01-01T00:00:00Z"; }],
+    ["applied", e => { e.lifecycle_state.staging_application = false; }],
+    ["release", e => { e.release.id = "wrong"; }],
+    ["head", e => { e.authorization.approved_head = "wrong"; }],
+    ["merge", e => { e.authorization.merge_commit = "wrong"; }],
+    ["tree", e => { e.authorization.tree = "wrong"; }],
+    ["parent", e => { e.authorization.ordered_parents[0] = "wrong"; }],
+    ["release environment", e => { e.release.environment = "production"; }],
+    ["release commit", e => { e.release.commit_sha = "wrong"; }],
+    ["migration digest", e => { e.migration.sha256 = "wrong"; }],
+    ["INFO missing", e => { e.validation.advisor_findings.info.pop(); }],
+    ["INFO substitute", e => { e.validation.advisor_findings.info[0] = "wrong"; }],
+    ["INFO duplicate", e => { e.validation.advisor_findings.info.push(e.validation.advisor_findings.info[0]); }],
+    ["WARN code", e => { e.validation.advisor_findings.warn.code = "wrong"; }],
+    ["WARN target", e => { e.validation.advisor_findings.warn.target.function = "wrong"; }],
+    ["second warning", e => { e.validation.advisor.warn_count = 2; }],
+    ["unapproved", e => { e.validation.advisor_findings.unapproved.push("unexpected"); }],
+    ["helper count", e => { e.validation.helper_contract.count = 2; }],
+    ["helper callable", e => { e.validation.helper_contract.callable = "wrong"; }],
+    ["helper named args", e => { e.validation.helper_contract.named_arguments[0] = "wrong"; }],
+    ["helper return", e => { e.validation.helper_contract.return_type = "text"; }],
+    ["helper language", e => { e.validation.helper_contract.language = "plpgsql"; }],
+    ["helper volatility", e => { e.validation.helper_contract.volatility = "VOLATILE"; }],
+    ["helper security", e => { e.validation.helper_contract.security_definer = false; }],
+    ["helper owner", e => { e.validation.helper_contract.owner = "wrong"; }],
+    ["helper path", e => { e.validation.helper_contract.search_path = "public"; }],
+    ["helper execute", e => { e.validation.helper_contract.execute.auth = false; }],
+    ["helper table select", e => { e.validation.helper_contract.authenticated_select_capability_grants = true; }],
+    ["baseline digest", e => { e.catalog_fingerprints.baseline.sha256 = "wrong"; }],
+    ["baseline bytes", e => { e.catalog_fingerprints.baseline.canonical_byte_length++; }],
+    ["baseline rows", e => { e.catalog_fingerprints.baseline.row_count++; }],
+    ["baseline membership", e => { e.catalog_fingerprints.membership.foundation[0] = "wrong"; }],
+    ["candidate digest", e => { e.catalog_fingerprints.candidate.sha256 = "wrong"; }],
+    ["candidate bytes", e => { e.catalog_fingerprints.candidate.canonical_byte_length++; }],
+    ["candidate rows", e => { e.catalog_fingerprints.candidate.row_count++; }],
+    ["candidate membership", e => { e.catalog_fingerprints.membership.candidate[0] = "wrong"; }],
+    ["historical candidate", e => { e.historical_evidence_hashes.candidate_rollback = "wrong"; }],
+    ["validation hash", e => { e.historical_evidence_hashes.validation_details = "wrong"; }],
+    ["local explained", e => { e.boundaries.local_state.explained = true; }],
+    ["local attribution", e => { e.boundaries.local_state.attribution = "someone"; }],
+    ["local cause", e => { e.boundaries.local_state.cause = "reason"; }],
+    ["local erased", e => { e.boundaries.local_state.erased = true; }],
+    ["local counts", e => { e.validation.controlled_reproduction.content_changes = 1; }],
+    ["database closure", e => { e.boundaries.database_contacted_for_closure = true; }],
+  ];
+  for (const [label, mutate] of mutations) {
+    const candidate = structuredClone(evidence);
+    mutate(candidate);
+    assert.throws(() => validateP1AttorneyClosure(migration, sql, candidate), label);
+  }
+});
+
 function readJson(relativePath) {
   return JSON.parse(readFileSync(path.join(ROOT, relativePath), "utf8"));
 }

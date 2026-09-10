@@ -3,6 +3,11 @@
   "evidence_id": "P1-004-GOVERNANCE-LIFECYCLE-CLOSURE-20260910",
   "work_item_id": "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION",
   "lifecycle": "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED",
+  "lifecycle_state": {
+    "repository_closure": false,
+    "staging_application": true,
+    "postapplication_readonly_verification": true
+  },
   "authorization": {
     "merge_base": "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667",
     "tree": "18b8e9031474201e274924664b2c3cb81a452a3c",
@@ -15,7 +20,13 @@
       "review_id": "5169513513",
       "approved_at": "2026-09-10T16:09:05Z"
     },
-    "merged_at": "2026-09-10T16:13:01Z"
+    "merged_at": "2026-09-10T16:13:01Z",
+    "approved_head": "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04",
+    "merge_commit": "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667",
+    "ordered_parents": [
+      "06fb7b6fe0616f724ac5cbe048b8a4a2964c6f60",
+      "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04"
+    ]
   },
   "migration": {
     "id": "20260910075939_p1_attorney_verification_eligibility_foundation",
@@ -25,8 +36,12 @@
   },
   "release": {
     "id": "REL-20260910-P1-004-STAGING-APPLICATION",
+    "commit_sha": "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04",
     "environment": "staging",
     "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "migration_id": "20260910075939_p1_attorney_verification_eligibility_foundation",
+    "migration_digest": "sha256:09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231",
+    "evidence_link": "governance/evidence/p1-004-governance-lifecycle-closure.json",
     "supabase_cli": "2.116.0",
     "application_exit": 0
   },
@@ -41,7 +56,11 @@
       "canonical_byte_length": 90175,
       "row_count": 279
     },
-    "scope": "baseline is the retained four-table foundation; candidate is exactly nine P1-004 relations and one approved helper"
+    "scope": "baseline is the retained four-table foundation; candidate is exactly nine P1-004 relations and one approved helper",
+    "membership": {
+      "foundation": ["public.staff_profiles", "public.capability_definitions", "public.capability_grants", "public.application_sessions"],
+      "candidate": ["public.attorney_profiles", "public.licenses", "public.insurance_records", "public.discipline_records", "public.practice_areas", "public.practice_area_authorisations", "public.verification_evidence", "public.eligibility_evaluations", "public.verification_evidence_subjects"]
+    }
   },
   "table_counts": {
     "candidate_tables": 9,
@@ -61,15 +80,62 @@
       "unexplained_local_event": true,
       "additional_findings": 0
     },
+    "advisor_findings": {
+      "info": [
+        "rls_enabled_no_policy:public.application_sessions",
+        "rls_enabled_no_policy:public.capability_definitions",
+        "rls_enabled_no_policy:public.capability_grants",
+        "rls_enabled_no_policy:public.jurisdiction_regulatory_modes",
+        "rls_enabled_no_policy:public.jurisdictions",
+        "rls_enabled_no_policy:public.launch_authorizations",
+        "rls_enabled_no_policy:public.launch_gate_evaluations",
+        "rls_enabled_no_policy:public.launch_gates",
+        "rls_enabled_no_policy:public.policy_authority_references",
+        "rls_enabled_no_policy:public.policy_types",
+        "rls_enabled_no_policy:public.policy_versions",
+        "rls_enabled_no_policy:public.regulatory_modes",
+        "rls_enabled_no_policy:public.service_areas"
+      ],
+      "warn": {
+        "code": "authenticated_security_definer_function_executable",
+        "target": {
+          "schema": "public",
+          "function": "has_manage_attorney_verification_scope",
+          "arguments": ["required_jurisdiction uuid", "allow_any_jurisdiction boolean"],
+          "language": "sql",
+          "security_definer": true
+        }
+      },
+      "unapproved": []
+    },
     "helper_contract": {
-      "identity": "public.has_manage_attorney_verification_scope(uuid, boolean)",
+      "identity": "public.has_manage_attorney_verification_scope(uuid,boolean)",
       "security_definer": true,
       "stable": true,
       "search_path": "pg_catalog",
       "anon_execute": false,
       "authenticated_execute": true,
       "service_execute": false,
-      "diagnosis": "The helper false-negative was diagnosed as an authenticated caller lacking a live manage_attorney_verification grant; no caller/user or capability-code parameter is accepted and the predicate does not grant table access."
+      "diagnosis": {
+        "pg_get_function_identity_arguments": "required_jurisdiction uuid, allow_any_jurisdiction boolean",
+        "named_argument_mismatch": true,
+        "regprocedure_namespace_name_exactly_one": true,
+        "regprocedure": "public.has_manage_attorney_verification_scope(uuid,boolean)",
+        "database_discrepancy": false
+      },
+      "contract": {
+        "count": 1,
+        "callable": "public.has_manage_attorney_verification_scope(uuid,boolean)",
+        "named_arguments": ["required_jurisdiction", "allow_any_jurisdiction"],
+        "return_type": "boolean",
+        "language": "sql",
+        "volatility": "STABLE",
+        "security_definer": true,
+        "owner": "postgres",
+        "search_path": "pg_catalog",
+        "execute": {"auth": true, "PUBLIC": false, "anon": false, "service_role": false},
+        "authenticated_select_capability_grants": false
+      }
     },
     "dry_run_reproduction": {
       "cli": "2.116.0",
@@ -79,7 +145,13 @@
         "20260910075939_p1_attorney_verification_eligibility_foundation.sql"
       ],
       "persistent_change": false,
-      "output_sha256": "77b9d667679a58132daf4233942a61b669cb53e748d108e9c2b38a54baf7e08b"
+      "output_sha256": "77b9d667679a58132daf4233942a61b669cb53e748d108e9c2b38a54baf7e08b",
+      "controlled_reproduction": {
+        "path": "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
+        "metadata_changes": 0,
+        "content_changes": 0,
+        "failed_to_reproduce": true
+      }
     },
     "checks": [
       "exact six-version migration history",
@@ -97,9 +169,16 @@
     "development_absent": true,
     "production_untouched": true,
     "old_accessed": false,
-    "database_contacted_for_closure": true,
+    "database_contacted_for_closure": false,
     "one_application_exit": 0,
-    "unexplained_local_event": "retained evidence records an unexplained .local event; no attribution or authorization is inferred"
+    "unexplained_local_event": "retained evidence records an unexplained .local event; no attribution or authorization is inferred",
+    "local_state": {
+      "explained": false,
+      "attribution": null,
+      "cause": null,
+      "erased": false
+    },
+    "database_discrepancy": false
   },
   "historical_evidence_hashes": {
     "candidate_rollback": "sha256:d7bce5ae1957543a8e3f6d21476b570f90bb7ceb0b39c8d7f55850a21fb428df",
