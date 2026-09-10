@@ -350,6 +350,59 @@
       "rollback_reference": "Revert only the governance-closure commit; do not alter migration history or any database.",
       "created_at": "2026-09-02T00:00:00Z",
       "updated_at": "2026-09-09T18:09:50Z"
+    },
+    {
+      "work_item_id": "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION",
+      "title": "P1-004 local attorney, verification and eligibility candidate",
+      "objective": "Implement the user-approved nine-relation contract, exact read-only capability helper, and separate pending/validated candidate governance lifecycle.",
+      "in_scope": [
+        "Nine approved P1-004 relations, exactly one approved read-only capability predicate, one capability seed, bounded integrity and RLS",
+        "Two-file governance validator extension and P1-004 tests/evidence",
+        "Rollback-only validation on mxjlvmowmodzdtdfgqpb followed by exact restoration"
+      ],
+      "out_of_scope": [
+        "Push, PR, review, merge, release, persistent Staging application",
+        "Source/dev DDL, production, OLD, P1-005+, other helpers or relations"
+      ],
+      "status": "in_progress",
+      "owner": "Rosuno P1-004 technical builder",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260910-P1-004-BOUNDED-CANDIDATE"],
+      "dependencies": ["WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
+      "acceptance_criteria": [
+        "Exact approved canonical start and unchanged five historical migration bytes",
+        "All local controls and bounded rollback-only security/integrity/history tests pass",
+        "Exact independent restoration proof before any final local candidate commit"
+      ],
+      "validation_commands": [
+        "pnpm run p0:test",
+        "pnpm run p0:validate",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run dependency:check",
+        "pnpm run secrets:check"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [
+        "20260910075939_p1_attorney_verification_eligibility_foundation"
+      ],
+      "rollback_reference": "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
+      "created_at": "2026-09-10T07:59:39Z",
+      "updated_at": "2026-09-10T07:59:39Z"
     }
   ]
 }

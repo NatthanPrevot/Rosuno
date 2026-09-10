@@ -181,6 +181,39 @@
         "governance/schema-drift/baseline.json"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260910-P1-004-BOUNDED-CANDIDATE",
+      "title": "Implement the approved bounded P1-004 local candidate",
+      "status": "proposed",
+      "scope": "P1-004 local implementation only; candidate awaits designated human PR review.",
+      "decision": "Implement the supplied approved startup contract plus the user-approved narrow validator extension and exactly public.has_manage_attorney_verification_scope(uuid, boolean). These are implementation-level decisions; no higher authority is altered.",
+      "rationale": "Preserve the five-migration persistent Staging foundation while representing one unreviewed/unapplied sequence-6 candidate truthfully. The approved predicate reads live capability grants without granting authenticated table access.",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": [
+        "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION"
+      ],
+      "owner": "Rosuno P1-004 technical builder",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "created_at": "2026-09-10T07:59:39Z",
+      "updated_at": "2026-09-10T07:59:39Z",
+      "supersedes": [],
+      "impact": "Exactly nine relations; mutable subject linkage with immutable independent historical evaluations; no write API, push, PR, merge, release or persistent application.",
+      "evidence": [
+        "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
+        "supabase/migrations/20260910075939_p1_attorney_verification_eligibility_foundation.sql"
+      ],
+      "expiry": null
     }
   ]
 }
