@@ -118,6 +118,33 @@
       "drift_check": "Rosuno Staging persistent application passed 39/39 post-application checks with exact five-version history, corrected catalog fingerprint, retained P1-003 contract, zero relevant rows, and zero additional advisor findings.",
       "rollback_plan": "If a later independently verified defect requires Staging rollback, remove only the sequence-5 correction through a separately reviewed non-production rollback migration; never edit migration history directly or alter P0/P1-001/P1-003 controls.",
       "depends_on": ["20260830023823_p1_jurisdiction_policy_launch_foundation"]
+    },
+    {
+      "migration_id": "20260910075939_p1_attorney_verification_eligibility_foundation",
+      "migration_kind": "product",
+      "sequence": 6,
+      "artifact_path": "supabase/migrations/20260910075939_p1_attorney_verification_eligibility_foundation.sql",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": [
+        "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION"
+      ],
+      "decision_refs": ["DEC-20260910-P1-004-BOUNDED-CANDIDATE"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "P1-004 rollback-only Rosuno Staging validation passed with exact restoration of the five-migration baseline; local unreviewed/unapplied candidate; no release.",
+      "rollback_plan": "Execute all candidate DDL and validation fixtures in one Rosuno Staging transaction ending explicitly in ROLLBACK; independently prove exact five-migration baseline restoration. Persistent application is prohibited.",
+      "depends_on": ["20260901012518_p1_authorization_scope_correction"]
     }
   ]
 }

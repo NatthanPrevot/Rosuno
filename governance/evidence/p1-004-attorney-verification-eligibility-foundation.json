@@ -1,0 +1,4635 @@
+{
+  "version": 1,
+  "migration_id": "20260910075939_p1_attorney_verification_eligibility_foundation",
+  "migration_sha256": "09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231",
+  "project_ref": "mxjlvmowmodzdtdfgqpb",
+  "phase": "rollback_only_validated",
+  "rollback_validation": {
+    "started_at": "2026-09-10T08:32:44Z",
+    "rolled_back_at": "2026-09-10T08:32:45Z",
+    "restored_at": "2026-09-10T08:33:33Z",
+    "transaction_end": "ROLLBACK",
+    "checks": {
+      "capability_helper": [
+        {
+          "name": "helper owner security stability search path boolean signature",
+          "passed": true
+        },
+        {
+          "name": "helper no mutation or dynamic SQL",
+          "passed": true
+        },
+        {
+          "name": "helper execute anon",
+          "passed": true
+        },
+        {
+          "name": "helper execute authenticated",
+          "passed": true
+        },
+        {
+          "name": "helper execute service_role",
+          "passed": true
+        },
+        {
+          "name": "authenticated grant table remains inaccessible",
+          "passed": true
+        },
+        {
+          "name": "missing matching scope",
+          "passed": true
+        },
+        {
+          "name": "missing null global-only",
+          "passed": true
+        },
+        {
+          "name": "missing any scope",
+          "passed": true
+        },
+        {
+          "name": "missing any ignores required jurisdiction",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability matching scope",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability null global-only",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability any scope",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability any ignores required jurisdiction",
+          "passed": true
+        },
+        {
+          "name": "revoked matching scope",
+          "passed": true
+        },
+        {
+          "name": "revoked null global-only",
+          "passed": true
+        },
+        {
+          "name": "revoked any scope",
+          "passed": true
+        },
+        {
+          "name": "revoked any ignores required jurisdiction",
+          "passed": true
+        },
+        {
+          "name": "expired matching scope",
+          "passed": true
+        },
+        {
+          "name": "expired null global-only",
+          "passed": true
+        },
+        {
+          "name": "expired any scope",
+          "passed": true
+        },
+        {
+          "name": "expired any ignores required jurisdiction",
+          "passed": true
+        },
+        {
+          "name": "future matching scope",
+          "passed": true
+        },
+        {
+          "name": "future null global-only",
+          "passed": true
+        },
+        {
+          "name": "future any scope",
+          "passed": true
+        },
+        {
+          "name": "future any ignores required jurisdiction",
+          "passed": true
+        },
+        {
+          "name": "resource matching scope",
+          "passed": true
+        },
+        {
+          "name": "resource null global-only",
+          "passed": true
+        },
+        {
+          "name": "resource any scope",
+          "passed": true
+        },
+        {
+          "name": "resource any ignores required jurisdiction",
+          "passed": true
+        },
+        {
+          "name": "matching matching scope",
+          "passed": true
+        },
+        {
+          "name": "matching null global-only",
+          "passed": true
+        },
+        {
+          "name": "matching any scope",
+          "passed": true
+        },
+        {
+          "name": "matching any ignores required jurisdiction",
+          "passed": true
+        },
+        {
+          "name": "matching correction requires both scopes",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction matching scope",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction null global-only",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction any scope",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction any ignores required jurisdiction",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction correction requires both scopes",
+          "passed": true
+        },
+        {
+          "name": "global matching scope",
+          "passed": true
+        },
+        {
+          "name": "global null global-only",
+          "passed": true
+        },
+        {
+          "name": "global any scope",
+          "passed": true
+        },
+        {
+          "name": "global any ignores required jurisdiction",
+          "passed": true
+        },
+        {
+          "name": "global correction requires both scopes",
+          "passed": true
+        },
+        {
+          "name": "caller cannot select another Rosuno User",
+          "passed": true
+        },
+        {
+          "name": "cannot borrow another User global grant",
+          "passed": true
+        },
+        {
+          "name": "no caller-ID parameter",
+          "passed": true
+        }
+      ],
+      "constraints": [
+        {
+          "name": "duplicate attorney profile",
+          "passed": true
+        },
+        {
+          "name": "duplicate license",
+          "passed": true
+        },
+        {
+          "name": "duplicate PAA",
+          "passed": true
+        },
+        {
+          "name": "orphan attorney_profiles.user_id",
+          "passed": true
+        },
+        {
+          "name": "orphan licenses.attorney_id",
+          "passed": true
+        },
+        {
+          "name": "orphan licenses.jurisdiction_id",
+          "passed": true
+        },
+        {
+          "name": "orphan insurance_records.attorney_id",
+          "passed": true
+        },
+        {
+          "name": "orphan insurance_records.jurisdiction_id",
+          "passed": true
+        },
+        {
+          "name": "orphan discipline_records.attorney_id",
+          "passed": true
+        },
+        {
+          "name": "orphan discipline_records.jurisdiction_id",
+          "passed": true
+        },
+        {
+          "name": "orphan practice_area_authorisations.attorney_id",
+          "passed": true
+        },
+        {
+          "name": "orphan practice_area_authorisations.jurisdiction_id",
+          "passed": true
+        },
+        {
+          "name": "orphan practice_area_authorisations.practice_area_id",
+          "passed": true
+        },
+        {
+          "name": "orphan practice_area_authorisations.criteria_policy_version_id",
+          "passed": true
+        },
+        {
+          "name": "orphan verification_evidence.jurisdiction_id",
+          "passed": true
+        },
+        {
+          "name": "orphan verification_evidence.retrieved_by_user_id",
+          "passed": true
+        },
+        {
+          "name": "orphan eligibility_evaluations.attorney_id",
+          "passed": true
+        },
+        {
+          "name": "orphan eligibility_evaluations.jurisdiction_id",
+          "passed": true
+        },
+        {
+          "name": "orphan verification_evidence_subjects.verification_evidence_id",
+          "passed": true
+        },
+        {
+          "name": "orphan subject license_id",
+          "passed": true
+        },
+        {
+          "name": "orphan subject insurance_record_id",
+          "passed": true
+        },
+        {
+          "name": "orphan subject discipline_record_id",
+          "passed": true
+        },
+        {
+          "name": "orphan subject practice_area_authorisation_id",
+          "passed": true
+        },
+        {
+          "name": "negative experience",
+          "passed": true
+        },
+        {
+          "name": "negative response",
+          "passed": true
+        },
+        {
+          "name": "profile taxonomy",
+          "passed": true
+        },
+        {
+          "name": "license dates",
+          "passed": true
+        },
+        {
+          "name": "blank license",
+          "passed": true
+        },
+        {
+          "name": "negative occurrence",
+          "passed": true
+        },
+        {
+          "name": "negative aggregate",
+          "passed": true
+        },
+        {
+          "name": "currency lowercase",
+          "passed": true
+        },
+        {
+          "name": "currency short",
+          "passed": true
+        },
+        {
+          "name": "currency nonascii",
+          "passed": true
+        },
+        {
+          "name": "insurance dates",
+          "passed": true
+        },
+        {
+          "name": "discipline dates",
+          "passed": true
+        },
+        {
+          "name": "blank practice code",
+          "passed": true
+        },
+        {
+          "name": "blank practice name",
+          "passed": true
+        },
+        {
+          "name": "blank PAA status",
+          "passed": true
+        },
+        {
+          "name": "PAA decision dates",
+          "passed": true
+        },
+        {
+          "name": "PAA effective dates",
+          "passed": true
+        },
+        {
+          "name": "no subject",
+          "passed": true
+        },
+        {
+          "name": "multiple subjects",
+          "passed": true
+        },
+        {
+          "name": "duplicate subject",
+          "passed": true
+        }
+      ],
+      "corrections": [
+        {
+          "name": "replacement preserves identity",
+          "passed": true
+        },
+        {
+          "name": "pure void",
+          "passed": true
+        },
+        {
+          "name": "erroneous replacement reversal",
+          "passed": true
+        },
+        {
+          "name": "erroneous void restoration",
+          "passed": true
+        },
+        {
+          "name": "A B C A repeated corrections",
+          "passed": true
+        },
+        {
+          "name": "cross-type replacement",
+          "passed": true
+        },
+        {
+          "name": "duplicate collision rejected",
+          "passed": true
+        },
+        {
+          "name": "Evidence byte-for-byte unchanged",
+          "passed": true
+        }
+      ],
+      "historical_independence": [
+        {
+          "name": "T1 byte-for-byte unchanged after correction and void",
+          "passed": true
+        },
+        {
+          "name": "T1 independent direct Evidence and professional identifiers",
+          "passed": true
+        },
+        {
+          "name": "T2 coexists without rewriting T1",
+          "passed": true
+        },
+        {
+          "name": "T2 direct references match the corrected association at its decision point",
+          "passed": true
+        }
+      ],
+      "rls": [
+        {
+          "name": "anon select * from public.attorney_profiles",
+          "passed": true
+        },
+        {
+          "name": "anon insert into public.attorney_profiles default values",
+          "passed": true
+        },
+        {
+          "name": "anon update public.attorney_profiles set id=id",
+          "passed": true
+        },
+        {
+          "name": "anon delete from public.attorney_profiles",
+          "passed": true
+        },
+        {
+          "name": "anon select * from public.licenses",
+          "passed": true
+        },
+        {
+          "name": "anon insert into public.licenses default values",
+          "passed": true
+        },
+        {
+          "name": "anon update public.licenses set id=id",
+          "passed": true
+        },
+        {
+          "name": "anon delete from public.licenses",
+          "passed": true
+        },
+        {
+          "name": "anon select * from public.insurance_records",
+          "passed": true
+        },
+        {
+          "name": "anon insert into public.insurance_records default values",
+          "passed": true
+        },
+        {
+          "name": "anon update public.insurance_records set id=id",
+          "passed": true
+        },
+        {
+          "name": "anon delete from public.insurance_records",
+          "passed": true
+        },
+        {
+          "name": "anon select * from public.discipline_records",
+          "passed": true
+        },
+        {
+          "name": "anon insert into public.discipline_records default values",
+          "passed": true
+        },
+        {
+          "name": "anon update public.discipline_records set id=id",
+          "passed": true
+        },
+        {
+          "name": "anon delete from public.discipline_records",
+          "passed": true
+        },
+        {
+          "name": "anon select * from public.practice_areas",
+          "passed": true
+        },
+        {
+          "name": "anon insert into public.practice_areas default values",
+          "passed": true
+        },
+        {
+          "name": "anon update public.practice_areas set id=id",
+          "passed": true
+        },
+        {
+          "name": "anon delete from public.practice_areas",
+          "passed": true
+        },
+        {
+          "name": "anon select * from public.practice_area_authorisations",
+          "passed": true
+        },
+        {
+          "name": "anon insert into public.practice_area_authorisations default values",
+          "passed": true
+        },
+        {
+          "name": "anon update public.practice_area_authorisations set id=id",
+          "passed": true
+        },
+        {
+          "name": "anon delete from public.practice_area_authorisations",
+          "passed": true
+        },
+        {
+          "name": "anon select * from public.verification_evidence",
+          "passed": true
+        },
+        {
+          "name": "anon insert into public.verification_evidence default values",
+          "passed": true
+        },
+        {
+          "name": "anon update public.verification_evidence set id=id",
+          "passed": true
+        },
+        {
+          "name": "anon delete from public.verification_evidence",
+          "passed": true
+        },
+        {
+          "name": "anon select * from public.eligibility_evaluations",
+          "passed": true
+        },
+        {
+          "name": "anon insert into public.eligibility_evaluations default values",
+          "passed": true
+        },
+        {
+          "name": "anon update public.eligibility_evaluations set id=id",
+          "passed": true
+        },
+        {
+          "name": "anon delete from public.eligibility_evaluations",
+          "passed": true
+        },
+        {
+          "name": "anon select * from public.verification_evidence_subjects",
+          "passed": true
+        },
+        {
+          "name": "anon insert into public.verification_evidence_subjects default values",
+          "passed": true
+        },
+        {
+          "name": "anon update public.verification_evidence_subjects set id=id",
+          "passed": true
+        },
+        {
+          "name": "anon delete from public.verification_evidence_subjects",
+          "passed": true
+        },
+        {
+          "name": "anon helper denied",
+          "passed": true
+        },
+        {
+          "name": "client active catalog only",
+          "passed": true
+        },
+        {
+          "name": "client private attorney_profiles",
+          "passed": true
+        },
+        {
+          "name": "client private licenses",
+          "passed": true
+        },
+        {
+          "name": "client private insurance_records",
+          "passed": true
+        },
+        {
+          "name": "client private discipline_records",
+          "passed": true
+        },
+        {
+          "name": "client private practice_area_authorisations",
+          "passed": true
+        },
+        {
+          "name": "client private verification_evidence",
+          "passed": true
+        },
+        {
+          "name": "client private eligibility_evaluations",
+          "passed": true
+        },
+        {
+          "name": "client private verification_evidence_subjects",
+          "passed": true
+        },
+        {
+          "name": "attorney owns attorney_profiles",
+          "passed": true
+        },
+        {
+          "name": "attorney owns licenses",
+          "passed": true
+        },
+        {
+          "name": "attorney owns insurance_records",
+          "passed": true
+        },
+        {
+          "name": "attorney owns discipline_records",
+          "passed": true
+        },
+        {
+          "name": "attorney owns practice_area_authorisations",
+          "passed": true
+        },
+        {
+          "name": "attorney owns practice_areas",
+          "passed": true
+        },
+        {
+          "name": "attorney private verification_evidence denied",
+          "passed": true
+        },
+        {
+          "name": "attorney private verification_evidence_subjects denied",
+          "passed": true
+        },
+        {
+          "name": "attorney private eligibility_evaluations denied",
+          "passed": true
+        },
+        {
+          "name": "cross-attorney license denied",
+          "passed": true
+        },
+        {
+          "name": "authenticated insert into public.attorney_profiles default values",
+          "passed": true
+        },
+        {
+          "name": "authenticated update public.attorney_profiles set id=id",
+          "passed": true
+        },
+        {
+          "name": "authenticated delete from public.attorney_profiles",
+          "passed": true
+        },
+        {
+          "name": "authenticated insert into public.licenses default values",
+          "passed": true
+        },
+        {
+          "name": "authenticated update public.licenses set id=id",
+          "passed": true
+        },
+        {
+          "name": "authenticated delete from public.licenses",
+          "passed": true
+        },
+        {
+          "name": "authenticated insert into public.insurance_records default values",
+          "passed": true
+        },
+        {
+          "name": "authenticated update public.insurance_records set id=id",
+          "passed": true
+        },
+        {
+          "name": "authenticated delete from public.insurance_records",
+          "passed": true
+        },
+        {
+          "name": "authenticated insert into public.discipline_records default values",
+          "passed": true
+        },
+        {
+          "name": "authenticated update public.discipline_records set id=id",
+          "passed": true
+        },
+        {
+          "name": "authenticated delete from public.discipline_records",
+          "passed": true
+        },
+        {
+          "name": "authenticated insert into public.practice_areas default values",
+          "passed": true
+        },
+        {
+          "name": "authenticated update public.practice_areas set id=id",
+          "passed": true
+        },
+        {
+          "name": "authenticated delete from public.practice_areas",
+          "passed": true
+        },
+        {
+          "name": "authenticated insert into public.practice_area_authorisations default values",
+          "passed": true
+        },
+        {
+          "name": "authenticated update public.practice_area_authorisations set id=id",
+          "passed": true
+        },
+        {
+          "name": "authenticated delete from public.practice_area_authorisations",
+          "passed": true
+        },
+        {
+          "name": "authenticated insert into public.verification_evidence default values",
+          "passed": true
+        },
+        {
+          "name": "authenticated update public.verification_evidence set id=id",
+          "passed": true
+        },
+        {
+          "name": "authenticated delete from public.verification_evidence",
+          "passed": true
+        },
+        {
+          "name": "authenticated insert into public.eligibility_evaluations default values",
+          "passed": true
+        },
+        {
+          "name": "authenticated update public.eligibility_evaluations set id=id",
+          "passed": true
+        },
+        {
+          "name": "authenticated delete from public.eligibility_evaluations",
+          "passed": true
+        },
+        {
+          "name": "authenticated insert into public.verification_evidence_subjects default values",
+          "passed": true
+        },
+        {
+          "name": "authenticated update public.verification_evidence_subjects set id=id",
+          "passed": true
+        },
+        {
+          "name": "authenticated delete from public.verification_evidence_subjects",
+          "passed": true
+        },
+        {
+          "name": "authenticated cannot read grant rows",
+          "passed": true
+        },
+        {
+          "name": "missing profile global-only",
+          "passed": true
+        },
+        {
+          "name": "missing null Insurance global-only",
+          "passed": true
+        },
+        {
+          "name": "missing null Evidence global-only",
+          "passed": true
+        },
+        {
+          "name": "missing inactive practice area",
+          "passed": true
+        },
+        {
+          "name": "missing denied attorney_profiles",
+          "passed": true
+        },
+        {
+          "name": "missing denied licenses",
+          "passed": true
+        },
+        {
+          "name": "missing denied insurance_records",
+          "passed": true
+        },
+        {
+          "name": "missing denied discipline_records",
+          "passed": true
+        },
+        {
+          "name": "missing denied practice_area_authorisations",
+          "passed": true
+        },
+        {
+          "name": "missing denied verification_evidence",
+          "passed": true
+        },
+        {
+          "name": "missing denied eligibility_evaluations",
+          "passed": true
+        },
+        {
+          "name": "missing denied verification_evidence_subjects",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability profile global-only",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability null Insurance global-only",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability null Evidence global-only",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability inactive practice area",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability denied attorney_profiles",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability denied licenses",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability denied insurance_records",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability denied discipline_records",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability denied practice_area_authorisations",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability denied verification_evidence",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability denied eligibility_evaluations",
+          "passed": true
+        },
+        {
+          "name": "wrong_capability denied verification_evidence_subjects",
+          "passed": true
+        },
+        {
+          "name": "revoked profile global-only",
+          "passed": true
+        },
+        {
+          "name": "revoked null Insurance global-only",
+          "passed": true
+        },
+        {
+          "name": "revoked null Evidence global-only",
+          "passed": true
+        },
+        {
+          "name": "revoked inactive practice area",
+          "passed": true
+        },
+        {
+          "name": "revoked denied attorney_profiles",
+          "passed": true
+        },
+        {
+          "name": "revoked denied licenses",
+          "passed": true
+        },
+        {
+          "name": "revoked denied insurance_records",
+          "passed": true
+        },
+        {
+          "name": "revoked denied discipline_records",
+          "passed": true
+        },
+        {
+          "name": "revoked denied practice_area_authorisations",
+          "passed": true
+        },
+        {
+          "name": "revoked denied verification_evidence",
+          "passed": true
+        },
+        {
+          "name": "revoked denied eligibility_evaluations",
+          "passed": true
+        },
+        {
+          "name": "revoked denied verification_evidence_subjects",
+          "passed": true
+        },
+        {
+          "name": "expired profile global-only",
+          "passed": true
+        },
+        {
+          "name": "expired null Insurance global-only",
+          "passed": true
+        },
+        {
+          "name": "expired null Evidence global-only",
+          "passed": true
+        },
+        {
+          "name": "expired inactive practice area",
+          "passed": true
+        },
+        {
+          "name": "expired denied attorney_profiles",
+          "passed": true
+        },
+        {
+          "name": "expired denied licenses",
+          "passed": true
+        },
+        {
+          "name": "expired denied insurance_records",
+          "passed": true
+        },
+        {
+          "name": "expired denied discipline_records",
+          "passed": true
+        },
+        {
+          "name": "expired denied practice_area_authorisations",
+          "passed": true
+        },
+        {
+          "name": "expired denied verification_evidence",
+          "passed": true
+        },
+        {
+          "name": "expired denied eligibility_evaluations",
+          "passed": true
+        },
+        {
+          "name": "expired denied verification_evidence_subjects",
+          "passed": true
+        },
+        {
+          "name": "future profile global-only",
+          "passed": true
+        },
+        {
+          "name": "future null Insurance global-only",
+          "passed": true
+        },
+        {
+          "name": "future null Evidence global-only",
+          "passed": true
+        },
+        {
+          "name": "future inactive practice area",
+          "passed": true
+        },
+        {
+          "name": "future denied attorney_profiles",
+          "passed": true
+        },
+        {
+          "name": "future denied licenses",
+          "passed": true
+        },
+        {
+          "name": "future denied insurance_records",
+          "passed": true
+        },
+        {
+          "name": "future denied discipline_records",
+          "passed": true
+        },
+        {
+          "name": "future denied practice_area_authorisations",
+          "passed": true
+        },
+        {
+          "name": "future denied verification_evidence",
+          "passed": true
+        },
+        {
+          "name": "future denied eligibility_evaluations",
+          "passed": true
+        },
+        {
+          "name": "future denied verification_evidence_subjects",
+          "passed": true
+        },
+        {
+          "name": "resource profile global-only",
+          "passed": true
+        },
+        {
+          "name": "resource null Insurance global-only",
+          "passed": true
+        },
+        {
+          "name": "resource null Evidence global-only",
+          "passed": true
+        },
+        {
+          "name": "resource inactive practice area",
+          "passed": true
+        },
+        {
+          "name": "resource denied attorney_profiles",
+          "passed": true
+        },
+        {
+          "name": "resource denied licenses",
+          "passed": true
+        },
+        {
+          "name": "resource denied insurance_records",
+          "passed": true
+        },
+        {
+          "name": "resource denied discipline_records",
+          "passed": true
+        },
+        {
+          "name": "resource denied practice_area_authorisations",
+          "passed": true
+        },
+        {
+          "name": "resource denied verification_evidence",
+          "passed": true
+        },
+        {
+          "name": "resource denied eligibility_evaluations",
+          "passed": true
+        },
+        {
+          "name": "resource denied verification_evidence_subjects",
+          "passed": true
+        },
+        {
+          "name": "matching profile global-only",
+          "passed": true
+        },
+        {
+          "name": "matching null Insurance global-only",
+          "passed": true
+        },
+        {
+          "name": "matching null Evidence global-only",
+          "passed": true
+        },
+        {
+          "name": "matching inactive practice area",
+          "passed": true
+        },
+        {
+          "name": "matching subject and Evidence readable",
+          "passed": true
+        },
+        {
+          "name": "association 92 independent scope and Evidence guard",
+          "passed": true
+        },
+        {
+          "name": "association 93 independent scope and Evidence guard",
+          "passed": true
+        },
+        {
+          "name": "association 94 independent scope and Evidence guard",
+          "passed": true
+        },
+        {
+          "name": "association 95 independent scope and Evidence guard",
+          "passed": true
+        },
+        {
+          "name": "association 96 independent scope and Evidence guard",
+          "passed": true
+        },
+        {
+          "name": "association 97 independent scope and Evidence guard",
+          "passed": true
+        },
+        {
+          "name": "matching exact licenses visibility",
+          "passed": true
+        },
+        {
+          "name": "matching exact insurance_records visibility",
+          "passed": true
+        },
+        {
+          "name": "matching exact discipline_records visibility",
+          "passed": true
+        },
+        {
+          "name": "matching exact practice_area_authorisations visibility",
+          "passed": true
+        },
+        {
+          "name": "matching exact verification_evidence visibility",
+          "passed": true
+        },
+        {
+          "name": "matching exact eligibility_evaluations visibility",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction profile global-only",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction null Insurance global-only",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction null Evidence global-only",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction inactive practice area",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction exact licenses visibility",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction exact insurance_records visibility",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction exact discipline_records visibility",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction exact practice_area_authorisations visibility",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction exact verification_evidence visibility",
+          "passed": true
+        },
+        {
+          "name": "wrong_jurisdiction exact eligibility_evaluations visibility",
+          "passed": true
+        },
+        {
+          "name": "global profile global-only",
+          "passed": true
+        },
+        {
+          "name": "global null Insurance global-only",
+          "passed": true
+        },
+        {
+          "name": "global null Evidence global-only",
+          "passed": true
+        },
+        {
+          "name": "global inactive practice area",
+          "passed": true
+        },
+        {
+          "name": "global exact licenses visibility",
+          "passed": true
+        },
+        {
+          "name": "global exact insurance_records visibility",
+          "passed": true
+        },
+        {
+          "name": "global exact discipline_records visibility",
+          "passed": true
+        },
+        {
+          "name": "global exact practice_area_authorisations visibility",
+          "passed": true
+        },
+        {
+          "name": "global exact verification_evidence visibility",
+          "passed": true
+        },
+        {
+          "name": "global exact eligibility_evaluations visibility",
+          "passed": true
+        },
+        {
+          "name": "global sees all mismatch and NULL associations",
+          "passed": true
+        }
+      ],
+      "service_privileges": [
+        {
+          "name": "anon attorney_profiles SELECT",
+          "passed": true
+        },
+        {
+          "name": "authenticated attorney_profiles SELECT",
+          "passed": true
+        },
+        {
+          "name": "service attorney_profiles SELECT",
+          "passed": true
+        },
+        {
+          "name": "anon attorney_profiles INSERT",
+          "passed": true
+        },
+        {
+          "name": "authenticated attorney_profiles INSERT",
+          "passed": true
+        },
+        {
+          "name": "service attorney_profiles INSERT",
+          "passed": true
+        },
+        {
+          "name": "anon attorney_profiles UPDATE",
+          "passed": true
+        },
+        {
+          "name": "authenticated attorney_profiles UPDATE",
+          "passed": true
+        },
+        {
+          "name": "service attorney_profiles UPDATE",
+          "passed": true
+        },
+        {
+          "name": "anon attorney_profiles DELETE",
+          "passed": true
+        },
+        {
+          "name": "authenticated attorney_profiles DELETE",
+          "passed": true
+        },
+        {
+          "name": "service attorney_profiles DELETE",
+          "passed": true
+        },
+        {
+          "name": "anon licenses SELECT",
+          "passed": true
+        },
+        {
+          "name": "authenticated licenses SELECT",
+          "passed": true
+        },
+        {
+          "name": "service licenses SELECT",
+          "passed": true
+        },
+        {
+          "name": "anon licenses INSERT",
+          "passed": true
+        },
+        {
+          "name": "authenticated licenses INSERT",
+          "passed": true
+        },
+        {
+          "name": "service licenses INSERT",
+          "passed": true
+        },
+        {
+          "name": "anon licenses UPDATE",
+          "passed": true
+        },
+        {
+          "name": "authenticated licenses UPDATE",
+          "passed": true
+        },
+        {
+          "name": "service licenses UPDATE",
+          "passed": true
+        },
+        {
+          "name": "anon licenses DELETE",
+          "passed": true
+        },
+        {
+          "name": "authenticated licenses DELETE",
+          "passed": true
+        },
+        {
+          "name": "service licenses DELETE",
+          "passed": true
+        },
+        {
+          "name": "anon insurance_records SELECT",
+          "passed": true
+        },
+        {
+          "name": "authenticated insurance_records SELECT",
+          "passed": true
+        },
+        {
+          "name": "service insurance_records SELECT",
+          "passed": true
+        },
+        {
+          "name": "anon insurance_records INSERT",
+          "passed": true
+        },
+        {
+          "name": "authenticated insurance_records INSERT",
+          "passed": true
+        },
+        {
+          "name": "service insurance_records INSERT",
+          "passed": true
+        },
+        {
+          "name": "anon insurance_records UPDATE",
+          "passed": true
+        },
+        {
+          "name": "authenticated insurance_records UPDATE",
+          "passed": true
+        },
+        {
+          "name": "service insurance_records UPDATE",
+          "passed": true
+        },
+        {
+          "name": "anon insurance_records DELETE",
+          "passed": true
+        },
+        {
+          "name": "authenticated insurance_records DELETE",
+          "passed": true
+        },
+        {
+          "name": "service insurance_records DELETE",
+          "passed": true
+        },
+        {
+          "name": "anon discipline_records SELECT",
+          "passed": true
+        },
+        {
+          "name": "authenticated discipline_records SELECT",
+          "passed": true
+        },
+        {
+          "name": "service discipline_records SELECT",
+          "passed": true
+        },
+        {
+          "name": "anon discipline_records INSERT",
+          "passed": true
+        },
+        {
+          "name": "authenticated discipline_records INSERT",
+          "passed": true
+        },
+        {
+          "name": "service discipline_records INSERT",
+          "passed": true
+        },
+        {
+          "name": "anon discipline_records UPDATE",
+          "passed": true
+        },
+        {
+          "name": "authenticated discipline_records UPDATE",
+          "passed": true
+        },
+        {
+          "name": "service discipline_records UPDATE",
+          "passed": true
+        },
+        {
+          "name": "anon discipline_records DELETE",
+          "passed": true
+        },
+        {
+          "name": "authenticated discipline_records DELETE",
+          "passed": true
+        },
+        {
+          "name": "service discipline_records DELETE",
+          "passed": true
+        },
+        {
+          "name": "anon practice_areas SELECT",
+          "passed": true
+        },
+        {
+          "name": "authenticated practice_areas SELECT",
+          "passed": true
+        },
+        {
+          "name": "service practice_areas SELECT",
+          "passed": true
+        },
+        {
+          "name": "anon practice_areas INSERT",
+          "passed": true
+        },
+        {
+          "name": "authenticated practice_areas INSERT",
+          "passed": true
+        },
+        {
+          "name": "service practice_areas INSERT",
+          "passed": true
+        },
+        {
+          "name": "anon practice_areas UPDATE",
+          "passed": true
+        },
+        {
+          "name": "authenticated practice_areas UPDATE",
+          "passed": true
+        },
+        {
+          "name": "service practice_areas UPDATE",
+          "passed": true
+        },
+        {
+          "name": "anon practice_areas DELETE",
+          "passed": true
+        },
+        {
+          "name": "authenticated practice_areas DELETE",
+          "passed": true
+        },
+        {
+          "name": "service practice_areas DELETE",
+          "passed": true
+        },
+        {
+          "name": "anon practice_area_authorisations SELECT",
+          "passed": true
+        },
+        {
+          "name": "authenticated practice_area_authorisations SELECT",
+          "passed": true
+        },
+        {
+          "name": "service practice_area_authorisations SELECT",
+          "passed": true
+        },
+        {
+          "name": "anon practice_area_authorisations INSERT",
+          "passed": true
+        },
+        {
+          "name": "authenticated practice_area_authorisations INSERT",
+          "passed": true
+        },
+        {
+          "name": "service practice_area_authorisations INSERT",
+          "passed": true
+        },
+        {
+          "name": "anon practice_area_authorisations UPDATE",
+          "passed": true
+        },
+        {
+          "name": "authenticated practice_area_authorisations UPDATE",
+          "passed": true
+        },
+        {
+          "name": "service practice_area_authorisations UPDATE",
+          "passed": true
+        },
+        {
+          "name": "anon practice_area_authorisations DELETE",
+          "passed": true
+        },
+        {
+          "name": "authenticated practice_area_authorisations DELETE",
+          "passed": true
+        },
+        {
+          "name": "service practice_area_authorisations DELETE",
+          "passed": true
+        },
+        {
+          "name": "anon verification_evidence SELECT",
+          "passed": true
+        },
+        {
+          "name": "authenticated verification_evidence SELECT",
+          "passed": true
+        },
+        {
+          "name": "service verification_evidence SELECT",
+          "passed": true
+        },
+        {
+          "name": "anon verification_evidence INSERT",
+          "passed": true
+        },
+        {
+          "name": "authenticated verification_evidence INSERT",
+          "passed": true
+        },
+        {
+          "name": "service verification_evidence INSERT",
+          "passed": true
+        },
+        {
+          "name": "anon verification_evidence UPDATE",
+          "passed": true
+        },
+        {
+          "name": "authenticated verification_evidence UPDATE",
+          "passed": true
+        },
+        {
+          "name": "service verification_evidence UPDATE",
+          "passed": true
+        },
+        {
+          "name": "anon verification_evidence DELETE",
+          "passed": true
+        },
+        {
+          "name": "authenticated verification_evidence DELETE",
+          "passed": true
+        },
+        {
+          "name": "service verification_evidence DELETE",
+          "passed": true
+        },
+        {
+          "name": "anon eligibility_evaluations SELECT",
+          "passed": true
+        },
+        {
+          "name": "authenticated eligibility_evaluations SELECT",
+          "passed": true
+        },
+        {
+          "name": "service eligibility_evaluations SELECT",
+          "passed": true
+        },
+        {
+          "name": "anon eligibility_evaluations INSERT",
+          "passed": true
+        },
+        {
+          "name": "authenticated eligibility_evaluations INSERT",
+          "passed": true
+        },
+        {
+          "name": "service eligibility_evaluations INSERT",
+          "passed": true
+        },
+        {
+          "name": "anon eligibility_evaluations UPDATE",
+          "passed": true
+        },
+        {
+          "name": "authenticated eligibility_evaluations UPDATE",
+          "passed": true
+        },
+        {
+          "name": "service eligibility_evaluations UPDATE",
+          "passed": true
+        },
+        {
+          "name": "anon eligibility_evaluations DELETE",
+          "passed": true
+        },
+        {
+          "name": "authenticated eligibility_evaluations DELETE",
+          "passed": true
+        },
+        {
+          "name": "service eligibility_evaluations DELETE",
+          "passed": true
+        },
+        {
+          "name": "anon verification_evidence_subjects SELECT",
+          "passed": true
+        },
+        {
+          "name": "authenticated verification_evidence_subjects SELECT",
+          "passed": true
+        },
+        {
+          "name": "service verification_evidence_subjects SELECT",
+          "passed": true
+        },
+        {
+          "name": "anon verification_evidence_subjects INSERT",
+          "passed": true
+        },
+        {
+          "name": "authenticated verification_evidence_subjects INSERT",
+          "passed": true
+        },
+        {
+          "name": "service verification_evidence_subjects INSERT",
+          "passed": true
+        },
+        {
+          "name": "anon verification_evidence_subjects UPDATE",
+          "passed": true
+        },
+        {
+          "name": "authenticated verification_evidence_subjects UPDATE",
+          "passed": true
+        },
+        {
+          "name": "service verification_evidence_subjects UPDATE",
+          "passed": true
+        },
+        {
+          "name": "anon verification_evidence_subjects DELETE",
+          "passed": true
+        },
+        {
+          "name": "authenticated verification_evidence_subjects DELETE",
+          "passed": true
+        },
+        {
+          "name": "service verification_evidence_subjects DELETE",
+          "passed": true
+        },
+        {
+          "name": "service subject update id",
+          "passed": true
+        },
+        {
+          "name": "service subject update verification_evidence_id",
+          "passed": true
+        },
+        {
+          "name": "service subject update license_id",
+          "passed": true
+        },
+        {
+          "name": "service subject update insurance_record_id",
+          "passed": true
+        },
+        {
+          "name": "service subject update discipline_record_id",
+          "passed": true
+        },
+        {
+          "name": "service subject update practice_area_authorisation_id",
+          "passed": true
+        },
+        {
+          "name": "service subject update created_at",
+          "passed": true
+        },
+        {
+          "name": "service delete attorney_profiles",
+          "passed": true
+        },
+        {
+          "name": "service delete licenses",
+          "passed": true
+        },
+        {
+          "name": "service delete insurance_records",
+          "passed": true
+        },
+        {
+          "name": "service delete discipline_records",
+          "passed": true
+        },
+        {
+          "name": "service delete practice_areas",
+          "passed": true
+        },
+        {
+          "name": "service delete practice_area_authorisations",
+          "passed": true
+        },
+        {
+          "name": "immutable update public.verification_evidence set id=id",
+          "passed": true
+        },
+        {
+          "name": "immutable delete from public.verification_evidence",
+          "passed": true
+        },
+        {
+          "name": "immutable update public.eligibility_evaluations set id=id",
+          "passed": true
+        },
+        {
+          "name": "immutable delete from public.eligibility_evaluations",
+          "passed": true
+        },
+        {
+          "name": "association protected id",
+          "passed": true
+        },
+        {
+          "name": "association protected verification_evidence_id",
+          "passed": true
+        },
+        {
+          "name": "association protected created_at",
+          "passed": true
+        }
+      ],
+      "structure": [
+        {
+          "name": "exact public table inventory",
+          "passed": true
+        },
+        {
+          "name": "all nine RLS enabled",
+          "passed": true
+        },
+        {
+          "name": "exact columns types nullability defaults order",
+          "passed": true
+        },
+        {
+          "name": "restrictive validated foreign keys",
+          "passed": true
+        },
+        {
+          "name": "exact constraint count p",
+          "passed": true
+        },
+        {
+          "name": "exact constraint count f",
+          "passed": true
+        },
+        {
+          "name": "exact constraint count u",
+          "passed": true
+        },
+        {
+          "name": "exact constraint count c",
+          "passed": true
+        },
+        {
+          "name": "nine select-only authenticated policies",
+          "passed": true
+        },
+        {
+          "name": "one permanent capability seed only",
+          "passed": true
+        }
+      ]
+    },
+    "before": {
+      "migration_history": [
+        ["20260828192126", "p0_restrict_rls_auto_enable_execution"],
+        ["20260829000015", "p1_platform_foundation"],
+        ["20260829171701", "p1_authorization_foundation"],
+        ["20260830023823", "p1_jurisdiction_policy_launch_foundation"],
+        ["20260901012518", "p1_authorization_scope_correction"]
+      ],
+      "catalog_rows": [
+        {
+          "category": "table",
+          "data": {
+            "comment": "Application session metadata; authentication workflows and secrets remain out of scope.",
+            "kind": "table",
+            "name": "application_sessions",
+            "owner": "postgres",
+            "schema": "public"
+          },
+          "identity": "public.application_sessions"
+        },
+        {
+          "category": "table",
+          "data": {
+            "comment": null,
+            "kind": "table",
+            "name": "capability_definitions",
+            "owner": "postgres",
+            "schema": "public"
+          },
+          "identity": "public.capability_definitions"
+        },
+        {
+          "category": "table",
+          "data": {
+            "comment": "Capability grant history for Staff subjects; this migration intentionally creates no grant rows.",
+            "kind": "table",
+            "name": "capability_grants",
+            "owner": "postgres",
+            "schema": "public"
+          },
+          "identity": "public.capability_grants"
+        },
+        {
+          "category": "table",
+          "data": {
+            "comment": "Staff profile with a server-authoritative staff state.",
+            "kind": "table",
+            "name": "staff_profiles",
+            "owner": "postgres",
+            "schema": "public"
+          },
+          "identity": "public.staff_profiles"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "text",
+            "default_expression": null,
+            "name": "auth_session_reference",
+            "nullable": false,
+            "ordinal": 3,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.auth_session_reference"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": "statement_timestamp()",
+            "name": "created_at",
+            "nullable": false,
+            "ordinal": 6,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.created_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": null,
+            "name": "ended_at",
+            "nullable": true,
+            "ordinal": 9,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.ended_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": null,
+            "name": "expires_at",
+            "nullable": false,
+            "ordinal": 4,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.expires_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": "gen_random_uuid()",
+            "name": "id",
+            "nullable": false,
+            "ordinal": 1,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": null,
+            "name": "revoked_at",
+            "nullable": true,
+            "ordinal": 5,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.revoked_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": null,
+            "name": "started_at",
+            "nullable": false,
+            "ordinal": 8,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.started_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": null,
+            "name": "user_id",
+            "nullable": false,
+            "ordinal": 2,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.user_id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "text",
+            "default_expression": null,
+            "name": "capability_code",
+            "nullable": false,
+            "ordinal": 2,
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.capability_code"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": "gen_random_uuid()",
+            "name": "id",
+            "nullable": false,
+            "ordinal": 1,
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "text",
+            "default_expression": null,
+            "name": "capability_code",
+            "nullable": false,
+            "ordinal": 11,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_code"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": "statement_timestamp()",
+            "name": "created_at",
+            "nullable": false,
+            "ordinal": 9,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.created_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": null,
+            "name": "expires_at",
+            "nullable": true,
+            "ordinal": 7,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.expires_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": "statement_timestamp()",
+            "name": "granted_at",
+            "nullable": false,
+            "ordinal": 5,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.granted_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": null,
+            "name": "granted_by_user_id",
+            "nullable": false,
+            "ordinal": 13,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.granted_by_user_id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": "gen_random_uuid()",
+            "name": "id",
+            "nullable": false,
+            "ordinal": 1,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": null,
+            "name": "jurisdiction_id",
+            "nullable": true,
+            "ordinal": 4,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.jurisdiction_id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "jsonb",
+            "default_expression": null,
+            "name": "resource_scope",
+            "nullable": true,
+            "ordinal": 12,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.resource_scope"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": null,
+            "name": "revoked_at",
+            "nullable": true,
+            "ordinal": 8,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.revoked_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": null,
+            "name": "user_id",
+            "nullable": false,
+            "ordinal": 2,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.user_id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": "statement_timestamp()",
+            "name": "created_at",
+            "nullable": false,
+            "ordinal": 5,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.created_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": "gen_random_uuid()",
+            "name": "id",
+            "nullable": false,
+            "ordinal": 1,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "text",
+            "default_expression": null,
+            "name": "staff_state",
+            "nullable": false,
+            "ordinal": 3,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.staff_state"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": "statement_timestamp()",
+            "name": "updated_at",
+            "nullable": false,
+            "ordinal": 6,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.updated_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": null,
+            "name": "user_id",
+            "nullable": false,
+            "ordinal": 2,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.user_id"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["auth_session_reference"],
+            "definition": "UNIQUE (auth_session_reference)",
+            "name": "application_sessions_auth_session_reference_key",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "application_sessions",
+            "type": "u"
+          },
+          "identity": "public.application_sessions.application_sessions_auth_session_reference_key"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["ended_at", "started_at"],
+            "definition": "CHECK (ended_at IS NULL OR ended_at >= started_at)",
+            "name": "application_sessions_ended_at_check",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "application_sessions",
+            "type": "c"
+          },
+          "identity": "public.application_sessions.application_sessions_ended_at_check"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["expires_at", "started_at"],
+            "definition": "CHECK (expires_at > started_at)",
+            "name": "application_sessions_expiry_check",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "application_sessions",
+            "type": "c"
+          },
+          "identity": "public.application_sessions.application_sessions_expiry_check"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["id"],
+            "definition": "PRIMARY KEY (id)",
+            "name": "application_sessions_pkey",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "application_sessions",
+            "type": "p"
+          },
+          "identity": "public.application_sessions.application_sessions_pkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["revoked_at", "started_at"],
+            "definition": "CHECK (revoked_at IS NULL OR revoked_at >= started_at)",
+            "name": "application_sessions_revoked_at_check",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "application_sessions",
+            "type": "c"
+          },
+          "identity": "public.application_sessions.application_sessions_revoked_at_check"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "application_sessions_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "application_sessions",
+            "type": "f"
+          },
+          "identity": "public.application_sessions.application_sessions_user_id_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["capability_code"],
+            "definition": "UNIQUE (capability_code)",
+            "name": "capability_definitions_capability_code_key",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "capability_definitions",
+            "type": "u"
+          },
+          "identity": "public.capability_definitions.capability_definitions_capability_code_key"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["id"],
+            "definition": "PRIMARY KEY (id)",
+            "name": "capability_definitions_pkey",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "capability_definitions",
+            "type": "p"
+          },
+          "identity": "public.capability_definitions.capability_definitions_pkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["capability_code"],
+            "definition": "FOREIGN KEY (capability_code) REFERENCES capability_definitions(capability_code) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_capability_code_fkey",
+            "referenced_columns": ["capability_code"],
+            "referenced_schema": "public",
+            "referenced_table": "capability_definitions",
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "f"
+          },
+          "identity": "public.capability_grants.capability_grants_capability_code_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["granted_by_user_id"],
+            "definition": "FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_granted_by_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "f"
+          },
+          "identity": "public.capability_grants.capability_grants_granted_by_user_id_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["jurisdiction_id"],
+            "definition": "FOREIGN KEY (jurisdiction_id) REFERENCES jurisdictions(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_jurisdiction_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "jurisdictions",
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "f"
+          },
+          "identity": "public.capability_grants.capability_grants_jurisdiction_id_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["id"],
+            "definition": "PRIMARY KEY (id)",
+            "name": "capability_grants_pkey",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "p"
+          },
+          "identity": "public.capability_grants.capability_grants_pkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["revoked_at", "granted_at"],
+            "definition": "CHECK (revoked_at IS NULL OR revoked_at >= granted_at)",
+            "name": "capability_grants_revoked_at_check",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "c"
+          },
+          "identity": "public.capability_grants.capability_grants_revoked_at_check"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES staff_profiles(user_id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_staff_profile_user_id_fkey",
+            "referenced_columns": ["user_id"],
+            "referenced_schema": "public",
+            "referenced_table": "staff_profiles",
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "f"
+          },
+          "identity": "public.capability_grants.capability_grants_staff_profile_user_id_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "f"
+          },
+          "identity": "public.capability_grants.capability_grants_user_id_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["expires_at", "granted_at"],
+            "definition": "CHECK (expires_at IS NULL OR expires_at > granted_at)",
+            "name": "capability_grants_validity_check",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "c"
+          },
+          "identity": "public.capability_grants.capability_grants_validity_check"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["id"],
+            "definition": "PRIMARY KEY (id)",
+            "name": "staff_profiles_pkey",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "staff_profiles",
+            "type": "p"
+          },
+          "identity": "public.staff_profiles.staff_profiles_pkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["staff_state"],
+            "definition": "CHECK (staff_state = ANY (ARRAY['invited'::text, 'active'::text, 'deactivated'::text, 'removed'::text]))",
+            "name": "staff_profiles_staff_state_check",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "staff_profiles",
+            "type": "c"
+          },
+          "identity": "public.staff_profiles.staff_profiles_staff_state_check"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "staff_profiles_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "staff_profiles",
+            "type": "f"
+          },
+          "identity": "public.staff_profiles.staff_profiles_user_id_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "UNIQUE (user_id)",
+            "name": "staff_profiles_user_id_key",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "staff_profiles",
+            "type": "u"
+          },
+          "identity": "public.staff_profiles.staff_profiles_user_id_key"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX application_sessions_auth_session_reference_key ON public.application_sessions USING btree (auth_session_reference)",
+            "name": "application_sessions_auth_session_reference_key",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.application_sessions_auth_session_reference_key"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX application_sessions_pkey ON public.application_sessions USING btree (id)",
+            "name": "application_sessions_pkey",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.application_sessions_pkey"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX capability_definitions_capability_code_key ON public.capability_definitions USING btree (capability_code)",
+            "name": "capability_definitions_capability_code_key",
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.capability_definitions_capability_code_key"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX capability_definitions_pkey ON public.capability_definitions USING btree (id)",
+            "name": "capability_definitions_pkey",
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.capability_definitions_pkey"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX capability_grants_pkey ON public.capability_grants USING btree (id)",
+            "name": "capability_grants_pkey",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_pkey"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE INDEX capability_grants_user_capability_idx ON public.capability_grants USING btree (user_id, capability_code, expires_at)",
+            "name": "capability_grants_user_capability_idx",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_user_capability_idx"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX staff_profiles_pkey ON public.staff_profiles USING btree (id)",
+            "name": "staff_profiles_pkey",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.staff_profiles_pkey"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX staff_profiles_user_id_key ON public.staff_profiles USING btree (user_id)",
+            "name": "staff_profiles_user_id_key",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.staff_profiles_user_id_key"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "application_sessions_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.application_sessions_user_id_fkey"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["capability_code"],
+            "definition": "FOREIGN KEY (capability_code) REFERENCES capability_definitions(capability_code) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_capability_code_fkey",
+            "referenced_columns": ["capability_code"],
+            "referenced_schema": "public",
+            "referenced_table": "capability_definitions",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_capability_code_fkey"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["granted_by_user_id"],
+            "definition": "FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_granted_by_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_granted_by_user_id_fkey"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["jurisdiction_id"],
+            "definition": "FOREIGN KEY (jurisdiction_id) REFERENCES jurisdictions(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_jurisdiction_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "jurisdictions",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_jurisdiction_id_fkey"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES staff_profiles(user_id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_staff_profile_user_id_fkey",
+            "referenced_columns": ["user_id"],
+            "referenced_schema": "public",
+            "referenced_table": "staff_profiles",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_staff_profile_user_id_fkey"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_user_id_fkey"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "staff_profiles_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.staff_profiles_user_id_fkey"
+        },
+        {
+          "category": "rls",
+          "data": {
+            "enabled": true,
+            "forced": false,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions"
+        },
+        {
+          "category": "rls",
+          "data": {
+            "enabled": true,
+            "forced": false,
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions"
+        },
+        {
+          "category": "rls",
+          "data": {
+            "enabled": true,
+            "forced": false,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants"
+        },
+        {
+          "category": "rls",
+          "data": {
+            "enabled": true,
+            "forced": false,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles"
+        },
+        {
+          "category": "policy",
+          "data": {
+            "check_expression": null,
+            "command": "SELECT",
+            "name": "staff_profiles_select_own",
+            "permissive": true,
+            "roles": ["authenticated"],
+            "schema": "public",
+            "table": "staff_profiles",
+            "using_expression": "(EXISTS ( SELECT 1\n   FROM users\n  WHERE ((users.id = staff_profiles.user_id) AND (users.auth_user_id = ( SELECT auth.uid() AS uid)))))"
+          },
+          "identity": "public.staff_profiles.staff_profiles_select_own"
+        },
+        {
+          "category": "trigger",
+          "data": {
+            "definition": "CREATE TRIGGER staff_profiles_set_updated_at BEFORE UPDATE ON staff_profiles FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+            "function": "public.set_updated_at",
+            "name": "staff_profiles_set_updated_at",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.staff_profiles_set_updated_at"
+        },
+        {
+          "category": "function",
+          "data": {
+            "configuration": ["search_path=pg_catalog"],
+            "definition": "CREATE OR REPLACE FUNCTION public.rls_auto_enable()\n RETURNS event_trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog'\nAS $function$\nDECLARE\n  cmd record;\nBEGIN\n  FOR cmd IN\n    SELECT *\n    FROM pg_event_trigger_ddl_commands()\n    WHERE command_tag IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')\n      AND object_type IN ('table','partitioned table')\n  LOOP\n     IF cmd.schema_name IS NOT NULL AND cmd.schema_name IN ('public') AND cmd.schema_name NOT IN ('pg_catalog','information_schema') AND cmd.schema_name NOT LIKE 'pg_toast%' AND cmd.schema_name NOT LIKE 'pg_temp%' THEN\n      BEGIN\n        EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);\n        RAISE LOG 'rls_auto_enable: enabled RLS on %', cmd.object_identity;\n      EXCEPTION\n        WHEN OTHERS THEN\n          RAISE LOG 'rls_auto_enable: failed to enable RLS on %', cmd.object_identity;\n      END;\n     ELSE\n        RAISE LOG 'rls_auto_enable: skip % (either system schema or not in enforced list: %.)', cmd.object_identity, cmd.schema_name;\n     END IF;\n  END LOOP;\nEND;\n$function$\n",
+            "language": "plpgsql",
+            "name": "rls_auto_enable",
+            "return_type": "event_trigger",
+            "schema": "public",
+            "security_definer": true,
+            "signature": "",
+            "volatility": "volatile"
+          },
+          "identity": "public.rls_auto_enable()"
+        },
+        {
+          "category": "function",
+          "data": {
+            "configuration": ["search_path=pg_catalog"],
+            "definition": "CREATE OR REPLACE FUNCTION public.set_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog'\nAS $function$\r\nbegin\r\n  new.updated_at = statement_timestamp();\r\n  return new;\r\nend;\r\n$function$\n",
+            "language": "plpgsql",
+            "name": "set_updated_at",
+            "return_type": "trigger",
+            "schema": "public",
+            "security_definer": false,
+            "signature": "",
+            "volatility": "volatile"
+          },
+          "identity": "public.set_updated_at()"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "PUBLIC",
+            "principal_name": null,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.PUBLIC"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "anon",
+            "principal_name": "anon",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.anon"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "authenticated",
+            "principal_name": "authenticated",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.authenticated"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "explicit_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "principal": "owner",
+            "principal_name": "postgres",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.owner"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": ["INSERT", "SELECT", "UPDATE"],
+            "explicit_privileges": ["INSERT", "SELECT", "UPDATE"],
+            "principal": "service_role",
+            "principal_name": "service_role",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.service_role"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "PUBLIC",
+            "principal_name": null,
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.PUBLIC"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "anon",
+            "principal_name": "anon",
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.anon"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "authenticated",
+            "principal_name": "authenticated",
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.authenticated"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "explicit_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "principal": "owner",
+            "principal_name": "postgres",
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.owner"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": ["SELECT"],
+            "explicit_privileges": ["SELECT"],
+            "principal": "service_role",
+            "principal_name": "service_role",
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.service_role"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "PUBLIC",
+            "principal_name": null,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.PUBLIC"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "anon",
+            "principal_name": "anon",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.anon"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "authenticated",
+            "principal_name": "authenticated",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.authenticated"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "explicit_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "principal": "owner",
+            "principal_name": "postgres",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.owner"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": ["INSERT", "SELECT", "UPDATE"],
+            "explicit_privileges": ["INSERT", "SELECT", "UPDATE"],
+            "principal": "service_role",
+            "principal_name": "service_role",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.service_role"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "PUBLIC",
+            "principal_name": null,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.PUBLIC"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "anon",
+            "principal_name": "anon",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.anon"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": ["SELECT"],
+            "explicit_privileges": ["SELECT"],
+            "principal": "authenticated",
+            "principal_name": "authenticated",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.authenticated"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "explicit_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "principal": "owner",
+            "principal_name": "postgres",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.owner"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": ["INSERT", "SELECT", "UPDATE"],
+            "explicit_privileges": ["INSERT", "SELECT", "UPDATE"],
+            "principal": "service_role",
+            "principal_name": "service_role",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.service_role"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": null,
+            "explicit_execute": false,
+            "function": "rls_auto_enable",
+            "principal": "PUBLIC",
+            "principal_name": null,
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.rls_auto_enable().PUBLIC"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": false,
+            "explicit_execute": false,
+            "function": "rls_auto_enable",
+            "principal": "anon",
+            "principal_name": "anon",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.rls_auto_enable().anon"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": false,
+            "explicit_execute": false,
+            "function": "rls_auto_enable",
+            "principal": "authenticated",
+            "principal_name": "authenticated",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.rls_auto_enable().authenticated"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": true,
+            "explicit_execute": true,
+            "function": "rls_auto_enable",
+            "principal": "owner",
+            "principal_name": "postgres",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.rls_auto_enable().owner"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": true,
+            "explicit_execute": true,
+            "function": "rls_auto_enable",
+            "principal": "service_role",
+            "principal_name": "service_role",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.rls_auto_enable().service_role"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": null,
+            "explicit_execute": false,
+            "function": "set_updated_at",
+            "principal": "PUBLIC",
+            "principal_name": null,
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.set_updated_at().PUBLIC"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": false,
+            "explicit_execute": false,
+            "function": "set_updated_at",
+            "principal": "anon",
+            "principal_name": "anon",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.set_updated_at().anon"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": false,
+            "explicit_execute": false,
+            "function": "set_updated_at",
+            "principal": "authenticated",
+            "principal_name": "authenticated",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.set_updated_at().authenticated"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": true,
+            "explicit_execute": true,
+            "function": "set_updated_at",
+            "principal": "owner",
+            "principal_name": "postgres",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.set_updated_at().owner"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": true,
+            "explicit_execute": true,
+            "function": "set_updated_at",
+            "principal": "service_role",
+            "principal_name": "service_role",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.set_updated_at().service_role"
+        }
+      ],
+      "public_tables": [
+        "application_sessions",
+        "capability_definitions",
+        "capability_grants",
+        "jurisdiction_regulatory_modes",
+        "jurisdictions",
+        "launch_authorizations",
+        "launch_gate_evaluations",
+        "launch_gates",
+        "policy_authority_references",
+        "policy_types",
+        "policy_versions",
+        "regulatory_modes",
+        "service_areas",
+        "staff_profiles",
+        "users"
+      ],
+      "public_function_count": 4,
+      "public_row_counts": {
+        "application_sessions": 0,
+        "capability_definitions": 0,
+        "capability_grants": 0,
+        "jurisdiction_regulatory_modes": 0,
+        "jurisdictions": 0,
+        "launch_authorizations": 0,
+        "launch_gate_evaluations": 0,
+        "launch_gates": 0,
+        "policy_authority_references": 0,
+        "policy_types": 0,
+        "policy_versions": 0,
+        "regulatory_modes": 0,
+        "service_areas": 0,
+        "staff_profiles": 0,
+        "users": 0
+      },
+      "candidate_relations": [],
+      "candidate_helper_present": false,
+      "candidate_seed_count": 0
+    },
+    "after": {
+      "migration_history": [
+        ["20260828192126", "p0_restrict_rls_auto_enable_execution"],
+        ["20260829000015", "p1_platform_foundation"],
+        ["20260829171701", "p1_authorization_foundation"],
+        ["20260830023823", "p1_jurisdiction_policy_launch_foundation"],
+        ["20260901012518", "p1_authorization_scope_correction"]
+      ],
+      "catalog_rows": [
+        {
+          "category": "table",
+          "data": {
+            "comment": "Application session metadata; authentication workflows and secrets remain out of scope.",
+            "kind": "table",
+            "name": "application_sessions",
+            "owner": "postgres",
+            "schema": "public"
+          },
+          "identity": "public.application_sessions"
+        },
+        {
+          "category": "table",
+          "data": {
+            "comment": null,
+            "kind": "table",
+            "name": "capability_definitions",
+            "owner": "postgres",
+            "schema": "public"
+          },
+          "identity": "public.capability_definitions"
+        },
+        {
+          "category": "table",
+          "data": {
+            "comment": "Capability grant history for Staff subjects; this migration intentionally creates no grant rows.",
+            "kind": "table",
+            "name": "capability_grants",
+            "owner": "postgres",
+            "schema": "public"
+          },
+          "identity": "public.capability_grants"
+        },
+        {
+          "category": "table",
+          "data": {
+            "comment": "Staff profile with a server-authoritative staff state.",
+            "kind": "table",
+            "name": "staff_profiles",
+            "owner": "postgres",
+            "schema": "public"
+          },
+          "identity": "public.staff_profiles"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "text",
+            "default_expression": null,
+            "name": "auth_session_reference",
+            "nullable": false,
+            "ordinal": 3,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.auth_session_reference"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": "statement_timestamp()",
+            "name": "created_at",
+            "nullable": false,
+            "ordinal": 6,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.created_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": null,
+            "name": "ended_at",
+            "nullable": true,
+            "ordinal": 9,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.ended_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": null,
+            "name": "expires_at",
+            "nullable": false,
+            "ordinal": 4,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.expires_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": "gen_random_uuid()",
+            "name": "id",
+            "nullable": false,
+            "ordinal": 1,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": null,
+            "name": "revoked_at",
+            "nullable": true,
+            "ordinal": 5,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.revoked_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": null,
+            "name": "started_at",
+            "nullable": false,
+            "ordinal": 8,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.started_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": null,
+            "name": "user_id",
+            "nullable": false,
+            "ordinal": 2,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.user_id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "text",
+            "default_expression": null,
+            "name": "capability_code",
+            "nullable": false,
+            "ordinal": 2,
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.capability_code"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": "gen_random_uuid()",
+            "name": "id",
+            "nullable": false,
+            "ordinal": 1,
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "text",
+            "default_expression": null,
+            "name": "capability_code",
+            "nullable": false,
+            "ordinal": 11,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_code"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": "statement_timestamp()",
+            "name": "created_at",
+            "nullable": false,
+            "ordinal": 9,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.created_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": null,
+            "name": "expires_at",
+            "nullable": true,
+            "ordinal": 7,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.expires_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": "statement_timestamp()",
+            "name": "granted_at",
+            "nullable": false,
+            "ordinal": 5,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.granted_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": null,
+            "name": "granted_by_user_id",
+            "nullable": false,
+            "ordinal": 13,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.granted_by_user_id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": "gen_random_uuid()",
+            "name": "id",
+            "nullable": false,
+            "ordinal": 1,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": null,
+            "name": "jurisdiction_id",
+            "nullable": true,
+            "ordinal": 4,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.jurisdiction_id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "jsonb",
+            "default_expression": null,
+            "name": "resource_scope",
+            "nullable": true,
+            "ordinal": 12,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.resource_scope"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": null,
+            "name": "revoked_at",
+            "nullable": true,
+            "ordinal": 8,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.revoked_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": null,
+            "name": "user_id",
+            "nullable": false,
+            "ordinal": 2,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.user_id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": "statement_timestamp()",
+            "name": "created_at",
+            "nullable": false,
+            "ordinal": 5,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.created_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": "gen_random_uuid()",
+            "name": "id",
+            "nullable": false,
+            "ordinal": 1,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.id"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "text",
+            "default_expression": null,
+            "name": "staff_state",
+            "nullable": false,
+            "ordinal": 3,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.staff_state"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "timestamp with time zone",
+            "default_expression": "statement_timestamp()",
+            "name": "updated_at",
+            "nullable": false,
+            "ordinal": 6,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.updated_at"
+        },
+        {
+          "category": "column",
+          "data": {
+            "canonical_type": "uuid",
+            "default_expression": null,
+            "name": "user_id",
+            "nullable": false,
+            "ordinal": 2,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.user_id"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["auth_session_reference"],
+            "definition": "UNIQUE (auth_session_reference)",
+            "name": "application_sessions_auth_session_reference_key",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "application_sessions",
+            "type": "u"
+          },
+          "identity": "public.application_sessions.application_sessions_auth_session_reference_key"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["ended_at", "started_at"],
+            "definition": "CHECK (ended_at IS NULL OR ended_at >= started_at)",
+            "name": "application_sessions_ended_at_check",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "application_sessions",
+            "type": "c"
+          },
+          "identity": "public.application_sessions.application_sessions_ended_at_check"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["expires_at", "started_at"],
+            "definition": "CHECK (expires_at > started_at)",
+            "name": "application_sessions_expiry_check",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "application_sessions",
+            "type": "c"
+          },
+          "identity": "public.application_sessions.application_sessions_expiry_check"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["id"],
+            "definition": "PRIMARY KEY (id)",
+            "name": "application_sessions_pkey",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "application_sessions",
+            "type": "p"
+          },
+          "identity": "public.application_sessions.application_sessions_pkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["revoked_at", "started_at"],
+            "definition": "CHECK (revoked_at IS NULL OR revoked_at >= started_at)",
+            "name": "application_sessions_revoked_at_check",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "application_sessions",
+            "type": "c"
+          },
+          "identity": "public.application_sessions.application_sessions_revoked_at_check"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "application_sessions_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "application_sessions",
+            "type": "f"
+          },
+          "identity": "public.application_sessions.application_sessions_user_id_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["capability_code"],
+            "definition": "UNIQUE (capability_code)",
+            "name": "capability_definitions_capability_code_key",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "capability_definitions",
+            "type": "u"
+          },
+          "identity": "public.capability_definitions.capability_definitions_capability_code_key"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["id"],
+            "definition": "PRIMARY KEY (id)",
+            "name": "capability_definitions_pkey",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "capability_definitions",
+            "type": "p"
+          },
+          "identity": "public.capability_definitions.capability_definitions_pkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["capability_code"],
+            "definition": "FOREIGN KEY (capability_code) REFERENCES capability_definitions(capability_code) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_capability_code_fkey",
+            "referenced_columns": ["capability_code"],
+            "referenced_schema": "public",
+            "referenced_table": "capability_definitions",
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "f"
+          },
+          "identity": "public.capability_grants.capability_grants_capability_code_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["granted_by_user_id"],
+            "definition": "FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_granted_by_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "f"
+          },
+          "identity": "public.capability_grants.capability_grants_granted_by_user_id_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["jurisdiction_id"],
+            "definition": "FOREIGN KEY (jurisdiction_id) REFERENCES jurisdictions(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_jurisdiction_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "jurisdictions",
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "f"
+          },
+          "identity": "public.capability_grants.capability_grants_jurisdiction_id_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["id"],
+            "definition": "PRIMARY KEY (id)",
+            "name": "capability_grants_pkey",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "p"
+          },
+          "identity": "public.capability_grants.capability_grants_pkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["revoked_at", "granted_at"],
+            "definition": "CHECK (revoked_at IS NULL OR revoked_at >= granted_at)",
+            "name": "capability_grants_revoked_at_check",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "c"
+          },
+          "identity": "public.capability_grants.capability_grants_revoked_at_check"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES staff_profiles(user_id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_staff_profile_user_id_fkey",
+            "referenced_columns": ["user_id"],
+            "referenced_schema": "public",
+            "referenced_table": "staff_profiles",
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "f"
+          },
+          "identity": "public.capability_grants.capability_grants_staff_profile_user_id_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "f"
+          },
+          "identity": "public.capability_grants.capability_grants_user_id_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["expires_at", "granted_at"],
+            "definition": "CHECK (expires_at IS NULL OR expires_at > granted_at)",
+            "name": "capability_grants_validity_check",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "capability_grants",
+            "type": "c"
+          },
+          "identity": "public.capability_grants.capability_grants_validity_check"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["id"],
+            "definition": "PRIMARY KEY (id)",
+            "name": "staff_profiles_pkey",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "staff_profiles",
+            "type": "p"
+          },
+          "identity": "public.staff_profiles.staff_profiles_pkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["staff_state"],
+            "definition": "CHECK (staff_state = ANY (ARRAY['invited'::text, 'active'::text, 'deactivated'::text, 'removed'::text]))",
+            "name": "staff_profiles_staff_state_check",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "staff_profiles",
+            "type": "c"
+          },
+          "identity": "public.staff_profiles.staff_profiles_staff_state_check"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "staff_profiles_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "staff_profiles",
+            "type": "f"
+          },
+          "identity": "public.staff_profiles.staff_profiles_user_id_fkey"
+        },
+        {
+          "category": "constraint",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "UNIQUE (user_id)",
+            "name": "staff_profiles_user_id_key",
+            "referenced_columns": [],
+            "referenced_schema": null,
+            "referenced_table": null,
+            "schema": "public",
+            "table": "staff_profiles",
+            "type": "u"
+          },
+          "identity": "public.staff_profiles.staff_profiles_user_id_key"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX application_sessions_auth_session_reference_key ON public.application_sessions USING btree (auth_session_reference)",
+            "name": "application_sessions_auth_session_reference_key",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.application_sessions_auth_session_reference_key"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX application_sessions_pkey ON public.application_sessions USING btree (id)",
+            "name": "application_sessions_pkey",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.application_sessions_pkey"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX capability_definitions_capability_code_key ON public.capability_definitions USING btree (capability_code)",
+            "name": "capability_definitions_capability_code_key",
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.capability_definitions_capability_code_key"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX capability_definitions_pkey ON public.capability_definitions USING btree (id)",
+            "name": "capability_definitions_pkey",
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.capability_definitions_pkey"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX capability_grants_pkey ON public.capability_grants USING btree (id)",
+            "name": "capability_grants_pkey",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_pkey"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE INDEX capability_grants_user_capability_idx ON public.capability_grants USING btree (user_id, capability_code, expires_at)",
+            "name": "capability_grants_user_capability_idx",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_user_capability_idx"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX staff_profiles_pkey ON public.staff_profiles USING btree (id)",
+            "name": "staff_profiles_pkey",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.staff_profiles_pkey"
+        },
+        {
+          "category": "index",
+          "data": {
+            "definition": "CREATE UNIQUE INDEX staff_profiles_user_id_key ON public.staff_profiles USING btree (user_id)",
+            "name": "staff_profiles_user_id_key",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.staff_profiles_user_id_key"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "application_sessions_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.application_sessions_user_id_fkey"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["capability_code"],
+            "definition": "FOREIGN KEY (capability_code) REFERENCES capability_definitions(capability_code) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_capability_code_fkey",
+            "referenced_columns": ["capability_code"],
+            "referenced_schema": "public",
+            "referenced_table": "capability_definitions",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_capability_code_fkey"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["granted_by_user_id"],
+            "definition": "FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_granted_by_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_granted_by_user_id_fkey"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["jurisdiction_id"],
+            "definition": "FOREIGN KEY (jurisdiction_id) REFERENCES jurisdictions(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_jurisdiction_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "jurisdictions",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_jurisdiction_id_fkey"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES staff_profiles(user_id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_staff_profile_user_id_fkey",
+            "referenced_columns": ["user_id"],
+            "referenced_schema": "public",
+            "referenced_table": "staff_profiles",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_staff_profile_user_id_fkey"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "capability_grants_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.capability_grants_user_id_fkey"
+        },
+        {
+          "category": "foreign_key",
+          "data": {
+            "columns": ["user_id"],
+            "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+            "name": "staff_profiles_user_id_fkey",
+            "referenced_columns": ["id"],
+            "referenced_schema": "public",
+            "referenced_table": "users",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.staff_profiles_user_id_fkey"
+        },
+        {
+          "category": "rls",
+          "data": {
+            "enabled": true,
+            "forced": false,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions"
+        },
+        {
+          "category": "rls",
+          "data": {
+            "enabled": true,
+            "forced": false,
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions"
+        },
+        {
+          "category": "rls",
+          "data": {
+            "enabled": true,
+            "forced": false,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants"
+        },
+        {
+          "category": "rls",
+          "data": {
+            "enabled": true,
+            "forced": false,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles"
+        },
+        {
+          "category": "policy",
+          "data": {
+            "check_expression": null,
+            "command": "SELECT",
+            "name": "staff_profiles_select_own",
+            "permissive": true,
+            "roles": ["authenticated"],
+            "schema": "public",
+            "table": "staff_profiles",
+            "using_expression": "(EXISTS ( SELECT 1\n   FROM users\n  WHERE ((users.id = staff_profiles.user_id) AND (users.auth_user_id = ( SELECT auth.uid() AS uid)))))"
+          },
+          "identity": "public.staff_profiles.staff_profiles_select_own"
+        },
+        {
+          "category": "trigger",
+          "data": {
+            "definition": "CREATE TRIGGER staff_profiles_set_updated_at BEFORE UPDATE ON staff_profiles FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+            "function": "public.set_updated_at",
+            "name": "staff_profiles_set_updated_at",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.staff_profiles_set_updated_at"
+        },
+        {
+          "category": "function",
+          "data": {
+            "configuration": ["search_path=pg_catalog"],
+            "definition": "CREATE OR REPLACE FUNCTION public.rls_auto_enable()\n RETURNS event_trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog'\nAS $function$\nDECLARE\n  cmd record;\nBEGIN\n  FOR cmd IN\n    SELECT *\n    FROM pg_event_trigger_ddl_commands()\n    WHERE command_tag IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')\n      AND object_type IN ('table','partitioned table')\n  LOOP\n     IF cmd.schema_name IS NOT NULL AND cmd.schema_name IN ('public') AND cmd.schema_name NOT IN ('pg_catalog','information_schema') AND cmd.schema_name NOT LIKE 'pg_toast%' AND cmd.schema_name NOT LIKE 'pg_temp%' THEN\n      BEGIN\n        EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);\n        RAISE LOG 'rls_auto_enable: enabled RLS on %', cmd.object_identity;\n      EXCEPTION\n        WHEN OTHERS THEN\n          RAISE LOG 'rls_auto_enable: failed to enable RLS on %', cmd.object_identity;\n      END;\n     ELSE\n        RAISE LOG 'rls_auto_enable: skip % (either system schema or not in enforced list: %.)', cmd.object_identity, cmd.schema_name;\n     END IF;\n  END LOOP;\nEND;\n$function$\n",
+            "language": "plpgsql",
+            "name": "rls_auto_enable",
+            "return_type": "event_trigger",
+            "schema": "public",
+            "security_definer": true,
+            "signature": "",
+            "volatility": "volatile"
+          },
+          "identity": "public.rls_auto_enable()"
+        },
+        {
+          "category": "function",
+          "data": {
+            "configuration": ["search_path=pg_catalog"],
+            "definition": "CREATE OR REPLACE FUNCTION public.set_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog'\nAS $function$\r\nbegin\r\n  new.updated_at = statement_timestamp();\r\n  return new;\r\nend;\r\n$function$\n",
+            "language": "plpgsql",
+            "name": "set_updated_at",
+            "return_type": "trigger",
+            "schema": "public",
+            "security_definer": false,
+            "signature": "",
+            "volatility": "volatile"
+          },
+          "identity": "public.set_updated_at()"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "PUBLIC",
+            "principal_name": null,
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.PUBLIC"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "anon",
+            "principal_name": "anon",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.anon"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "authenticated",
+            "principal_name": "authenticated",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.authenticated"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "explicit_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "principal": "owner",
+            "principal_name": "postgres",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.owner"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": ["INSERT", "SELECT", "UPDATE"],
+            "explicit_privileges": ["INSERT", "SELECT", "UPDATE"],
+            "principal": "service_role",
+            "principal_name": "service_role",
+            "schema": "public",
+            "table": "application_sessions"
+          },
+          "identity": "public.application_sessions.service_role"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "PUBLIC",
+            "principal_name": null,
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.PUBLIC"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "anon",
+            "principal_name": "anon",
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.anon"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "authenticated",
+            "principal_name": "authenticated",
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.authenticated"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "explicit_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "principal": "owner",
+            "principal_name": "postgres",
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.owner"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": ["SELECT"],
+            "explicit_privileges": ["SELECT"],
+            "principal": "service_role",
+            "principal_name": "service_role",
+            "schema": "public",
+            "table": "capability_definitions"
+          },
+          "identity": "public.capability_definitions.service_role"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "PUBLIC",
+            "principal_name": null,
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.PUBLIC"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "anon",
+            "principal_name": "anon",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.anon"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "authenticated",
+            "principal_name": "authenticated",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.authenticated"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "explicit_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "principal": "owner",
+            "principal_name": "postgres",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.owner"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": ["INSERT", "SELECT", "UPDATE"],
+            "explicit_privileges": ["INSERT", "SELECT", "UPDATE"],
+            "principal": "service_role",
+            "principal_name": "service_role",
+            "schema": "public",
+            "table": "capability_grants"
+          },
+          "identity": "public.capability_grants.service_role"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "PUBLIC",
+            "principal_name": null,
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.PUBLIC"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [],
+            "explicit_privileges": [],
+            "principal": "anon",
+            "principal_name": "anon",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.anon"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": ["SELECT"],
+            "explicit_privileges": ["SELECT"],
+            "principal": "authenticated",
+            "principal_name": "authenticated",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.authenticated"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "explicit_privileges": [
+              "DELETE",
+              "INSERT",
+              "MAINTAIN",
+              "REFERENCES",
+              "SELECT",
+              "TRIGGER",
+              "TRUNCATE",
+              "UPDATE"
+            ],
+            "principal": "owner",
+            "principal_name": "postgres",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.owner"
+        },
+        {
+          "category": "table_privilege",
+          "data": {
+            "effective_privileges": ["INSERT", "SELECT", "UPDATE"],
+            "explicit_privileges": ["INSERT", "SELECT", "UPDATE"],
+            "principal": "service_role",
+            "principal_name": "service_role",
+            "schema": "public",
+            "table": "staff_profiles"
+          },
+          "identity": "public.staff_profiles.service_role"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": null,
+            "explicit_execute": false,
+            "function": "rls_auto_enable",
+            "principal": "PUBLIC",
+            "principal_name": null,
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.rls_auto_enable().PUBLIC"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": false,
+            "explicit_execute": false,
+            "function": "rls_auto_enable",
+            "principal": "anon",
+            "principal_name": "anon",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.rls_auto_enable().anon"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": false,
+            "explicit_execute": false,
+            "function": "rls_auto_enable",
+            "principal": "authenticated",
+            "principal_name": "authenticated",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.rls_auto_enable().authenticated"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": true,
+            "explicit_execute": true,
+            "function": "rls_auto_enable",
+            "principal": "owner",
+            "principal_name": "postgres",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.rls_auto_enable().owner"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": true,
+            "explicit_execute": true,
+            "function": "rls_auto_enable",
+            "principal": "service_role",
+            "principal_name": "service_role",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.rls_auto_enable().service_role"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": null,
+            "explicit_execute": false,
+            "function": "set_updated_at",
+            "principal": "PUBLIC",
+            "principal_name": null,
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.set_updated_at().PUBLIC"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": false,
+            "explicit_execute": false,
+            "function": "set_updated_at",
+            "principal": "anon",
+            "principal_name": "anon",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.set_updated_at().anon"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": false,
+            "explicit_execute": false,
+            "function": "set_updated_at",
+            "principal": "authenticated",
+            "principal_name": "authenticated",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.set_updated_at().authenticated"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": true,
+            "explicit_execute": true,
+            "function": "set_updated_at",
+            "principal": "owner",
+            "principal_name": "postgres",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.set_updated_at().owner"
+        },
+        {
+          "category": "function_privilege",
+          "data": {
+            "effective_execute": true,
+            "explicit_execute": true,
+            "function": "set_updated_at",
+            "principal": "service_role",
+            "principal_name": "service_role",
+            "schema": "public",
+            "signature": ""
+          },
+          "identity": "public.set_updated_at().service_role"
+        }
+      ],
+      "public_tables": [
+        "application_sessions",
+        "capability_definitions",
+        "capability_grants",
+        "jurisdiction_regulatory_modes",
+        "jurisdictions",
+        "launch_authorizations",
+        "launch_gate_evaluations",
+        "launch_gates",
+        "policy_authority_references",
+        "policy_types",
+        "policy_versions",
+        "regulatory_modes",
+        "service_areas",
+        "staff_profiles",
+        "users"
+      ],
+      "public_function_count": 4,
+      "public_row_counts": {
+        "application_sessions": 0,
+        "capability_definitions": 0,
+        "capability_grants": 0,
+        "jurisdiction_regulatory_modes": 0,
+        "jurisdictions": 0,
+        "launch_authorizations": 0,
+        "launch_gate_evaluations": 0,
+        "launch_gates": 0,
+        "policy_authority_references": 0,
+        "policy_types": 0,
+        "policy_versions": 0,
+        "regulatory_modes": 0,
+        "service_areas": 0,
+        "staff_profiles": 0,
+        "users": 0
+      },
+      "candidate_relations": [],
+      "candidate_helper_present": false,
+      "candidate_seed_count": 0
+    }
+  }
+}

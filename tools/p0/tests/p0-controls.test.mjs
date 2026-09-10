@@ -1,10 +1,21 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { test } from "node:test";
 import {
   P1_REGULATORY_CATALOG_SQL,
+  P1_ATTORNEY_PENDING,
+  P1_ATTORNEY_VALIDATED,
   ROOT,
   scanSecretLikeText,
   validateCiWorkflow,
@@ -1543,4 +1554,253 @@ test("package scripts reject executable product or deployment carriers", () => {
   const packageJson = readJson("package.json");
   packageJson.scripts.deploy = "node product-server.mjs";
   assert.throws(() => validatePackageJson(packageJson), /scripts/);
+});
+
+// Disposable filesystem fixtures exercise the actual register/drift entry points.
+// Synthetic completed proof below is test input, never live validation evidence.
+test("P1-004 local overlay preserves the exact five-migration foundation", async (t) => {
+  async function fixture(run) {
+    const root = mkdtempSync(path.join(tmpdir(), "rosuno-p1-004-controls-"));
+    try {
+      for (const directory of ["governance", "supabase", "tools/p0/lib"]) {
+        cpSync(path.join(ROOT, directory), path.join(root, directory), {
+          recursive: true,
+        });
+      }
+      execFileSync("git", ["init", "-q", root]);
+      const controls = await import(
+        pathToFileURL(path.join(root, "tools/p0/lib/controls.mjs"))
+      );
+      const register = readJson(
+        "governance/migrations/reviewed-migrations.json",
+      );
+      register.migrations = register.migrations.slice(0, 5);
+      // Remove a real local overlay from the disposable fixture, if present.
+      const actual = readJson("governance/migrations/reviewed-migrations.json")
+        .migrations[5];
+      if (actual)
+        rmSync(path.join(root, actual.artifact_path), { force: true });
+      const id =
+        "20260910075939_p1_attorney_verification_eligibility_foundation";
+      const candidate = {
+        ...structuredClone(register.migrations[4]),
+        migration_id: id,
+        sequence: 6,
+        artifact_path: `supabase/migrations/${id}.sql`,
+        reviewed: false,
+        reviewed_by: "pending designated human PR review",
+        reviewed_at: null,
+        applied_environment: "none",
+        release_refs: [],
+        non_production_validation: false,
+        drift_check: P1_ATTORNEY_PENDING,
+        depends_on: ["20260901012518_p1_authorization_scope_correction"],
+      };
+      register.migrations.push(candidate);
+      const sql = "-- Disposable governance fixture; never executed as SQL.\n";
+      writeFileSync(path.join(root, candidate.artifact_path), sql);
+      const evidence = {
+        version: 1,
+        migration_id: id,
+        migration_sha256: createHash("sha256").update(sql).digest("hex"),
+        project_ref: "mxjlvmowmodzdtdfgqpb",
+        phase: "rollback_only_pending",
+        rollback_validation: null,
+      };
+      const report = readJson("governance/schema-drift/baseline.json");
+      const validate = () => {
+        writeFileSync(
+          path.join(
+            root,
+            "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
+          ),
+          JSON.stringify(evidence),
+        );
+        const files = execFileSync(
+          "git",
+          ["ls-files", "-co", "--exclude-standard"],
+          { cwd: root, encoding: "utf8" },
+        )
+          .trim()
+          .split("\n");
+        controls.validateMigrationRegister(register, {}, files);
+        controls.validateDriftReport(report, register);
+      };
+      await run({
+        root,
+        register,
+        candidate,
+        evidence,
+        report,
+        validate,
+        controls,
+        sql,
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+  await t.test(
+    "pending candidate passes without claiming validation or changing baseline",
+    () => fixture(({ validate }) => assert.doesNotThrow(validate)),
+  );
+  const mutations = {
+    "unregistered P1-004 SQL": ({ register }) => register.migrations.pop(),
+    "absent registered artifact": ({ root, candidate }) =>
+      rmSync(path.join(root, candidate.artifact_path)),
+    "wrong sequence": ({ candidate }) => {
+      candidate.sequence = 7;
+    },
+    "wrong predecessor": ({ candidate }) => {
+      candidate.depends_on = [
+        "20260830023823_p1_jurisdiction_policy_launch_foundation",
+      ];
+    },
+    "wrong migration name": ({ candidate }) => {
+      candidate.migration_id = "20260910075939_arbitrary";
+    },
+    "wrong migration path": ({ candidate }) => {
+      candidate.artifact_path =
+        "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql";
+    },
+    "reviewed candidate": ({ candidate }) => {
+      candidate.reviewed = true;
+    },
+    "persistently applied candidate": ({ candidate }) => {
+      candidate.applied_environment = "staging";
+    },
+    "released candidate": ({ candidate }) => {
+      candidate.release_refs = ["REL-FALSE"];
+    },
+    "two candidates": ({ register, candidate }) => {
+      register.migrations.push({
+        ...candidate,
+        sequence: 7,
+        migration_id:
+          "20260910075940_p1_attorney_verification_eligibility_foundation",
+      });
+    },
+    "P1-005 candidate": ({ candidate }) => {
+      candidate.migration_id = "20260910075939_p1_client_intake_foundation";
+    },
+    "candidate included in persistent baseline": ({ report, candidate }) => {
+      report.migration_inventory.push(candidate);
+    },
+    "false completed flag": ({ candidate }) => {
+      candidate.non_production_validation = true;
+    },
+    "false completed rollback text": ({ candidate }) => {
+      candidate.drift_check = P1_ATTORNEY_VALIDATED;
+    },
+    "false completed proof": ({ candidate, evidence }) => {
+      candidate.non_production_validation = true;
+      candidate.drift_check = P1_ATTORNEY_VALIDATED;
+      evidence.phase = "rollback_only_validated";
+    },
+    "artifact changed after validation evidence": ({ root, candidate }) => {
+      writeFileSync(path.join(root, candidate.artifact_path), "-- changed\n");
+    },
+  };
+  for (const [name, mutate] of Object.entries(mutations)) {
+    await t.test(`rejects ${name}`, () =>
+      fixture((f) => {
+        mutate(f);
+        assert.throws(f.validate);
+      }),
+    );
+  }
+  for (let index = 0; index < 5; index++) {
+    await t.test(`rejects foundation ${index + 1} byte mutation`, () =>
+      fixture((f) => {
+        const file = f.report.migration_inventory[index].artifact_path;
+        writeFileSync(
+          path.join(f.root, file),
+          readFileSync(path.join(f.root, file), "utf8") + "\n",
+        );
+        assert.throws(f.validate);
+      }),
+    );
+    await t.test(`rejects foundation ${index + 1} reorder`, () =>
+      fixture((f) => {
+        const other = (index + 1) % 5;
+        [f.register.migrations[index], f.register.migrations[other]] = [
+          f.register.migrations[other],
+          f.register.migrations[index],
+        ];
+        assert.throws(f.validate);
+      }),
+    );
+  }
+  await t.test(
+    "completed phase requires matching artifact, successful checks and exact restoration",
+    () =>
+      fixture((f) => {
+        const tables = [
+          "application_sessions",
+          "capability_definitions",
+          "capability_grants",
+          "jurisdiction_regulatory_modes",
+          "jurisdictions",
+          "launch_authorizations",
+          "launch_gate_evaluations",
+          "launch_gates",
+          "policy_authority_references",
+          "policy_types",
+          "policy_versions",
+          "regulatory_modes",
+          "service_areas",
+          "staff_profiles",
+          "users",
+        ];
+        const snapshot = readJson(
+          "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json",
+        ).normalized_outputs.snapshot;
+        const state = {
+          migration_history: f.report.migration_inventory.map((m) => [
+            m.migration_id.slice(0, 14),
+            m.migration_id.slice(15),
+          ]),
+          catalog_rows: snapshot.rows,
+          public_tables: tables,
+          public_function_count: 4,
+          public_row_counts: Object.fromEntries(
+            tables.map((name) => [name, 0]),
+          ),
+          candidate_relations: [],
+          candidate_helper_present: false,
+          candidate_seed_count: 0,
+        };
+        f.candidate.non_production_validation = true;
+        f.candidate.drift_check = P1_ATTORNEY_VALIDATED;
+        f.evidence.phase = "rollback_only_validated";
+        f.evidence.rollback_validation = {
+          started_at: "2026-09-10T08:00:00Z",
+          rolled_back_at: "2026-09-10T08:01:00Z",
+          restored_at: "2026-09-10T08:02:00Z",
+          transaction_end: "ROLLBACK",
+          checks: Object.fromEntries(
+            [
+              "structure",
+              "constraints",
+              "rls",
+              "service_privileges",
+              "capability_helper",
+              "corrections",
+              "historical_independence",
+            ].map((name) => [
+              name,
+              [{ name: `synthetic ${name} assertion`, passed: true }],
+            ]),
+          ),
+          before: structuredClone(state),
+          after: structuredClone(state),
+        };
+        assert.doesNotThrow(f.validate);
+        f.evidence.rollback_validation.after.candidate_helper_present = true;
+        assert.throws(f.validate, /restoration/);
+        f.evidence.rollback_validation.after.candidate_helper_present = false;
+        f.evidence.rollback_validation.transaction_end = "COMMIT";
+        assert.throws(f.validate, /rollback/);
+      }),
+  );
 });

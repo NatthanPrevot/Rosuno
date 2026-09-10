@@ -4471,6 +4471,203 @@ export function validateRestoreEvidence(evidence) {
   }
 }
 
+export const P1_ATTORNEY_PENDING =
+  "P1-004 rollback-only Rosuno Staging validation pending; local unreviewed/unapplied candidate; no release; five-migration persistent baseline unchanged.";
+export const P1_ATTORNEY_VALIDATED =
+  "P1-004 rollback-only Rosuno Staging validation passed with exact restoration of the five-migration baseline; local unreviewed/unapplied candidate; no release.";
+const P1_ATTORNEY_EVIDENCE_PATH =
+  "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json";
+const P1_ATTORNEY_ID =
+  /^([0-9]{14})_p1_attorney_verification_eligibility_foundation$/;
+
+// This predicate classifies only the explicitly authorized local candidate.
+// It neither reviews a migration nor changes the persistent foundation.
+export function validateP1AttorneyCandidate(migration, sql, evidence) {
+  const context = "P1-004 candidate";
+  requireExactFields(migration, MIGRATION_FIELDS, context);
+  const match = P1_ATTORNEY_ID.exec(migration.migration_id);
+  if (!match || match[1] <= "20260901012518") {
+    fail(`${context} migration name/version is invalid`);
+  }
+  const stamp = match[1];
+  requireTimestamp(
+    `${stamp.slice(0, 4)}-${stamp.slice(4, 6)}-${stamp.slice(6, 8)}T${stamp.slice(8, 10)}:${stamp.slice(10, 12)}:${stamp.slice(12, 14)}Z`,
+    `${context} version`,
+  );
+  if (
+    migration.sequence !== 6 ||
+    migration.migration_kind !== "product" ||
+    migration.artifact_path !==
+      `supabase/migrations/${migration.migration_id}.sql` ||
+    JSON.stringify(migration.depends_on) !==
+      JSON.stringify([P1_AUTHORIZATION_CORRECTION_MIGRATION_ID])
+  )
+    fail(`${context} sequence, kind, path, or predecessor is invalid`);
+  if (
+    migration.reviewed !== false ||
+    migration.reviewed_by !== "pending designated human PR review" ||
+    migration.reviewed_at !== null ||
+    migration.applied_environment !== "none" ||
+    !Array.isArray(migration.release_refs) ||
+    migration.release_refs.length !== 0
+  )
+    fail(`${context} must remain unreviewed, unapplied, and unreleased`);
+  requireNonEmptyString(sql, `${context} SQL artifact`);
+  requireExactFields(
+    evidence,
+    [
+      "version",
+      "migration_id",
+      "migration_sha256",
+      "project_ref",
+      "phase",
+      "rollback_validation",
+    ],
+    `${context} evidence`,
+  );
+  if (
+    evidence.version !== 1 ||
+    evidence.migration_id !== migration.migration_id ||
+    evidence.migration_sha256 !==
+      createHash("sha256").update(sql).digest("hex") ||
+    evidence.project_ref !== "mxjlvmowmodzdtdfgqpb"
+  )
+    fail(
+      `${context} evidence does not identify the exact artifact and Staging target`,
+    );
+  if (migration.non_production_validation === false) {
+    if (
+      migration.drift_check !== P1_ATTORNEY_PENDING ||
+      evidence.phase !== "rollback_only_pending" ||
+      evidence.rollback_validation !== null
+    ) {
+      fail(
+        `${context} pending state falsely claims completed rollback-only validation`,
+      );
+    }
+    return "rollback_only_pending";
+  }
+  if (
+    migration.non_production_validation !== true ||
+    migration.drift_check !== P1_ATTORNEY_VALIDATED ||
+    evidence.phase !== "rollback_only_validated"
+  ) {
+    fail(`${context} validation phase is inconsistent`);
+  }
+  const proof = evidence.rollback_validation;
+  requireExactFields(
+    proof,
+    [
+      "started_at",
+      "rolled_back_at",
+      "restored_at",
+      "transaction_end",
+      "checks",
+      "before",
+      "after",
+    ],
+    `${context} rollback proof`,
+  );
+  validateChronology(
+    proof.started_at,
+    proof.rolled_back_at,
+    `${context} transaction`,
+  );
+  validateChronology(
+    proof.rolled_back_at,
+    proof.restored_at,
+    `${context} restoration`,
+  );
+  if (proof.transaction_end !== "ROLLBACK")
+    fail(`${context} lacks explicit rollback proof`);
+  const categories = [
+    "structure",
+    "constraints",
+    "rls",
+    "service_privileges",
+    "capability_helper",
+    "corrections",
+    "historical_independence",
+  ];
+  requireExactFields(proof.checks, categories, `${context} validation checks`);
+  for (const category of categories) {
+    requireArray(proof.checks[category], `${context} ${category}`, 1);
+    uniqueIds(proof.checks[category], "name", `${context} ${category}`);
+    for (const check of proof.checks[category]) {
+      requireExactFields(check, ["name", "passed"], `${context} check`);
+      if (check.passed !== true)
+        fail(`${context} contains a failed validation check`);
+    }
+  }
+  for (const state of [proof.before, proof.after]) {
+    requireExactFields(
+      state,
+      [
+        "migration_history",
+        "catalog_rows",
+        "public_tables",
+        "public_function_count",
+        "public_row_counts",
+        "candidate_relations",
+        "candidate_helper_present",
+        "candidate_seed_count",
+      ],
+      `${context} restoration state`,
+    );
+    const catalog = canonicalizeCatalogRows(state.catalog_rows);
+    if (
+      JSON.stringify(state.migration_history) !==
+        JSON.stringify(P1_AUTHORIZATION_CORRECTION_MIGRATION_HISTORY) ||
+      catalog.sha256 !== P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256 ||
+      catalog.canonicalBytes.length !==
+        P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES ||
+      catalog.snapshot.rows.length !==
+        P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS ||
+      state.public_function_count !== 4 ||
+      JSON.stringify(state.candidate_relations) !== "[]" ||
+      state.candidate_helper_present !== false ||
+      state.candidate_seed_count !== 0
+    ) {
+      fail(`${context} lacks exact five-migration baseline restoration`);
+    }
+    const tables = [
+      "application_sessions",
+      "capability_definitions",
+      "capability_grants",
+      "jurisdiction_regulatory_modes",
+      "jurisdictions",
+      "launch_authorizations",
+      "launch_gate_evaluations",
+      "launch_gates",
+      "policy_authority_references",
+      "policy_types",
+      "policy_versions",
+      "regulatory_modes",
+      "service_areas",
+      "staff_profiles",
+      "users",
+    ];
+    if (JSON.stringify(state.public_tables) !== JSON.stringify(tables))
+      fail(`${context} public table inventory differs`);
+    requireExactFields(
+      state.public_row_counts,
+      tables,
+      `${context} row counts`,
+    );
+    if (Object.values(state.public_row_counts).some((count) => count !== 0))
+      fail(`${context} rows survive validation`);
+  }
+  return "rollback_only_validated";
+}
+
+function readP1AttorneyCandidate(migration) {
+  return validateP1AttorneyCandidate(
+    migration,
+    readFileSync(path.join(ROOT, migration.artifact_path), "utf8"),
+    readJson(P1_ATTORNEY_EVIDENCE_PATH),
+  );
+}
+
 export function validateMigrationRegister(
   register,
   references = {},
@@ -4481,6 +4678,7 @@ export function validateMigrationRegister(
   const registeredArtifacts = new Set();
   for (const [index, migration] of register.migrations.entries()) {
     const context = `migration ${index + 1}`;
+    let acceptedP1AttorneyCandidate = false;
     requireExactFields(migration, MIGRATION_FIELDS, context);
     if (!["security_control", "product"].includes(migration.migration_kind)) {
       fail(`${context}.migration_kind is not allowed`);
@@ -4561,6 +4759,9 @@ export function validateMigrationRegister(
           migration,
           `${context}.artifact`,
         );
+      } else if (P1_ATTORNEY_ID.test(migration.migration_id)) {
+        readP1AttorneyCandidate(migration);
+        acceptedP1AttorneyCandidate = true;
       } else {
         fail(`${context}.artifact_path is outside the authorized P1 slice`);
       }
@@ -4615,6 +4816,7 @@ export function validateMigrationRegister(
     }
     if (
       migration.applied_environment === "none" &&
+      !acceptedP1AttorneyCandidate &&
       (migration.migration_kind !== "product" ||
         migration.non_production_validation !== true)
     ) {
@@ -4638,7 +4840,8 @@ export function validateMigrationRegister(
       migration.drift_check !== "clean" &&
       !acceptedP1AuthorizationToolingException &&
       !acceptedP1RegulatoryToolingException &&
-      !acceptedP1AuthorizationCorrectionValidation
+      !acceptedP1AuthorizationCorrectionValidation &&
+      !acceptedP1AttorneyCandidate
     ) {
       fail(`${context} lacks a clean drift check`);
     }
@@ -4740,16 +4943,24 @@ export function validateDriftReport(report, migrationRegister = null) {
     readJson("governance/migrations/reviewed-migrations.json");
   if (
     register.product_migrations_present !== true ||
-    register.migrations?.length !== FOUNDATION_BASELINE_MIGRATIONS.length ||
-    register.migrations.some(
-      (migration, index) =>
-        migration.sequence !== FOUNDATION_BASELINE_MIGRATIONS[index].sequence ||
-        migration.migration_id !==
-          FOUNDATION_BASELINE_MIGRATIONS[index].migration_id ||
-        migration.reviewed !== true,
-    )
+    ![5, 6].includes(register.migrations?.length) ||
+    register.migrations
+      .slice(0, 5)
+      .some(
+        (migration, index) =>
+          migration.sequence !==
+            FOUNDATION_BASELINE_MIGRATIONS[index].sequence ||
+          migration.migration_id !==
+            FOUNDATION_BASELINE_MIGRATIONS[index].migration_id ||
+          migration.reviewed !== true,
+      )
   ) {
     fail("schema drift migration inventory contradicts the reviewed register");
+  }
+  if (register.migrations.length === 6) {
+    // Exclude only a separately classified candidate, never an arbitrary sixth migration.
+    validateMigrationRegister(register, {}, repositoryFiles());
+    readP1AttorneyCandidate(register.migrations[5]);
   }
   for (const artifact of FOUNDATION_BASELINE_MIGRATIONS) {
     const digest = createHash("sha256")
@@ -5038,6 +5249,9 @@ export function validateNeutralPaths(files, packageJson) {
       !allowedRootFiles.has(file) &&
       !allowedGithubFiles.has(file) &&
       !allowedP1Files.has(file) &&
+      !/^supabase\/migrations\/[0-9]{14}_p1_attorney_verification_eligibility_foundation\.sql$/.test(
+        file,
+      ) &&
       !file.startsWith("governance/") &&
       !file.startsWith("tools/p0/"),
   );
