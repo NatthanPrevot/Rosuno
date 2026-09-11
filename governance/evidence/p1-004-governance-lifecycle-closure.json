@@ -4,12 +4,12 @@
   "work_item_id": "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION",
   "lifecycle": "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED",
   "lifecycle_state": {
-    "repository_closure": false,
+    "repository_closure": true,
     "staging_application": true,
     "postapplication_readonly_verification": true
   },
   "authorization": {
-    "merge_base": "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667",
+    "merge_base": "06fb7b6fe0616f724ac5cbe048b8a4a2964c6f60",
     "tree": "18b8e9031474201e274924664b2c3cb81a452a3c",
     "head": "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04",
     "pull_request": 14,
@@ -32,18 +32,28 @@
     "id": "20260910075939_p1_attorney_verification_eligibility_foundation",
     "sha256": "09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231",
     "sequence": 6,
-    "history_versions": 6
+    "history_versions": 6,
+    "history": [
+      "20260828192126_p0_restrict_rls_auto_enable_execution",
+      "20260829000015_p1_platform_foundation",
+      "20260829171701_p1_authorization_foundation",
+      "20260830023823_p1_jurisdiction_policy_launch_foundation",
+      "20260901012518_p1_authorization_scope_correction",
+      "20260910075939_p1_attorney_verification_eligibility_foundation"
+    ]
   },
   "release": {
     "id": "REL-20260910-P1-004-STAGING-APPLICATION",
-    "commit_sha": "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04",
+    "commit_sha": "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667",
     "environment": "staging",
     "project_ref": "mxjlvmowmodzdtdfgqpb",
     "migration_id": "20260910075939_p1_attorney_verification_eligibility_foundation",
     "migration_digest": "sha256:09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231",
     "evidence_link": "governance/evidence/p1-004-governance-lifecycle-closure.json",
     "supabase_cli": "2.116.0",
-    "application_exit": 0
+    "application_exit": 0,
+    "created_at": "2026-09-10T18:27:37Z",
+    "created_at_semantics": "traceability record creation"
   },
   "catalog_fingerprints": {
     "baseline": {
@@ -58,8 +68,88 @@
     },
     "scope": "baseline is the retained four-table foundation; candidate is exactly nine P1-004 relations and one approved helper",
     "membership": {
-      "foundation": ["public.staff_profiles", "public.capability_definitions", "public.capability_grants", "public.application_sessions"],
-      "candidate": ["public.attorney_profiles", "public.licenses", "public.insurance_records", "public.discipline_records", "public.practice_areas", "public.practice_area_authorisations", "public.verification_evidence", "public.eligibility_evaluations", "public.verification_evidence_subjects"]
+      "foundation": [
+        "public.staff_profiles",
+        "public.capability_definitions",
+        "public.capability_grants",
+        "public.application_sessions"
+      ],
+      "candidate": [
+        "public.attorney_profiles",
+        "public.licenses",
+        "public.insurance_records",
+        "public.discipline_records",
+        "public.practice_areas",
+        "public.practice_area_authorisations",
+        "public.verification_evidence",
+        "public.eligibility_evaluations",
+        "public.verification_evidence_subjects"
+      ]
+    },
+    "query_scopes": {
+      "foundation": {
+        "tables": [
+          "public.staff_profiles",
+          "public.capability_definitions",
+          "public.capability_grants",
+          "public.application_sessions"
+        ],
+        "functions": ["public.rls_auto_enable", "public.set_updated_at"],
+        "principals": [
+          "PUBLIC",
+          "anon",
+          "authenticated",
+          "service_role",
+          "owner"
+        ],
+        "categories": [
+          "table",
+          "column",
+          "constraint",
+          "index",
+          "foreign_key",
+          "rls",
+          "policy",
+          "trigger",
+          "function",
+          "table_privilege",
+          "function_privilege"
+        ]
+      },
+      "candidate": {
+        "tables": [
+          "public.attorney_profiles",
+          "public.licenses",
+          "public.insurance_records",
+          "public.discipline_records",
+          "public.practice_areas",
+          "public.practice_area_authorisations",
+          "public.verification_evidence",
+          "public.eligibility_evaluations",
+          "public.verification_evidence_subjects"
+        ],
+        "functions": ["public.has_manage_attorney_verification_scope"],
+        "principals": [
+          "PUBLIC",
+          "anon",
+          "authenticated",
+          "service_role",
+          "owner"
+        ],
+        "categories": [
+          "table",
+          "column",
+          "constraint",
+          "index",
+          "foreign_key",
+          "rls",
+          "policy",
+          "trigger",
+          "function",
+          "table_privilege",
+          "function_privilege"
+        ]
+      }
     }
   },
   "table_counts": {
@@ -71,12 +161,13 @@
     "zero_business_rows": true,
     "sole_seed": {
       "count": 1,
-      "description": "one capability seed only"
+      "description": "one capability seed only",
+      "capability_code": "manage_attorney_verification"
     },
     "advisor": {
       "info_count": 13,
       "warn_count": 1,
-      "warn_bound": "bounded expected migration/application observation",
+      "warn_bound": "Accepted only for the exact P1-004 helper and approved contract.",
       "unexplained_local_event": true,
       "additional_findings": 0
     },
@@ -101,7 +192,10 @@
         "target": {
           "schema": "public",
           "function": "has_manage_attorney_verification_scope",
-          "arguments": ["required_jurisdiction uuid", "allow_any_jurisdiction boolean"],
+          "arguments": [
+            "required_jurisdiction uuid",
+            "allow_any_jurisdiction boolean"
+          ],
           "language": "sql",
           "security_definer": true
         }
@@ -121,7 +215,9 @@
         "named_argument_mismatch": true,
         "regprocedure_namespace_name_exactly_one": true,
         "regprocedure": "public.has_manage_attorney_verification_scope(uuid,boolean)",
-        "database_discrepancy": false
+        "database_discrepancy": false,
+        "failed_comparison": "uuid, boolean",
+        "function_row_incorrectly_excluded": true
       },
       "contract": {
         "count": 1,
@@ -133,8 +229,14 @@
         "security_definer": true,
         "owner": "postgres",
         "search_path": "pg_catalog",
-        "execute": {"auth": true, "PUBLIC": false, "anon": false, "service_role": false},
-        "authenticated_select_capability_grants": false
+        "execute": {
+          "auth": true,
+          "PUBLIC": false,
+          "anon": false,
+          "service_role": false
+        },
+        "authenticated_select_capability_grants": false,
+        "identity_arguments": "required_jurisdiction uuid, allow_any_jurisdiction boolean"
       }
     },
     "dry_run_reproduction": {
@@ -147,10 +249,10 @@
       "persistent_change": false,
       "output_sha256": "77b9d667679a58132daf4233942a61b669cb53e748d108e9c2b38a54baf7e08b",
       "controlled_reproduction": {
-        "path": "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
         "metadata_changes": 0,
         "content_changes": 0,
-        "failed_to_reproduce": true
+        "failed_to_reproduce": true,
+        "path_changes": 0
       }
     },
     "checks": [
@@ -162,7 +264,18 @@
       "exact Advisor state",
       "helper contract and false-negative diagnosis",
       "zero-change dry-run reproduction"
-    ]
+    ],
+    "business_row_counts": {
+      "attorney_profiles": 0,
+      "licenses": 0,
+      "insurance_records": 0,
+      "discipline_records": 0,
+      "practice_areas": 0,
+      "practice_area_authorisations": 0,
+      "verification_evidence": 0,
+      "eligibility_evaluations": 0,
+      "verification_evidence_subjects": 0
+    }
   },
   "boundaries": {
     "source_absent": true,
@@ -176,7 +289,8 @@
       "explained": false,
       "attribution": null,
       "cause": null,
-      "erased": false
+      "erased": false,
+      "status": "unexplained"
     },
     "database_discrepancy": false
   },
@@ -193,5 +307,74 @@
     "production_untouched": true,
     "old_not_accessed": true,
     "sensitive_payloads_present": false
+  },
+  "database_contact": {
+    "repository_governance_closure": false,
+    "prior_separately_authorized_staging_application": true,
+    "subsequent_staging_verification": {
+      "contacted_database": true,
+      "read_only": true
+    }
+  },
+  "fresh_reconciliation": {
+    "snapshot_timestamp": "2026-09-10T22:48:00.544397Z",
+    "isolation": "REPEATABLE READ",
+    "read_only": true,
+    "meaning": "new accepted catalog reconciliation, not original application time",
+    "advisor_observed_at": "2026-09-10T22:48:41.317Z"
+  },
+  "unexpected_agent_checkpoint": {
+    "commit": "aa678911ff7fc41f630330de2a185c0bc11c4919",
+    "tree": "187a234d0fffe9bdf96d00a5c8405c349fcb54d4",
+    "parent": "cf8120776010af7c8836c8ba6d4b9736ec60012b",
+    "author": "Replit Agent",
+    "committer": "Replit Agent",
+    "author_timestamp": "2026-09-10T18:50:17Z",
+    "committer_timestamp": "2026-09-10T18:50:17Z",
+    "subject": "Update governance lifecycle evidence and add control automation tools",
+    "authorship_trailer": "Replit-Commit-Author: Agent",
+    "validation_at_discovery": {
+      "formatting_check": "failed",
+      "p0_closure_controls": "failed",
+      "full_p0_tests": "not completed",
+      "typecheck": "not completed",
+      "build": "not completed",
+      "secrets_check": "passed",
+      "dependency_security_audit": "passed",
+      "later_passing_full_validation_before_discovery_proven": false
+    },
+    "authorized_validated_commit": false,
+    "passing_full_validation_before_discovery_proven": false,
+    "pushed": false,
+    "remote_closure_branch_present_at_discovery": false,
+    "github_main_at_discovery": "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667",
+    "exact_internal_trigger_proven": false,
+    "exact_internal_trigger": null,
+    "correction_paths": [
+      "governance/evidence/p1-004-governance-lifecycle-closure.json",
+      "governance/schema-drift/baseline.json",
+      "tools/p0/lib/controls.mjs",
+      "tools/p0/tests/p0-controls.test.mjs"
+    ],
+    "observed_ref_movements": [
+      {
+        "ref": "refs/heads/replit-agent",
+        "before": "d6a6be5a1ad171b71a1a44c36090fa0f01acc08d",
+        "after": "f90d9bcce907c001c992e833ee2189724a374643",
+        "exact_reflog_timestamp": null
+      },
+      {
+        "ref": "refs/replit/agent-ledger",
+        "before": "d6a6be5a1ad171b71a1a44c36090fa0f01acc08d",
+        "after": "f90d9bcce907c001c992e833ee2189724a374643",
+        "exact_reflog_timestamp": null
+      },
+      {
+        "ref": "refs/remotes/gitsafe-backup/main",
+        "before": "03b669ce3ea1b99ac4adb428a840ae1de6d9b546",
+        "after": "aa678911ff7fc41f630330de2a185c0bc11c4919",
+        "exact_reflog_timestamp": null
+      }
+    ]
   }
 }

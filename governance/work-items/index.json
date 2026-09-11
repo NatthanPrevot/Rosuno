@@ -354,7 +354,7 @@
     {
       "work_item_id": "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION",
       "title": "P1-004 local attorney, verification and eligibility candidate",
-      "objective": "Implement, review, apply once, release, and close the authorized nine-relation P1-004 foundation with exact evidence and preserved rollback-only validation.",
+      "objective": "Implement the user-approved nine-relation contract, exact read-only capability helper, and separate pending/validated candidate governance lifecycle.",
       "in_scope": [
         "Nine approved P1-004 relations, exactly one approved read-only capability predicate, one capability seed, bounded integrity and RLS",
         "Two-file governance validator extension and P1-004 tests/evidence",
@@ -379,14 +379,12 @@
         "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
       ],
-      "decision_refs": ["DEC-20260910-P1-004-GOVERNANCE-LIFECYCLE-CLOSURE"],
+      "decision_refs": ["DEC-20260910-P1-004-BOUNDED-CANDIDATE"],
       "dependencies": ["WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
       "acceptance_criteria": [
-        "Protected review approval and merge facts are recorded exactly for PR #14.",
-        "The sequence-6 migration is reviewed and once applied only to Rosuno Staging.",
-        "Exact six-version history and both catalog fingerprint scopes are independently recorded.",
-        "The helper contract, bounded Advisor state, zero business rows, and restoration evidence are preserved.",
-        "Source/dev are absent, production is untouched, OLD is not accessed, and the unexplained .local event is recorded without attribution."
+        "Exact approved canonical start and unchanged five historical migration bytes",
+        "All local controls and bounded rollback-only security/integrity/history tests pass",
+        "Exact independent restoration proof before any final local candidate commit"
       ],
       "validation_commands": [
         "pnpm run p0:test",
@@ -404,7 +402,7 @@
       ],
       "rollback_reference": "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
       "created_at": "2026-09-10T07:59:39Z",
-      "updated_at": "2026-09-10T16:13:01Z"
+      "updated_at": "2026-09-10T18:27:37Z"
     }
   ]
 }

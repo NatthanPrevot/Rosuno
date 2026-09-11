@@ -2,9 +2,9 @@
   "version": 1,
   "product_schema_present": true,
   "baseline_id": "rosuno-staging-p1-004-20260910-v1",
-  "baseline_digest": "sha256:bd45acce67e74a35676f02ba0789be64d05753435547b086df600752bdb55957",
+  "baseline_digest": "sha256:53837aef8833e9d14e6739c54ac8b82a05b133b178b6ceaf7393fe49f0798a33",
   "checked_environment": "staging",
-  "checked_at": "2026-09-10T16:13:01Z",
+  "checked_at": "2026-09-10T22:48:00.544397Z",
   "project": {
     "name": "Rosuno Staging",
     "project_ref": "mxjlvmowmodzdtdfgqpb"
@@ -62,7 +62,7 @@
     },
     {
       "path": "governance/evidence/p1-004-governance-lifecycle-closure.json",
-      "sha256": "1c5c5bc27662b7f9d4dfa356c87c319e9e5f5ebd425766381415e7341854dffa"
+      "sha256": "0ace4c7c1b30af97d35c98d2638383d525ff66b3be74581e91c7dc9a21149a47"
     }
   ],
   "catalog_fingerprint": {

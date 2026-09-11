@@ -135,7 +135,7 @@
       "work_item_refs": [
         "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION"
       ],
-      "decision_refs": ["DEC-20260910-P1-004-GOVERNANCE-LIFECYCLE-CLOSURE"],
+      "decision_refs": ["DEC-20260910-P1-004-BOUNDED-CANDIDATE"],
       "release_refs": ["REL-20260910-P1-004-STAGING-APPLICATION"],
       "reviewed": true,
       "reviewed_by": "Rosuno",

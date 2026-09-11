@@ -4482,161 +4482,626 @@ const P1_ATTORNEY_CLOSURE_EVIDENCE_PATH =
 const P1_ATTORNEY_ID =
   /^([0-9]{14})_p1_attorney_verification_eligibility_foundation$/;
 
-export function validateP1AttorneyClosure(migration, sql, evidence) {
-  const context = "P1-004 closure";
-  requireExactFields(migration, MIGRATION_FIELDS, context);
-  if (
-    migration.sequence !== 6 ||
-    migration.reviewed !== true ||
-    migration.reviewed_by !== "Rosuno" ||
-    migration.reviewed_at !== "2026-09-10T16:09:05Z" ||
-    migration.applied_environment !== "staging" ||
-    migration.non_production_validation !== true ||
-    migration.release_refs?.join("|") !==
-      "REL-20260910-P1-004-STAGING-APPLICATION"
-  ) {
-    fail(`${context} lifecycle state is invalid`);
-  }
-  requireNonEmptyString(sql, `${context} SQL`);
-  requireExactFields(
-    evidence,
-    [
-      "version",
-      "evidence_id",
-      "work_item_id",
-      "lifecycle",
-      "lifecycle_state",
-      "authorization",
-      "migration",
-      "release",
-      "catalog_fingerprints",
-      "table_counts",
-      "validation",
-      "boundaries",
-      "historical_evidence_hashes",
-      "integrity",
+// Accepted P1-004 closure contract; changes require a separately reviewed gate.
+
+const P1004_FINAL = {
+  evidence: {
+    version: 1,
+    evidence_id: "P1-004-GOVERNANCE-LIFECYCLE-CLOSURE-20260910",
+    work_item_id: "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION",
+    lifecycle: "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED",
+    lifecycle_state: {
+      repository_closure: true,
+      staging_application: true,
+      postapplication_readonly_verification: true,
+    },
+    authorization: {
+      merge_base: "06fb7b6fe0616f724ac5cbe048b8a4a2964c6f60",
+      tree: "18b8e9031474201e274924664b2c3cb81a452a3c",
+      head: "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04",
+      pull_request: 14,
+      title: "P1-004: attorney verification and eligibility foundation",
+      review: {
+        identity: "Rosuno",
+        status: "approved",
+        review_id: "5169513513",
+        approved_at: "2026-09-10T16:09:05Z",
+      },
+      merged_at: "2026-09-10T16:13:01Z",
+      approved_head: "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04",
+      merge_commit: "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667",
+      ordered_parents: [
+        "06fb7b6fe0616f724ac5cbe048b8a4a2964c6f60",
+        "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04",
+      ],
+    },
+    migration: {
+      id: "20260910075939_p1_attorney_verification_eligibility_foundation",
+      sha256:
+        "09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231",
+      sequence: 6,
+      history_versions: 6,
+      history: [
+        "20260828192126_p0_restrict_rls_auto_enable_execution",
+        "20260829000015_p1_platform_foundation",
+        "20260829171701_p1_authorization_foundation",
+        "20260830023823_p1_jurisdiction_policy_launch_foundation",
+        "20260901012518_p1_authorization_scope_correction",
+        "20260910075939_p1_attorney_verification_eligibility_foundation",
+      ],
+    },
+    release: {
+      id: "REL-20260910-P1-004-STAGING-APPLICATION",
+      commit_sha: "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667",
+      environment: "staging",
+      project_ref: "mxjlvmowmodzdtdfgqpb",
+      migration_id:
+        "20260910075939_p1_attorney_verification_eligibility_foundation",
+      migration_digest:
+        "sha256:09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231",
+      evidence_link:
+        "governance/evidence/p1-004-governance-lifecycle-closure.json",
+      supabase_cli: "2.116.0",
+      application_exit: 0,
+      created_at: "2026-09-10T18:27:37Z",
+      created_at_semantics: "traceability record creation",
+    },
+    catalog_fingerprints: {
+      baseline: {
+        sha256:
+          "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e",
+        canonical_byte_length: 31443,
+        row_count: 102,
+      },
+      candidate: {
+        sha256:
+          "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508",
+        canonical_byte_length: 90175,
+        row_count: 279,
+      },
+      scope:
+        "baseline is the retained four-table foundation; candidate is exactly nine P1-004 relations and one approved helper",
+      membership: {
+        foundation: [
+          "public.staff_profiles",
+          "public.capability_definitions",
+          "public.capability_grants",
+          "public.application_sessions",
+        ],
+        candidate: [
+          "public.attorney_profiles",
+          "public.licenses",
+          "public.insurance_records",
+          "public.discipline_records",
+          "public.practice_areas",
+          "public.practice_area_authorisations",
+          "public.verification_evidence",
+          "public.eligibility_evaluations",
+          "public.verification_evidence_subjects",
+        ],
+      },
+      query_scopes: {
+        foundation: {
+          tables: [
+            "public.staff_profiles",
+            "public.capability_definitions",
+            "public.capability_grants",
+            "public.application_sessions",
+          ],
+          functions: ["public.rls_auto_enable", "public.set_updated_at"],
+          principals: [
+            "PUBLIC",
+            "anon",
+            "authenticated",
+            "service_role",
+            "owner",
+          ],
+          categories: [
+            "table",
+            "column",
+            "constraint",
+            "index",
+            "foreign_key",
+            "rls",
+            "policy",
+            "trigger",
+            "function",
+            "table_privilege",
+            "function_privilege",
+          ],
+        },
+        candidate: {
+          tables: [
+            "public.attorney_profiles",
+            "public.licenses",
+            "public.insurance_records",
+            "public.discipline_records",
+            "public.practice_areas",
+            "public.practice_area_authorisations",
+            "public.verification_evidence",
+            "public.eligibility_evaluations",
+            "public.verification_evidence_subjects",
+          ],
+          functions: ["public.has_manage_attorney_verification_scope"],
+          principals: [
+            "PUBLIC",
+            "anon",
+            "authenticated",
+            "service_role",
+            "owner",
+          ],
+          categories: [
+            "table",
+            "column",
+            "constraint",
+            "index",
+            "foreign_key",
+            "rls",
+            "policy",
+            "trigger",
+            "function",
+            "table_privilege",
+            "function_privilege",
+          ],
+        },
+      },
+    },
+    table_counts: {
+      candidate_tables: 9,
+      candidate_structural_tables_and_controls: 24,
+    },
+    validation: {
+      retained_rollback_only_evidence:
+        "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
+      zero_business_rows: true,
+      sole_seed: {
+        count: 1,
+        description: "one capability seed only",
+        capability_code: "manage_attorney_verification",
+      },
+      advisor: {
+        info_count: 13,
+        warn_count: 1,
+        warn_bound:
+          "Accepted only for the exact P1-004 helper and approved contract.",
+        unexplained_local_event: true,
+        additional_findings: 0,
+      },
+      advisor_findings: {
+        info: [
+          "rls_enabled_no_policy:public.application_sessions",
+          "rls_enabled_no_policy:public.capability_definitions",
+          "rls_enabled_no_policy:public.capability_grants",
+          "rls_enabled_no_policy:public.jurisdiction_regulatory_modes",
+          "rls_enabled_no_policy:public.jurisdictions",
+          "rls_enabled_no_policy:public.launch_authorizations",
+          "rls_enabled_no_policy:public.launch_gate_evaluations",
+          "rls_enabled_no_policy:public.launch_gates",
+          "rls_enabled_no_policy:public.policy_authority_references",
+          "rls_enabled_no_policy:public.policy_types",
+          "rls_enabled_no_policy:public.policy_versions",
+          "rls_enabled_no_policy:public.regulatory_modes",
+          "rls_enabled_no_policy:public.service_areas",
+        ],
+        warn: {
+          code: "authenticated_security_definer_function_executable",
+          target: {
+            schema: "public",
+            function: "has_manage_attorney_verification_scope",
+            arguments: [
+              "required_jurisdiction uuid",
+              "allow_any_jurisdiction boolean",
+            ],
+            language: "sql",
+            security_definer: true,
+          },
+        },
+        unapproved: [],
+      },
+      helper_contract: {
+        identity: "public.has_manage_attorney_verification_scope(uuid,boolean)",
+        security_definer: true,
+        stable: true,
+        search_path: "pg_catalog",
+        anon_execute: false,
+        authenticated_execute: true,
+        service_execute: false,
+        diagnosis: {
+          pg_get_function_identity_arguments:
+            "required_jurisdiction uuid, allow_any_jurisdiction boolean",
+          named_argument_mismatch: true,
+          regprocedure_namespace_name_exactly_one: true,
+          regprocedure:
+            "public.has_manage_attorney_verification_scope(uuid,boolean)",
+          database_discrepancy: false,
+          failed_comparison: "uuid, boolean",
+          function_row_incorrectly_excluded: true,
+        },
+        contract: {
+          count: 1,
+          callable:
+            "public.has_manage_attorney_verification_scope(uuid,boolean)",
+          named_arguments: ["required_jurisdiction", "allow_any_jurisdiction"],
+          return_type: "boolean",
+          language: "sql",
+          volatility: "STABLE",
+          security_definer: true,
+          owner: "postgres",
+          search_path: "pg_catalog",
+          execute: {
+            auth: true,
+            PUBLIC: false,
+            anon: false,
+            service_role: false,
+          },
+          authenticated_select_capability_grants: false,
+          identity_arguments:
+            "required_jurisdiction uuid, allow_any_jurisdiction boolean",
+        },
+      },
+      dry_run_reproduction: {
+        cli: "2.116.0",
+        exit: 0,
+        up_to_date: false,
+        migrations: [
+          "20260910075939_p1_attorney_verification_eligibility_foundation.sql",
+        ],
+        persistent_change: false,
+        output_sha256:
+          "77b9d667679a58132daf4233942a61b669cb53e748d108e9c2b38a54baf7e08b",
+        controlled_reproduction: {
+          metadata_changes: 0,
+          content_changes: 0,
+          failed_to_reproduce: true,
+          path_changes: 0,
+        },
+      },
+      checks: [
+        "exact six-version migration history",
+        "both fingerprint scopes",
+        "24/9 tables",
+        "zero business rows",
+        "sole seed",
+        "exact Advisor state",
+        "helper contract and false-negative diagnosis",
+        "zero-change dry-run reproduction",
+      ],
+      business_row_counts: {
+        attorney_profiles: 0,
+        licenses: 0,
+        insurance_records: 0,
+        discipline_records: 0,
+        practice_areas: 0,
+        practice_area_authorisations: 0,
+        verification_evidence: 0,
+        eligibility_evaluations: 0,
+        verification_evidence_subjects: 0,
+      },
+    },
+    boundaries: {
+      source_absent: true,
+      development_absent: true,
+      production_untouched: true,
+      old_accessed: false,
+      database_contacted_for_closure: false,
+      one_application_exit: 0,
+      unexplained_local_event:
+        "retained evidence records an unexplained .local event; no attribution or authorization is inferred",
+      local_state: {
+        explained: false,
+        attribution: null,
+        cause: null,
+        erased: false,
+        status: "unexplained",
+      },
+      database_discrepancy: false,
+    },
+    historical_evidence_hashes: {
+      candidate_rollback:
+        "sha256:d7bce5ae1957543a8e3f6d21476b570f90bb7ceb0b39c8d7f55850a21fb428df",
+      validation_details:
+        "sha256:9c5944113486a56321ffb42d214399df57e883504cccf5f77985c2a77130c49d",
+      p1_003:
+        "sha256:59f4facdc8115606cedf517b17f690f050b8203287289ca6735ddaa26d7c6f34",
+      p1_002_correction:
+        "sha256:4f63b0d550d5a1a589549d031a7184ec7072cd96fdbd20a47918613e0fc6136f",
+      p1_002_fingerprint:
+        "sha256:c5bb94594f8a82915ad5a9faabbee00ad90bf782914de072bee8a6a5fa333e6f",
+    },
+    integrity: {
+      historical_migrations_unchanged: true,
+      historical_evidence_unchanged: true,
+      production_untouched: true,
+      old_not_accessed: true,
+      sensitive_payloads_present: false,
+    },
+    database_contact: {
+      repository_governance_closure: false,
+      prior_separately_authorized_staging_application: true,
+      subsequent_staging_verification: {
+        contacted_database: true,
+        read_only: true,
+      },
+    },
+    fresh_reconciliation: {
+      snapshot_timestamp: "2026-09-10T22:48:00.544397Z",
+      isolation: "REPEATABLE READ",
+      read_only: true,
+      meaning:
+        "new accepted catalog reconciliation, not original application time",
+      advisor_observed_at: "2026-09-10T22:48:41.317Z",
+    },
+    unexpected_agent_checkpoint: {
+      commit: "aa678911ff7fc41f630330de2a185c0bc11c4919",
+      tree: "187a234d0fffe9bdf96d00a5c8405c349fcb54d4",
+      parent: "cf8120776010af7c8836c8ba6d4b9736ec60012b",
+      author: "Replit Agent",
+      committer: "Replit Agent",
+      author_timestamp: "2026-09-10T18:50:17Z",
+      committer_timestamp: "2026-09-10T18:50:17Z",
+      subject:
+        "Update governance lifecycle evidence and add control automation tools",
+      authorship_trailer: "Replit-Commit-Author: Agent",
+      validation_at_discovery: {
+        formatting_check: "failed",
+        p0_closure_controls: "failed",
+        full_p0_tests: "not completed",
+        typecheck: "not completed",
+        build: "not completed",
+        secrets_check: "passed",
+        dependency_security_audit: "passed",
+        later_passing_full_validation_before_discovery_proven: false,
+      },
+      authorized_validated_commit: false,
+      passing_full_validation_before_discovery_proven: false,
+      pushed: false,
+      remote_closure_branch_present_at_discovery: false,
+      github_main_at_discovery: "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667",
+      exact_internal_trigger_proven: false,
+      exact_internal_trigger: null,
+      correction_paths: [
+        "governance/evidence/p1-004-governance-lifecycle-closure.json",
+        "governance/schema-drift/baseline.json",
+        "tools/p0/lib/controls.mjs",
+        "tools/p0/tests/p0-controls.test.mjs",
+      ],
+      observed_ref_movements: [
+        {
+          ref: "refs/heads/replit-agent",
+          before: "d6a6be5a1ad171b71a1a44c36090fa0f01acc08d",
+          after: "f90d9bcce907c001c992e833ee2189724a374643",
+          exact_reflog_timestamp: null,
+        },
+        {
+          ref: "refs/replit/agent-ledger",
+          before: "d6a6be5a1ad171b71a1a44c36090fa0f01acc08d",
+          after: "f90d9bcce907c001c992e833ee2189724a374643",
+          exact_reflog_timestamp: null,
+        },
+        {
+          ref: "refs/remotes/gitsafe-backup/main",
+          before: "03b669ce3ea1b99ac4adb428a840ae1de6d9b546",
+          after: "aa678911ff7fc41f630330de2a185c0bc11c4919",
+          exact_reflog_timestamp: null,
+        },
+      ],
+    },
+  },
+  migration: {
+    migration_id:
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+    migration_kind: "product",
+    sequence: 6,
+    artifact_path:
+      "supabase/migrations/20260910075939_p1_attorney_verification_eligibility_foundation.sql",
+    authority_refs: [
+      "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+      "DOMAIN-MODEL-V1.4-LOCKED",
+      "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+      "SCHEMA-INVENTORY-V0.7-LOCKED",
+      "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+      "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
     ],
-    context,
-  );
-  if (
-    evidence.lifecycle !==
-      "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED" ||
-    evidence.lifecycle_state?.repository_closure !== false ||
-    evidence.lifecycle_state?.staging_application !== true ||
-    evidence.lifecycle_state?.postapplication_readonly_verification !== true ||
-    evidence.work_item_id !==
-      "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION" ||
-    evidence.authorization.pull_request !== 14 ||
-    evidence.authorization.merge_base !==
-      "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667" ||
-    evidence.authorization.tree !==
-      "18b8e9031474201e274924664b2c3cb81a452a3c" ||
-    evidence.authorization.review.identity !== "Rosuno" ||
-    evidence.authorization.review.status !== "approved" ||
-    evidence.authorization.approved_head !==
-      "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04" ||
-    evidence.authorization.merge_commit !==
-      "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667" ||
-    evidence.authorization.ordered_parents?.join("|") !==
-      "06fb7b6fe0616f724ac5cbe048b8a4a2964c6f60|a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04" ||
-    evidence.authorization.review.review_id !== "5169513513" ||
-    evidence.authorization.review.approved_at !== "2026-09-10T16:09:05Z" ||
-    evidence.authorization.merged_at !== "2026-09-10T16:13:01Z" ||
-    evidence.migration.sha256 !==
-      createHash("sha256").update(sql).digest("hex") ||
-    evidence.migration.sequence !== 6 ||
-    evidence.migration.history_versions !== 6 ||
-    evidence.release.id !== "REL-20260910-P1-004-STAGING-APPLICATION" ||
-    evidence.release.commit_sha !==
-      "a4712f5f092c1c6e44b04ff5fb5fe1ffba926e04" ||
-    evidence.release.migration_id !==
-      "20260910075939_p1_attorney_verification_eligibility_foundation" ||
-    evidence.release.migration_digest !==
-      "sha256:09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231" ||
-    evidence.release.evidence_link !== P1_ATTORNEY_CLOSURE_EVIDENCE_PATH ||
-    evidence.release.project_ref !== "mxjlvmowmodzdtdfgqpb" ||
-    evidence.release.supabase_cli !== "2.116.0" ||
-    evidence.release.application_exit !== 0 ||
-    evidence.migration.id !==
-      "20260910075939_p1_attorney_verification_eligibility_foundation" ||
-    evidence.catalog_fingerprints.baseline.sha256 !==
-      "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e" ||
-    evidence.catalog_fingerprints.baseline.canonical_byte_length !== 31443 ||
-    evidence.catalog_fingerprints.baseline.row_count !== 102 ||
-    evidence.catalog_fingerprints.candidate.sha256 !==
-      "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508" ||
-    evidence.catalog_fingerprints.candidate.canonical_byte_length !== 90175 ||
-    evidence.catalog_fingerprints.candidate.row_count !== 279 ||
-    evidence.catalog_fingerprints.scope !==
-      "baseline is the retained four-table foundation; candidate is exactly nine P1-004 relations and one approved helper" ||
-    evidence.catalog_fingerprints.membership?.foundation?.join("|") !==
-      "public.staff_profiles|public.capability_definitions|public.capability_grants|public.application_sessions" ||
-    evidence.catalog_fingerprints.membership?.candidate?.join("|") !==
-      "public.attorney_profiles|public.licenses|public.insurance_records|public.discipline_records|public.practice_areas|public.practice_area_authorisations|public.verification_evidence|public.eligibility_evaluations|public.verification_evidence_subjects" ||
-    evidence.table_counts.candidate_tables !== 9 ||
-    evidence.table_counts.candidate_structural_tables_and_controls !== 24 ||
-    evidence.validation.advisor.info_count !== 13 ||
-    evidence.validation.advisor.warn_count !== 1 ||
-    evidence.validation.advisor_findings?.info?.join("|") !==
-      "rls_enabled_no_policy:public.application_sessions|rls_enabled_no_policy:public.capability_definitions|rls_enabled_no_policy:public.capability_grants|rls_enabled_no_policy:public.jurisdiction_regulatory_modes|rls_enabled_no_policy:public.jurisdictions|rls_enabled_no_policy:public.launch_authorizations|rls_enabled_no_policy:public.launch_gate_evaluations|rls_enabled_no_policy:public.launch_gates|rls_enabled_no_policy:public.policy_authority_references|rls_enabled_no_policy:public.policy_types|rls_enabled_no_policy:public.policy_versions|rls_enabled_no_policy:public.regulatory_modes|rls_enabled_no_policy:public.service_areas" ||
-    evidence.validation.advisor_findings?.warn?.code !==
-      "authenticated_security_definer_function_executable" ||
-    evidence.validation.advisor_findings?.warn?.target?.schema !== "public" ||
-    evidence.validation.advisor_findings?.warn?.target?.function !==
-      "has_manage_attorney_verification_scope" ||
-    evidence.validation.advisor_findings?.warn?.target?.arguments?.join("|") !==
-      "required_jurisdiction uuid|allow_any_jurisdiction boolean" ||
-    evidence.validation.advisor_findings?.warn?.target?.language !== "sql" ||
-    evidence.validation.advisor_findings?.warn?.target?.security_definer !== true ||
-    evidence.validation.advisor_findings?.unapproved?.length !== 0 ||
-    evidence.validation.helper_contract?.count !== 1 ||
-    evidence.validation.helper_contract?.callable !==
-      "public.has_manage_attorney_verification_scope(uuid,boolean)" ||
-    evidence.validation.helper_contract?.named_arguments?.join("|") !==
-      "required_jurisdiction|allow_any_jurisdiction" ||
-    evidence.validation.helper_contract?.return_type !== "boolean" ||
-    evidence.validation.helper_contract?.language !== "sql" ||
-    evidence.validation.helper_contract?.volatility !== "STABLE" ||
-    evidence.validation.helper_contract?.security_definer !== true ||
-    evidence.validation.helper_contract?.owner !== "postgres" ||
-    evidence.validation.helper_contract?.search_path !== "pg_catalog" ||
-    evidence.validation.helper_contract?.execute?.auth !== true ||
-    evidence.validation.helper_contract?.execute?.PUBLIC !== false ||
-    evidence.validation.helper_contract?.execute?.anon !== false ||
-    evidence.validation.helper_contract?.execute?.service_role !== false ||
-    evidence.validation.helper_contract?.authenticated_select_capability_grants !== false ||
-    evidence.validation.helper_contract?.diagnosis?.pg_get_function_identity_arguments !==
-      "required_jurisdiction uuid, allow_any_jurisdiction boolean" ||
-    evidence.validation.helper_contract?.diagnosis?.named_argument_mismatch !== true ||
-    evidence.validation.helper_contract?.diagnosis?.regprocedure_namespace_name_exactly_one !== true ||
-    evidence.validation.helper_contract?.diagnosis?.database_discrepancy !== false ||
-    evidence.validation.controlled_reproduction?.metadata_changes !== 0 ||
-    evidence.validation.controlled_reproduction?.content_changes !== 0 ||
-    evidence.validation.controlled_reproduction?.failed_to_reproduce !== true ||
-    evidence.boundaries.local_state?.explained !== false ||
-    evidence.validation.zero_business_rows !== true ||
-    evidence.validation.sole_seed?.count !== 1 ||
-    evidence.boundaries.source_absent !== true ||
-    evidence.boundaries.development_absent !== true ||
-    evidence.boundaries.production_untouched !== true ||
-    evidence.boundaries.old_accessed !== false ||
-    evidence.boundaries.database_contacted_for_closure !== false ||
-    evidence.boundaries.database_discrepancy !== false ||
-    evidence.boundaries.local_state?.explained !== false ||
-    evidence.boundaries.local_state?.attribution !== null ||
-    evidence.boundaries.local_state?.cause !== null ||
-    evidence.boundaries.local_state?.erased !== false ||
-    evidence.historical_evidence_hashes?.candidate_rollback !==
-      "sha256:d7bce5ae1957543a8e3f6d21476b570f90bb7ceb0b39c8d7f55850a21fb428df" ||
-    evidence.historical_evidence_hashes?.validation_details !==
-      "sha256:9c5944113486a56321ffb42d214399df57e883504cccf5f77985c2a77130c49d" ||
-    evidence.integrity.historical_migrations_unchanged !== true ||
-    evidence.integrity.historical_evidence_unchanged !== true
-  ) {
-    fail(`${context} evidence facts are invalid`);
+    work_item_refs: ["WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION"],
+    decision_refs: ["DEC-20260910-P1-004-BOUNDED-CANDIDATE"],
+    release_refs: ["REL-20260910-P1-004-STAGING-APPLICATION"],
+    reviewed: true,
+    reviewed_by: "Rosuno",
+    reviewed_at: "2026-09-10T16:09:05Z",
+    applied_environment: "staging",
+    non_production_validation: true,
+    drift_check:
+      "Rosuno Staging persistent application passed exact six-version history, both catalog fingerprint scopes, zero business rows, exact Advisor state, and bounded closure checks.",
+    rollback_plan:
+      "If a later independently verified defect requires Staging rollback, remove only the sequence-6 migration through a separately reviewed non-production rollback migration; never edit migration history directly or alter P0/P1-001/P1-002/P1-003 controls.",
+    depends_on: ["20260901012518_p1_authorization_scope_correction"],
+  },
+  decision: {
+    decision_id: "DEC-20260910-P1-004-BOUNDED-CANDIDATE",
+    title: "Implement the approved bounded P1-004 local candidate",
+    status: "accepted",
+    scope:
+      "Original authorization: bounded local P1-004 implementation only. Current accepted lifecycle records later separately authorized gates.",
+    decision:
+      "Implement the supplied approved startup contract plus the user-approved narrow validator extension and exactly public.has_manage_attorney_verification_scope(uuid, boolean). These are implementation-level decisions; no higher authority is altered.",
+    rationale:
+      "The original implementation decision did not authorize PR creation, review, merge, persistent Staging application, release, or repository closure. Those later events occurred under separate explicit gates and are recorded in the closure evidence. Immutable candidate and rollback-only evidence preserve the original implementation history.",
+    authority_refs: [
+      "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+      "DOMAIN-MODEL-V1.4-LOCKED",
+      "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+      "SCHEMA-INVENTORY-V0.7-LOCKED",
+      "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+      "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+    ],
+    work_item_refs: ["WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION"],
+    owner: "Rosuno P1-004 technical builder",
+    reviewer: {
+      identity: "Rosuno",
+      status: "approved",
+    },
+    created_at: "2026-09-10T07:59:39Z",
+    updated_at: "2026-09-10T18:27:37Z",
+    supersedes: [],
+    impact:
+      "Records current accepted P1-004 lifecycle completion without broadening the original local implementation authorization. Later review, merge, Staging application, release, and governance closure remain separately authorized events; no production, OLD, or later-work authorization is granted.",
+    evidence: [
+      "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
+      "supabase/migrations/20260910075939_p1_attorney_verification_eligibility_foundation.sql",
+      "governance/evidence/p1-004-governance-lifecycle-closure.json",
+      "governance/releases/traceability.json",
+      "governance/schema-drift/baseline.json",
+    ],
+    expiry: null,
+  },
+  work: {
+    work_item_id: "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION",
+    title: "P1-004 local attorney, verification and eligibility candidate",
+    objective:
+      "Implement the user-approved nine-relation contract, exact read-only capability helper, and separate pending/validated candidate governance lifecycle.",
+    in_scope: [
+      "Nine approved P1-004 relations, exactly one approved read-only capability predicate, one capability seed, bounded integrity and RLS",
+      "Two-file governance validator extension and P1-004 tests/evidence",
+      "Rollback-only validation on mxjlvmowmodzdtdfgqpb followed by exact restoration",
+    ],
+    out_of_scope: [
+      "Push, PR, review, merge, release, persistent Staging application",
+      "Source/dev DDL, production, OLD, P1-005+, other helpers or relations",
+    ],
+    status: "completed",
+    owner: "Rosuno P1-004 technical builder",
+    reviewer: {
+      identity: "Rosuno",
+      status: "approved",
+    },
+    priority: "P1",
+    authority_refs: [
+      "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+      "DOMAIN-MODEL-V1.4-LOCKED",
+      "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+      "SCHEMA-INVENTORY-V0.7-LOCKED",
+      "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+      "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+    ],
+    decision_refs: ["DEC-20260910-P1-004-BOUNDED-CANDIDATE"],
+    dependencies: ["WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
+    acceptance_criteria: [
+      "Exact approved canonical start and unchanged five historical migration bytes",
+      "All local controls and bounded rollback-only security/integrity/history tests pass",
+      "Exact independent restoration proof before any final local candidate commit",
+    ],
+    validation_commands: [
+      "pnpm run p0:test",
+      "pnpm run p0:validate",
+      "pnpm run format:check",
+      "pnpm run typecheck",
+      "pnpm run build",
+      "pnpm run dependency:check",
+      "pnpm run secrets:check",
+    ],
+    environment: "staging",
+    release_refs: ["REL-20260910-P1-004-STAGING-APPLICATION"],
+    migration_refs: [
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+    ],
+    rollback_reference:
+      "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
+    created_at: "2026-09-10T07:59:39Z",
+    updated_at: "2026-09-10T18:27:37Z",
+  },
+  release: {
+    release_id: "REL-20260910-P1-004-STAGING-APPLICATION",
+    commit_sha: "4dfc3b2b6e83f5a5bc9f54ef108f88306827c667",
+    work_item_refs: ["WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION"],
+    decision_refs: ["DEC-20260910-P1-004-BOUNDED-CANDIDATE"],
+    migration_refs: [
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+    ],
+    validation_evidence: [
+      "governance/evidence/p1-004-governance-lifecycle-closure.json",
+      "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
+      "supabase/migrations/20260910075939_p1_attorney_verification_eligibility_foundation.sql",
+      "pnpm run p0:validate",
+      "pnpm run p0:test",
+    ],
+    artifact_digest:
+      "sha256:09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231",
+    environment: "staging",
+    reviewer: {
+      identity: "Rosuno",
+      status: "approved",
+    },
+    rollback_reference:
+      "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
+    created_at: "2026-09-10T18:27:37Z",
+  },
+  protectedHashes: {
+    "supabase/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.sql":
+      "2ba591b2767c43a32731c8b74b5ffaa07c47a41d096eee6fb3672aad9278c49d",
+    "supabase/migrations/20260829000015_p1_platform_foundation.sql":
+      "67dfd44b2bd7525a588e6eb59c33a0056f3a5c67eec5f45dd93e6aab37f7afc8",
+    "supabase/migrations/20260829171701_p1_authorization_foundation.sql":
+      "6471ac68949234e29ae1cc492eaa2f77dc15ca010998f72898284b8c9a855fec",
+    "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql":
+      "94e9b746cf303154790bc51e8160f9184b2e9765e82ec2702e03030f7a79b7ee",
+    "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql":
+      "bf0cdabed8ffa41a65e793b9041c00dc7d2ca47eeef40c2750770e195b47d6c5",
+    "supabase/migrations/20260910075939_p1_attorney_verification_eligibility_foundation.sql":
+      "09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231",
+    "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json":
+      "d7bce5ae1957543a8e3f6d21476b570f90bb7ceb0b39c8d7f55850a21fb428df",
+    "governance/evidence/p1-004-validation-details.json":
+      "9c5944113486a56321ffb42d214399df57e883504cccf5f77985c2a77130c49d",
+  },
+};
+
+function p1004Exact(actual, expected, location) {
+  if (expected === null || typeof expected !== "object") {
+    if (actual !== expected) fail(`P1-004 ${location}: unexpected value`);
+    return;
   }
-  if (scanSecretLikeText(JSON.stringify(evidence), context).length > 0)
-    fail(`${context} contains a secret-like value`);
+  if (Array.isArray(expected)) {
+    if (!Array.isArray(actual) || actual.length !== expected.length)
+      fail(`P1-004 ${location}: array length/type mismatch`);
+    expected.forEach((value, index) =>
+      p1004Exact(actual[index], value, `${location}[${index}]`),
+    );
+    return;
+  }
+  if (actual === null || typeof actual !== "object" || Array.isArray(actual))
+    fail(`P1-004 ${location}: expected object`);
+  const keys = Object.keys(expected).sort();
+  if (JSON.stringify(Object.keys(actual).sort()) !== JSON.stringify(keys))
+    fail(`P1-004 ${location}: field set mismatch`);
+  for (const key of keys)
+    p1004Exact(actual[key], expected[key], `${location}.${key}`);
+}
+
+function p1004Unique(records, field, value) {
+  const found = records.filter((x) => x[field] === value);
+  if (found.length !== 1)
+    fail(`P1-004 ${field}: missing or duplicate ${value}`);
+  return found[0];
+}
+
+export function validateP1AttorneyClosure(migration, sql, evidence) {
+  p1004Exact(migration, P1004_FINAL.migration, "migration");
+  p1004Exact(evidence, P1004_FINAL.evidence, "evidence");
+  if (
+    createHash("sha256").update(sql).digest("hex") !==
+    P1004_FINAL.evidence.migration.sha256
+  )
+    fail("P1-004 migration SQL digest mismatch");
+  for (const [relative, expected] of Object.entries(
+    P1004_FINAL.protectedHashes,
+  )) {
+    const actual = createHash("sha256")
+      .update(readFileSync(path.join(ROOT, relative)))
+      .digest("hex");
+    if (actual !== expected) fail(`P1-004 protected bytes: ${relative}`);
+  }
+  if (scanSecretLikeText(JSON.stringify(evidence), "P1-004 closure").length)
+    fail("P1-004 closure contains a secret-like value");
 }
 
 export function validateP1AttorneyClosureTraceability(
@@ -4645,46 +5110,21 @@ export function validateP1AttorneyClosureTraceability(
   decisions,
   releases,
 ) {
-  const migration = migrations.migrations.find(
-    (entry) =>
-      entry.migration_id ===
-      "20260910075939_p1_attorney_verification_eligibility_foundation",
-  );
-  const workItem = workItems.work_items.find(
-    (entry) =>
-      entry.work_item_id ===
-      "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION",
-  );
-  const decision = decisions.decisions.find(
-    (entry) =>
-      entry.decision_id === "DEC-20260910-P1-004-GOVERNANCE-LIFECYCLE-CLOSURE",
-  );
-  const release = releases.releases.find(
-    (entry) => entry.release_id === "REL-20260910-P1-004-STAGING-APPLICATION",
-  );
-  if (
-    !migration ||
-    migration.reviewed !== true ||
-    migration.applied_environment !== "staging" ||
-    migration.release_refs?.join("|") !==
-      "REL-20260910-P1-004-STAGING-APPLICATION" ||
-    !workItem ||
-    workItem.status !== "completed" ||
-    workItem.reviewer?.identity !== "Rosuno" ||
-    workItem.reviewer?.status !== "approved" ||
-    !decision ||
-    decision.status !== "accepted" ||
-    decision.reviewer?.identity !== "Rosuno" ||
-    decision.reviewer?.status !== "approved" ||
-    !release ||
-    release.environment !== "staging" ||
-    release.reviewer?.identity !== "Rosuno" ||
-    release.reviewer?.status !== "approved" ||
-    release.migration_refs?.join("|") !==
-      "20260910075939_p1_attorney_verification_eligibility_foundation"
-  ) {
-    fail("P1-004 accepted closure traceability is invalid");
+  for (const [records, field, expected, label] of [
+    [migrations.migrations, "migration_id", P1004_FINAL.migration, "migration"],
+    [workItems.work_items, "work_item_id", P1004_FINAL.work, "work item"],
+    [decisions.decisions, "decision_id", P1004_FINAL.decision, "decision"],
+    [releases.releases, "release_id", P1004_FINAL.release, "release"],
+  ]) {
+    p1004Exact(p1004Unique(records, field, expected[field]), expected, label);
   }
+  if (
+    decisions.decisions.some(
+      (x) =>
+        x.decision_id === "DEC-20260910-P1-004-GOVERNANCE-LIFECYCLE-CLOSURE",
+    )
+  )
+    fail("P1-004 duplicate closure decision remains");
 }
 
 // This predicate classifies only the explicitly authorized local candidate.
@@ -5141,7 +5581,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     (!closedP1004 && report.baseline_id !== FOUNDATION_BASELINE_ID) ||
     report.checked_environment !== "staging" ||
     (closedP1004
-      ? report.checked_at !== "2026-09-10T16:13:01Z"
+      ? report.checked_at !== "2026-09-10T22:48:00.544397Z"
       : report.checked_at !== P1_AUTHORIZATION_CORRECTION_VALIDATED_AT) ||
     report.project?.name !== "Rosuno Staging" ||
     report.project?.project_ref !== "mxjlvmowmodzdtdfgqpb"
@@ -5189,6 +5629,8 @@ export function validateDriftReport(report, migrationRegister = null) {
   ) {
     fail("schema drift migration inventory contradicts the reviewed register");
   }
+  if (closedP1004 && register.migrations.length !== 6)
+    fail("P1-004 baseline requires six migrations");
   if (register.migrations.length === 6) {
     // Historical disposable fixtures already validate their isolated
     // five-migration inventory through the caller; only the live closure

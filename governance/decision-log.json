@@ -185,10 +185,10 @@
     {
       "decision_id": "DEC-20260910-P1-004-BOUNDED-CANDIDATE",
       "title": "Implement the approved bounded P1-004 local candidate",
-      "status": "proposed",
-      "scope": "P1-004 local implementation only; candidate awaits designated human PR review.",
+      "status": "accepted",
+      "scope": "Original authorization: bounded local P1-004 implementation only. Current accepted lifecycle records later separately authorized gates.",
       "decision": "Implement the supplied approved startup contract plus the user-approved narrow validator extension and exactly public.has_manage_attorney_verification_scope(uuid, boolean). These are implementation-level decisions; no higher authority is altered.",
-      "rationale": "Preserve the five-migration persistent Staging foundation while representing one unreviewed/unapplied sequence-6 candidate truthfully. The approved predicate reads live capability grants without granting authenticated table access.",
+      "rationale": "The original implementation decision did not authorize PR creation, review, merge, persistent Staging application, release, or repository closure. Those later events occurred under separate explicit gates and are recorded in the closure evidence. Immutable candidate and rollback-only evidence preserve the original implementation history.",
       "authority_refs": [
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
         "DOMAIN-MODEL-V1.4-LOCKED",
@@ -202,47 +202,16 @@
       ],
       "owner": "Rosuno P1-004 technical builder",
       "reviewer": {
-        "identity": "pending designated human PR review",
-        "status": "pending"
-      },
-      "created_at": "2026-09-10T07:59:39Z",
-      "updated_at": "2026-09-10T07:59:39Z",
-      "supersedes": [],
-      "impact": "Exactly nine relations; mutable subject linkage with immutable independent historical evaluations; no write API, push, PR, merge, release or persistent application.",
-      "evidence": [
-        "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
-        "supabase/migrations/20260910075939_p1_attorney_verification_eligibility_foundation.sql"
-      ],
-      "expiry": null
-    },
-    {
-      "decision_id": "DEC-20260910-P1-004-GOVERNANCE-LIFECYCLE-CLOSURE",
-      "title": "Accept P1-004 attorney verification and eligibility foundation closure",
-      "status": "accepted",
-      "scope": "P1-004 attorney verification and eligibility foundation; reviewed Rosuno Staging application",
-      "decision": "Accept the protected-review-approved sequence-6 product migration and its one-time persistent Rosuno Staging application as the P1-004 foundation. Close the lifecycle with exact evidence, release traceability, and the six-version baseline while preserving rollback-only evidence and all production boundaries.",
-      "rationale": "PR #14 was approved by Rosuno at 2026-09-10T16:09:05Z and merged at 2026-09-10T16:13:01Z. Staging evidence records the supplied migration digest, both catalog fingerprint scopes, the exact Advisor result of 13 INFO and one bounded WARN, zero business rows, and no source/dev, production, or OLD access.",
-      "authority_refs": [
-        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
-        "DOMAIN-MODEL-V1.4-LOCKED",
-        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
-        "SCHEMA-INVENTORY-V0.7-LOCKED",
-        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
-        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
-      ],
-      "work_item_refs": [
-        "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION"
-      ],
-      "owner": "P1 implementation owner",
-      "reviewer": {
         "identity": "Rosuno",
         "status": "approved"
       },
       "created_at": "2026-09-10T07:59:39Z",
-      "updated_at": "2026-09-10T16:13:01Z",
-      "supersedes": ["DEC-20260910-P1-004-BOUNDED-CANDIDATE"],
-      "impact": "Records accepted, reviewed, merged, and once-applied P1-004 in Rosuno Staging only; production remains untouched and no OLD access occurred.",
+      "updated_at": "2026-09-10T18:27:37Z",
+      "supersedes": [],
+      "impact": "Records current accepted P1-004 lifecycle completion without broadening the original local implementation authorization. Later review, merge, Staging application, release, and governance closure remain separately authorized events; no production, OLD, or later-work authorization is granted.",
       "evidence": [
+        "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
+        "supabase/migrations/20260910075939_p1_attorney_verification_eligibility_foundation.sql",
         "governance/evidence/p1-004-governance-lifecycle-closure.json",
         "governance/releases/traceability.json",
         "governance/schema-drift/baseline.json"
