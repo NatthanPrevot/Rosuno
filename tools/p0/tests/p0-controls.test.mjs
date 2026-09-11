@@ -35,6 +35,8 @@ import {
   validateP1AuthorizationLifecycleTraceability,
   validateP1AuthorizationMigration,
   validateP1ApplicationTraceability,
+  validateP1AttorneyClosure,
+  validateP1AttorneyClosureTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
   validateP1RegulatoryCatalog,
@@ -48,6 +50,358 @@ import {
   validateTraceabilityConsistency,
   validateWorkItem,
 } from "../lib/controls.mjs";
+
+test("P1-004 accepted closure requires exact lifecycle evidence and traceability", () => {
+  const migration = readJson(
+    "governance/migrations/reviewed-migrations.json",
+  ).migrations.at(-1);
+  const evidence = readJson(
+    "governance/evidence/p1-004-governance-lifecycle-closure.json",
+  );
+  const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+  assert.doesNotThrow(() =>
+    validateP1AttorneyClosure(migration, sql, evidence),
+  );
+  const stale = structuredClone(evidence);
+  stale.release.application_exit = 1;
+  assert.throws(() => validateP1AttorneyClosure(migration, sql, stale));
+  const registers = {
+    migrations: readJson("governance/migrations/reviewed-migrations.json"),
+    workItems: readJson("governance/work-items/index.json"),
+    decisions: readJson("governance/decision-log.json"),
+    releases: readJson("governance/releases/traceability.json"),
+  };
+  assert.doesNotThrow(() =>
+    validateP1AttorneyClosureTraceability(
+      registers.migrations,
+      registers.workItems,
+      registers.decisions,
+      registers.releases,
+    ),
+  );
+});
+
+test("P1-004 closure rejects each independently mutated governed fact", () => {
+  const migration = readJson(
+    "governance/migrations/reviewed-migrations.json",
+  ).migrations.at(-1);
+  const evidence = readJson(
+    "governance/evidence/p1-004-governance-lifecycle-closure.json",
+  );
+  const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+  const mutations = [
+    [
+      "decision",
+      (e) => {
+        e.lifecycle = "ACCEPTED";
+      },
+    ],
+    [
+      "work item",
+      (e) => {
+        e.work_item_id = "stale";
+      },
+    ],
+    [
+      "reviewer",
+      (e) => {
+        e.authorization.review.identity = "other";
+      },
+    ],
+    [
+      "reviewed",
+      (e) => {
+        e.lifecycle_state.postapplication_readonly_verification = false;
+      },
+    ],
+    [
+      "reviewed_by",
+      (e) => {
+        e.authorization.review.status = "pending";
+      },
+    ],
+    [
+      "review id",
+      (e) => {
+        e.authorization.review.review_id = "x";
+      },
+    ],
+    [
+      "review time",
+      (e) => {
+        e.authorization.review.approved_at = "2026-01-01T00:00:00Z";
+      },
+    ],
+    [
+      "applied",
+      (e) => {
+        e.lifecycle_state.staging_application = false;
+      },
+    ],
+    [
+      "release",
+      (e) => {
+        e.release.id = "wrong";
+      },
+    ],
+    [
+      "head",
+      (e) => {
+        e.authorization.approved_head = "wrong";
+      },
+    ],
+    [
+      "merge",
+      (e) => {
+        e.authorization.merge_commit = "wrong";
+      },
+    ],
+    [
+      "tree",
+      (e) => {
+        e.authorization.tree = "wrong";
+      },
+    ],
+    [
+      "parent",
+      (e) => {
+        e.authorization.ordered_parents[0] = "wrong";
+      },
+    ],
+    [
+      "release environment",
+      (e) => {
+        e.release.environment = "production";
+      },
+    ],
+    [
+      "release commit",
+      (e) => {
+        e.release.commit_sha = "wrong";
+      },
+    ],
+    [
+      "migration digest",
+      (e) => {
+        e.migration.sha256 = "wrong";
+      },
+    ],
+    [
+      "INFO missing",
+      (e) => {
+        e.validation.advisor_findings.info.pop();
+      },
+    ],
+    [
+      "INFO substitute",
+      (e) => {
+        e.validation.advisor_findings.info[0] = "wrong";
+      },
+    ],
+    [
+      "INFO duplicate",
+      (e) => {
+        e.validation.advisor_findings.info.push(
+          e.validation.advisor_findings.info[0],
+        );
+      },
+    ],
+    [
+      "WARN code",
+      (e) => {
+        e.validation.advisor_findings.warn.code = "wrong";
+      },
+    ],
+    [
+      "WARN target",
+      (e) => {
+        e.validation.advisor_findings.warn.target.function = "wrong";
+      },
+    ],
+    [
+      "second warning",
+      (e) => {
+        e.validation.advisor.warn_count = 2;
+      },
+    ],
+    [
+      "unapproved",
+      (e) => {
+        e.validation.advisor_findings.unapproved.push("unexpected");
+      },
+    ],
+    [
+      "helper count",
+      (e) => {
+        e.validation.helper_contract.contract.count = 2;
+      },
+    ],
+    [
+      "helper callable",
+      (e) => {
+        e.validation.helper_contract.contract.callable = "wrong";
+      },
+    ],
+    [
+      "helper named args",
+      (e) => {
+        e.validation.helper_contract.contract.named_arguments[0] = "wrong";
+      },
+    ],
+    [
+      "helper return",
+      (e) => {
+        e.validation.helper_contract.contract.return_type = "text";
+      },
+    ],
+    [
+      "helper language",
+      (e) => {
+        e.validation.helper_contract.contract.language = "plpgsql";
+      },
+    ],
+    [
+      "helper volatility",
+      (e) => {
+        e.validation.helper_contract.contract.volatility = "VOLATILE";
+      },
+    ],
+    [
+      "helper security",
+      (e) => {
+        e.validation.helper_contract.contract.security_definer = false;
+      },
+    ],
+    [
+      "helper owner",
+      (e) => {
+        e.validation.helper_contract.contract.owner = "wrong";
+      },
+    ],
+    [
+      "helper path",
+      (e) => {
+        e.validation.helper_contract.contract.search_path = "public";
+      },
+    ],
+    [
+      "helper execute",
+      (e) => {
+        e.validation.helper_contract.contract.execute.auth = false;
+      },
+    ],
+    [
+      "helper table select",
+      (e) => {
+        e.validation.helper_contract.contract.authenticated_select_capability_grants = true;
+      },
+    ],
+    [
+      "baseline digest",
+      (e) => {
+        e.catalog_fingerprints.baseline.sha256 = "wrong";
+      },
+    ],
+    [
+      "baseline bytes",
+      (e) => {
+        e.catalog_fingerprints.baseline.canonical_byte_length++;
+      },
+    ],
+    [
+      "baseline rows",
+      (e) => {
+        e.catalog_fingerprints.baseline.row_count++;
+      },
+    ],
+    [
+      "baseline membership",
+      (e) => {
+        e.catalog_fingerprints.membership.foundation[0] = "wrong";
+      },
+    ],
+    [
+      "candidate digest",
+      (e) => {
+        e.catalog_fingerprints.candidate.sha256 = "wrong";
+      },
+    ],
+    [
+      "candidate bytes",
+      (e) => {
+        e.catalog_fingerprints.candidate.canonical_byte_length++;
+      },
+    ],
+    [
+      "candidate rows",
+      (e) => {
+        e.catalog_fingerprints.candidate.row_count++;
+      },
+    ],
+    [
+      "candidate membership",
+      (e) => {
+        e.catalog_fingerprints.membership.candidate[0] = "wrong";
+      },
+    ],
+    [
+      "historical candidate",
+      (e) => {
+        e.historical_evidence_hashes.candidate_rollback = "wrong";
+      },
+    ],
+    [
+      "validation hash",
+      (e) => {
+        e.historical_evidence_hashes.validation_details = "wrong";
+      },
+    ],
+    [
+      "local explained",
+      (e) => {
+        e.boundaries.local_state.explained = true;
+      },
+    ],
+    [
+      "local attribution",
+      (e) => {
+        e.boundaries.local_state.attribution = "someone";
+      },
+    ],
+    [
+      "local cause",
+      (e) => {
+        e.boundaries.local_state.cause = "reason";
+      },
+    ],
+    [
+      "local erased",
+      (e) => {
+        e.boundaries.local_state.erased = true;
+      },
+    ],
+    [
+      "local counts",
+      (e) => {
+        e.validation.dry_run_reproduction.controlled_reproduction.content_changes = 1;
+      },
+    ],
+    [
+      "database closure",
+      (e) => {
+        e.boundaries.database_contacted_for_closure = true;
+      },
+    ],
+  ];
+  for (const [label, mutate] of mutations) {
+    const candidate = structuredClone(evidence);
+    mutate(candidate);
+    assert.throws(
+      () => validateP1AttorneyClosure(migration, sql, candidate),
+      label,
+    );
+  }
+});
 
 function readJson(relativePath) {
   return JSON.parse(readFileSync(path.join(ROOT, relativePath), "utf8"));
@@ -1608,6 +1962,22 @@ test("P1-004 local overlay preserves the exact five-migration foundation", async
         rollback_validation: null,
       };
       const report = readJson("governance/schema-drift/baseline.json");
+      // Historical candidate fixtures intentionally validate against the
+      // retained five-migration baseline, not the live accepted closure.
+      report.baseline_id = "rosuno-staging-foundation-20260901-v1";
+      report.baseline_digest =
+        "sha256:6bb6920c2d418d27d0c406399c79ad1be2d9705f30ca2d6d364e54211d3156e8";
+      report.checked_at = "2026-09-01T18:27:41.110779Z";
+      report.migration_inventory = report.migration_inventory.slice(0, 5);
+      report.accepted_evidence = report.accepted_evidence.slice(0, 3);
+      report.evidence = report.evidence.slice(0, 3);
+      report.catalog_fingerprint = {
+        format: "rosuno-p1-catalog-v1",
+        sha256:
+          "72825bbbfe9d8f0bdbbc4bb7967d8a343f552a0db104cc62f2e6b2fabae4323e",
+        canonical_byte_length: 31443,
+        row_count: 102,
+      };
       const validate = () => {
         writeFileSync(
           path.join(
@@ -1623,7 +1993,14 @@ test("P1-004 local overlay preserves the exact five-migration foundation", async
         )
           .trim()
           .split("\n");
-        controls.validateMigrationRegister(register, {}, files);
+        // Keep the fixture's discovered inventory limited to migration
+        // artifacts; the disposable checkout intentionally has no index.
+        const migrationFiles = files.filter(
+          (file) =>
+            file.startsWith("governance/migrations/") ||
+            file.startsWith("supabase/migrations/"),
+        );
+        controls.validateMigrationRegister(register, {}, migrationFiles);
         controls.validateDriftReport(report, register);
       };
       await run({
@@ -1803,4 +2180,185 @@ test("P1-004 local overlay preserves the exact five-migration foundation", async
         assert.throws(f.validate, /rollback/);
       }),
   );
+});
+
+// Every scalar and collection in the final closure contract is independently
+// mutated. Mutation happens outside assert.throws, so a defective mutator fails.
+function p1004Mutations(value, route = []) {
+  const result = [];
+  if (value !== null && typeof value === "object") {
+    result.push([route, Array.isArray(value) ? {} : []]);
+    if (Array.isArray(value)) {
+      result.push([
+        route,
+        [...value, value.length ? structuredClone(value[0]) : "unexpected"],
+      ]);
+      if (value.length) result.push([route, value.slice(1)]);
+    } else {
+      result.push([route, { ...value, unapproved_field: true }]);
+      for (const key of Object.keys(value)) {
+        const missing = structuredClone(value);
+        delete missing[key];
+        result.push([route, missing]);
+      }
+    }
+    for (const [key, child] of Object.entries(value))
+      result.push(...p1004Mutations(child, [...route, key]));
+  } else {
+    result.push([
+      route,
+      typeof value === "boolean"
+        ? !value
+        : typeof value === "number"
+          ? value + 1
+          : value === null
+            ? "unproven"
+            : "mutated",
+    ]);
+  }
+  return result;
+}
+function p1004Changed(value, route, replacement) {
+  if (!route.length) return structuredClone(replacement);
+  const copy = structuredClone(value);
+  let target = copy;
+  for (const key of route.slice(0, -1)) target = target[key];
+  target[route.at(-1)] = structuredClone(replacement);
+  return copy;
+}
+test("P1-004 closure rejects every independent evidence mutation", async (t) => {
+  const evidence = readJson(
+    "governance/evidence/p1-004-governance-lifecycle-closure.json",
+  );
+  const migration = readJson(
+    "governance/migrations/reviewed-migrations.json",
+  ).migrations.at(-1);
+  const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+  assert.doesNotThrow(() =>
+    validateP1AttorneyClosure(migration, sql, evidence),
+  );
+  for (const [i, [route, replacement]] of p1004Mutations(evidence).entries()) {
+    await t.test(String(i) + ":" + route.join("."), () => {
+      const altered = p1004Changed(evidence, route, replacement);
+      assert.throws(() => validateP1AttorneyClosure(migration, sql, altered));
+    });
+  }
+});
+test("P1-004 closure rejects every independent lifecycle record mutation", async (t) => {
+  const registers = [
+    readJson("governance/migrations/reviewed-migrations.json"),
+    readJson("governance/work-items/index.json"),
+    readJson("governance/decision-log.json"),
+    readJson("governance/releases/traceability.json"),
+  ];
+  const selectors = [
+    [
+      "migrations",
+      "migration_id",
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+    ],
+    [
+      "work_items",
+      "work_item_id",
+      "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION",
+    ],
+    ["decisions", "decision_id", "DEC-20260910-P1-004-BOUNDED-CANDIDATE"],
+    ["releases", "release_id", "REL-20260910-P1-004-STAGING-APPLICATION"],
+  ];
+  assert.doesNotThrow(() =>
+    validateP1AttorneyClosureTraceability(...registers),
+  );
+  for (const [slot, [collection, key, id]] of selectors.entries()) {
+    const index = registers[slot][collection].findIndex((x) => x[key] === id);
+    assert.notEqual(index, -1);
+    const record = registers[slot][collection][index];
+    for (const [i, [route, replacement]] of p1004Mutations(record).entries()) {
+      await t.test(collection + ":" + i + ":" + route.join("."), () => {
+        const altered = structuredClone(registers);
+        altered[slot][collection][index] = p1004Changed(
+          record,
+          route,
+          replacement,
+        );
+        assert.throws(() => validateP1AttorneyClosureTraceability(...altered));
+      });
+    }
+    await t.test(collection + ":duplicate", () => {
+      const altered = structuredClone(registers);
+      altered[slot][collection].push(structuredClone(record));
+      assert.throws(() => validateP1AttorneyClosureTraceability(...altered));
+    });
+  }
+  const duplicate = structuredClone(registers);
+  duplicate[2].decisions.push({
+    ...duplicate[2].decisions.find((x) => x.decision_id === selectors[2][2]),
+    decision_id: "DEC-20260910-P1-004-GOVERNANCE-LIFECYCLE-CLOSURE",
+  });
+  assert.throws(() => validateP1AttorneyClosureTraceability(...duplicate));
+});
+test("P1-004 closed baseline rejects its specific governed-value mutations", async (t) => {
+  const baseline = readJson("governance/schema-drift/baseline.json");
+  const register = readJson("governance/migrations/reviewed-migrations.json");
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-004-20260910-v1");
+  assert.equal(baseline.checked_at, "2026-09-10T22:48:00.544397Z");
+  assert.equal(baseline.migration_inventory.length, 6);
+  assert.doesNotThrow(() => validateDriftReport(baseline, register));
+
+  const mutations = [
+    [
+      "checked_at",
+      (x) => {
+        x.checked_at = "2026-09-10T16:13:01Z";
+      },
+    ],
+    [
+      "candidate SHA",
+      (x) => {
+        x.catalog_fingerprint.sha256 = "0".repeat(64);
+      },
+    ],
+    [
+      "candidate bytes",
+      (x) => {
+        x.catalog_fingerprint.canonical_byte_length++;
+      },
+    ],
+    [
+      "candidate rows",
+      (x) => {
+        x.catalog_fingerprint.row_count++;
+      },
+    ],
+    [
+      "six-migration inventory",
+      (x) => {
+        x.migration_inventory.pop();
+      },
+    ],
+    [
+      "closure evidence SHA",
+      (x) => {
+        const item = x.accepted_evidence.find(
+          (y) =>
+            y.path ===
+            "governance/evidence/p1-004-governance-lifecycle-closure.json",
+        );
+        assert.ok(item);
+        item.sha256 = "0".repeat(64);
+      },
+    ],
+    [
+      "baseline digest",
+      (x) => {
+        x.baseline_digest = "sha256:" + "0".repeat(64);
+      },
+    ],
+  ];
+  for (const [label, mutate] of mutations) {
+    await t.test(label, () => {
+      const altered = structuredClone(baseline);
+      mutate(altered);
+      assert.throws(() => validateDriftReport(altered, register), label);
+    });
+  }
 });

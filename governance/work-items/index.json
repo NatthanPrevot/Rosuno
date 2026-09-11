@@ -364,11 +364,11 @@
         "Push, PR, review, merge, release, persistent Staging application",
         "Source/dev DDL, production, OLD, P1-005+, other helpers or relations"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "owner": "Rosuno P1-004 technical builder",
       "reviewer": {
-        "identity": "pending designated human PR review",
-        "status": "pending"
+        "identity": "Rosuno",
+        "status": "approved"
       },
       "priority": "P1",
       "authority_refs": [
@@ -395,14 +395,14 @@
         "pnpm run dependency:check",
         "pnpm run secrets:check"
       ],
-      "environment": "none",
-      "release_refs": [],
+      "environment": "staging",
+      "release_refs": ["REL-20260910-P1-004-STAGING-APPLICATION"],
       "migration_refs": [
         "20260910075939_p1_attorney_verification_eligibility_foundation"
       ],
       "rollback_reference": "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
       "created_at": "2026-09-10T07:59:39Z",
-      "updated_at": "2026-09-10T07:59:39Z"
+      "updated_at": "2026-09-10T18:27:37Z"
     }
   ]
 }
