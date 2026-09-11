@@ -5333,6 +5333,7 @@ export function validateMigrationRegister(
   for (const [index, migration] of register.migrations.entries()) {
     const context = `migration ${index + 1}`;
     let acceptedP1AttorneyCandidate = false;
+    let acceptedP1ClientIntakeCandidate = false;
     requireExactFields(migration, MIGRATION_FIELDS, context);
     if (!["security_control", "product"].includes(migration.migration_kind)) {
       fail(`${context}.migration_kind is not allowed`);
@@ -5416,6 +5417,13 @@ export function validateMigrationRegister(
       } else if (P1_ATTORNEY_ID.test(migration.migration_id)) {
         readP1AttorneyCandidate(migration);
         acceptedP1AttorneyCandidate = true;
+      } else if (P1_CLIENT_INTAKE_ID.test(migration.migration_id)) {
+        const candidateSql = readFileSync(
+          path.join(ROOT, migration.artifact_path),
+          "utf8",
+        );
+        validateP1ClientIntakeCandidate(migration, candidateSql);
+        acceptedP1ClientIntakeCandidate = true;
       } else {
         fail(`${context}.artifact_path is outside the authorized P1 slice`);
       }
@@ -5471,6 +5479,7 @@ export function validateMigrationRegister(
     if (
       migration.applied_environment === "none" &&
       !acceptedP1AttorneyCandidate &&
+      !acceptedP1ClientIntakeCandidate &&
       (migration.migration_kind !== "product" ||
         migration.non_production_validation !== true)
     ) {
@@ -5495,7 +5504,8 @@ export function validateMigrationRegister(
       !acceptedP1AuthorizationToolingException &&
       !acceptedP1RegulatoryToolingException &&
       !acceptedP1AuthorizationCorrectionValidation &&
-      !acceptedP1AttorneyCandidate
+      !acceptedP1AttorneyCandidate &&
+      !acceptedP1ClientIntakeCandidate
     ) {
       fail(`${context} lacks a clean drift check`);
     }
@@ -5615,7 +5625,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     readJson("governance/migrations/reviewed-migrations.json");
   if (
     register.product_migrations_present !== true ||
-    ![5, 6].includes(register.migrations?.length) ||
+    ![5, 6, 7].includes(register.migrations?.length) ||
     register.migrations
       .slice(0, 5)
       .some(
@@ -5629,8 +5639,10 @@ export function validateDriftReport(report, migrationRegister = null) {
   ) {
     fail("schema drift migration inventory contradicts the reviewed register");
   }
-  if (closedP1004 && register.migrations.length !== 6)
-    fail("P1-004 baseline requires six migrations");
+  if (closedP1004 && ![6, 7].includes(register.migrations.length))
+    fail(
+      "P1-004 baseline requires six accepted migrations plus at most one bounded overlay",
+    );
   if (register.migrations.length === 6) {
     // Historical disposable fixtures already validate their isolated
     // five-migration inventory through the caller; only the live closure
@@ -5640,6 +5652,13 @@ export function validateDriftReport(report, migrationRegister = null) {
     } else {
       readP1AttorneyCandidate(register.migrations[5]);
     }
+  }
+  if (register.migrations.length === 7) {
+    if (!closedP1004)
+      fail(
+        "P1-005 overlay requires the accepted six-migration P1-004 baseline",
+      );
+    validateMigrationRegister(register, {}, repositoryFiles());
   }
   for (const artifact of FOUNDATION_BASELINE_MIGRATIONS) {
     const digest = createHash("sha256")
@@ -5946,6 +5965,9 @@ export function validateNeutralPaths(files, packageJson) {
       !/^supabase\/migrations\/[0-9]{14}_p1_attorney_verification_eligibility_foundation\.sql$/.test(
         file,
       ) &&
+      !/^supabase\/migrations\/[0-9]{14}_p1_client_intake_ai_foundation\.sql$/.test(
+        file,
+      ) &&
       !file.startsWith("governance/") &&
       !file.startsWith("tools/p0/"),
   );
@@ -6111,6 +6133,12 @@ export function validateRepository() {
     decisions,
     releases,
   );
+  validateP1ClientIntakeTraceability(
+    migrations,
+    workItems,
+    decisions,
+    releases,
+  );
   validateP1RegulatoryTraceability(migrations, workItems, decisions, releases);
   validateP1AuthorizationCorrectionTraceability(
     migrations,
@@ -6150,3 +6178,300 @@ export function scanRepositoryForSecrets() {
 }
 
 export { ROOT };
+
+/* P1-005 bounded local candidate controls.
+ * These controls classify only the explicitly authorized unreviewed/unapplied
+ * sequence-7 overlay. They do not alter the accepted six-migration baseline.
+ */
+const P1_CLIENT_INTAKE_ID = /^([0-9]{14})_p1_client_intake_ai_foundation$/;
+const P1_CLIENT_INTAKE_MIGRATION_ID =
+  "20260911062917_p1_client_intake_ai_foundation";
+const P1_CLIENT_INTAKE_MIGRATION_PATH =
+  "supabase/migrations/20260911062917_p1_client_intake_ai_foundation.sql";
+const P1_CLIENT_INTAKE_MIGRATION_SHA256 =
+  "13be2baeaa808d38a5e209071c94a9c9565fbd1280aeae0395abc50502e2b375";
+const P1_CLIENT_INTAKE_MIGRATION_BYTES = 8590;
+const P1_CLIENT_INTAKE_DECISION_ID = "DEC-20260911-P1-005-BOUNDED-CANDIDATE";
+const P1_CLIENT_INTAKE_WORK_ITEM_ID = "WI-P1-005-CLIENT-INTAKE-AI-FOUNDATION";
+const P1_CLIENT_INTAKE_DEPENDENCY_ID =
+  "20260910075939_p1_attorney_verification_eligibility_foundation";
+const P1_CLIENT_INTAKE_DEPENDENCY_WORK_ITEM =
+  "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION";
+const P1_CLIENT_INTAKE_PENDING_DRIFT =
+  "Not yet executed. This is an unreviewed, unapplied local candidate; no database validation or persistent application has occurred.";
+const P1_CLIENT_INTAKE_ROLLBACK =
+  "A separately authorized rollback-only Rosuno Staging validation must execute the candidate and fixtures in one transaction ending explicitly in ROLLBACK, then independently prove exact restoration of the accepted six-migration baseline before any candidate commit is authorized.";
+const P1_CLIENT_INTAKE_AUTHORITY_REFS = [
+  "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+  "DOMAIN-MODEL-V1.4-LOCKED",
+  "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+  "SCHEMA-INVENTORY-V0.7-LOCKED",
+  "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+  "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+];
+
+export function validateP1ClientIntakeCandidate(migration, sql) {
+  const context = "P1-005 migration";
+
+  requireExactFields(migration, MIGRATION_FIELDS, context);
+
+  if (
+    !P1_CLIENT_INTAKE_ID.test(migration.migration_id) ||
+    migration.migration_id !== P1_CLIENT_INTAKE_MIGRATION_ID
+  ) {
+    fail("P1-005 migration id is not the authorized sequence-7 candidate");
+  }
+
+  if (migration.sequence !== 7) fail("P1-005 migration sequence must be 7");
+
+  if (migration.migration_kind !== "product")
+    fail("P1-005 migration kind must be product");
+
+  if (migration.artifact_path !== P1_CLIENT_INTAKE_MIGRATION_PATH)
+    fail("P1-005 artifact path mismatch");
+
+  requireStringArrayExact(
+    migration.authority_refs,
+    P1_CLIENT_INTAKE_AUTHORITY_REFS,
+    "P1-005 authority_refs",
+  );
+  requireStringArrayExact(
+    migration.work_item_refs,
+    [P1_CLIENT_INTAKE_WORK_ITEM_ID],
+    "P1-005 work_item_refs",
+  );
+  requireStringArrayExact(
+    migration.decision_refs,
+    [P1_CLIENT_INTAKE_DECISION_ID],
+    "P1-005 decision_refs",
+  );
+  requireStringArrayExact(migration.release_refs, [], "P1-005 release_refs");
+  requireStringArrayExact(
+    migration.depends_on,
+    [P1_CLIENT_INTAKE_DEPENDENCY_ID],
+    "P1-005 depends_on",
+  );
+
+  if (migration.reviewed !== false)
+    fail("P1-005 local candidate must remain unreviewed");
+
+  if (migration.reviewed_by !== "pending designated human PR review")
+    fail("P1-005 reviewer must remain pending");
+
+  if (migration.reviewed_at !== null)
+    fail("P1-005 reviewed_at must remain null");
+
+  if (migration.applied_environment !== "none")
+    fail("P1-005 applied_environment must remain none");
+
+  if (migration.non_production_validation !== false)
+    fail("P1-005 validation must remain false before the validation gate");
+
+  if (migration.drift_check !== P1_CLIENT_INTAKE_PENDING_DRIFT)
+    fail("P1-005 pending drift text mismatch");
+
+  if (migration.rollback_plan !== P1_CLIENT_INTAKE_ROLLBACK)
+    fail("P1-005 rollback plan mismatch");
+
+  if (Buffer.byteLength(sql, "utf8") !== P1_CLIENT_INTAKE_MIGRATION_BYTES)
+    fail("P1-005 migration byte length mismatch");
+
+  const digest = createHash("sha256").update(sql).digest("hex");
+  if (digest !== P1_CLIENT_INTAKE_MIGRATION_SHA256)
+    fail("P1-005 migration SHA-256 mismatch");
+
+  const createdTables = [...sql.matchAll(/create table public\.(\w+)/gi)].map(
+    (match) => match[1],
+  );
+
+  if (
+    JSON.stringify(createdTables) !==
+    JSON.stringify([
+      "client_profiles",
+      "intakes",
+      "ai_suggestions",
+      "jurisdiction_assessments",
+    ])
+  ) {
+    fail("P1-005 migration table scope mismatch");
+  }
+
+  if (/create\s+(?:or replace\s+)?function/i.test(sql))
+    fail("P1-005 must not create a function");
+
+  if (/insert into public\./i.test(sql))
+    fail("P1-005 must not seed public data");
+
+  return "pending";
+}
+
+export function validateP1ClientIntakeTraceability(
+  migrations,
+  workItems,
+  decisions,
+  releases,
+) {
+  const migrationRecords = migrations.migrations;
+  const workItemRecords = workItems.work_items;
+  const decisionRecords = decisions.decisions;
+  const releaseRecords = releases.releases;
+
+  if (!Array.isArray(migrationRecords))
+    fail("P1-005 migration register is malformed");
+  if (!Array.isArray(workItemRecords))
+    fail("P1-005 work-item register is malformed");
+  if (!Array.isArray(decisionRecords))
+    fail("P1-005 decision register is malformed");
+  if (!Array.isArray(releaseRecords))
+    fail("P1-005 release register is malformed");
+
+  const exactlyOne = (records, field, value, label) => {
+    const found = records.filter((record) => record[field] === value);
+    if (found.length !== 1)
+      fail(`P1-005 ${label}: missing or duplicate ${value}`);
+    return found[0];
+  };
+
+  const migration = exactlyOne(
+    migrationRecords,
+    "migration_id",
+    P1_CLIENT_INTAKE_MIGRATION_ID,
+    "migration",
+  );
+
+  const migrationSql = readFileSync(
+    path.join(ROOT, migration.artifact_path),
+    "utf8",
+  );
+  validateP1ClientIntakeCandidate(migration, migrationSql);
+
+  const decision = exactlyOne(
+    decisionRecords,
+    "decision_id",
+    P1_CLIENT_INTAKE_DECISION_ID,
+    "decision",
+  );
+
+  requireExactFields(decision, DECISION_FIELDS, "P1-005 decision");
+
+  if (decision.status !== "proposed")
+    fail("P1-005 decision must remain proposed");
+
+  if (decision.owner !== "Rosuno P1-005 technical builder")
+    fail("P1-005 decision owner mismatch");
+
+  if (
+    JSON.stringify(decision.reviewer) !==
+    JSON.stringify({
+      identity: "pending designated human PR review",
+      status: "pending",
+    })
+  ) {
+    fail("P1-005 decision reviewer mismatch");
+  }
+
+  requireStringArrayExact(
+    decision.authority_refs,
+    P1_CLIENT_INTAKE_AUTHORITY_REFS,
+    "P1-005 decision authority_refs",
+  );
+  requireStringArrayExact(
+    decision.work_item_refs,
+    [P1_CLIENT_INTAKE_WORK_ITEM_ID],
+    "P1-005 decision work_item_refs",
+  );
+  requireStringArrayExact(
+    decision.supersedes,
+    [],
+    "P1-005 decision supersedes",
+  );
+  requireStringArrayExact(
+    decision.evidence,
+    [P1_CLIENT_INTAKE_MIGRATION_PATH],
+    "P1-005 decision evidence",
+  );
+
+  if (decision.expiry !== null) fail("P1-005 decision expiry must remain null");
+
+  requireTimestamp(decision.created_at, "P1-005 decision.created_at");
+  requireTimestamp(decision.updated_at, "P1-005 decision.updated_at");
+
+  if (decision.created_at !== decision.updated_at)
+    fail("P1-005 pending decision timestamps must match");
+
+  const workItem = exactlyOne(
+    workItemRecords,
+    "work_item_id",
+    P1_CLIENT_INTAKE_WORK_ITEM_ID,
+    "work item",
+  );
+
+  requireExactFields(workItem, WORK_ITEM_FIELDS, "P1-005 work item");
+
+  if (workItem.status !== "in_progress")
+    fail("P1-005 work item must remain in_progress");
+
+  if (workItem.owner !== "Rosuno P1-005 technical builder")
+    fail("P1-005 work item owner mismatch");
+
+  if (
+    JSON.stringify(workItem.reviewer) !==
+    JSON.stringify({
+      identity: "pending designated human PR review",
+      status: "pending",
+    })
+  ) {
+    fail("P1-005 work item reviewer mismatch");
+  }
+
+  if (workItem.priority !== "P1") fail("P1-005 work item priority mismatch");
+
+  if (workItem.environment !== "none")
+    fail("P1-005 work item environment must remain none");
+
+  requireStringArrayExact(
+    workItem.authority_refs,
+    P1_CLIENT_INTAKE_AUTHORITY_REFS,
+    "P1-005 work item authority_refs",
+  );
+  requireStringArrayExact(
+    workItem.decision_refs,
+    [P1_CLIENT_INTAKE_DECISION_ID],
+    "P1-005 work item decision_refs",
+  );
+  requireStringArrayExact(
+    workItem.dependencies,
+    [P1_CLIENT_INTAKE_DEPENDENCY_WORK_ITEM],
+    "P1-005 work item dependencies",
+  );
+  requireStringArrayExact(
+    workItem.release_refs,
+    [],
+    "P1-005 work item release_refs",
+  );
+  requireStringArrayExact(
+    workItem.migration_refs,
+    [P1_CLIENT_INTAKE_MIGRATION_ID],
+    "P1-005 work item migration_refs",
+  );
+
+  if (workItem.rollback_reference !== "tools/p0/p1-005-rollback.mjs")
+    fail("P1-005 work item rollback reference mismatch");
+
+  requireTimestamp(workItem.created_at, "P1-005 work item.created_at");
+  requireTimestamp(workItem.updated_at, "P1-005 work item.updated_at");
+
+  if (workItem.created_at !== workItem.updated_at)
+    fail("P1-005 pending work-item timestamps must match");
+
+  const leakedRelease = releaseRecords.some(
+    (release) =>
+      release.migration_refs?.includes(P1_CLIENT_INTAKE_MIGRATION_ID) ||
+      release.work_item_refs?.includes(P1_CLIENT_INTAKE_WORK_ITEM_ID) ||
+      release.decision_refs?.includes(P1_CLIENT_INTAKE_DECISION_ID),
+  );
+
+  if (leakedRelease) fail("P1-005 local candidate must not have a release");
+
+  return true;
+}

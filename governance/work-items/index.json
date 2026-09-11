@@ -403,6 +403,70 @@
       "rollback_reference": "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
       "created_at": "2026-09-10T07:59:39Z",
       "updated_at": "2026-09-10T18:27:37Z"
+    },
+    {
+      "work_item_id": "WI-P1-005-CLIENT-INTAKE-AI-FOUNDATION",
+      "title": "P1-005 Client / Intake / Jurisdiction Assessment / AI foundation",
+      "objective": "Implement the authority-defined four-relation Client / Intake / Jurisdiction Assessment / AI Suggestion database foundation while preserving jurisdiction provenance, Intake continuity, least privilege, and human authority over consequential decisions.",
+      "in_scope": [
+        "public.client_profiles, public.intakes, public.jurisdiction_assessments, and public.ai_suggestions only",
+        "Server-generated UUID and timestamp behavior required by the approved physical contract",
+        "Restrictive foreign keys, exact bounded checks and indexes, immediate RLS, relationship-based authenticated SELECT, and least-privilege service_role ACLs",
+        "Reuse of public.set_updated_at() only for client_profiles and intakes",
+        "Local contract and rollback-only validation tooling, with database execution reserved for a separately authorized gate"
+      ],
+      "out_of_scope": [
+        "Commit, push, PR, review, merge, release, or persistent Staging application",
+        "Database-connected validation during this implementation gate",
+        "Generic AI context tables or polymorphic FK triggers",
+        "New staff capabilities or capability seeds",
+        "Automatic 90-day Intake expiry policy",
+        "Intake content/version tables or later revision model",
+        "Referrals, scheduling, bookings, consultations, communications, payments, compliance, production, OLD, P1-006, or later work"
+      ],
+      "status": "in_progress",
+      "owner": "Rosuno P1-005 technical builder",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260911-P1-005-BOUNDED-CANDIDATE"],
+      "dependencies": [
+        "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION"
+      ],
+      "acceptance_criteria": [
+        "Exact synchronized canonical start at ba7ac95c7667200472badb768b4062bbc3d63a66 and unchanged six historical migration bytes",
+        "Exactly four approved P1-005 relations in one sequence-7 migration and no unauthorized relation, helper, capability, seed, or later-phase object",
+        "Intake states are exactly draft, submitted, active, expired, superseded, and closed, with no automatic 90-day expiry default",
+        "Jurisdiction Assessments preserve Intake/Jurisdiction provenance and AI Suggestions remain non-authoritative advisory records",
+        "Authenticated access is SELECT-only and relationship-scoped to the owning client; attorney status alone grants no Intake, Assessment, or AI access",
+        "service_role mutation privileges match the bounded table/column contract and no target table grants DELETE",
+        "Future separately authorized rollback-only Staging validation proves exact restoration before any candidate commit is authorized"
+      ],
+      "validation_commands": [
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": ["20260911062917_p1_client_intake_ai_foundation"],
+      "rollback_reference": "tools/p0/p1-005-rollback.mjs",
+      "created_at": "2026-09-11T06:29:18Z",
+      "updated_at": "2026-09-11T06:29:18Z"
     }
   ]
 }

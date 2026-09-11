@@ -217,6 +217,36 @@
         "governance/schema-drift/baseline.json"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260911-P1-005-BOUNDED-CANDIDATE",
+      "title": "Implement the bounded P1-005 Client / Intake / AI local candidate",
+      "status": "proposed",
+      "scope": "P1-005 local repository implementation only; no review, merge, database validation, persistent application, production activity, or later work.",
+      "decision": "Implement exactly client_profiles, intakes, jurisdiction_assessments, and ai_suggestions using the user-approved P1-005 physical decision-gate resolutions. These are implementation-level decisions only and do not alter higher locked authority.",
+      "rationale": "The locked Migration 5 slice requires the four-relation Client / Intake / Jurisdiction Assessment / AI foundation. The bounded implementation preserves Intake continuity, historical assessment provenance, relationship-based client reads, least privilege, and AI-as-suggestion-only boundaries without inventing later-phase tables, staff capabilities, expiry policy, generic AI context tables, or authoritative AI transitions.",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-005-CLIENT-INTAKE-AI-FOUNDATION"],
+      "owner": "Rosuno P1-005 technical builder",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "created_at": "2026-09-11T06:29:18Z",
+      "updated_at": "2026-09-11T06:29:18Z",
+      "supersedes": [],
+      "impact": "Exactly four P1-005 foundation relations in one unreviewed/unapplied local sequence-7 candidate. No capability seed, release, database validation, persistent application, production mutation, OLD access, or P1-006+ authorization.",
+      "evidence": [
+        "supabase/migrations/20260911062917_p1_client_intake_ai_foundation.sql"
+      ],
+      "expiry": null
     }
   ]
 }

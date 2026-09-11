@@ -145,6 +145,33 @@
       "drift_check": "Rosuno Staging persistent application passed exact six-version history, both catalog fingerprint scopes, zero business rows, exact Advisor state, and bounded closure checks.",
       "rollback_plan": "If a later independently verified defect requires Staging rollback, remove only the sequence-6 migration through a separately reviewed non-production rollback migration; never edit migration history directly or alter P0/P1-001/P1-002/P1-003 controls.",
       "depends_on": ["20260901012518_p1_authorization_scope_correction"]
+    },
+    {
+      "migration_id": "20260911062917_p1_client_intake_ai_foundation",
+      "migration_kind": "product",
+      "sequence": 7,
+      "artifact_path": "supabase/migrations/20260911062917_p1_client_intake_ai_foundation.sql",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-005-CLIENT-INTAKE-AI-FOUNDATION"],
+      "decision_refs": ["DEC-20260911-P1-005-BOUNDED-CANDIDATE"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": false,
+      "drift_check": "Not yet executed. This is an unreviewed, unapplied local candidate; no database validation or persistent application has occurred.",
+      "rollback_plan": "A separately authorized rollback-only Rosuno Staging validation must execute the candidate and fixtures in one transaction ending explicitly in ROLLBACK, then independently prove exact restoration of the accepted six-migration baseline before any candidate commit is authorized.",
+      "depends_on": [
+        "20260910075939_p1_attorney_verification_eligibility_foundation"
+      ]
     }
   ]
 }
