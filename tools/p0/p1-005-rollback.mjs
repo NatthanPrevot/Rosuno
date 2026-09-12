@@ -1,5 +1,6 @@
 // Generates rollback-only P1-005 validation SQL. This module never connects to a database.
 import { writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import {
   columns,
   required,
@@ -706,6 +707,10 @@ export function buildRollbackValidation() {
   };
 }
 
-if (process.argv[2]) {
+const invokedDirectly =
+  typeof process.argv[1] === "string" &&
+  pathToFileURL(process.argv[1]).href === import.meta.url;
+
+if (invokedDirectly && process.argv[2]) {
   writeFileSync(process.argv[2], buildRollbackValidation().sql);
 }

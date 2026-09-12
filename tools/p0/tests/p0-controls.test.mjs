@@ -104,6 +104,49 @@ test("P1-005 pending local candidate requires exact bounded lifecycle and six-mi
   );
 });
 
+test("P1-005 rollback generator is import-safe and direct CLI remains functional", () => {
+  const temp = mkdtempSync(
+    path.join(tmpdir(), "rosuno-p1-005-rollback-import-"),
+  );
+  const directTarget = path.join(temp, "direct.sql");
+
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        'await import("./tools/p0/p1-005-rollback.mjs");',
+        "importer-placeholder",
+        temp,
+      ],
+      {
+        cwd: ROOT,
+        stdio: "pipe",
+      },
+    );
+
+    execFileSync(
+      process.execPath,
+      [path.join(ROOT, "tools/p0/p1-005-rollback.mjs"), directTarget],
+      {
+        cwd: ROOT,
+        stdio: "pipe",
+      },
+    );
+
+    const generated = readFileSync(directTarget, "utf8");
+
+    assert.match(generated, /^BEGIN;\n/);
+    assert.match(generated, /\nROLLBACK;\n$/);
+  } finally {
+    rmSync(temp, {
+      recursive: true,
+      force: true,
+    });
+  }
+});
+
 test("P1-004 accepted closure requires exact lifecycle evidence and traceability", () => {
   const migration = readJson(
     "governance/migrations/reviewed-migrations.json",
