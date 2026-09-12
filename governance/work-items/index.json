@@ -424,11 +424,11 @@
         "Intake content/version tables or later revision model",
         "Referrals, scheduling, bookings, consultations, communications, payments, compliance, production, OLD, P1-006, or later work"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "owner": "Rosuno P1-005 technical builder",
       "reviewer": {
-        "identity": "pending designated human PR review",
-        "status": "pending"
+        "identity": "Rosuno",
+        "status": "approved"
       },
       "priority": "P1",
       "authority_refs": [
@@ -461,12 +461,12 @@
         "pnpm run secrets:check",
         "pnpm run dependency:check"
       ],
-      "environment": "none",
-      "release_refs": [],
+      "environment": "staging",
+      "release_refs": ["REL-20260912-P1-005-STAGING-APPLICATION"],
       "migration_refs": ["20260911062917_p1_client_intake_ai_foundation"],
       "rollback_reference": "tools/p0/p1-005-rollback.mjs",
       "created_at": "2026-09-11T06:29:18Z",
-      "updated_at": "2026-09-11T06:29:18Z"
+      "updated_at": "2026-09-12T22:31:52Z"
     }
   ]
 }

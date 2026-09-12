@@ -39,6 +39,7 @@ import {
   validateP1AttorneyClosure,
   validateP1AttorneyClosureTraceability,
   validateP1ClientIntakeCandidate,
+  validateP1ClientIntakeClosure,
   validateP1ClientIntakeTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
@@ -54,7 +55,7 @@ import {
   validateWorkItem,
 } from "../lib/controls.mjs";
 
-test("P1-005 pending local candidate requires exact bounded lifecycle and six-migration baseline overlay", () => {
+test("P1-005 accepted closure requires exact lifecycle evidence and seven-migration baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -72,9 +73,17 @@ test("P1-005 pending local candidate requires exact bounded lifecycle and six-mi
     "utf8",
   );
 
+  const evidence = readJson(
+    "governance/evidence/p1-005-governance-lifecycle-closure.json",
+  );
+
   assert.equal(
     validateP1ClientIntakeCandidate(migration, migrationSql),
-    "pending",
+    "closed",
+  );
+
+  assert.doesNotThrow(() =>
+    validateP1ClientIntakeClosure(migration, migrationSql, evidence),
   );
 
   assert.doesNotThrow(() =>
@@ -88,13 +97,43 @@ test("P1-005 pending local candidate requires exact bounded lifecycle and six-mi
 
   const baseline = readJson("governance/schema-drift/baseline.json");
 
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-005-20260912-v1");
+  assert.equal(baseline.migration_inventory.length, 7);
+  assert.equal(
+    baseline.catalog_fingerprint.sha256,
+    "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
+  );
+  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 231062);
+  assert.equal(baseline.catalog_fingerprint.row_count, 744);
+
   assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
 
-  const wrongDependency = structuredClone(migration);
-  wrongDependency.depends_on = [];
+  const staleEvidence = structuredClone(evidence);
+  staleEvidence.fingerprints.final_28_table.sha256 = "0".repeat(64);
 
   assert.throws(() =>
-    validateP1ClientIntakeCandidate(wrongDependency, migrationSql),
+    validateP1ClientIntakeClosure(migration, migrationSql, staleEvidence),
+  );
+
+  const staleMigration = structuredClone(migration);
+  staleMigration.applied_environment = "none";
+
+  assert.throws(() =>
+    validateP1ClientIntakeClosure(staleMigration, migrationSql, evidence),
+  );
+
+  const staleReleases = structuredClone(releases);
+  staleReleases.releases.find(
+    (item) => item.release_id === "REL-20260912-P1-005-STAGING-APPLICATION",
+  ).commit_sha = "0".repeat(40);
+
+  assert.throws(() =>
+    validateP1ClientIntakeTraceability(
+      migrations,
+      workItems,
+      decisions,
+      staleReleases,
+    ),
   );
 
   assert.throws(() =>
@@ -2439,11 +2478,114 @@ test("P1-004 closure rejects every independent lifecycle record mutation", async
   assert.throws(() => validateP1AttorneyClosureTraceability(...duplicate));
 });
 test("P1-004 closed baseline rejects its specific governed-value mutations", async (t) => {
-  const baseline = readJson("governance/schema-drift/baseline.json");
   const register = readJson("governance/migrations/reviewed-migrations.json");
+
+  const baseline = {
+    version: 1,
+    product_schema_present: true,
+    baseline_id: "rosuno-staging-p1-004-20260910-v1",
+    baseline_digest:
+      "sha256:53837aef8833e9d14e6739c54ac8b82a05b133b178b6ceaf7393fe49f0798a33",
+    checked_environment: "staging",
+    checked_at: "2026-09-10T22:48:00.544397Z",
+    project: {
+      name: "Rosuno Staging",
+      project_ref: "mxjlvmowmodzdtdfgqpb",
+    },
+    migration_inventory: [
+      {
+        sequence: 1,
+        migration_id: "20260828192126_p0_restrict_rls_auto_enable_execution",
+        artifact_path:
+          "supabase/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.sql",
+        sha256:
+          "2ba591b2767c43a32731c8b74b5ffaa07c47a41d096eee6fb3672aad9278c49d",
+      },
+      {
+        sequence: 2,
+        migration_id: "20260829000015_p1_platform_foundation",
+        artifact_path:
+          "supabase/migrations/20260829000015_p1_platform_foundation.sql",
+        sha256:
+          "67dfd44b2bd7525a588e6eb59c33a0056f3a5c67eec5f45dd93e6aab37f7afc8",
+      },
+      {
+        sequence: 3,
+        migration_id: "20260829171701_p1_authorization_foundation",
+        artifact_path:
+          "supabase/migrations/20260829171701_p1_authorization_foundation.sql",
+        sha256:
+          "6471ac68949234e29ae1cc492eaa2f77dc15ca010998f72898284b8c9a855fec",
+      },
+      {
+        sequence: 4,
+        migration_id: "20260830023823_p1_jurisdiction_policy_launch_foundation",
+        artifact_path:
+          "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql",
+        sha256:
+          "94e9b746cf303154790bc51e8160f9184b2e9765e82ec2702e03030f7a79b7ee",
+      },
+      {
+        sequence: 5,
+        migration_id: "20260901012518_p1_authorization_scope_correction",
+        artifact_path:
+          "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql",
+        sha256:
+          "bf0cdabed8ffa41a65e793b9041c00dc7d2ca47eeef40c2750770e195b47d6c5",
+      },
+      {
+        sequence: 6,
+        migration_id:
+          "20260910075939_p1_attorney_verification_eligibility_foundation",
+        artifact_path:
+          "supabase/migrations/20260910075939_p1_attorney_verification_eligibility_foundation.sql",
+        sha256:
+          "09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231",
+      },
+    ],
+    accepted_evidence: [
+      {
+        path: "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json",
+        sha256:
+          "59f4facdc8115606cedf517b17f690f050b8203287289ca6735ddaa26d7c6f34",
+      },
+      {
+        path: "governance/evidence/p1-002-authorization-scope-correction.json",
+        sha256:
+          "4f63b0d550d5a1a589549d031a7184ec7072cd96fdbd20a47918613e0fc6136f",
+      },
+      {
+        path: "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json",
+        sha256:
+          "c5bb94594f8a82915ad5a9faabbee00ad90bf782914de072bee8a6a5fa333e6f",
+      },
+      {
+        path: "governance/evidence/p1-004-governance-lifecycle-closure.json",
+        sha256:
+          "0ace4c7c1b30af97d35c98d2638383d525ff66b3be74581e91c7dc9a21149a47",
+      },
+    ],
+    catalog_fingerprint: {
+      format: "rosuno-p1-catalog-v1",
+      sha256:
+        "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508",
+      canonical_byte_length: 90175,
+      row_count: 279,
+    },
+    evidence: [
+      "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json",
+      "governance/evidence/p1-002-authorization-scope-correction.json",
+      "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json",
+      "governance/evidence/p1-004-governance-lifecycle-closure.json",
+    ],
+    drift_status: "clean",
+    drift_items: [],
+  };
+
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-004-20260910-v1");
   assert.equal(baseline.checked_at, "2026-09-10T22:48:00.544397Z");
   assert.equal(baseline.migration_inventory.length, 6);
+  assert.equal(baseline.accepted_evidence.length, 4);
   assert.doesNotThrow(() => validateDriftReport(baseline, register));
 
   const mutations = [
