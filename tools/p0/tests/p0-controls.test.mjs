@@ -37,6 +37,8 @@ import {
   validateP1ApplicationTraceability,
   validateP1AttorneyClosure,
   validateP1AttorneyClosureTraceability,
+  validateP1ClientIntakeCandidate,
+  validateP1ClientIntakeTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
   validateP1RegulatoryCatalog,
@@ -51,10 +53,65 @@ import {
   validateWorkItem,
 } from "../lib/controls.mjs";
 
+test("P1-005 pending local candidate requires exact bounded lifecycle and six-migration baseline overlay", () => {
+  const migrations = readJson("governance/migrations/reviewed-migrations.json");
+  const workItems = readJson("governance/work-items/index.json");
+  const decisions = readJson("governance/decision-log.json");
+  const releases = readJson("governance/releases/traceability.json");
+
+  const migration = migrations.migrations.find(
+    (item) =>
+      item.migration_id === "20260911062917_p1_client_intake_ai_foundation",
+  );
+
+  assert.ok(migration);
+
+  const migrationSql = readFileSync(
+    path.join(ROOT, migration.artifact_path),
+    "utf8",
+  );
+
+  assert.equal(
+    validateP1ClientIntakeCandidate(migration, migrationSql),
+    "pending",
+  );
+
+  assert.doesNotThrow(() =>
+    validateP1ClientIntakeTraceability(
+      migrations,
+      workItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  const baseline = readJson("governance/schema-drift/baseline.json");
+
+  assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
+
+  const wrongDependency = structuredClone(migration);
+  wrongDependency.depends_on = [];
+
+  assert.throws(() =>
+    validateP1ClientIntakeCandidate(wrongDependency, migrationSql),
+  );
+
+  assert.throws(() =>
+    validateP1ClientIntakeCandidate(
+      migration,
+      migrationSql + "\n-- unauthorized byte drift\n",
+    ),
+  );
+});
+
 test("P1-004 accepted closure requires exact lifecycle evidence and traceability", () => {
   const migration = readJson(
     "governance/migrations/reviewed-migrations.json",
-  ).migrations.at(-1);
+  ).migrations.find(
+    (item) =>
+      item.migration_id ===
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+  );
   const evidence = readJson(
     "governance/evidence/p1-004-governance-lifecycle-closure.json",
   );
@@ -84,7 +141,11 @@ test("P1-004 accepted closure requires exact lifecycle evidence and traceability
 test("P1-004 closure rejects each independently mutated governed fact", () => {
   const migration = readJson(
     "governance/migrations/reviewed-migrations.json",
-  ).migrations.at(-1);
+  ).migrations.find(
+    (item) =>
+      item.migration_id ===
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+  );
   const evidence = readJson(
     "governance/evidence/p1-004-governance-lifecycle-closure.json",
   );
@@ -1930,9 +1991,10 @@ test("P1-004 local overlay preserves the exact five-migration foundation", async
       );
       register.migrations = register.migrations.slice(0, 5);
       // Remove a real local overlay from the disposable fixture, if present.
-      const actual = readJson("governance/migrations/reviewed-migrations.json")
-        .migrations[5];
-      if (actual)
+      const liveOverlays = readJson(
+        "governance/migrations/reviewed-migrations.json",
+      ).migrations.slice(5);
+      for (const actual of liveOverlays)
         rmSync(path.join(root, actual.artifact_path), { force: true });
       const id =
         "20260910075939_p1_attorney_verification_eligibility_foundation";
@@ -2232,7 +2294,11 @@ test("P1-004 closure rejects every independent evidence mutation", async (t) => 
   );
   const migration = readJson(
     "governance/migrations/reviewed-migrations.json",
-  ).migrations.at(-1);
+  ).migrations.find(
+    (item) =>
+      item.migration_id ===
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+  );
   const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
   assert.doesNotThrow(() =>
     validateP1AttorneyClosure(migration, sql, evidence),
