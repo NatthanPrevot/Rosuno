@@ -1,0 +1,171 @@
+{
+  "version": 1,
+  "evidence_id": "P1-005-GOVERNANCE-LIFECYCLE-CLOSURE-20260912",
+  "work_item_id": "WI-P1-005-CLIENT-INTAKE-AI-FOUNDATION",
+  "lifecycle": "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED",
+  "lifecycle_state": {
+    "repository_closure": true,
+    "staging_application": true,
+    "postapplication_readonly_verification": true
+  },
+  "repository": {
+    "canonical_main": "f24890559fcf36521ca10a143d6b648f139fe540",
+    "canonical_tree": "66e4dad568950e4029027d2f6fafefb9a8937900",
+    "protected_main": true,
+    "implementation": {
+      "pull_request": 16,
+      "title": "P1-005: Client / Intake / Jurisdiction Assessment / AI foundation",
+      "base": "ba7ac95c7667200472badb768b4062bbc3d63a66",
+      "head": "66f83120d3febfa504f3c2cf935caafa021a8cbb",
+      "merge_commit": "1d0131671aefa11d88ada4c770d59f45a3814fd9",
+      "review_id": "5185576354",
+      "approved_at": "2026-09-12T06:15:51Z",
+      "merged_at": "2026-09-12T06:24:24Z",
+      "workflow_run_id": 34649537302,
+      "workflow_conclusion": "success"
+    },
+    "corrections": [
+      {
+        "pull_request": 17,
+        "title": "P1-005: fix rollback generator import guard",
+        "base": "1d0131671aefa11d88ada4c770d59f45a3814fd9",
+        "head": "84a633b4a2c13119df74be307fffb50494f92a16",
+        "merge_commit": "b8b0aadb6e093c453f07cba391842f72e3fe5c89",
+        "review_id": "5187093171",
+        "approved_at": "2026-09-12T16:17:58Z",
+        "merged_at": "2026-09-12T16:35:56Z",
+        "workflow_run_id": 34703728948,
+        "workflow_conclusion": "success"
+      },
+      {
+        "pull_request": 18,
+        "title": "P1-005: fix rollback tool test import side effects",
+        "base": "b8b0aadb6e093c453f07cba391842f72e3fe5c89",
+        "head": "9b625c603b0b5e97273af616ae0714cf0055781e",
+        "merge_commit": "f24890559fcf36521ca10a143d6b648f139fe540",
+        "review_id": "5187387530",
+        "approved_at": "2026-09-12T17:43:11Z",
+        "merged_at": "2026-09-12T17:47:23Z",
+        "workflow_run_id": 34708429568,
+        "workflow_conclusion": "success"
+      }
+    ]
+  },
+  "migration": {
+    "id": "20260911062917_p1_client_intake_ai_foundation",
+    "sha256": "13be2baeaa808d38a5e209071c94a9c9565fbd1280aeae0395abc50502e2b375",
+    "byte_length": 8590,
+    "sequence": 7,
+    "history_versions": 7,
+    "history": [
+      "20260828192126_p0_restrict_rls_auto_enable_execution",
+      "20260829000015_p1_platform_foundation",
+      "20260829171701_p1_authorization_foundation",
+      "20260830023823_p1_jurisdiction_policy_launch_foundation",
+      "20260901012518_p1_authorization_scope_correction",
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+      "20260911062917_p1_client_intake_ai_foundation"
+    ]
+  },
+  "gate5": {
+    "result": "PASS",
+    "rollback_checks": 93,
+    "accepted_baseline_catalog": {
+      "sha256": "ba0d1128e01244d472edb8c2a38823024cf56a0134492a5d1f6f6d687593144a",
+      "canonical_byte_length": 200217,
+      "row_count": 642
+    },
+    "pre_post_state": "EXACT_MATCH",
+    "pre_post_catalog": "EXACT_MATCH",
+    "persistent_migration_history_change": "NONE",
+    "persistent_p1_005_ddl_dml": "NONE"
+  },
+  "gate6": {
+    "result": "PASS",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "supabase_cli": "2.116.0",
+    "application_exit": 0,
+    "migration_history_count": 7,
+    "public_tables": 28,
+    "public_rls": 28,
+    "p1_005_rows": {
+      "client_profiles": 0,
+      "intakes": 0,
+      "jurisdiction_assessments": 0,
+      "ai_suggestions": 0
+    },
+    "capability_codes": ["manage_attorney_verification"]
+  },
+  "fingerprints": {
+    "snapshot_at": "2026-09-12T21:11:10.801292Z",
+    "transaction_read_only": true,
+    "p1_005_scope": {
+      "sha256": "d0dba48dd6a993af75ac24617708a43d64cce18229c4daf1773e70cf2499c34f",
+      "canonical_byte_length": 32663,
+      "row_count": 108
+    },
+    "final_28_table": {
+      "sha256": "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
+      "canonical_byte_length": 231062,
+      "row_count": 744
+    }
+  },
+  "security_advisor": {
+    "observed_at": "2026-09-12T21:13:03.413Z",
+    "info_count": 13,
+    "warn_count": 1,
+    "unapproved_count": 0,
+    "info_targets": [
+      "public.application_sessions",
+      "public.capability_definitions",
+      "public.capability_grants",
+      "public.jurisdiction_regulatory_modes",
+      "public.jurisdictions",
+      "public.launch_authorizations",
+      "public.launch_gate_evaluations",
+      "public.launch_gates",
+      "public.policy_authority_references",
+      "public.policy_types",
+      "public.policy_versions",
+      "public.regulatory_modes",
+      "public.service_areas"
+    ],
+    "warning": {
+      "code": "authenticated_security_definer_function_executable",
+      "schema": "public",
+      "function": "has_manage_attorney_verification_scope",
+      "arguments": "required_jurisdiction uuid, allow_any_jurisdiction boolean",
+      "language": "sql",
+      "security_definer": true
+    }
+  },
+  "release": {
+    "id": "REL-20260912-P1-005-STAGING-APPLICATION",
+    "commit_sha": "f24890559fcf36521ca10a143d6b648f139fe540",
+    "environment": "staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "migration_id": "20260911062917_p1_client_intake_ai_foundation",
+    "migration_digest": "sha256:13be2baeaa808d38a5e209071c94a9c9565fbd1280aeae0395abc50502e2b375",
+    "evidence_link": "governance/evidence/p1-005-governance-lifecycle-closure.json",
+    "supabase_cli": "2.116.0",
+    "application_exit": 0,
+    "created_at": "2026-09-12T22:31:52Z",
+    "created_at_semantics": "traceability record creation"
+  },
+  "boundaries": {
+    "production_untouched": true,
+    "source_development_untouched": true,
+    "old_project_specific_query_or_mutation": false,
+    "old_used_as_canonical_state": false,
+    "fast_control_started": false,
+    "p1_006_started": false
+  },
+  "integrity": {
+    "historical_migrations_unchanged": true,
+    "p1_005_migration_sha256": "13be2baeaa808d38a5e209071c94a9c9565fbd1280aeae0395abc50502e2b375",
+    "p1_005_migration_bytes": 8590,
+    "no_fake_business_data": true,
+    "no_new_capability_seed": true,
+    "no_new_security_definer_helper": true
+  }
+}

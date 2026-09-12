@@ -1,10 +1,10 @@
 {
   "version": 1,
   "product_schema_present": true,
-  "baseline_id": "rosuno-staging-p1-004-20260910-v1",
-  "baseline_digest": "sha256:53837aef8833e9d14e6739c54ac8b82a05b133b178b6ceaf7393fe49f0798a33",
+  "baseline_id": "rosuno-staging-p1-005-20260912-v1",
+  "baseline_digest": "sha256:1a4d4ffeb9f0bd6de1b960c573967bcc97ac0cfc37f7aafecd01237543c26a56",
   "checked_environment": "staging",
-  "checked_at": "2026-09-10T22:48:00.544397Z",
+  "checked_at": "2026-09-12T21:11:10.801292Z",
   "project": {
     "name": "Rosuno Staging",
     "project_ref": "mxjlvmowmodzdtdfgqpb"
@@ -45,6 +45,12 @@
       "migration_id": "20260910075939_p1_attorney_verification_eligibility_foundation",
       "artifact_path": "supabase/migrations/20260910075939_p1_attorney_verification_eligibility_foundation.sql",
       "sha256": "09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231"
+    },
+    {
+      "sequence": 7,
+      "migration_id": "20260911062917_p1_client_intake_ai_foundation",
+      "artifact_path": "supabase/migrations/20260911062917_p1_client_intake_ai_foundation.sql",
+      "sha256": "13be2baeaa808d38a5e209071c94a9c9565fbd1280aeae0395abc50502e2b375"
     }
   ],
   "accepted_evidence": [
@@ -63,19 +69,24 @@
     {
       "path": "governance/evidence/p1-004-governance-lifecycle-closure.json",
       "sha256": "0ace4c7c1b30af97d35c98d2638383d525ff66b3be74581e91c7dc9a21149a47"
+    },
+    {
+      "path": "governance/evidence/p1-005-governance-lifecycle-closure.json",
+      "sha256": "430e9555c5594845339ff50e17b7466f469c6e833d8337056896200ba6e0af66"
     }
   ],
   "catalog_fingerprint": {
     "format": "rosuno-p1-catalog-v1",
-    "sha256": "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508",
-    "canonical_byte_length": 90175,
-    "row_count": 279
+    "sha256": "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
+    "canonical_byte_length": 231062,
+    "row_count": 744
   },
   "evidence": [
     "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json",
     "governance/evidence/p1-002-authorization-scope-correction.json",
     "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json",
-    "governance/evidence/p1-004-governance-lifecycle-closure.json"
+    "governance/evidence/p1-004-governance-lifecycle-closure.json",
+    "governance/evidence/p1-005-governance-lifecycle-closure.json"
   ],
   "drift_status": "clean",
   "drift_items": []

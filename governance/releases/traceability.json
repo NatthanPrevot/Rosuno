@@ -159,6 +159,28 @@
       },
       "rollback_reference": "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
       "created_at": "2026-09-10T18:27:37Z"
+    },
+    {
+      "release_id": "REL-20260912-P1-005-STAGING-APPLICATION",
+      "commit_sha": "f24890559fcf36521ca10a143d6b648f139fe540",
+      "work_item_refs": ["WI-P1-005-CLIENT-INTAKE-AI-FOUNDATION"],
+      "decision_refs": ["DEC-20260911-P1-005-BOUNDED-CANDIDATE"],
+      "migration_refs": ["20260911062917_p1_client_intake_ai_foundation"],
+      "validation_evidence": [
+        "governance/evidence/p1-005-governance-lifecycle-closure.json",
+        "supabase/migrations/20260911062917_p1_client_intake_ai_foundation.sql",
+        "tools/p0/p1-005-rollback.mjs",
+        "pnpm run p0:validate",
+        "pnpm run p0:test"
+      ],
+      "artifact_digest": "sha256:13be2baeaa808d38a5e209071c94a9c9565fbd1280aeae0395abc50502e2b375",
+      "environment": "staging",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "rollback_reference": "tools/p0/p1-005-rollback.mjs",
+      "created_at": "2026-09-12T22:31:52Z"
     }
   ]
 }

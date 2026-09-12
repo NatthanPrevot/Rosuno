@@ -221,10 +221,10 @@
     {
       "decision_id": "DEC-20260911-P1-005-BOUNDED-CANDIDATE",
       "title": "Implement the bounded P1-005 Client / Intake / AI local candidate",
-      "status": "proposed",
-      "scope": "P1-005 local repository implementation only; no review, merge, database validation, persistent application, production activity, or later work.",
+      "status": "accepted",
+      "scope": "Original authorization: bounded local P1-005 implementation only. Current accepted lifecycle records later separately authorized protected review, merge, rollback-only Staging validation, persistent Staging application, and governance closure.",
       "decision": "Implement exactly client_profiles, intakes, jurisdiction_assessments, and ai_suggestions using the user-approved P1-005 physical decision-gate resolutions. These are implementation-level decisions only and do not alter higher locked authority.",
-      "rationale": "The locked Migration 5 slice requires the four-relation Client / Intake / Jurisdiction Assessment / AI foundation. The bounded implementation preserves Intake continuity, historical assessment provenance, relationship-based client reads, least privilege, and AI-as-suggestion-only boundaries without inventing later-phase tables, staff capabilities, expiry policy, generic AI context tables, or authoritative AI transitions.",
+      "rationale": "The original implementation decision did not authorize protected review, merge, database validation, persistent Staging application, release, or repository closure. Those later events occurred under separate explicit gates and are retained in the closure evidence. Historical migration bytes and the original bounded implementation remain unchanged.",
       "authority_refs": [
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
         "DOMAIN-MODEL-V1.4-LOCKED",
@@ -236,15 +236,19 @@
       "work_item_refs": ["WI-P1-005-CLIENT-INTAKE-AI-FOUNDATION"],
       "owner": "Rosuno P1-005 technical builder",
       "reviewer": {
-        "identity": "pending designated human PR review",
-        "status": "pending"
+        "identity": "Rosuno",
+        "status": "approved"
       },
       "created_at": "2026-09-11T06:29:18Z",
-      "updated_at": "2026-09-11T06:29:18Z",
+      "updated_at": "2026-09-12T22:31:52Z",
       "supersedes": [],
-      "impact": "Exactly four P1-005 foundation relations in one unreviewed/unapplied local sequence-7 candidate. No capability seed, release, database validation, persistent application, production mutation, OLD access, or P1-006+ authorization.",
+      "impact": "Records current accepted P1-005 lifecycle completion without broadening the original implementation authorization. No production, source/development database, OLD project-specific activity, Fast-Control bootstrap, P1-006, or later-work authorization is granted.",
       "evidence": [
-        "supabase/migrations/20260911062917_p1_client_intake_ai_foundation.sql"
+        "supabase/migrations/20260911062917_p1_client_intake_ai_foundation.sql",
+        "tools/p0/p1-005-rollback.mjs",
+        "governance/evidence/p1-005-governance-lifecycle-closure.json",
+        "governance/releases/traceability.json",
+        "governance/schema-drift/baseline.json"
       ],
       "expiry": null
     }
