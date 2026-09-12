@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   cpSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -104,36 +105,68 @@ test("P1-005 pending local candidate requires exact bounded lifecycle and six-mi
   );
 });
 
-test("P1-005 rollback generator is import-safe and direct CLI remains functional", () => {
+test("P1-005 reusable contract and rollback imports are inert and direct CLI remains functional", () => {
   const temp = mkdtempSync(
     path.join(tmpdir(), "rosuno-p1-005-rollback-import-"),
   );
   const directTarget = path.join(temp, "direct.sql");
 
+  const importTargets = [
+    "./tools/p0/lib/p1-005-contract-data.mjs",
+    "./tools/p0/p1-005-rollback.mjs",
+  ];
+
   try {
-    execFileSync(
-      process.execPath,
-      [
-        "--input-type=module",
-        "--eval",
-        'await import("./tools/p0/p1-005-rollback.mjs");',
-        "importer-placeholder",
-        temp,
-      ],
-      {
-        cwd: ROOT,
-        stdio: "pipe",
-      },
+    const rollbackSource = readFileSync(
+      path.join(ROOT, "tools/p0/p1-005-rollback.mjs"),
+      "utf8",
+    );
+    const contractDataSource = readFileSync(
+      path.join(ROOT, "tools/p0/lib/p1-005-contract-data.mjs"),
+      "utf8",
     );
 
-    execFileSync(
+    assert.doesNotMatch(rollbackSource, /tests\/p1-005-contract\.test\.mjs/);
+    assert.doesNotMatch(contractDataSource, /node:test|\.test\.mjs/);
+
+    for (const target of importTargets) {
+      const probe = spawnSync(
+        process.execPath,
+        [
+          "--input-type=module",
+          "--eval",
+          `await import(${JSON.stringify(target)});`,
+          "importer-placeholder",
+          temp,
+        ],
+        {
+          cwd: ROOT,
+          encoding: "utf8",
+        },
+      );
+
+      assert.equal(probe.status, 0, `${target} import failed: ${probe.stderr}`);
+      assert.equal(probe.stdout, "", `${target} import emitted stdout`);
+      assert.equal(probe.stderr, "", `${target} import emitted stderr`);
+      assert.deepEqual(
+        readdirSync(temp),
+        [],
+        `${target} import mutated filesystem`,
+      );
+    }
+
+    const direct = spawnSync(
       process.execPath,
       [path.join(ROOT, "tools/p0/p1-005-rollback.mjs"), directTarget],
       {
         cwd: ROOT,
-        stdio: "pipe",
+        encoding: "utf8",
       },
     );
+
+    assert.equal(direct.status, 0, direct.stderr);
+    assert.equal(direct.stdout, "");
+    assert.equal(direct.stderr, "");
 
     const generated = readFileSync(directTarget, "utf8");
 

@@ -3,10 +3,10 @@ import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import {
   columns,
+  readMigrationSql,
   required,
-  sql,
   tables,
-} from "./tests/p1-005-contract.test.mjs";
+} from "./lib/p1-005-contract-data.mjs";
 import { CATALOG_SQL } from "./lib/catalog-fingerprint.mjs";
 
 const q = (value) => "'" + String(value).replaceAll("'", "''") + "'";
@@ -251,6 +251,8 @@ select jsonb_build_object(
 `;
 
 export function buildRollbackValidation() {
+  const sql = readMigrationSql();
+
   const statements = [
     "BEGIN;",
     "SET LOCAL statement_timeout = '90s';",
