@@ -5970,6 +5970,8 @@ export function validatePackageJson(packageJson) {
     "p0:test": "node --test tools/p0/tests/*.test.mjs",
     "secrets:check": "node tools/p0/secret-scan.mjs",
     "dependency:check": "pnpm audit --audit-level=high",
+    "rosuno:preflight": "node tools/p0/fast-control.mjs preflight",
+    "rosuno:check": "node tools/p0/fast-control.mjs check",
   };
   if (JSON.stringify(packageJson.scripts) !== JSON.stringify(expectedScripts)) {
     fail("package scripts must match the P0 control allowlist");
