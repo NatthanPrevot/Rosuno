@@ -2,10 +2,10 @@
 import { writeFileSync } from "node:fs";
 import {
   columns,
+  readMigrationSql,
   required,
   tables,
-  sql,
-} from "./tests/p1-004-contract.test.mjs";
+} from "./lib/p1-004-contract-data.mjs";
 import { CATALOG_SQL } from "./lib/catalog-fingerprint.mjs";
 const q = (s) => "'" + String(s).replaceAll("'", "''") + "'";
 const id = (n) => `00400000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -52,6 +52,8 @@ export const baselineStateSql = `select jsonb_build_object(
 'rls_enabled_count',(select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' and c.relrowsecurity),
 'triggers',(select count(*) from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and not t.tgisinternal)) as state;`;
 export function buildRollbackValidation() {
+  const sql = readMigrationSql();
+
   const statements = [
     "BEGIN;",
     "SET LOCAL statement_timeout = '90s';",

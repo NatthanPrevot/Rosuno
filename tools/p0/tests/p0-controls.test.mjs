@@ -2646,3 +2646,31 @@ test("P1-004 closed baseline rejects its specific governed-value mutations", asy
     });
   }
 });
+
+test("Fast-Control package scripts remain explicit and dependency-neutral", () => {
+  const packageJson = JSON.parse(
+    readFileSync(path.join(ROOT, "package.json"), "utf8"),
+  );
+
+  assert.equal(
+    packageJson.scripts["rosuno:preflight"],
+    "node tools/p0/fast-control.mjs preflight",
+  );
+
+  assert.equal(
+    packageJson.scripts["rosuno:check"],
+    "node tools/p0/fast-control.mjs check",
+  );
+
+  assert.doesNotThrow(() => validatePackageJson(packageJson));
+
+  const withoutPreflight = structuredClone(packageJson);
+  delete withoutPreflight.scripts["rosuno:preflight"];
+
+  assert.throws(() => validatePackageJson(withoutPreflight));
+
+  const broadenedDependencies = structuredClone(packageJson);
+  broadenedDependencies.dependencies = { unexpected: "1.0.0" };
+
+  assert.throws(() => validatePackageJson(broadenedDependencies));
+});
