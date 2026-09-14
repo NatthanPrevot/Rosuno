@@ -488,11 +488,11 @@
         "California-specific schema or counsel-gated policy values",
         "Production, OLD, source/development database mutation, or P1-007 and later work"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "owner": "Rosuno P1-006 implementation owner",
       "reviewer": {
         "identity": "Rosuno",
-        "status": "pending"
+        "status": "approved"
       },
       "priority": "P1",
       "authority_refs": [
@@ -520,11 +520,11 @@
         "pnpm run rosuno:check --base <base> --head <head> --branch <branch> --allow <approved-path>"
       ],
       "environment": "staging",
-      "release_refs": [],
+      "release_refs": ["REL-20260914-P1-006-STAGING-APPLICATION"],
       "migration_refs": ["20260914000658_p1_marketplace_referral_foundation"],
       "rollback_reference": "tools/p0/p1-006-rollback.mjs",
       "created_at": "2026-09-14T00:11:59Z",
-      "updated_at": "2026-09-14T00:11:59Z"
+      "updated_at": "2026-09-14T05:18:06Z"
     }
   ]
 }

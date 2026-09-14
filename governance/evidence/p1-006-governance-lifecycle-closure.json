@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "evidence_id": "P1-006-GOVERNANCE-LIFECYCLE-CLOSURE-20260914",
+  "work_item_id": "WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION",
+  "lifecycle": "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED",
+  "lifecycle_state": {
+    "repository_closure": true,
+    "staging_application": true,
+    "postapplication_readonly_verification": true
+  },
+  "repository": {
+    "canonical_main": "e4e418cde4e046a077c5883c8eadd0c6c4e02c5d",
+    "canonical_tree": "d8895434a7641386628c2ea0d47fa95f46807cce",
+    "protected_main": true,
+    "implementation": {
+      "pull_request": 21,
+      "title": "P1-006: Marketplace / Referral foundation",
+      "base": "70520947a64e61d68371a6ff2d9f4d089f15c8e1",
+      "head": "7035057f8384bb6be33910b41c9bc6d34bdfa33e",
+      "tree": "d8895434a7641386628c2ea0d47fa95f46807cce",
+      "merge_commit": "e4e418cde4e046a077c5883c8eadd0c6c4e02c5d",
+      "ordered_parents": [
+        "70520947a64e61d68371a6ff2d9f4d089f15c8e1",
+        "7035057f8384bb6be33910b41c9bc6d34bdfa33e"
+      ],
+      "review_id": "5193223962",
+      "approved_at": "2026-09-14T01:51:58Z",
+      "merged_at": "2026-09-14T01:54:32Z",
+      "workflow_run_id": 34797119626,
+      "workflow_conclusion": "success"
+    }
+  },
+  "migration": {
+    "id": "20260914000658_p1_marketplace_referral_foundation",
+    "sha256": "9035b76466c5b201e54667ee537eb4f9342c191ce5aa35d9e13d44f0def3e094",
+    "sequence": 8,
+    "history_versions": 8,
+    "history": [
+      "20260828192126_p0_restrict_rls_auto_enable_execution",
+      "20260829000015_p1_platform_foundation",
+      "20260829171701_p1_authorization_foundation",
+      "20260830023823_p1_jurisdiction_policy_launch_foundation",
+      "20260901012518_p1_authorization_scope_correction",
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+      "20260911062917_p1_client_intake_ai_foundation",
+      "20260914000658_p1_marketplace_referral_foundation"
+    ]
+  },
+  "gate5": {
+    "result": "PASS",
+    "generated_sql_sha256": "98f44c808f19ba0fbb2d9309f5f3f2f85020c29c709ea20c4b337d4e2e5001e3",
+    "generated_sql_lines": 392,
+    "generated_sql_bytes": 22878,
+    "application_exit": 0,
+    "final_transaction_action": "ROLLBACK",
+    "pre_post_state": "EXACT_MATCH",
+    "persistent_migration_history_change": "NONE",
+    "persistent_p1_006_ddl_dml": "NONE"
+  },
+  "gate6": {
+    "result": "PASS",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "supabase_cli": "2.116.0",
+    "dry_run_migrations": [
+      "20260914000658_p1_marketplace_referral_foundation.sql"
+    ],
+    "application_exit": 0,
+    "migration_history_count": 8,
+    "public_tables": 31,
+    "public_rls": 31,
+    "p1_006_rows": {
+      "referrals": 0,
+      "referral_eligible_pool_entries": 0,
+      "referral_presentations": 0
+    }
+  },
+  "fingerprints": {
+    "fresh_reconciliation_at": "2026-09-14T05:00:30.987864Z",
+    "transaction_read_only": true,
+    "prior_28_table": {
+      "sha256": "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
+      "canonical_byte_length": 231062,
+      "row_count": 744
+    },
+    "final_31_table": {
+      "sha256": "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
+      "canonical_byte_length": 253195,
+      "row_count": 816,
+      "category_counts": {
+        "table": 31,
+        "column": 259,
+        "constraint": 156,
+        "index": 75,
+        "foreign_key": 58,
+        "rls": 31,
+        "policy": 15,
+        "trigger": 18,
+        "function": 3,
+        "table_privilege": 155,
+        "function_privilege": 15
+      }
+    }
+  },
+  "security_advisor": {
+    "info_count": 16,
+    "warn_count": 1,
+    "unapproved_count": 0,
+    "p1_006_info_targets": [
+      "public.referrals",
+      "public.referral_eligible_pool_entries",
+      "public.referral_presentations"
+    ],
+    "warning": {
+      "code": "authenticated_security_definer_function_executable",
+      "schema": "public",
+      "function": "has_manage_attorney_verification_scope",
+      "arguments": "required_jurisdiction uuid, allow_any_jurisdiction boolean",
+      "security_definer": true,
+      "pre_existing": true
+    },
+    "observed_at": "2026-09-14T05:18:38.695Z",
+    "info_targets": [
+      "public.application_sessions",
+      "public.capability_definitions",
+      "public.capability_grants",
+      "public.jurisdiction_regulatory_modes",
+      "public.jurisdictions",
+      "public.launch_authorizations",
+      "public.launch_gate_evaluations",
+      "public.launch_gates",
+      "public.policy_authority_references",
+      "public.policy_types",
+      "public.policy_versions",
+      "public.referral_eligible_pool_entries",
+      "public.referral_presentations",
+      "public.referrals",
+      "public.regulatory_modes",
+      "public.service_areas"
+    ]
+  },
+  "release": {
+    "id": "REL-20260914-P1-006-STAGING-APPLICATION",
+    "commit_sha": "e4e418cde4e046a077c5883c8eadd0c6c4e02c5d",
+    "environment": "staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "migration_id": "20260914000658_p1_marketplace_referral_foundation",
+    "migration_digest": "sha256:9035b76466c5b201e54667ee537eb4f9342c191ce5aa35d9e13d44f0def3e094",
+    "evidence_link": "governance/evidence/p1-006-governance-lifecycle-closure.json",
+    "supabase_cli": "2.116.0",
+    "application_exit": 0,
+    "created_at": "2026-09-14T05:18:06Z",
+    "created_at_semantics": "traceability record creation"
+  },
+  "boundaries": {
+    "production_authorized": false,
+    "old_supabase_mutation_authorized": false,
+    "p1_007_authorized": false,
+    "database_mutation_during_closure": false
+  },
+  "integrity": {
+    "historical_migrations_unchanged": true,
+    "p1_006_migration_sha256": "9035b76466c5b201e54667ee537eb4f9342c191ce5aa35d9e13d44f0def3e094",
+    "no_fake_business_data": true,
+    "no_new_capability_seed": true,
+    "no_new_security_definer_helper": true
+  }
+}

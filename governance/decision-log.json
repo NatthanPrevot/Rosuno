@@ -256,9 +256,9 @@
       "decision_id": "DEC-20260914-P1-006-BOUNDED-CANDIDATE",
       "title": "Implement the bounded P1-006 Marketplace / Referral foundation",
       "status": "accepted",
-      "scope": "Bounded local Physical 1F Marketplace / Referral foundation implementation only; no protected review, remote mutation, database execution, or later P1 work.",
+      "scope": "Original authorization: bounded local P1-006 implementation only. Current accepted lifecycle records later separately authorized protected review, merge, rollback-only Staging validation, persistent Staging application, and governance closure.",
       "decision": "Implement exactly referrals, referral_eligible_pool_entries, and referral_presentations using the frozen P1-006 physical contract. Preserve authoritative Intake attempt ordering, immutable eligible-pool and presentation evidence, fail-closed end-user access, and narrow trusted-server mutation. Do not represent this database foundation as the complete operational Discovery / Referral workflow.",
-      "rationale": "The ten current locked Rosuno authority documents place Marketplace / Referral persistence in Physical 1F while Scheduling, Consultation Request, and Bookability remain later dependencies. The frozen contract resolves the physical implementation without inventing regulatory outcome taxonomies, referral-policy columns, paid ranking, recommendation truth, or later-phase relations.",
+      "rationale": "The original implementation decision did not authorize protected review, merge, database validation, persistent Staging application, release, or repository closure. Those later events occurred under separate explicit gates and are retained in the closure evidence. Historical migration bytes and the original bounded implementation remain unchanged.",
       "authority_refs": [
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
         "DOMAIN-MODEL-V1.4-LOCKED",
@@ -274,14 +274,15 @@
         "status": "approved"
       },
       "created_at": "2026-09-14T00:11:59Z",
-      "updated_at": "2026-09-14T00:11:59Z",
+      "updated_at": "2026-09-14T05:18:06Z",
       "supersedes": [],
-      "impact": "Authorizes only the bounded local P1-006 implementation gate. It does not authorize commit, push, pull request, merge, database contact, rollback validation, persistent Staging application, production, OLD access, P1-007, or an end-to-end Referral capability claim.",
+      "impact": "Records current accepted P1-006 lifecycle completion without broadening the original implementation authorization. No production, OLD Supabase mutation, P1-007, or later-work authorization is granted.",
       "evidence": [
         "supabase/migrations/20260914000658_p1_marketplace_referral_foundation.sql",
-        "tools/p0/lib/p1-006-contract-data.mjs",
-        "tools/p0/tests/p1-006-contract.test.mjs",
-        "tools/p0/p1-006-rollback.mjs"
+        "tools/p0/p1-006-rollback.mjs",
+        "governance/evidence/p1-006-governance-lifecycle-closure.json",
+        "governance/releases/traceability.json",
+        "governance/schema-drift/baseline.json"
       ],
       "expiry": null
     }

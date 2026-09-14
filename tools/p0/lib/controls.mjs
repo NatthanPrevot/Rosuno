@@ -5596,17 +5596,22 @@ export function validateDriftReport(report, migrationRegister = null) {
     report.baseline_id === "rosuno-staging-p1-004-20260910-v1";
   const closedP1005 =
     report.baseline_id === "rosuno-staging-p1-005-20260912-v1";
+  const closedP1006 =
+    report.baseline_id === "rosuno-staging-p1-006-20260914-v1";
 
-  const expectedCheckedAt = closedP1005
-    ? P1_CLIENT_INTAKE_OBSERVED_AT
-    : closedP1004
-      ? "2026-09-10T22:48:00.544397Z"
-      : P1_AUTHORIZATION_CORRECTION_VALIDATED_AT;
+  const expectedCheckedAt = closedP1006
+    ? "2026-09-14T05:00:30.987864Z"
+    : closedP1005
+      ? P1_CLIENT_INTAKE_OBSERVED_AT
+      : closedP1004
+        ? "2026-09-10T22:48:00.544397Z"
+        : P1_AUTHORIZATION_CORRECTION_VALIDATED_AT;
 
   if (
     report.version !== 1 ||
     (!closedP1004 &&
       !closedP1005 &&
+      !closedP1006 &&
       report.baseline_id !== FOUNDATION_BASELINE_ID) ||
     report.checked_environment !== "staging" ||
     report.checked_at !== expectedCheckedAt ||
@@ -5632,11 +5637,25 @@ export function validateDriftReport(report, migrationRegister = null) {
     sha256: P1_CLIENT_INTAKE_MIGRATION_SHA256,
   };
 
-  const expectedInventory = closedP1005
-    ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration, p1005Migration]
-    : closedP1004
-      ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration]
-      : FOUNDATION_BASELINE_MIGRATIONS;
+  const p1006Migration = {
+    sequence: 8,
+    migration_id: P1_MARKETPLACE_REFERRAL_MIGRATION_ID,
+    artifact_path: P1_MARKETPLACE_REFERRAL_MIGRATION_PATH,
+    sha256: P1_MARKETPLACE_REFERRAL_MIGRATION_SHA256,
+  };
+
+  const expectedInventory = closedP1006
+    ? [
+        ...FOUNDATION_BASELINE_MIGRATIONS,
+        p1004Migration,
+        p1005Migration,
+        p1006Migration,
+      ]
+    : closedP1005
+      ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration, p1005Migration]
+      : closedP1004
+        ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration]
+        : FOUNDATION_BASELINE_MIGRATIONS;
 
   if (
     JSON.stringify(report.migration_inventory) !==
@@ -5678,11 +5697,24 @@ export function validateDriftReport(report, migrationRegister = null) {
       "P1-005 baseline requires seven accepted migrations plus at most one bounded P1-006 overlay",
     );
 
-  if (!closedP1004 && !closedP1005 && register.migrations.length === 7) {
+  if (closedP1006 && register.migrations.length !== 8)
+    fail("P1-006 baseline requires exactly eight accepted migrations");
+
+  if (
+    !closedP1004 &&
+    !closedP1005 &&
+    !closedP1006 &&
+    register.migrations.length === 7
+  ) {
     fail("P1-005 overlay requires the accepted P1-004 baseline");
   }
 
-  if (!closedP1004 && !closedP1005 && register.migrations.length === 8) {
+  if (
+    !closedP1004 &&
+    !closedP1005 &&
+    !closedP1006 &&
+    register.migrations.length === 8
+  ) {
     fail("P1-006 overlay requires an accepted P1-004 or P1-005 baseline");
   }
 
@@ -5695,14 +5727,14 @@ export function validateDriftReport(report, migrationRegister = null) {
   }
 
   if (register.migrations.length === 7) {
-    if (!closedP1004 && !closedP1005)
+    if (!closedP1004 && !closedP1005 && !closedP1006)
       fail("seven migrations require an accepted P1-004 or P1-005 baseline");
 
     validateMigrationRegister(register, {}, repositoryFiles());
   }
 
   if (register.migrations.length === 8) {
-    if (!closedP1004 && !closedP1005)
+    if (!closedP1004 && !closedP1005 && !closedP1006)
       fail("eight migrations require an accepted P1-004 or P1-005 baseline");
 
     validateMigrationRegister(register, {}, repositoryFiles());
@@ -5735,11 +5767,29 @@ export function validateDriftReport(report, migrationRegister = null) {
       .digest("hex"),
   };
 
-  const expectedEvidence = closedP1005
-    ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence, p1005Evidence]
-    : closedP1004
-      ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence]
-      : FOUNDATION_BASELINE_EVIDENCE;
+  const p1006Evidence = {
+    path: P1_MARKETPLACE_REFERRAL_CLOSURE_EVIDENCE_PATH,
+    sha256: createHash("sha256")
+      .update(
+        readFileSync(
+          path.join(ROOT, P1_MARKETPLACE_REFERRAL_CLOSURE_EVIDENCE_PATH),
+        ),
+      )
+      .digest("hex"),
+  };
+
+  const expectedEvidence = closedP1006
+    ? [
+        ...FOUNDATION_BASELINE_EVIDENCE,
+        p1004Evidence,
+        p1005Evidence,
+        p1006Evidence,
+      ]
+    : closedP1005
+      ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence, p1005Evidence]
+      : closedP1004
+        ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence]
+        : FOUNDATION_BASELINE_EVIDENCE;
 
   if (
     JSON.stringify(report.accepted_evidence) !==
@@ -5759,25 +5809,32 @@ export function validateDriftReport(report, migrationRegister = null) {
       fail(`schema drift evidence digest is invalid for ${artifact.path}`);
   }
 
-  const expectedCatalog = closedP1005
+  const expectedCatalog = closedP1006
     ? {
         sha256:
-          "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
-        bytes: 231062,
-        rows: 744,
+          "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
+        bytes: 253195,
+        rows: 816,
       }
-    : closedP1004
+    : closedP1005
       ? {
           sha256:
-            "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508",
-          bytes: 90175,
-          rows: 279,
+            "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
+          bytes: 231062,
+          rows: 744,
         }
-      : {
-          sha256: P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256,
-          bytes: P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES,
-          rows: P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS,
-        };
+      : closedP1004
+        ? {
+            sha256:
+              "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508",
+            bytes: 90175,
+            rows: 279,
+          }
+        : {
+            sha256: P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256,
+            bytes: P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES,
+            rows: P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS,
+          };
 
   if (
     report.catalog_fingerprint?.format !== "rosuno-p1-catalog-v1" ||
@@ -5804,7 +5861,10 @@ export function validateDriftReport(report, migrationRegister = null) {
 
   if (
     report.baseline_digest !== `sha256:${digest}` ||
-    (!closedP1004 && !closedP1005 && digest !== FOUNDATION_BASELINE_DIGEST)
+    (!closedP1004 &&
+      !closedP1005 &&
+      !closedP1006 &&
+      digest !== FOUNDATION_BASELINE_DIGEST)
   ) {
     fail("schema drift baseline identity/digest is invalid");
   }
@@ -7005,9 +7065,11 @@ export function validateP1ClientIntakeTraceability(
   return true;
 }
 
-/* P1-006 bounded pending-candidate controls.
- * This recognizes only the local Physical 1F candidate. It does not recognize
- * review, release, database validation, persistent application, or closure.
+/* P1-006 bounded lifecycle controls.
+ * Historical pending-candidate validation remains supported, while the
+ * reviewed branch requires exact protected review, rollback-only Staging
+ * validation, persistent Staging application, release traceability, closure
+ * evidence, and the accepted eight-migration baseline.
  */
 const P1_MARKETPLACE_REFERRAL_ID =
   /^([0-9]{14})_p1_marketplace_referral_foundation$/;
@@ -7018,14 +7080,54 @@ const P1_MARKETPLACE_REFERRAL_MIGRATION_PATH =
 const P1_MARKETPLACE_REFERRAL_MIGRATION_SHA256 =
   "9035b76466c5b201e54667ee537eb4f9342c191ce5aa35d9e13d44f0def3e094";
 const P1_MARKETPLACE_REFERRAL_MIGRATION_BYTES = 4506;
-const P1_MARKETPLACE_REFERRAL_RECORD_SHA256 =
+
+const P1_MARKETPLACE_REFERRAL_DECISION_ID =
+  "DEC-20260914-P1-006-BOUNDED-CANDIDATE";
+const P1_MARKETPLACE_REFERRAL_WORK_ITEM_ID =
+  "WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION";
+const P1_MARKETPLACE_REFERRAL_RELEASE_ID =
+  "REL-20260914-P1-006-STAGING-APPLICATION";
+const P1_MARKETPLACE_REFERRAL_CLOSURE_EVIDENCE_PATH =
+  "governance/evidence/p1-006-governance-lifecycle-closure.json";
+
+const P1_MARKETPLACE_REFERRAL_REVIEWED_AT = "2026-09-14T01:51:58Z";
+const P1_MARKETPLACE_REFERRAL_LIFECYCLE_AT = "2026-09-14T05:18:06Z";
+
+const P1_MARKETPLACE_REFERRAL_PENDING_RECORD_SHA256 =
   "04144524ad18a940795ec697d3a842aa368348cfe11f1255a91438ed47392b4b";
+const P1_MARKETPLACE_REFERRAL_CLOSED_RECORD_SHA256 =
+  "46a6252620ec4a54d40be34195c5639faf0e0c97ca4f600e6e02defbacb187b4";
+
+const P1_MARKETPLACE_REFERRAL_PENDING_DECISION_SHA256 =
+  "2c05d3e782c00e8d2a23fb78b34afdd59e5dcde84da46fe91f461d38f424e96f";
+const P1_MARKETPLACE_REFERRAL_CLOSED_DECISION_SHA256 =
+  "a1804db9bcaf7d1796404f019424c41a109b10cfa5faef25db9ec4f25e16f694";
+
+const P1_MARKETPLACE_REFERRAL_PENDING_WORK_ITEM_SHA256 =
+  "00325da449ba765a86c5c8c300effcc28d7a33eb9586dffac6329bcecc7c95f3";
+const P1_MARKETPLACE_REFERRAL_CLOSED_WORK_ITEM_SHA256 =
+  "ffd06bbd2b2cc177eba3c554bd98acb6238143a7e622b1a88ae6282237bdc884";
+
+const P1_MARKETPLACE_REFERRAL_CLOSED_RELEASE_SHA256 =
+  "1c934d75192e5c3138ac18dfd851e107bd4874a79c43c8795164211ee598f6b6";
+
+const P1_MARKETPLACE_REFERRAL_CLOSURE_CANONICAL_SHA256 =
+  "e92c4c9ee83cab4e75a7a0bcd9c7644ae95ad4ff1591c52814f5d77b47477d67";
+const P1_MARKETPLACE_REFERRAL_CLOSURE_RAW_SHA256 =
+  "98b65da2060efde8788b41ba3f2fd0a3822726af91856da154e9b1aa76e6574c";
+const P1_MARKETPLACE_REFERRAL_CLOSURE_BYTES = 5888;
 
 const P1_MARKETPLACE_REFERRAL_PENDING_DRIFT =
   "Not yet executed. This is an unreviewed, unapplied local candidate; no database validation or persistent application has occurred.";
 
 const P1_MARKETPLACE_REFERRAL_PENDING_ROLLBACK =
   "A separately authorized rollback-only Rosuno Staging validation must execute the exact protected candidate transactionally and independently prove exact restoration of the accepted seven-migration baseline before any persistent Staging application.";
+
+const P1_MARKETPLACE_REFERRAL_CLOSED_DRIFT =
+  "Rosuno Staging rollback-only validation passed exact restoration of the accepted seven-migration baseline; persistent application then passed exact eight-version history, 31/31 RLS, zero P1-006 business rows, exact 31-table catalog fingerprint, and zero unapproved security-advisor findings.";
+
+const P1_MARKETPLACE_REFERRAL_CLOSED_ROLLBACK =
+  "If a later independently verified defect requires Staging rollback, remove only the sequence-8 P1-006 change through a separately reviewed forward-only non-production rollback migration; never edit historical migration bytes or migration history directly, and preserve all earlier accepted controls.";
 
 function p1006Canonical(value) {
   if (Array.isArray(value)) return value.map(p1006Canonical);
@@ -7045,6 +7147,16 @@ function p1006Digest(value) {
   return createHash("sha256")
     .update(JSON.stringify(p1006Canonical(value)))
     .digest("hex");
+}
+
+function p1006ExactlyOne(records, field, value, label) {
+  const found = records.filter((record) => record[field] === value);
+
+  if (found.length !== 1) {
+    fail(`P1-006 ${label}: missing or duplicate ${value}`);
+  }
+
+  return found[0];
 }
 
 function validateP1MarketplaceReferralIdentity(migration, sql) {
@@ -7096,8 +7208,94 @@ function validateP1MarketplaceReferralIdentity(migration, sql) {
   }
 }
 
+export function validateP1MarketplaceReferralClosure(migration, sql, evidence) {
+  validateP1MarketplaceReferralIdentity(migration, sql);
+
+  requireStringArrayExact(
+    migration.release_refs,
+    [P1_MARKETPLACE_REFERRAL_RELEASE_ID],
+    "P1-006 release_refs",
+  );
+
+  if (
+    migration.reviewed !== true ||
+    migration.reviewed_by !== "Rosuno" ||
+    migration.reviewed_at !== P1_MARKETPLACE_REFERRAL_REVIEWED_AT ||
+    migration.applied_environment !== "staging" ||
+    migration.non_production_validation !== true ||
+    migration.drift_check !== P1_MARKETPLACE_REFERRAL_CLOSED_DRIFT ||
+    migration.rollback_plan !== P1_MARKETPLACE_REFERRAL_CLOSED_ROLLBACK ||
+    p1006Digest(migration) !== P1_MARKETPLACE_REFERRAL_CLOSED_RECORD_SHA256
+  ) {
+    fail("P1-006 closed migration lifecycle is invalid");
+  }
+
+  requireExactFields(
+    evidence,
+    [
+      "version",
+      "evidence_id",
+      "work_item_id",
+      "lifecycle",
+      "lifecycle_state",
+      "repository",
+      "migration",
+      "gate5",
+      "gate6",
+      "fingerprints",
+      "security_advisor",
+      "release",
+      "boundaries",
+      "integrity",
+    ],
+    "P1-006 closure evidence",
+  );
+
+  if (
+    evidence.version !== 1 ||
+    evidence.evidence_id !== "P1-006-GOVERNANCE-LIFECYCLE-CLOSURE-20260914" ||
+    evidence.work_item_id !== P1_MARKETPLACE_REFERRAL_WORK_ITEM_ID ||
+    evidence.lifecycle !==
+      "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED" ||
+    p1006Digest(evidence) !== P1_MARKETPLACE_REFERRAL_CLOSURE_CANONICAL_SHA256
+  ) {
+    fail("P1-006 closure evidence identity is invalid");
+  }
+
+  const evidenceText = readFileSync(
+    path.join(ROOT, P1_MARKETPLACE_REFERRAL_CLOSURE_EVIDENCE_PATH),
+    "utf8",
+  );
+
+  if (
+    Buffer.byteLength(evidenceText, "utf8") !==
+      P1_MARKETPLACE_REFERRAL_CLOSURE_BYTES ||
+    createHash("sha256").update(evidenceText).digest("hex") !==
+      P1_MARKETPLACE_REFERRAL_CLOSURE_RAW_SHA256
+  ) {
+    fail("P1-006 closure evidence bytes are invalid");
+  }
+
+  if (
+    scanSecretLikeText(JSON.stringify(evidence), "P1-006 closure").length > 0
+  ) {
+    fail("P1-006 closure contains a secret-like value");
+  }
+
+  return true;
+}
+
 export function validateP1MarketplaceReferralCandidate(migration, sql) {
   validateP1MarketplaceReferralIdentity(migration, sql);
+
+  if (migration.reviewed === true) {
+    validateP1MarketplaceReferralClosure(
+      migration,
+      sql,
+      readJson(P1_MARKETPLACE_REFERRAL_CLOSURE_EVIDENCE_PATH),
+    );
+    return "closed";
+  }
 
   if (
     migration.reviewed !== false ||
@@ -7112,32 +7310,13 @@ export function validateP1MarketplaceReferralCandidate(migration, sql) {
     fail("P1-006 pending migration lifecycle is invalid");
   }
 
-  if (p1006Digest(migration) !== P1_MARKETPLACE_REFERRAL_RECORD_SHA256) {
-    fail("P1-006 migration governance record mismatch");
+  if (
+    p1006Digest(migration) !== P1_MARKETPLACE_REFERRAL_PENDING_RECORD_SHA256
+  ) {
+    fail("P1-006 pending migration governance record mismatch");
   }
 
   return "pending";
-}
-
-const P1_MARKETPLACE_REFERRAL_DECISION_ID =
-  "DEC-20260914-P1-006-BOUNDED-CANDIDATE";
-const P1_MARKETPLACE_REFERRAL_WORK_ITEM_ID =
-  "WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION";
-
-const P1_MARKETPLACE_REFERRAL_DECISION_SHA256 =
-  "2c05d3e782c00e8d2a23fb78b34afdd59e5dcde84da46fe91f461d38f424e96f";
-
-const P1_MARKETPLACE_REFERRAL_WORK_ITEM_SHA256 =
-  "00325da449ba765a86c5c8c300effcc28d7a33eb9586dffac6329bcecc7c95f3";
-
-function p1006ExactlyOne(records, field, value, label) {
-  const found = records.filter((record) => record[field] === value);
-
-  if (found.length !== 1) {
-    fail(`P1-006 ${label}: missing or duplicate ${value}`);
-  }
-
-  return found[0];
 }
 
 export function validateP1MarketplaceReferralTraceability(
@@ -7176,28 +7355,85 @@ export function validateP1MarketplaceReferralTraceability(
     "work item",
   );
 
+  requireExactFields(decision, DECISION_FIELDS, "P1-006 decision");
+  requireExactFields(workItem, WORK_ITEM_FIELDS, "P1-006 work item");
+
   const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+  const state = validateP1MarketplaceReferralCandidate(migration, sql);
 
-  validateP1MarketplaceReferralCandidate(migration, sql);
+  if (state === "pending") {
+    if (
+      p1006Digest(decision) !== P1_MARKETPLACE_REFERRAL_PENDING_DECISION_SHA256
+    ) {
+      fail("P1-006 pending decision governance record mismatch");
+    }
 
-  if (p1006Digest(decision) !== P1_MARKETPLACE_REFERRAL_DECISION_SHA256) {
-    fail("P1-006 decision governance record mismatch");
+    if (
+      p1006Digest(workItem) !== P1_MARKETPLACE_REFERRAL_PENDING_WORK_ITEM_SHA256
+    ) {
+      fail("P1-006 pending work-item governance record mismatch");
+    }
+
+    const leakedRelease = releases.releases.some(
+      (release) =>
+        release.migration_refs?.includes(
+          P1_MARKETPLACE_REFERRAL_MIGRATION_ID,
+        ) ||
+        release.work_item_refs?.includes(
+          P1_MARKETPLACE_REFERRAL_WORK_ITEM_ID,
+        ) ||
+        release.decision_refs?.includes(P1_MARKETPLACE_REFERRAL_DECISION_ID),
+    );
+
+    if (leakedRelease) {
+      fail("P1-006 pending candidate must not have a release");
+    }
+
+    return true;
   }
 
-  if (p1006Digest(workItem) !== P1_MARKETPLACE_REFERRAL_WORK_ITEM_SHA256) {
-    fail("P1-006 work-item governance record mismatch");
+  if (
+    p1006Digest(decision) !== P1_MARKETPLACE_REFERRAL_CLOSED_DECISION_SHA256
+  ) {
+    fail("P1-006 accepted decision governance record mismatch");
   }
 
-  const leakedRelease = releases.releases.some(
-    (release) =>
-      release.migration_refs?.includes(P1_MARKETPLACE_REFERRAL_MIGRATION_ID) ||
-      release.work_item_refs?.includes(P1_MARKETPLACE_REFERRAL_WORK_ITEM_ID) ||
-      release.decision_refs?.includes(P1_MARKETPLACE_REFERRAL_DECISION_ID),
+  if (
+    p1006Digest(workItem) !== P1_MARKETPLACE_REFERRAL_CLOSED_WORK_ITEM_SHA256
+  ) {
+    fail("P1-006 completed work-item governance record mismatch");
+  }
+
+  const release = p1006ExactlyOne(
+    releases.releases,
+    "release_id",
+    P1_MARKETPLACE_REFERRAL_RELEASE_ID,
+    "release",
   );
 
-  if (leakedRelease) {
-    fail("P1-006 pending candidate must not have a release");
+  requireExactFields(release, RELEASE_FIELDS, "P1-006 release");
+
+  if (p1006Digest(release) !== P1_MARKETPLACE_REFERRAL_CLOSED_RELEASE_SHA256) {
+    fail("P1-006 release governance record mismatch");
   }
+
+  const references = releases.releases.filter(
+    (item) =>
+      item.migration_refs?.includes(P1_MARKETPLACE_REFERRAL_MIGRATION_ID) ||
+      item.work_item_refs?.includes(P1_MARKETPLACE_REFERRAL_WORK_ITEM_ID) ||
+      item.decision_refs?.includes(P1_MARKETPLACE_REFERRAL_DECISION_ID),
+  );
+
+  if (
+    references.length !== 1 ||
+    references[0].release_id !== P1_MARKETPLACE_REFERRAL_RELEASE_ID
+  ) {
+    fail("P1-006 release linkage is duplicated or inconsistent");
+  }
+
+  const evidence = readJson(P1_MARKETPLACE_REFERRAL_CLOSURE_EVIDENCE_PATH);
+
+  validateP1MarketplaceReferralClosure(migration, sql, evidence);
 
   return true;
 }
