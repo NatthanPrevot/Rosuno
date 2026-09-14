@@ -467,6 +467,64 @@
       "rollback_reference": "tools/p0/p1-005-rollback.mjs",
       "created_at": "2026-09-11T06:29:18Z",
       "updated_at": "2026-09-12T22:31:52Z"
+    },
+    {
+      "work_item_id": "WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION",
+      "title": "P1-006 Marketplace / Referral physical foundation",
+      "objective": "Implement the smallest authority-defined Physical 1F Referral persistence and security foundation while preserving referral attempt history, eligible-pool evidence, Presented Set evidence, jurisdiction neutrality, least privilege, and the later Bookability / Scheduling boundary.",
+      "in_scope": [
+        "public.referrals, public.referral_eligible_pool_entries, and public.referral_presentations only",
+        "Authoritative Intake attempt ordering through unique intake_id and attempt_ordinal",
+        "Immutable eligible-pool and presentation evidence with restrictive historical foreign keys",
+        "Immediate RLS, fail-closed ordinary end-user access, and bounded service_role privileges",
+        "Exact authority-supported indexes without speculative indexing",
+        "Local contract, governance, validator, and rollback-generation tooling; database execution remains a separately authorized later gate"
+      ],
+      "out_of_scope": [
+        "Commit, push, pull request, review, merge, release, rollback execution, or persistent Staging application",
+        "Any database contact during the local implementation gate",
+        "Consultation Requests, Availability, Slot Holds, Bookings, Instant Availability Intents, Bookability Evaluations, Consultations, payments, communications, or later-phase relations",
+        "A direct referral_policy_version_id on referrals, a separate allocation-truth table, recommendation truth, Best Match, paid placement, subscription priority, or a regulatory outcome enum",
+        "California-specific schema or counsel-gated policy values",
+        "Production, OLD, source/development database mutation, or P1-007 and later work"
+      ],
+      "status": "in_progress",
+      "owner": "Rosuno P1-006 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260914-P1-006-BOUNDED-CANDIDATE"],
+      "dependencies": ["WI-P1-005-CLIENT-INTAKE-AI-FOUNDATION"],
+      "acceptance_criteria": [
+        "Exactly three Physical 1F relations are introduced and no later-phase relation, function, capability, seed, or parallel allocation truth is added",
+        "The migration contains exactly eight restrictive foreign keys, one Intake attempt-order uniqueness invariant, and the two additional authority-supported lookup indexes",
+        "Eligible-pool and presentation evidence remain append-only to the trusted server and ordinary end users receive no direct access in 1F",
+        "Referral mutation is limited to creation plus the bounded outcome fields; no target relation grants DELETE",
+        "No hard-coded regulatory outcome taxonomy, recommendation state, paid ranking, California-specific core assumption, or direct referral_policy_version_id is introduced",
+        "Local targeted tests and the complete canonical Fast-Control validation pass on frozen candidate bytes before a candidate commit",
+        "Any database rollback validation or persistent Staging application occurs only under later separate authorization",
+        "Completion of P1-006 is described only as the Physical 1F Marketplace / Referral foundation, not end-to-end operational Referral capability"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p1-006-contract.test.mjs",
+        "pnpm run rosuno:check --base <base> --head <head> --branch <branch> --allow <approved-path>"
+      ],
+      "environment": "staging",
+      "release_refs": [],
+      "migration_refs": ["20260914000658_p1_marketplace_referral_foundation"],
+      "rollback_reference": "tools/p0/p1-006-rollback.mjs",
+      "created_at": "2026-09-14T00:11:59Z",
+      "updated_at": "2026-09-14T00:11:59Z"
     }
   ]
 }

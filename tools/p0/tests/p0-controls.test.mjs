@@ -41,6 +41,8 @@ import {
   validateP1ClientIntakeCandidate,
   validateP1ClientIntakeClosure,
   validateP1ClientIntakeTraceability,
+  validateP1MarketplaceReferralCandidate,
+  validateP1MarketplaceReferralTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
   validateP1RegulatoryCatalog,
@@ -2673,4 +2675,99 @@ test("Fast-Control package scripts remain explicit and dependency-neutral", () =
   broadenedDependencies.dependencies = { unexpected: "1.0.0" };
 
   assert.throws(() => validatePackageJson(broadenedDependencies));
+});
+
+test("P1-006 pending candidate preserves exact local lifecycle and traceability", () => {
+  const migrations = readJson("governance/migrations/reviewed-migrations.json");
+  const workItems = readJson("governance/work-items/index.json");
+  const decisions = readJson("governance/decision-log.json");
+  const releases = readJson("governance/releases/traceability.json");
+
+  const migration = migrations.migrations.find(
+    (item) =>
+      item.migration_id === "20260914000658_p1_marketplace_referral_foundation",
+  );
+
+  assert.ok(migration);
+
+  const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+
+  assert.equal(
+    validateP1MarketplaceReferralCandidate(migration, sql),
+    "pending",
+  );
+
+  assert.doesNotThrow(() =>
+    validateP1MarketplaceReferralTraceability(
+      migrations,
+      workItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  const baseline = readJson("governance/schema-drift/baseline.json");
+
+  assert.equal(baseline.migration_inventory.length, 7);
+  assert.equal(migrations.migrations.length, 8);
+
+  assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
+
+  assert.throws(() =>
+    validateP1MarketplaceReferralCandidate(
+      migration,
+      sql + "\n-- unauthorized byte drift\n",
+    ),
+  );
+
+  const reviewedMigration = structuredClone(migration);
+  reviewedMigration.reviewed = true;
+
+  assert.throws(() =>
+    validateP1MarketplaceReferralCandidate(reviewedMigration, sql),
+  );
+
+  const staleDecisions = structuredClone(decisions);
+  staleDecisions.decisions.find(
+    (item) => item.decision_id === "DEC-20260914-P1-006-BOUNDED-CANDIDATE",
+  ).title = "wrong";
+
+  assert.throws(() =>
+    validateP1MarketplaceReferralTraceability(
+      migrations,
+      workItems,
+      staleDecisions,
+      releases,
+    ),
+  );
+
+  const staleWorkItems = structuredClone(workItems);
+  staleWorkItems.work_items.find(
+    (item) => item.work_item_id === "WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION",
+  ).status = "complete";
+
+  assert.throws(() =>
+    validateP1MarketplaceReferralTraceability(
+      migrations,
+      staleWorkItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  const leakedReleases = structuredClone(releases);
+  leakedReleases.releases.push({
+    migration_refs: ["20260914000658_p1_marketplace_referral_foundation"],
+    work_item_refs: [],
+    decision_refs: [],
+  });
+
+  assert.throws(() =>
+    validateP1MarketplaceReferralTraceability(
+      migrations,
+      workItems,
+      decisions,
+      leakedReleases,
+    ),
+  );
 });
