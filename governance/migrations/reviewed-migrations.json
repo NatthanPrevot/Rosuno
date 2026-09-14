@@ -172,6 +172,31 @@
       "depends_on": [
         "20260910075939_p1_attorney_verification_eligibility_foundation"
       ]
+    },
+    {
+      "migration_id": "20260914000658_p1_marketplace_referral_foundation",
+      "migration_kind": "product",
+      "sequence": 8,
+      "artifact_path": "supabase/migrations/20260914000658_p1_marketplace_referral_foundation.sql",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION"],
+      "decision_refs": ["DEC-20260914-P1-006-BOUNDED-CANDIDATE"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": false,
+      "drift_check": "Not yet executed. This is an unreviewed, unapplied local candidate; no database validation or persistent application has occurred.",
+      "rollback_plan": "A separately authorized rollback-only Rosuno Staging validation must execute the exact protected candidate transactionally and independently prove exact restoration of the accepted seven-migration baseline before any persistent Staging application.",
+      "depends_on": ["20260911062917_p1_client_intake_ai_foundation"]
     }
   ]
 }

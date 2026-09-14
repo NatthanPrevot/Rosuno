@@ -251,6 +251,39 @@
         "governance/schema-drift/baseline.json"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260914-P1-006-BOUNDED-CANDIDATE",
+      "title": "Implement the bounded P1-006 Marketplace / Referral foundation",
+      "status": "accepted",
+      "scope": "Bounded local Physical 1F Marketplace / Referral foundation implementation only; no protected review, remote mutation, database execution, or later P1 work.",
+      "decision": "Implement exactly referrals, referral_eligible_pool_entries, and referral_presentations using the frozen P1-006 physical contract. Preserve authoritative Intake attempt ordering, immutable eligible-pool and presentation evidence, fail-closed end-user access, and narrow trusted-server mutation. Do not represent this database foundation as the complete operational Discovery / Referral workflow.",
+      "rationale": "The ten current locked Rosuno authority documents place Marketplace / Referral persistence in Physical 1F while Scheduling, Consultation Request, and Bookability remain later dependencies. The frozen contract resolves the physical implementation without inventing regulatory outcome taxonomies, referral-policy columns, paid ranking, recommendation truth, or later-phase relations.",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION"],
+      "owner": "Rosuno P1-006 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-09-14T00:11:59Z",
+      "updated_at": "2026-09-14T00:11:59Z",
+      "supersedes": [],
+      "impact": "Authorizes only the bounded local P1-006 implementation gate. It does not authorize commit, push, pull request, merge, database contact, rollback validation, persistent Staging application, production, OLD access, P1-007, or an end-to-end Referral capability claim.",
+      "evidence": [
+        "supabase/migrations/20260914000658_p1_marketplace_referral_foundation.sql",
+        "tools/p0/lib/p1-006-contract-data.mjs",
+        "tools/p0/tests/p1-006-contract.test.mjs",
+        "tools/p0/p1-006-rollback.mjs"
+      ],
+      "expiry": null
     }
   ]
 }
