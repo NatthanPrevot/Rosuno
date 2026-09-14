@@ -188,14 +188,14 @@
       ],
       "work_item_refs": ["WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION"],
       "decision_refs": ["DEC-20260914-P1-006-BOUNDED-CANDIDATE"],
-      "release_refs": [],
-      "reviewed": false,
-      "reviewed_by": "pending designated human PR review",
-      "reviewed_at": null,
-      "applied_environment": "none",
-      "non_production_validation": false,
-      "drift_check": "Not yet executed. This is an unreviewed, unapplied local candidate; no database validation or persistent application has occurred.",
-      "rollback_plan": "A separately authorized rollback-only Rosuno Staging validation must execute the exact protected candidate transactionally and independently prove exact restoration of the accepted seven-migration baseline before any persistent Staging application.",
+      "release_refs": ["REL-20260914-P1-006-STAGING-APPLICATION"],
+      "reviewed": true,
+      "reviewed_by": "Rosuno",
+      "reviewed_at": "2026-09-14T01:51:58Z",
+      "applied_environment": "staging",
+      "non_production_validation": true,
+      "drift_check": "Rosuno Staging rollback-only validation passed exact restoration of the accepted seven-migration baseline; persistent application then passed exact eight-version history, 31/31 RLS, zero P1-006 business rows, exact 31-table catalog fingerprint, and zero unapproved security-advisor findings.",
+      "rollback_plan": "If a later independently verified defect requires Staging rollback, remove only the sequence-8 P1-006 change through a separately reviewed forward-only non-production rollback migration; never edit historical migration bytes or migration history directly, and preserve all earlier accepted controls.",
       "depends_on": ["20260911062917_p1_client_intake_ai_foundation"]
     }
   ]

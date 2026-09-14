@@ -181,6 +181,28 @@
       },
       "rollback_reference": "tools/p0/p1-005-rollback.mjs",
       "created_at": "2026-09-12T22:31:52Z"
+    },
+    {
+      "release_id": "REL-20260914-P1-006-STAGING-APPLICATION",
+      "commit_sha": "e4e418cde4e046a077c5883c8eadd0c6c4e02c5d",
+      "work_item_refs": ["WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION"],
+      "decision_refs": ["DEC-20260914-P1-006-BOUNDED-CANDIDATE"],
+      "migration_refs": ["20260914000658_p1_marketplace_referral_foundation"],
+      "validation_evidence": [
+        "governance/evidence/p1-006-governance-lifecycle-closure.json",
+        "supabase/migrations/20260914000658_p1_marketplace_referral_foundation.sql",
+        "tools/p0/p1-006-rollback.mjs",
+        "pnpm run p0:validate",
+        "pnpm run p0:test"
+      ],
+      "artifact_digest": "sha256:9035b76466c5b201e54667ee537eb4f9342c191ce5aa35d9e13d44f0def3e094",
+      "environment": "staging",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "rollback_reference": "tools/p0/p1-006-rollback.mjs",
+      "created_at": "2026-09-14T05:18:06Z"
     }
   ]
 }

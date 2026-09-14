@@ -42,6 +42,7 @@ import {
   validateP1ClientIntakeClosure,
   validateP1ClientIntakeTraceability,
   validateP1MarketplaceReferralCandidate,
+  validateP1MarketplaceReferralClosure,
   validateP1MarketplaceReferralTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
@@ -57,7 +58,7 @@ import {
   validateWorkItem,
 } from "../lib/controls.mjs";
 
-test("P1-005 accepted closure requires exact lifecycle evidence and seven-migration baseline", () => {
+test("P1-005 accepted closure remains valid under the current P1-006 baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -99,14 +100,18 @@ test("P1-005 accepted closure requires exact lifecycle evidence and seven-migrat
 
   const baseline = readJson("governance/schema-drift/baseline.json");
 
-  assert.equal(baseline.baseline_id, "rosuno-staging-p1-005-20260912-v1");
-  assert.equal(baseline.migration_inventory.length, 7);
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-006-20260914-v1");
+  assert.equal(baseline.migration_inventory.length, 8);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
-    "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
+    "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
   );
-  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 231062);
-  assert.equal(baseline.catalog_fingerprint.row_count, 744);
+  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 253195);
+  assert.equal(baseline.catalog_fingerprint.row_count, 816);
+  assert.equal(
+    baseline.baseline_digest,
+    "sha256:031db3fe5e3c8c2de73ae81224a66c46edb4c86305410f81cb7ba01a0725577a",
+  );
 
   assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
 
@@ -2677,7 +2682,7 @@ test("Fast-Control package scripts remain explicit and dependency-neutral", () =
   assert.throws(() => validatePackageJson(broadenedDependencies));
 });
 
-test("P1-006 pending candidate preserves exact local lifecycle and traceability", () => {
+test("P1-006 accepted closure requires exact lifecycle evidence and eight-migration baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -2691,10 +2696,17 @@ test("P1-006 pending candidate preserves exact local lifecycle and traceability"
   assert.ok(migration);
 
   const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+  const evidence = readJson(
+    "governance/evidence/p1-006-governance-lifecycle-closure.json",
+  );
 
   assert.equal(
     validateP1MarketplaceReferralCandidate(migration, sql),
-    "pending",
+    "closed",
+  );
+
+  assert.doesNotThrow(() =>
+    validateP1MarketplaceReferralClosure(migration, sql, evidence),
   );
 
   assert.doesNotThrow(() =>
@@ -2708,10 +2720,49 @@ test("P1-006 pending candidate preserves exact local lifecycle and traceability"
 
   const baseline = readJson("governance/schema-drift/baseline.json");
 
-  assert.equal(baseline.migration_inventory.length, 7);
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-006-20260914-v1");
+  assert.equal(baseline.migration_inventory.length, 8);
   assert.equal(migrations.migrations.length, 8);
+  assert.equal(
+    baseline.catalog_fingerprint.sha256,
+    "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
+  );
+  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 253195);
+  assert.equal(baseline.catalog_fingerprint.row_count, 816);
+  assert.equal(
+    baseline.baseline_digest,
+    "sha256:031db3fe5e3c8c2de73ae81224a66c46edb4c86305410f81cb7ba01a0725577a",
+  );
 
   assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
+
+  const staleEvidence = structuredClone(evidence);
+  staleEvidence.security_advisor.info_count = 15;
+
+  assert.throws(() =>
+    validateP1MarketplaceReferralClosure(migration, sql, staleEvidence),
+  );
+
+  const staleMigration = structuredClone(migration);
+  staleMigration.applied_environment = "none";
+
+  assert.throws(() =>
+    validateP1MarketplaceReferralClosure(staleMigration, sql, evidence),
+  );
+
+  const staleReleases = structuredClone(releases);
+  staleReleases.releases.find(
+    (item) => item.release_id === "REL-20260914-P1-006-STAGING-APPLICATION",
+  ).commit_sha = "0".repeat(40);
+
+  assert.throws(() =>
+    validateP1MarketplaceReferralTraceability(
+      migrations,
+      workItems,
+      decisions,
+      staleReleases,
+    ),
+  );
 
   assert.throws(() =>
     validateP1MarketplaceReferralCandidate(
@@ -2720,54 +2771,73 @@ test("P1-006 pending candidate preserves exact local lifecycle and traceability"
     ),
   );
 
-  const reviewedMigration = structuredClone(migration);
-  reviewedMigration.reviewed = true;
+  /* Historical pending-candidate validation remains deterministic. */
+  const pendingMigration = structuredClone(migration);
+  pendingMigration.release_refs = [];
+  pendingMigration.reviewed = false;
+  pendingMigration.reviewed_by = "pending designated human PR review";
+  pendingMigration.reviewed_at = null;
+  pendingMigration.applied_environment = "none";
+  pendingMigration.non_production_validation = false;
+  pendingMigration.drift_check =
+    "Not yet executed. This is an unreviewed, unapplied local candidate; no database validation or persistent application has occurred.";
+  pendingMigration.rollback_plan =
+    "A separately authorized rollback-only Rosuno Staging validation must execute the exact protected candidate transactionally and independently prove exact restoration of the accepted seven-migration baseline before any persistent Staging application.";
 
-  assert.throws(() =>
-    validateP1MarketplaceReferralCandidate(reviewedMigration, sql),
+  assert.equal(
+    validateP1MarketplaceReferralCandidate(pendingMigration, sql),
+    "pending",
   );
 
-  const staleDecisions = structuredClone(decisions);
-  staleDecisions.decisions.find(
+  const pendingMigrations = structuredClone(migrations);
+  pendingMigrations.migrations[
+    pendingMigrations.migrations.findIndex(
+      (item) =>
+        item.migration_id ===
+        "20260914000658_p1_marketplace_referral_foundation",
+    )
+  ] = pendingMigration;
+
+  const pendingDecisions = structuredClone(decisions);
+  const pendingDecision = pendingDecisions.decisions.find(
     (item) => item.decision_id === "DEC-20260914-P1-006-BOUNDED-CANDIDATE",
-  ).title = "wrong";
-
-  assert.throws(() =>
-    validateP1MarketplaceReferralTraceability(
-      migrations,
-      workItems,
-      staleDecisions,
-      releases,
-    ),
   );
 
-  const staleWorkItems = structuredClone(workItems);
-  staleWorkItems.work_items.find(
+  pendingDecision.scope =
+    "Bounded local Physical 1F Marketplace / Referral foundation implementation only; no protected review, remote mutation, database execution, or later P1 work.";
+  pendingDecision.rationale =
+    "The ten current locked Rosuno authority documents place Marketplace / Referral persistence in Physical 1F while Scheduling, Consultation Request, and Bookability remain later dependencies. The frozen contract resolves the physical implementation without inventing regulatory outcome taxonomies, referral-policy columns, paid ranking, recommendation truth, or later-phase relations.";
+  pendingDecision.updated_at = "2026-09-14T00:11:59Z";
+  pendingDecision.impact =
+    "Authorizes only the bounded local P1-006 implementation gate. It does not authorize commit, push, pull request, merge, database contact, rollback validation, persistent Staging application, production, OLD access, P1-007, or an end-to-end Referral capability claim.";
+  pendingDecision.evidence = [
+    "supabase/migrations/20260914000658_p1_marketplace_referral_foundation.sql",
+    "tools/p0/lib/p1-006-contract-data.mjs",
+    "tools/p0/tests/p1-006-contract.test.mjs",
+    "tools/p0/p1-006-rollback.mjs",
+  ];
+
+  const pendingWorkItems = structuredClone(workItems);
+  const pendingWorkItem = pendingWorkItems.work_items.find(
     (item) => item.work_item_id === "WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION",
-  ).status = "complete";
-
-  assert.throws(() =>
-    validateP1MarketplaceReferralTraceability(
-      migrations,
-      staleWorkItems,
-      decisions,
-      releases,
-    ),
   );
 
-  const leakedReleases = structuredClone(releases);
-  leakedReleases.releases.push({
-    migration_refs: ["20260914000658_p1_marketplace_referral_foundation"],
-    work_item_refs: [],
-    decision_refs: [],
-  });
+  pendingWorkItem.status = "in_progress";
+  pendingWorkItem.reviewer.status = "pending";
+  pendingWorkItem.release_refs = [];
+  pendingWorkItem.updated_at = "2026-09-14T00:11:59Z";
 
-  assert.throws(() =>
+  const pendingReleases = structuredClone(releases);
+  pendingReleases.releases = pendingReleases.releases.filter(
+    (item) => item.release_id !== "REL-20260914-P1-006-STAGING-APPLICATION",
+  );
+
+  assert.doesNotThrow(() =>
     validateP1MarketplaceReferralTraceability(
-      migrations,
-      workItems,
-      decisions,
-      leakedReleases,
+      pendingMigrations,
+      pendingWorkItems,
+      pendingDecisions,
+      pendingReleases,
     ),
   );
 });

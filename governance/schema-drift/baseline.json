@@ -1,10 +1,10 @@
 {
   "version": 1,
   "product_schema_present": true,
-  "baseline_id": "rosuno-staging-p1-005-20260912-v1",
-  "baseline_digest": "sha256:1a4d4ffeb9f0bd6de1b960c573967bcc97ac0cfc37f7aafecd01237543c26a56",
+  "baseline_id": "rosuno-staging-p1-006-20260914-v1",
+  "baseline_digest": "sha256:031db3fe5e3c8c2de73ae81224a66c46edb4c86305410f81cb7ba01a0725577a",
   "checked_environment": "staging",
-  "checked_at": "2026-09-12T21:11:10.801292Z",
+  "checked_at": "2026-09-14T05:00:30.987864Z",
   "project": {
     "name": "Rosuno Staging",
     "project_ref": "mxjlvmowmodzdtdfgqpb"
@@ -51,6 +51,12 @@
       "migration_id": "20260911062917_p1_client_intake_ai_foundation",
       "artifact_path": "supabase/migrations/20260911062917_p1_client_intake_ai_foundation.sql",
       "sha256": "13be2baeaa808d38a5e209071c94a9c9565fbd1280aeae0395abc50502e2b375"
+    },
+    {
+      "sequence": 8,
+      "migration_id": "20260914000658_p1_marketplace_referral_foundation",
+      "artifact_path": "supabase/migrations/20260914000658_p1_marketplace_referral_foundation.sql",
+      "sha256": "9035b76466c5b201e54667ee537eb4f9342c191ce5aa35d9e13d44f0def3e094"
     }
   ],
   "accepted_evidence": [
@@ -73,20 +79,25 @@
     {
       "path": "governance/evidence/p1-005-governance-lifecycle-closure.json",
       "sha256": "430e9555c5594845339ff50e17b7466f469c6e833d8337056896200ba6e0af66"
+    },
+    {
+      "path": "governance/evidence/p1-006-governance-lifecycle-closure.json",
+      "sha256": "98b65da2060efde8788b41ba3f2fd0a3822726af91856da154e9b1aa76e6574c"
     }
   ],
   "catalog_fingerprint": {
     "format": "rosuno-p1-catalog-v1",
-    "sha256": "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
-    "canonical_byte_length": 231062,
-    "row_count": 744
+    "sha256": "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
+    "canonical_byte_length": 253195,
+    "row_count": 816
   },
   "evidence": [
     "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json",
     "governance/evidence/p1-002-authorization-scope-correction.json",
     "governance/evidence/p1-002-corrected-catalog-fingerprint-v2.json",
     "governance/evidence/p1-004-governance-lifecycle-closure.json",
-    "governance/evidence/p1-005-governance-lifecycle-closure.json"
+    "governance/evidence/p1-005-governance-lifecycle-closure.json",
+    "governance/evidence/p1-006-governance-lifecycle-closure.json"
   ],
   "drift_status": "clean",
   "drift_items": []
