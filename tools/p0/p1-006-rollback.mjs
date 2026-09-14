@@ -285,10 +285,10 @@ values (
     `insert into public.referrals(
        id,intake_id,attorney_id,jurisdiction_id,attempt_ordinal
      ) values (
-       ${id(11)},
-       ${id(4)},
-       ${id(6)},
-       ${id(5)},
+       ${u(11)},
+       ${u(4)},
+       ${u(6)},
+       ${u(5)},
        1
      )`,
     "23505",
@@ -300,10 +300,10 @@ values (
     `insert into public.referrals(
        id,intake_id,attorney_id,jurisdiction_id,attempt_ordinal
      ) values (
-       ${id(12)},
-       ${id(999)},
-       ${id(6)},
-       ${id(5)},
+       ${u(12)},
+       ${u(999)},
+       ${u(6)},
+       ${u(5)},
        2
      )`,
     "23503",
@@ -370,33 +370,33 @@ where id=${u(8)};`);
     "service_role cannot rewrite Referral allocation context",
     `update public.referrals
        set allocation_method='rewritten'
-       where id=${id(8)}`,
+       where id=${u(8)}`,
   );
 
   denied(
     "eligible-pool evidence is immutable",
     `update public.referral_eligible_pool_entries
        set pool_reason='{"changed":true}'::jsonb
-       where id=${id(9)}`,
+       where id=${u(9)}`,
   );
 
   denied(
     "eligible-pool evidence cannot be deleted",
     `delete from public.referral_eligible_pool_entries
-       where id=${id(9)}`,
+       where id=${u(9)}`,
   );
 
   denied(
     "presentation evidence is immutable",
     `update public.referral_presentations
        set display_position=2
-       where id=${id(10)}`,
+       where id=${u(10)}`,
   );
 
   denied(
     "presentation evidence cannot be deleted",
     `delete from public.referral_presentations
-       where id=${id(10)}`,
+       where id=${u(10)}`,
   );
 
   add("RESET ROLE;");
