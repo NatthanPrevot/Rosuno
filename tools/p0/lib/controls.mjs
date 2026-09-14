@@ -5334,6 +5334,7 @@ export function validateMigrationRegister(
     const context = `migration ${index + 1}`;
     let acceptedP1AttorneyCandidate = false;
     let acceptedP1ClientIntakeCandidate = false;
+    let acceptedP1MarketplaceReferralCandidate = false;
     requireExactFields(migration, MIGRATION_FIELDS, context);
     if (!["security_control", "product"].includes(migration.migration_kind)) {
       fail(`${context}.migration_kind is not allowed`);
@@ -5424,6 +5425,9 @@ export function validateMigrationRegister(
         );
         validateP1ClientIntakeCandidate(migration, candidateSql);
         acceptedP1ClientIntakeCandidate = true;
+      } else if (P1_MARKETPLACE_REFERRAL_ID.test(migration.migration_id)) {
+        validateP1MarketplaceReferralCandidate(migration, sql);
+        acceptedP1MarketplaceReferralCandidate = true;
       } else {
         fail(`${context}.artifact_path is outside the authorized P1 slice`);
       }
@@ -5480,6 +5484,7 @@ export function validateMigrationRegister(
       migration.applied_environment === "none" &&
       !acceptedP1AttorneyCandidate &&
       !acceptedP1ClientIntakeCandidate &&
+      !acceptedP1MarketplaceReferralCandidate &&
       (migration.migration_kind !== "product" ||
         migration.non_production_validation !== true)
     ) {
@@ -5505,7 +5510,8 @@ export function validateMigrationRegister(
       !acceptedP1RegulatoryToolingException &&
       !acceptedP1AuthorizationCorrectionValidation &&
       !acceptedP1AttorneyCandidate &&
-      !acceptedP1ClientIntakeCandidate
+      !acceptedP1ClientIntakeCandidate &&
+      !acceptedP1MarketplaceReferralCandidate
     ) {
       fail(`${context} lacks a clean drift check`);
     }
@@ -5647,7 +5653,7 @@ export function validateDriftReport(report, migrationRegister = null) {
 
   if (
     register.product_migrations_present !== true ||
-    ![5, 6, 7].includes(register.migrations?.length) ||
+    ![5, 6, 7, 8].includes(register.migrations?.length) ||
     register.migrations
       .slice(0, 5)
       .some(
@@ -5662,16 +5668,22 @@ export function validateDriftReport(report, migrationRegister = null) {
     fail("schema drift migration inventory contradicts the reviewed register");
   }
 
-  if (closedP1004 && ![6, 7].includes(register.migrations.length))
+  if (closedP1004 && ![6, 7, 8].includes(register.migrations.length))
     fail(
-      "P1-004 baseline requires six accepted migrations plus at most one bounded overlay",
+      "P1-004 baseline requires six accepted migrations plus at most two bounded overlays",
     );
 
-  if (closedP1005 && register.migrations.length !== 7)
-    fail("P1-005 baseline requires exactly seven accepted migrations");
+  if (closedP1005 && ![7, 8].includes(register.migrations.length))
+    fail(
+      "P1-005 baseline requires seven accepted migrations plus at most one bounded P1-006 overlay",
+    );
 
   if (!closedP1004 && !closedP1005 && register.migrations.length === 7) {
     fail("P1-005 overlay requires the accepted P1-004 baseline");
+  }
+
+  if (!closedP1004 && !closedP1005 && register.migrations.length === 8) {
+    fail("P1-006 overlay requires an accepted P1-004 or P1-005 baseline");
   }
 
   if (register.migrations.length === 6) {
@@ -5685,6 +5697,13 @@ export function validateDriftReport(report, migrationRegister = null) {
   if (register.migrations.length === 7) {
     if (!closedP1004 && !closedP1005)
       fail("seven migrations require an accepted P1-004 or P1-005 baseline");
+
+    validateMigrationRegister(register, {}, repositoryFiles());
+  }
+
+  if (register.migrations.length === 8) {
+    if (!closedP1004 && !closedP1005)
+      fail("eight migrations require an accepted P1-004 or P1-005 baseline");
 
     validateMigrationRegister(register, {}, repositoryFiles());
   }
@@ -6030,6 +6049,9 @@ export function validateNeutralPaths(files, packageJson) {
       !/^supabase\/migrations\/[0-9]{14}_p1_client_intake_ai_foundation\.sql$/.test(
         file,
       ) &&
+      !/^supabase\/migrations\/[0-9]{14}_p1_marketplace_referral_foundation\.sql$/.test(
+        file,
+      ) &&
       !file.startsWith("governance/") &&
       !file.startsWith("tools/p0/"),
   );
@@ -6196,6 +6218,12 @@ export function validateRepository() {
     releases,
   );
   validateP1ClientIntakeTraceability(
+    migrations,
+    workItems,
+    decisions,
+    releases,
+  );
+  validateP1MarketplaceReferralTraceability(
     migrations,
     workItems,
     decisions,
@@ -6973,6 +7001,203 @@ export function validateP1ClientIntakeTraceability(
   const evidence = readJson(P1_CLIENT_INTAKE_CLOSURE_EVIDENCE_PATH);
 
   validateP1ClientIntakeClosure(migration, migrationSql, evidence);
+
+  return true;
+}
+
+/* P1-006 bounded pending-candidate controls.
+ * This recognizes only the local Physical 1F candidate. It does not recognize
+ * review, release, database validation, persistent application, or closure.
+ */
+const P1_MARKETPLACE_REFERRAL_ID =
+  /^([0-9]{14})_p1_marketplace_referral_foundation$/;
+const P1_MARKETPLACE_REFERRAL_MIGRATION_ID =
+  "20260914000658_p1_marketplace_referral_foundation";
+const P1_MARKETPLACE_REFERRAL_MIGRATION_PATH =
+  "supabase/migrations/20260914000658_p1_marketplace_referral_foundation.sql";
+const P1_MARKETPLACE_REFERRAL_MIGRATION_SHA256 =
+  "9035b76466c5b201e54667ee537eb4f9342c191ce5aa35d9e13d44f0def3e094";
+const P1_MARKETPLACE_REFERRAL_MIGRATION_BYTES = 4506;
+const P1_MARKETPLACE_REFERRAL_RECORD_SHA256 =
+  "04144524ad18a940795ec697d3a842aa368348cfe11f1255a91438ed47392b4b";
+
+const P1_MARKETPLACE_REFERRAL_PENDING_DRIFT =
+  "Not yet executed. This is an unreviewed, unapplied local candidate; no database validation or persistent application has occurred.";
+
+const P1_MARKETPLACE_REFERRAL_PENDING_ROLLBACK =
+  "A separately authorized rollback-only Rosuno Staging validation must execute the exact protected candidate transactionally and independently prove exact restoration of the accepted seven-migration baseline before any persistent Staging application.";
+
+function p1006Canonical(value) {
+  if (Array.isArray(value)) return value.map(p1006Canonical);
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, p1006Canonical(value[key])]),
+    );
+  }
+
+  return value;
+}
+
+function p1006Digest(value) {
+  return createHash("sha256")
+    .update(JSON.stringify(p1006Canonical(value)))
+    .digest("hex");
+}
+
+function validateP1MarketplaceReferralIdentity(migration, sql) {
+  requireExactFields(migration, MIGRATION_FIELDS, "P1-006 migration");
+
+  if (
+    !P1_MARKETPLACE_REFERRAL_ID.test(migration.migration_id) ||
+    migration.migration_id !== P1_MARKETPLACE_REFERRAL_MIGRATION_ID ||
+    migration.sequence !== 8 ||
+    migration.migration_kind !== "product" ||
+    migration.artifact_path !== P1_MARKETPLACE_REFERRAL_MIGRATION_PATH
+  ) {
+    fail("P1-006 migration identity is invalid");
+  }
+
+  if (
+    Buffer.byteLength(sql, "utf8") !== P1_MARKETPLACE_REFERRAL_MIGRATION_BYTES
+  ) {
+    fail("P1-006 migration byte length mismatch");
+  }
+
+  const sqlDigest = createHash("sha256").update(sql).digest("hex");
+
+  if (sqlDigest !== P1_MARKETPLACE_REFERRAL_MIGRATION_SHA256) {
+    fail("P1-006 migration SHA-256 mismatch");
+  }
+
+  const createdTables = [...sql.matchAll(/create table public\.(\w+)/gi)].map(
+    (match) => match[1],
+  );
+
+  if (
+    JSON.stringify(createdTables) !==
+    JSON.stringify([
+      "referrals",
+      "referral_eligible_pool_entries",
+      "referral_presentations",
+    ])
+  ) {
+    fail("P1-006 migration table scope mismatch");
+  }
+
+  if (/create\s+(?:or replace\s+)?function/i.test(sql)) {
+    fail("P1-006 must not create a function");
+  }
+
+  if (/insert into public\./i.test(sql)) {
+    fail("P1-006 must not seed public data");
+  }
+}
+
+export function validateP1MarketplaceReferralCandidate(migration, sql) {
+  validateP1MarketplaceReferralIdentity(migration, sql);
+
+  if (
+    migration.reviewed !== false ||
+    migration.reviewed_by !== "pending designated human PR review" ||
+    migration.reviewed_at !== null ||
+    migration.applied_environment !== "none" ||
+    migration.non_production_validation !== false ||
+    migration.release_refs.length !== 0 ||
+    migration.drift_check !== P1_MARKETPLACE_REFERRAL_PENDING_DRIFT ||
+    migration.rollback_plan !== P1_MARKETPLACE_REFERRAL_PENDING_ROLLBACK
+  ) {
+    fail("P1-006 pending migration lifecycle is invalid");
+  }
+
+  if (p1006Digest(migration) !== P1_MARKETPLACE_REFERRAL_RECORD_SHA256) {
+    fail("P1-006 migration governance record mismatch");
+  }
+
+  return "pending";
+}
+
+const P1_MARKETPLACE_REFERRAL_DECISION_ID =
+  "DEC-20260914-P1-006-BOUNDED-CANDIDATE";
+const P1_MARKETPLACE_REFERRAL_WORK_ITEM_ID =
+  "WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION";
+
+const P1_MARKETPLACE_REFERRAL_DECISION_SHA256 =
+  "2c05d3e782c00e8d2a23fb78b34afdd59e5dcde84da46fe91f461d38f424e96f";
+
+const P1_MARKETPLACE_REFERRAL_WORK_ITEM_SHA256 =
+  "00325da449ba765a86c5c8c300effcc28d7a33eb9586dffac6329bcecc7c95f3";
+
+function p1006ExactlyOne(records, field, value, label) {
+  const found = records.filter((record) => record[field] === value);
+
+  if (found.length !== 1) {
+    fail(`P1-006 ${label}: missing or duplicate ${value}`);
+  }
+
+  return found[0];
+}
+
+export function validateP1MarketplaceReferralTraceability(
+  migrations,
+  workItems,
+  decisions,
+  releases,
+) {
+  if (
+    !Array.isArray(migrations.migrations) ||
+    !Array.isArray(workItems.work_items) ||
+    !Array.isArray(decisions.decisions) ||
+    !Array.isArray(releases.releases)
+  ) {
+    fail("P1-006 traceability register is malformed");
+  }
+
+  const migration = p1006ExactlyOne(
+    migrations.migrations,
+    "migration_id",
+    P1_MARKETPLACE_REFERRAL_MIGRATION_ID,
+    "migration",
+  );
+
+  const decision = p1006ExactlyOne(
+    decisions.decisions,
+    "decision_id",
+    P1_MARKETPLACE_REFERRAL_DECISION_ID,
+    "decision",
+  );
+
+  const workItem = p1006ExactlyOne(
+    workItems.work_items,
+    "work_item_id",
+    P1_MARKETPLACE_REFERRAL_WORK_ITEM_ID,
+    "work item",
+  );
+
+  const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+
+  validateP1MarketplaceReferralCandidate(migration, sql);
+
+  if (p1006Digest(decision) !== P1_MARKETPLACE_REFERRAL_DECISION_SHA256) {
+    fail("P1-006 decision governance record mismatch");
+  }
+
+  if (p1006Digest(workItem) !== P1_MARKETPLACE_REFERRAL_WORK_ITEM_SHA256) {
+    fail("P1-006 work-item governance record mismatch");
+  }
+
+  const leakedRelease = releases.releases.some(
+    (release) =>
+      release.migration_refs?.includes(P1_MARKETPLACE_REFERRAL_MIGRATION_ID) ||
+      release.work_item_refs?.includes(P1_MARKETPLACE_REFERRAL_WORK_ITEM_ID) ||
+      release.decision_refs?.includes(P1_MARKETPLACE_REFERRAL_DECISION_ID),
+  );
+
+  if (leakedRelease) {
+    fail("P1-006 pending candidate must not have a release");
+  }
 
   return true;
 }

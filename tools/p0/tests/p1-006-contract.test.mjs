@@ -11,10 +11,7 @@ const sql = readMigrationSql();
 
 function tableBody(table) {
   const match = sql.match(
-    new RegExp(
-      `create table public\\.${table}\\s*\\(([\\s\\S]*?)\\n\\);`,
-      "i",
-    ),
+    new RegExp(`create table public\\.${table}\\s*\\(([\\s\\S]*?)\\n\\);`, "i"),
   );
 
   assert.ok(match, `missing create table for ${table}`);
@@ -22,9 +19,7 @@ function tableBody(table) {
 }
 
 function expectedColumns(definition) {
-  return definition
-    .split(" ")
-    .map((item) => item.split(":")[0]);
+  return definition.split(" ").map((item) => item.split(":")[0]);
 }
 
 function actualColumns(table) {
@@ -35,9 +30,7 @@ function actualColumns(table) {
 
 test("P1-006 SQL is exactly the bounded three-relation 1F foundation", () => {
   assert.deepEqual(
-    [...sql.matchAll(/create table public\.(\w+)/gi)].map(
-      (match) => match[1],
-    ),
+    [...sql.matchAll(/create table public\.(\w+)/gi)].map((match) => match[1]),
     tables,
   );
 
@@ -97,10 +90,7 @@ test("P1-006 columns and timestamp defaults match the locked physical surface", 
     /(?:eligible_as_of|shown_at|outcome_recorded_at)\s+timestamptz[^,\n]*\bdefault\b/i,
   );
 
-  assert.match(
-    sql,
-    /attorney_id uuid,\s*jurisdiction_id uuid not null/i,
-  );
+  assert.match(sql, /attorney_id uuid,\s*jurisdiction_id uuid not null/i);
   assert.match(sql, /pool_reason jsonb,\s*created_at/i);
   assert.match(
     sql,

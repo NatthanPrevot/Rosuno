@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
-export const migrationPath = "supabase/migrations/20260914000658_p1_marketplace_referral_foundation.sql";
+export const migrationPath =
+  "supabase/migrations/20260914000658_p1_marketplace_referral_foundation.sql";
 
 export const tables = [
   "referrals",
@@ -18,8 +19,7 @@ export const columns = {
 };
 
 export const required = {
-  referrals:
-    "id intake_id jurisdiction_id attempt_ordinal created_at",
+  referrals: "id intake_id jurisdiction_id attempt_ordinal created_at",
   referral_eligible_pool_entries:
     "id referral_id attorney_id eligibility_evaluation_id eligible_as_of created_at",
   referral_presentations:
