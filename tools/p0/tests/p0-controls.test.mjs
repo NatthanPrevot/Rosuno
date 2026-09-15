@@ -44,6 +44,8 @@ import {
   validateP1MarketplaceReferralCandidate,
   validateP1MarketplaceReferralClosure,
   validateP1MarketplaceReferralTraceability,
+  validateP1SchedulingRequestBookingBookabilityCandidate,
+  validateP1SchedulingRequestBookingBookabilityTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
   validateP1RegulatoryCatalog,
@@ -2722,7 +2724,7 @@ test("P1-006 accepted closure requires exact lifecycle evidence and eight-migrat
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-006-20260914-v1");
   assert.equal(baseline.migration_inventory.length, 8);
-  assert.equal(migrations.migrations.length, 8);
+  assert.equal(migrations.migrations.length, 9);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
@@ -2838,6 +2840,117 @@ test("P1-006 accepted closure requires exact lifecycle evidence and eight-migrat
       pendingWorkItems,
       pendingDecisions,
       pendingReleases,
+    ),
+  );
+});
+test("P1-007 pending candidate is exact above the accepted P1-006 Staging baseline", () => {
+  const migrations = readJson("governance/migrations/reviewed-migrations.json");
+  const workItems = readJson("governance/work-items/index.json");
+  const decisions = readJson("governance/decision-log.json");
+  const releases = readJson("governance/releases/traceability.json");
+  const baseline = readJson("governance/schema-drift/baseline.json");
+
+  const migrationId =
+    "20260914231532_p1_scheduling_request_booking_bookability_foundation";
+  const decisionId = "DEC-20260914-P1-007-BOUNDED-CANDIDATE";
+  const workItemId =
+    "WI-P1-007-SCHEDULING-REQUEST-BOOKING-BOOKABILITY-FOUNDATION";
+
+  const migration = migrations.migrations.find(
+    (item) => item.migration_id === migrationId,
+  );
+
+  assert.ok(migration);
+
+  const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+
+  assert.equal(
+    validateP1SchedulingRequestBookingBookabilityCandidate(migration, sql),
+    "pending",
+  );
+
+  assert.doesNotThrow(() =>
+    validateP1SchedulingRequestBookingBookabilityTraceability(
+      migrations,
+      workItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-006-20260914-v1");
+  assert.equal(baseline.migration_inventory.length, 8);
+  assert.equal(migrations.migrations.length, 9);
+
+  assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
+
+  const byteDriftSql = `${sql}\n-- unauthorized P1-007 byte drift\n`;
+
+  assert.throws(() =>
+    validateP1SchedulingRequestBookingBookabilityCandidate(
+      migration,
+      byteDriftSql,
+    ),
+  );
+
+  const invalidLifecycle = structuredClone(migration);
+  invalidLifecycle.reviewed = true;
+
+  assert.throws(() =>
+    validateP1SchedulingRequestBookingBookabilityCandidate(
+      invalidLifecycle,
+      sql,
+    ),
+  );
+
+  const staleDecisions = structuredClone(decisions);
+  const staleDecision = staleDecisions.decisions.find(
+    (item) => item.decision_id === decisionId,
+  );
+
+  assert.ok(staleDecision);
+  staleDecision.title += " drift";
+
+  assert.throws(() =>
+    validateP1SchedulingRequestBookingBookabilityTraceability(
+      migrations,
+      workItems,
+      staleDecisions,
+      releases,
+    ),
+  );
+
+  const staleWorkItems = structuredClone(workItems);
+  const staleWorkItem = staleWorkItems.work_items.find(
+    (item) => item.work_item_id === workItemId,
+  );
+
+  assert.ok(staleWorkItem);
+  staleWorkItem.objective += " drift";
+
+  assert.throws(() =>
+    validateP1SchedulingRequestBookingBookabilityTraceability(
+      migrations,
+      staleWorkItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  const leakedReleases = structuredClone(releases);
+  leakedReleases.releases.push({
+    release_id: "REL-P1-007-UNAUTHORIZED-TEST",
+    migration_refs: [migrationId],
+    work_item_refs: [workItemId],
+    decision_refs: [decisionId],
+  });
+
+  assert.throws(() =>
+    validateP1SchedulingRequestBookingBookabilityTraceability(
+      migrations,
+      workItems,
+      decisions,
+      leakedReleases,
     ),
   );
 });
