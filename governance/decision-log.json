@@ -285,6 +285,41 @@
         "governance/schema-drift/baseline.json"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260914-P1-007-BOUNDED-CANDIDATE",
+      "title": "Implement the bounded P1-007 Scheduling / Request / Booking / Bookability foundation",
+      "status": "accepted",
+      "scope": "Bounded local Physical 1G Scheduling / Request / Booking / Bookability foundation implementation only; no branch publication, protected review, remote mutation, database execution, or later P1 work.",
+      "decision": "Implement exactly consultation_requests, availability_rules, blackouts, slot_holds, bookings, instant_availability_intents, and bookability_evaluations using the frozen P1-007 physical contract. Preserve scheduled-versus-instant request semantics, transaction-boundary Request/Hold consistency, server-authoritative Hold lifecycle and scheduling conflict guards, session-bound Instant Availability Intent, immutable point-in-time Bookability evidence, and fail-closed least privilege. Under the separately approved P1-007 interpretation gates, bookings.consultation_id is required in P1-007 without a Booking-to-Consultation foreign key; P1-008 must add that restrictive foreign key forward-only after consultations exists. Recurring Availability requires effective_from, permits null effective_until as open-ended, and requires effective_until >= effective_from when an end is present.",
+      "rationale": "The ten current locked Rosuno authority documents place Scheduling, Consultation Request, Booking substrate, Instant Availability Intent, and Bookability evidence in Physical 1G while Consultation persistence belongs to the later Physical 1H boundary. The two approved interpretation gates resolve only the under-specified cross-migration Booking foreign key and recurring Availability effective range; they do not authorize early Consultation creation, invented recurrence semantics, or later workflow.",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": [
+        "WI-P1-007-SCHEDULING-REQUEST-BOOKING-BOOKABILITY-FOUNDATION"
+      ],
+      "owner": "Rosuno P1-007 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-09-15T03:23:17Z",
+      "updated_at": "2026-09-15T03:23:17Z",
+      "supersedes": [],
+      "impact": "Authorizes only the bounded local P1-007 candidate implementation gate, including local validation and the controlled local candidate commit per the current Operating Model. It does not authorize branch publication, pull request creation, review, merge, database contact, rollback execution, persistent Staging application, production, OLD access, P1-008, or an end-to-end Scheduling / Booking capability claim.",
+      "evidence": [
+        "supabase/migrations/20260914231532_p1_scheduling_request_booking_bookability_foundation.sql",
+        "tools/p0/lib/p1-007-contract-data.mjs",
+        "tools/p0/tests/p1-007-contract.test.mjs",
+        "tools/p0/p1-007-rollback.mjs"
+      ],
+      "expiry": null
     }
   ]
 }

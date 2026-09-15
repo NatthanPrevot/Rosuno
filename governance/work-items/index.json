@@ -525,6 +525,74 @@
       "rollback_reference": "tools/p0/p1-006-rollback.mjs",
       "created_at": "2026-09-14T00:11:59Z",
       "updated_at": "2026-09-14T05:18:06Z"
+    },
+    {
+      "work_item_id": "WI-P1-007-SCHEDULING-REQUEST-BOOKING-BOOKABILITY-FOUNDATION",
+      "title": "P1-007 Scheduling / Request / Booking / Bookability physical foundation",
+      "objective": "Implement the smallest authority-defined Physical 1G persistence and security foundation for scheduled and instant consultation requests, attorney Availability and Blackouts, Slot Holds, Booking history substrate, Instant Availability Intent, and immutable Bookability evidence while preserving jurisdiction neutrality, least privilege, concurrency safety, and the later Consultation boundary.",
+      "in_scope": [
+        "Exactly public.consultation_requests, public.availability_rules, public.blackouts, public.slot_holds, public.bookings, public.instant_availability_intents, and public.bookability_evaluations",
+        "Scheduled Availability recurrence with timezone context, required effective_from, optional open-ended effective_until, and one-time specific_date semantics",
+        "Deferred transaction-boundary Request/Hold consistency and server-authoritative Hold release/expiry behavior",
+        "Per-attorney scheduling conflict guards for active Holds and current confirmed Bookings, including same-Consultation reschedule history",
+        "Session-bound Instant Availability Intent and immutable point-in-time Bookability evidence tied to matching Eligibility",
+        "Immediate RLS, four relationship-scoped authenticated SELECT policies, fail-closed ordinary access, and bounded service_role privileges",
+        "Approved deferred Booking-to-Consultation FK boundary: required consultation_id without the FK in P1-007; restrictive FK added forward-only in P1-008",
+        "Exact authority-supported indexes without speculative indexing",
+        "Local contract, governance, validator, and rollback-generation tooling; database execution remains a separately authorized later gate"
+      ],
+      "out_of_scope": [
+        "Branch publication, pull request, review, merge, release, rollback execution, or persistent Staging application",
+        "Any database contact during the local implementation gate",
+        "Consultation persistence, the P1-008 Booking-to-Consultation FK, payments, communications, or later-phase relations",
+        "A complete application-level Request acceptance or Booking creation workflow; P1-007 Booking application mutation remains fail-closed",
+        "Persisted Presence or heartbeat state; Available Now remains composed from Eligibility, runtime Presence/Readiness, and Intent",
+        "Invented weekday numbering, duration rules, pending-request caps, cancellation/refund policy, jurisdiction-specific regulatory outcomes, or counsel-gated policy values",
+        "Production, OLD, source/development database mutation, or P1-008 and later work"
+      ],
+      "status": "in_progress",
+      "owner": "Rosuno P1-007 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260914-P1-007-BOUNDED-CANDIDATE"],
+      "dependencies": ["WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION"],
+      "acceptance_criteria": [
+        "Exactly seven Physical 1G persistent relations are introduced; Presence remains ephemeral and no later-phase relation is added",
+        "The migration preserves the frozen 53 named table constraints, five enforcement functions, nine triggers, ten authority-supported indexes, and four ordinary-user SELECT policies",
+        "Recurring Availability requires effective_from, permits null effective_until as open-ended, and rejects an end before the start without inventing a weekday numeric convention",
+        "Scheduled Requests require their Hold at the transaction boundary, Instant Requests cannot retain a Hold, and terminal Requests cannot retain an active Hold",
+        "Overlapping active Holds and current confirmed Bookings for the same attorney are rejected using the bounded scheduling conflict control",
+        "Booking consultation_id remains required without a Consultation FK in P1-007, and application Booking mutation remains fail-closed until the later authorized Consultation boundary",
+        "Instant Availability Intent is bound to the attorney's authoritative application session and cannot survive an ended, revoked, expired, or shorter-lived session",
+        "Bookability Evaluation remains immutable point-in-time evidence tied to an Eligibility Evaluation for the same attorney and does not become eligibility or policy authority",
+        "No target relation grants DELETE; ordinary authenticated access and service_role mutation remain exactly bounded by the frozen contract",
+        "Local targeted tests and the complete canonical Fast-Control validation pass on frozen candidate bytes before the controlled local candidate commit",
+        "Any database rollback validation or persistent Staging application occurs only under later separate authorization",
+        "Completion is described only as the Physical 1G foundation, not end-to-end operational Scheduling or Booking capability"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p1-007-contract.test.mjs",
+        "pnpm run rosuno:check --base <base> --head <head> --branch <branch> --allow <approved-path>"
+      ],
+      "environment": "staging",
+      "release_refs": [],
+      "migration_refs": [
+        "20260914231532_p1_scheduling_request_booking_bookability_foundation"
+      ],
+      "rollback_reference": "tools/p0/p1-007-rollback.mjs",
+      "created_at": "2026-09-15T03:23:17Z",
+      "updated_at": "2026-09-15T03:23:17Z"
     }
   ]
 }
