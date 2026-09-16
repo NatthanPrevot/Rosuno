@@ -45,6 +45,7 @@ import {
   validateP1MarketplaceReferralClosure,
   validateP1MarketplaceReferralTraceability,
   validateP1SchedulingRequestBookingBookabilityCandidate,
+  validateP1SchedulingRequestBookingBookabilityClosure,
   validateP1SchedulingRequestBookingBookabilityTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
@@ -60,7 +61,7 @@ import {
   validateWorkItem,
 } from "../lib/controls.mjs";
 
-test("P1-005 accepted closure remains valid under the current P1-006 baseline", () => {
+test("P1-005 accepted closure remains valid under the current P1-007 baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -102,17 +103,17 @@ test("P1-005 accepted closure remains valid under the current P1-006 baseline", 
 
   const baseline = readJson("governance/schema-drift/baseline.json");
 
-  assert.equal(baseline.baseline_id, "rosuno-staging-p1-006-20260914-v1");
-  assert.equal(baseline.migration_inventory.length, 8);
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-007-20260916-v1");
+  assert.equal(baseline.migration_inventory.length, 9);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
-    "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
+    "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
   );
-  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 253195);
-  assert.equal(baseline.catalog_fingerprint.row_count, 816);
+  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 348401);
+  assert.equal(baseline.catalog_fingerprint.row_count, 1089);
   assert.equal(
     baseline.baseline_digest,
-    "sha256:031db3fe5e3c8c2de73ae81224a66c46edb4c86305410f81cb7ba01a0725577a",
+    "sha256:c4f2151ac71875a55e91c5ce050740a702a6069c194bbf7f99ef4ce8df8d0609",
   );
 
   assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
@@ -2684,7 +2685,7 @@ test("Fast-Control package scripts remain explicit and dependency-neutral", () =
   assert.throws(() => validatePackageJson(broadenedDependencies));
 });
 
-test("P1-006 accepted closure requires exact lifecycle evidence and eight-migration baseline", () => {
+test("P1-006 accepted closure remains valid under the current P1-007 baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -2722,18 +2723,18 @@ test("P1-006 accepted closure requires exact lifecycle evidence and eight-migrat
 
   const baseline = readJson("governance/schema-drift/baseline.json");
 
-  assert.equal(baseline.baseline_id, "rosuno-staging-p1-006-20260914-v1");
-  assert.equal(baseline.migration_inventory.length, 8);
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-007-20260916-v1");
+  assert.equal(baseline.migration_inventory.length, 9);
   assert.equal(migrations.migrations.length, 9);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
-    "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
+    "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
   );
-  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 253195);
-  assert.equal(baseline.catalog_fingerprint.row_count, 816);
+  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 348401);
+  assert.equal(baseline.catalog_fingerprint.row_count, 1089);
   assert.equal(
     baseline.baseline_digest,
-    "sha256:031db3fe5e3c8c2de73ae81224a66c46edb4c86305410f81cb7ba01a0725577a",
+    "sha256:c4f2151ac71875a55e91c5ce050740a702a6069c194bbf7f99ef4ce8df8d0609",
   );
 
   assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
@@ -2843,7 +2844,7 @@ test("P1-006 accepted closure requires exact lifecycle evidence and eight-migrat
     ),
   );
 });
-test("P1-007 pending candidate is exact above the accepted P1-006 Staging baseline", () => {
+test("P1-007 accepted closure requires exact lifecycle evidence and nine-migration baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -2855,6 +2856,7 @@ test("P1-007 pending candidate is exact above the accepted P1-006 Staging baseli
   const decisionId = "DEC-20260914-P1-007-BOUNDED-CANDIDATE";
   const workItemId =
     "WI-P1-007-SCHEDULING-REQUEST-BOOKING-BOOKABILITY-FOUNDATION";
+  const releaseId = "REL-20260916-P1-007-STAGING-APPLICATION";
 
   const migration = migrations.migrations.find(
     (item) => item.migration_id === migrationId,
@@ -2863,10 +2865,21 @@ test("P1-007 pending candidate is exact above the accepted P1-006 Staging baseli
   assert.ok(migration);
 
   const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+  const evidence = readJson(
+    "governance/evidence/p1-007-governance-lifecycle-closure.json",
+  );
 
   assert.equal(
     validateP1SchedulingRequestBookingBookabilityCandidate(migration, sql),
-    "pending",
+    "closed",
+  );
+
+  assert.doesNotThrow(() =>
+    validateP1SchedulingRequestBookingBookabilityClosure(
+      migration,
+      sql,
+      evidence,
+    ),
   );
 
   assert.doesNotThrow(() =>
@@ -2878,79 +2891,137 @@ test("P1-007 pending candidate is exact above the accepted P1-006 Staging baseli
     ),
   );
 
-  assert.equal(baseline.baseline_id, "rosuno-staging-p1-006-20260914-v1");
-  assert.equal(baseline.migration_inventory.length, 8);
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-007-20260916-v1");
+  assert.equal(baseline.migration_inventory.length, 9);
   assert.equal(migrations.migrations.length, 9);
+  assert.equal(
+    baseline.catalog_fingerprint.sha256,
+    "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
+  );
+  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 348401);
+  assert.equal(baseline.catalog_fingerprint.row_count, 1089);
+  assert.equal(
+    baseline.baseline_digest,
+    "sha256:c4f2151ac71875a55e91c5ce050740a702a6069c194bbf7f99ef4ce8df8d0609",
+  );
 
   assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
 
-  const byteDriftSql = `${sql}\n-- unauthorized P1-007 byte drift\n`;
+  const staleEvidence = structuredClone(evidence);
+  staleEvidence.security_advisor.info_count = 18;
+
+  assert.throws(() =>
+    validateP1SchedulingRequestBookingBookabilityClosure(
+      migration,
+      sql,
+      staleEvidence,
+    ),
+  );
+
+  const staleMigration = structuredClone(migration);
+  staleMigration.applied_environment = "none";
+
+  assert.throws(() =>
+    validateP1SchedulingRequestBookingBookabilityClosure(
+      staleMigration,
+      sql,
+      evidence,
+    ),
+  );
+
+  const staleReleases = structuredClone(releases);
+  staleReleases.releases.find(
+    (item) => item.release_id === releaseId,
+  ).commit_sha = "0".repeat(40);
+
+  assert.throws(() =>
+    validateP1SchedulingRequestBookingBookabilityTraceability(
+      migrations,
+      workItems,
+      decisions,
+      staleReleases,
+    ),
+  );
 
   assert.throws(() =>
     validateP1SchedulingRequestBookingBookabilityCandidate(
       migration,
-      byteDriftSql,
+      sql + "\n-- unauthorized P1-007 byte drift\n",
     ),
   );
 
-  const invalidLifecycle = structuredClone(migration);
-  invalidLifecycle.reviewed = true;
+  /* Historical pending-candidate validation remains deterministic. */
+  const pendingMigration = structuredClone(migration);
+  pendingMigration.release_refs = [];
+  pendingMigration.reviewed = false;
+  pendingMigration.reviewed_by = "pending designated human PR review";
+  pendingMigration.reviewed_at = null;
+  pendingMigration.applied_environment = "none";
+  pendingMigration.non_production_validation = false;
+  pendingMigration.drift_check =
+    "Not yet executed. This is an unreviewed, unapplied local P1-007 candidate; no database validation or persistent application has occurred.";
+  pendingMigration.rollback_plan =
+    "A separately authorized rollback-only Rosuno Staging validation must execute the exact protected candidate transactionally and independently prove exact restoration of the accepted eight-migration baseline before any persistent Staging application.";
 
-  assert.throws(() =>
+  assert.equal(
     validateP1SchedulingRequestBookingBookabilityCandidate(
-      invalidLifecycle,
+      pendingMigration,
       sql,
     ),
+    "pending",
   );
 
-  const staleDecisions = structuredClone(decisions);
-  const staleDecision = staleDecisions.decisions.find(
+  const pendingMigrations = structuredClone(migrations);
+  pendingMigrations.migrations[
+    pendingMigrations.migrations.findIndex(
+      (item) => item.migration_id === migrationId,
+    )
+  ] = pendingMigration;
+
+  const pendingDecisions = structuredClone(decisions);
+  const pendingDecision = pendingDecisions.decisions.find(
     (item) => item.decision_id === decisionId,
   );
 
-  assert.ok(staleDecision);
-  staleDecision.title += " drift";
+  assert.ok(pendingDecision);
 
-  assert.throws(() =>
-    validateP1SchedulingRequestBookingBookabilityTraceability(
-      migrations,
-      workItems,
-      staleDecisions,
-      releases,
-    ),
-  );
+  pendingDecision.scope =
+    "Bounded local Physical 1G Scheduling / Request / Booking / Bookability foundation implementation only; no branch publication, protected review, remote mutation, database execution, or later P1 work.";
+  pendingDecision.rationale =
+    "The ten current locked Rosuno authority documents place Scheduling, Consultation Request, Booking substrate, Instant Availability Intent, and Bookability evidence in Physical 1G while Consultation persistence belongs to the later Physical 1H boundary. The two approved interpretation gates resolve only the under-specified cross-migration Booking foreign key and recurring Availability effective range; they do not authorize early Consultation creation, invented recurrence semantics, or later workflow.";
+  pendingDecision.updated_at = "2026-09-15T03:23:17Z";
+  pendingDecision.impact =
+    "Authorizes only the bounded local P1-007 candidate implementation gate, including local validation and the controlled local candidate commit per the current Operating Model. It does not authorize branch publication, pull request creation, review, merge, database contact, rollback execution, persistent Staging application, production, OLD access, P1-008, or an end-to-end Scheduling / Booking capability claim.";
+  pendingDecision.evidence = [
+    "supabase/migrations/20260914231532_p1_scheduling_request_booking_bookability_foundation.sql",
+    "tools/p0/lib/p1-007-contract-data.mjs",
+    "tools/p0/tests/p1-007-contract.test.mjs",
+    "tools/p0/p1-007-rollback.mjs",
+  ];
 
-  const staleWorkItems = structuredClone(workItems);
-  const staleWorkItem = staleWorkItems.work_items.find(
+  const pendingWorkItems = structuredClone(workItems);
+  const pendingWorkItem = pendingWorkItems.work_items.find(
     (item) => item.work_item_id === workItemId,
   );
 
-  assert.ok(staleWorkItem);
-  staleWorkItem.objective += " drift";
+  assert.ok(pendingWorkItem);
 
-  assert.throws(() =>
-    validateP1SchedulingRequestBookingBookabilityTraceability(
-      migrations,
-      staleWorkItems,
-      decisions,
-      releases,
-    ),
+  pendingWorkItem.status = "in_progress";
+  pendingWorkItem.reviewer.status = "pending";
+  pendingWorkItem.release_refs = [];
+  pendingWorkItem.updated_at = "2026-09-15T03:23:17Z";
+
+  const pendingReleases = structuredClone(releases);
+  pendingReleases.releases = pendingReleases.releases.filter(
+    (item) => item.release_id !== releaseId,
   );
 
-  const leakedReleases = structuredClone(releases);
-  leakedReleases.releases.push({
-    release_id: "REL-P1-007-UNAUTHORIZED-TEST",
-    migration_refs: [migrationId],
-    work_item_refs: [workItemId],
-    decision_refs: [decisionId],
-  });
-
-  assert.throws(() =>
+  assert.doesNotThrow(() =>
     validateP1SchedulingRequestBookingBookabilityTraceability(
-      migrations,
-      workItems,
-      decisions,
-      leakedReleases,
+      pendingMigrations,
+      pendingWorkItems,
+      pendingDecisions,
+      pendingReleases,
     ),
   );
 });

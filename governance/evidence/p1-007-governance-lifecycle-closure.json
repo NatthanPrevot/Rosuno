@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "evidence_id": "P1-007-GOVERNANCE-LIFECYCLE-CLOSURE-20260916",
+  "work_item_id": "WI-P1-007-SCHEDULING-REQUEST-BOOKING-BOOKABILITY-FOUNDATION",
+  "lifecycle": "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED",
+  "lifecycle_state": {
+    "repository_closure": true,
+    "staging_application": true,
+    "postapplication_readonly_verification": true
+  },
+  "repository": {
+    "canonical_main": "26d71dd9cc3338aefc3bebd95544f6aef4059021",
+    "canonical_tree": "f101c22b84b4064098190b92a4cfa57a8ee38783",
+    "protected_main": true,
+    "implementation": {
+      "pull_request": 23,
+      "title": "P1-007: scheduling request booking bookability foundation",
+      "base": "ba1510d4b231412e4203c24b6575045c691d8a75",
+      "head": "087532817b9fcb76185abe89b6f5367c24e91832",
+      "tree": "f101c22b84b4064098190b92a4cfa57a8ee38783",
+      "merge_commit": "26d71dd9cc3338aefc3bebd95544f6aef4059021",
+      "ordered_parents": [
+        "ba1510d4b231412e4203c24b6575045c691d8a75",
+        "087532817b9fcb76185abe89b6f5367c24e91832"
+      ],
+      "review_id": "5210520550",
+      "approved_at": "2026-09-15T13:23:21Z",
+      "merged_at": "2026-09-15T13:30:00Z",
+      "workflow_run_id": 34974271836,
+      "workflow_conclusion": "success"
+    }
+  },
+  "migration": {
+    "id": "20260914231532_p1_scheduling_request_booking_bookability_foundation",
+    "sha256": "4865a0643ffab7d8afcd9d26aeecc180e9fe51d6f261cc83717cfb1ab3bf370f",
+    "sequence": 9,
+    "history_versions": 9,
+    "history": [
+      "20260828192126_p0_restrict_rls_auto_enable_execution",
+      "20260829000015_p1_platform_foundation",
+      "20260829171701_p1_authorization_foundation",
+      "20260830023823_p1_jurisdiction_policy_launch_foundation",
+      "20260901012518_p1_authorization_scope_correction",
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+      "20260911062917_p1_client_intake_ai_foundation",
+      "20260914000658_p1_marketplace_referral_foundation",
+      "20260914231532_p1_scheduling_request_booking_bookability_foundation"
+    ]
+  },
+  "gate5": {
+    "result": "PASS",
+    "generated_sql_sha256": "e4bf84d5569c3f60d5f3f831fe371ed1cb26c742b35e3f61721fd43c79cb57fa",
+    "generated_sql_lines": 1796,
+    "generated_sql_bytes": 60681,
+    "application_exit": 0,
+    "final_transaction_action": "ROLLBACK",
+    "pre_post_state": "EXACT_MATCH",
+    "persistent_migration_history_change": "NONE",
+    "persistent_p1_007_ddl_dml": "NONE"
+  },
+  "gate6": {
+    "result": "PASS",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "supabase_cli": "2.116.0",
+    "dry_run_migrations": [
+      "20260914231532_p1_scheduling_request_booking_bookability_foundation.sql"
+    ],
+    "application_exit": 0,
+    "migration_history_count": 9,
+    "public_tables": 38,
+    "public_rls": 38,
+    "p1_007_rows": {
+      "consultation_requests": 0,
+      "availability_rules": 0,
+      "blackouts": 0,
+      "slot_holds": 0,
+      "bookings": 0,
+      "instant_availability_intents": 0,
+      "bookability_evaluations": 0
+    }
+  },
+  "fingerprints": {
+    "fresh_reconciliation_at": "2026-09-16T04:43:44.771854Z",
+    "transaction_read_only": true,
+    "prior_31_table": {
+      "sha256": "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
+      "canonical_byte_length": 253195,
+      "row_count": 816
+    },
+    "final_38_table": {
+      "sha256": "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
+      "canonical_byte_length": 348401,
+      "row_count": 1089,
+      "category_counts": {
+        "table": 38,
+        "column": 340,
+        "constraint": 218,
+        "index": 96,
+        "foreign_key": 75,
+        "rls": 38,
+        "policy": 19,
+        "trigger": 27,
+        "function": 8,
+        "table_privilege": 190,
+        "function_privilege": 40
+      }
+    }
+  },
+  "security_advisor": {
+    "info_count": 19,
+    "warn_count": 1,
+    "unapproved_count": 0,
+    "p1_007_info_targets": [
+      "public.bookability_evaluations",
+      "public.bookings",
+      "public.slot_holds"
+    ],
+    "warning": {
+      "code": "authenticated_security_definer_function_executable",
+      "schema": "public",
+      "function": "has_manage_attorney_verification_scope",
+      "arguments": "required_jurisdiction uuid, allow_any_jurisdiction boolean",
+      "security_definer": true,
+      "pre_existing": true
+    },
+    "observed_at": "2026-09-16T04:43:28.020Z",
+    "info_targets": [
+      "public.application_sessions",
+      "public.bookability_evaluations",
+      "public.bookings",
+      "public.capability_definitions",
+      "public.capability_grants",
+      "public.jurisdiction_regulatory_modes",
+      "public.jurisdictions",
+      "public.launch_authorizations",
+      "public.launch_gate_evaluations",
+      "public.launch_gates",
+      "public.policy_authority_references",
+      "public.policy_types",
+      "public.policy_versions",
+      "public.referral_eligible_pool_entries",
+      "public.referral_presentations",
+      "public.referrals",
+      "public.regulatory_modes",
+      "public.service_areas",
+      "public.slot_holds"
+    ]
+  },
+  "release": {
+    "id": "REL-20260916-P1-007-STAGING-APPLICATION",
+    "commit_sha": "26d71dd9cc3338aefc3bebd95544f6aef4059021",
+    "environment": "staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "migration_id": "20260914231532_p1_scheduling_request_booking_bookability_foundation",
+    "migration_digest": "sha256:4865a0643ffab7d8afcd9d26aeecc180e9fe51d6f261cc83717cfb1ab3bf370f",
+    "evidence_link": "governance/evidence/p1-007-governance-lifecycle-closure.json",
+    "supabase_cli": "2.116.0",
+    "application_exit": 0,
+    "created_at": "2026-09-16T04:59:13Z",
+    "created_at_semantics": "traceability record creation"
+  },
+  "boundaries": {
+    "production_authorized": false,
+    "old_supabase_mutation_authorized": false,
+    "p1_008_authorized": false,
+    "database_mutation_during_closure": false
+  },
+  "integrity": {
+    "historical_migrations_unchanged": true,
+    "p1_007_migration_sha256": "4865a0643ffab7d8afcd9d26aeecc180e9fe51d6f261cc83717cfb1ab3bf370f",
+    "no_fake_business_data": true,
+    "no_new_capability_seed": true,
+    "no_new_security_definer_helper": true
+  }
+}

@@ -5608,20 +5608,25 @@ export function validateDriftReport(report, migrationRegister = null) {
     report.baseline_id === "rosuno-staging-p1-005-20260912-v1";
   const closedP1006 =
     report.baseline_id === "rosuno-staging-p1-006-20260914-v1";
+  const closedP1007 =
+    report.baseline_id === "rosuno-staging-p1-007-20260916-v1";
 
-  const expectedCheckedAt = closedP1006
-    ? "2026-09-14T05:00:30.987864Z"
-    : closedP1005
-      ? P1_CLIENT_INTAKE_OBSERVED_AT
-      : closedP1004
-        ? "2026-09-10T22:48:00.544397Z"
-        : P1_AUTHORIZATION_CORRECTION_VALIDATED_AT;
+  const expectedCheckedAt = closedP1007
+    ? "2026-09-16T04:43:44.771854Z"
+    : closedP1006
+      ? "2026-09-14T05:00:30.987864Z"
+      : closedP1005
+        ? P1_CLIENT_INTAKE_OBSERVED_AT
+        : closedP1004
+          ? "2026-09-10T22:48:00.544397Z"
+          : P1_AUTHORIZATION_CORRECTION_VALIDATED_AT;
 
   if (
     report.version !== 1 ||
     (!closedP1004 &&
       !closedP1005 &&
       !closedP1006 &&
+      !closedP1007 &&
       report.baseline_id !== FOUNDATION_BASELINE_ID) ||
     report.checked_environment !== "staging" ||
     report.checked_at !== expectedCheckedAt ||
@@ -5654,18 +5659,33 @@ export function validateDriftReport(report, migrationRegister = null) {
     sha256: P1_MARKETPLACE_REFERRAL_MIGRATION_SHA256,
   };
 
-  const expectedInventory = closedP1006
+  const p1007Migration = {
+    sequence: 9,
+    migration_id: P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_MIGRATION_ID,
+    artifact_path: P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_MIGRATION_PATH,
+    sha256: P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_MIGRATION_SHA256,
+  };
+
+  const expectedInventory = closedP1007
     ? [
         ...FOUNDATION_BASELINE_MIGRATIONS,
         p1004Migration,
         p1005Migration,
         p1006Migration,
+        p1007Migration,
       ]
-    : closedP1005
-      ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration, p1005Migration]
-      : closedP1004
-        ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration]
-        : FOUNDATION_BASELINE_MIGRATIONS;
+    : closedP1006
+      ? [
+          ...FOUNDATION_BASELINE_MIGRATIONS,
+          p1004Migration,
+          p1005Migration,
+          p1006Migration,
+        ]
+      : closedP1005
+        ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration, p1005Migration]
+        : closedP1004
+          ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration]
+          : FOUNDATION_BASELINE_MIGRATIONS;
 
   if (
     JSON.stringify(report.migration_inventory) !==
@@ -5712,10 +5732,14 @@ export function validateDriftReport(report, migrationRegister = null) {
       "P1-006 baseline requires eight accepted migrations plus at most one bounded P1-007 overlay",
     );
 
+  if (closedP1007 && register.migrations.length !== 9)
+    fail("P1-007 baseline requires exactly nine accepted migrations");
+
   if (
     !closedP1004 &&
     !closedP1005 &&
     !closedP1006 &&
+    !closedP1007 &&
     register.migrations.length === 7
   ) {
     fail("P1-005 overlay requires the accepted P1-004 baseline");
@@ -5725,6 +5749,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1004 &&
     !closedP1005 &&
     !closedP1006 &&
+    !closedP1007 &&
     register.migrations.length === 8
   ) {
     fail("P1-006 overlay requires an accepted P1-004 or P1-005 baseline");
@@ -5734,6 +5759,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1004 &&
     !closedP1005 &&
     !closedP1006 &&
+    !closedP1007 &&
     register.migrations.length === 9
   ) {
     fail("P1-007 overlay requires an accepted P1 baseline lineage");
@@ -5748,21 +5774,21 @@ export function validateDriftReport(report, migrationRegister = null) {
   }
 
   if (register.migrations.length === 7) {
-    if (!closedP1004 && !closedP1005 && !closedP1006)
+    if (!closedP1004 && !closedP1005 && !closedP1006 && !closedP1007)
       fail("seven migrations require an accepted P1-004 or P1-005 baseline");
 
     validateMigrationRegister(register, {}, repositoryFiles());
   }
 
   if (register.migrations.length === 8) {
-    if (!closedP1004 && !closedP1005 && !closedP1006)
+    if (!closedP1004 && !closedP1005 && !closedP1006 && !closedP1007)
       fail("eight migrations require an accepted P1-004 or P1-005 baseline");
 
     validateMigrationRegister(register, {}, repositoryFiles());
   }
 
   if (register.migrations.length === 9) {
-    if (!closedP1004 && !closedP1005 && !closedP1006)
+    if (!closedP1004 && !closedP1005 && !closedP1006 && !closedP1007)
       fail("nine migrations require an accepted P1 baseline lineage");
 
     validateMigrationRegister(register, {}, repositoryFiles());
@@ -5806,18 +5832,40 @@ export function validateDriftReport(report, migrationRegister = null) {
       .digest("hex"),
   };
 
-  const expectedEvidence = closedP1006
+  const p1007Evidence = {
+    path: P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSURE_EVIDENCE_PATH,
+    sha256: createHash("sha256")
+      .update(
+        readFileSync(
+          path.join(
+            ROOT,
+            P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSURE_EVIDENCE_PATH,
+          ),
+        ),
+      )
+      .digest("hex"),
+  };
+
+  const expectedEvidence = closedP1007
     ? [
         ...FOUNDATION_BASELINE_EVIDENCE,
         p1004Evidence,
         p1005Evidence,
         p1006Evidence,
+        p1007Evidence,
       ]
-    : closedP1005
-      ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence, p1005Evidence]
-      : closedP1004
-        ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence]
-        : FOUNDATION_BASELINE_EVIDENCE;
+    : closedP1006
+      ? [
+          ...FOUNDATION_BASELINE_EVIDENCE,
+          p1004Evidence,
+          p1005Evidence,
+          p1006Evidence,
+        ]
+      : closedP1005
+        ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence, p1005Evidence]
+        : closedP1004
+          ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence]
+          : FOUNDATION_BASELINE_EVIDENCE;
 
   if (
     JSON.stringify(report.accepted_evidence) !==
@@ -5837,32 +5885,39 @@ export function validateDriftReport(report, migrationRegister = null) {
       fail(`schema drift evidence digest is invalid for ${artifact.path}`);
   }
 
-  const expectedCatalog = closedP1006
+  const expectedCatalog = closedP1007
     ? {
         sha256:
-          "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
-        bytes: 253195,
-        rows: 816,
+          "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
+        bytes: 348401,
+        rows: 1089,
       }
-    : closedP1005
+    : closedP1006
       ? {
           sha256:
-            "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
-          bytes: 231062,
-          rows: 744,
+            "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
+          bytes: 253195,
+          rows: 816,
         }
-      : closedP1004
+      : closedP1005
         ? {
             sha256:
-              "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508",
-            bytes: 90175,
-            rows: 279,
+              "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
+            bytes: 231062,
+            rows: 744,
           }
-        : {
-            sha256: P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256,
-            bytes: P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES,
-            rows: P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS,
-          };
+        : closedP1004
+          ? {
+              sha256:
+                "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508",
+              bytes: 90175,
+              rows: 279,
+            }
+          : {
+              sha256: P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256,
+              bytes: P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES,
+              rows: P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS,
+            };
 
   if (
     report.catalog_fingerprint?.format !== "rosuno-p1-catalog-v1" ||
@@ -5892,6 +5947,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     (!closedP1004 &&
       !closedP1005 &&
       !closedP1006 &&
+      !closedP1007 &&
       digest !== FOUNDATION_BASELINE_DIGEST)
   ) {
     fail("schema drift baseline identity/digest is invalid");
@@ -7474,11 +7530,11 @@ export function validateP1MarketplaceReferralTraceability(
 
   return true;
 }
-/* P1-007 bounded pending-candidate controls.
- * The accepted Staging baseline remains the closed P1-006 eight-migration
- * baseline. P1-007 is permitted here only as one exact local, unreviewed,
- * unapplied sequence-9 overlay. Review, release, closure, rollback execution,
- * and persistent Staging application remain separately authorized later gates.
+/* P1-007 bounded lifecycle controls.
+ * Historical pending-candidate validation remains supported, while the
+ * reviewed branch requires exact protected review, rollback-only Staging
+ * validation, persistent Staging application, release traceability, closure
+ * evidence, and the accepted nine-migration baseline.
  */
 const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_ID =
   /^([0-9]{14})_p1_scheduling_request_booking_bookability_foundation$/;
@@ -7494,19 +7550,49 @@ const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_DECISION_ID =
   "DEC-20260914-P1-007-BOUNDED-CANDIDATE";
 const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_WORK_ITEM_ID =
   "WI-P1-007-SCHEDULING-REQUEST-BOOKING-BOOKABILITY-FOUNDATION";
+const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_RELEASE_ID =
+  "REL-20260916-P1-007-STAGING-APPLICATION";
+const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSURE_EVIDENCE_PATH =
+  "governance/evidence/p1-007-governance-lifecycle-closure.json";
+
+const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_REVIEWED_AT =
+  "2026-09-15T13:23:21Z";
 
 const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_PENDING_RECORD_SHA256 =
   "9f66c9be3829ab988b2c864b87ba7c8c983a3e4a927ddc9ed369569d3c10846c";
+const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSED_RECORD_SHA256 =
+  "dd26c737b643fc992da35272299d633bd899e0830706b8e573eb7e718776c4cc";
+
 const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_PENDING_DECISION_SHA256 =
   "dcf33151f4c0cfb2712d8bbbdbad240b7f8312d4b1f2fd40f1873e2c99ccc337";
+const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSED_DECISION_SHA256 =
+  "7c2da25728ab0b28254cb58e1eb0d7704a82c870b3f5c3fd27b1514cdbb9e92f";
+
 const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_PENDING_WORK_ITEM_SHA256 =
   "2da45385eba9004cdfa42fa107ade3537ac756a0dafd34177f9c490d5cebfedf";
+const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSED_WORK_ITEM_SHA256 =
+  "b02824248b225844988b06c7e7e339482bb83771c59e52c16bcd5a146938094f";
+
+const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSED_RELEASE_SHA256 =
+  "00c45a7f8210dbc412d5535fa6a86d97ec5c555f47c8f3b71da9c6719ba47a4a";
+
+const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSURE_CANONICAL_SHA256 =
+  "7fff3839b7fe3b7489b69d8f84bbdff70328ab7e61430cc0459181f5dbc02666";
+const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSURE_RAW_SHA256 =
+  "91d8f56ed23f85478b798866606d8bf051d8c26a0c899adc2dfccf7588688f78";
+const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSURE_BYTES = 6235;
 
 const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_PENDING_DRIFT =
   "Not yet executed. This is an unreviewed, unapplied local P1-007 candidate; no database validation or persistent application has occurred.";
 
 const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_PENDING_ROLLBACK =
   "A separately authorized rollback-only Rosuno Staging validation must execute the exact protected candidate transactionally and independently prove exact restoration of the accepted eight-migration baseline before any persistent Staging application.";
+
+const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSED_DRIFT =
+  "Rosuno Staging rollback-only validation passed exact restoration of the accepted eight-migration baseline; persistent application then passed exact nine-version history, 38/38 RLS, zero P1-007 business rows, exact 38-table catalog fingerprint, and zero unapproved security-advisor findings.";
+
+const P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSED_ROLLBACK =
+  "If a later independently verified defect requires Staging rollback, remove only the sequence-9 P1-007 change through a separately reviewed forward-only non-production rollback migration; never edit historical migration bytes or migration history directly, and preserve all earlier accepted controls.";
 
 function p1007Canonical(value) {
   if (Array.isArray(value)) return value.map(p1007Canonical);
@@ -7594,11 +7680,110 @@ function validateP1SchedulingRequestBookingBookabilityIdentity(migration, sql) {
   }
 }
 
+export function validateP1SchedulingRequestBookingBookabilityClosure(
+  migration,
+  sql,
+  evidence,
+) {
+  validateP1SchedulingRequestBookingBookabilityIdentity(migration, sql);
+
+  requireStringArrayExact(
+    migration.release_refs,
+    [P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_RELEASE_ID],
+    "P1-007 release_refs",
+  );
+
+  if (
+    migration.reviewed !== true ||
+    migration.reviewed_by !== "Rosuno" ||
+    migration.reviewed_at !==
+      P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_REVIEWED_AT ||
+    migration.applied_environment !== "staging" ||
+    migration.non_production_validation !== true ||
+    migration.drift_check !==
+      P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSED_DRIFT ||
+    migration.rollback_plan !==
+      P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSED_ROLLBACK ||
+    p1007Digest(migration) !==
+      P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSED_RECORD_SHA256
+  ) {
+    fail("P1-007 closed migration lifecycle is invalid");
+  }
+
+  requireExactFields(
+    evidence,
+    [
+      "version",
+      "evidence_id",
+      "work_item_id",
+      "lifecycle",
+      "lifecycle_state",
+      "repository",
+      "migration",
+      "gate5",
+      "gate6",
+      "fingerprints",
+      "security_advisor",
+      "release",
+      "boundaries",
+      "integrity",
+    ],
+    "P1-007 closure evidence",
+  );
+
+  if (
+    evidence.version !== 1 ||
+    evidence.evidence_id !== "P1-007-GOVERNANCE-LIFECYCLE-CLOSURE-20260916" ||
+    evidence.work_item_id !==
+      P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_WORK_ITEM_ID ||
+    evidence.lifecycle !==
+      "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED" ||
+    p1007Digest(evidence) !==
+      P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSURE_CANONICAL_SHA256
+  ) {
+    fail("P1-007 closure evidence identity is invalid");
+  }
+
+  const evidenceText = readFileSync(
+    path.join(
+      ROOT,
+      P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSURE_EVIDENCE_PATH,
+    ),
+    "utf8",
+  );
+
+  if (
+    Buffer.byteLength(evidenceText, "utf8") !==
+      P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSURE_BYTES ||
+    createHash("sha256").update(evidenceText).digest("hex") !==
+      P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSURE_RAW_SHA256
+  ) {
+    fail("P1-007 closure evidence bytes are invalid");
+  }
+
+  if (
+    scanSecretLikeText(JSON.stringify(evidence), "P1-007 closure").length > 0
+  ) {
+    fail("P1-007 closure contains a secret-like value");
+  }
+
+  return true;
+}
+
 export function validateP1SchedulingRequestBookingBookabilityCandidate(
   migration,
   sql,
 ) {
   validateP1SchedulingRequestBookingBookabilityIdentity(migration, sql);
+
+  if (migration.reviewed === true) {
+    validateP1SchedulingRequestBookingBookabilityClosure(
+      migration,
+      sql,
+      readJson(P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSURE_EVIDENCE_PATH),
+    );
+    return "closed";
+  }
 
   if (
     migration.reviewed !== false ||
@@ -7665,44 +7850,106 @@ export function validateP1SchedulingRequestBookingBookabilityTraceability(
   requireExactFields(workItem, WORK_ITEM_FIELDS, "P1-007 work item");
 
   const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+  const state = validateP1SchedulingRequestBookingBookabilityCandidate(
+    migration,
+    sql,
+  );
 
-  if (
-    validateP1SchedulingRequestBookingBookabilityCandidate(migration, sql) !==
-    "pending"
-  ) {
-    fail("P1-007 must remain pending during the local candidate gate");
+  if (state === "pending") {
+    if (
+      p1007Digest(decision) !==
+      P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_PENDING_DECISION_SHA256
+    ) {
+      fail("P1-007 pending decision governance record mismatch");
+    }
+
+    if (
+      p1007Digest(workItem) !==
+      P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_PENDING_WORK_ITEM_SHA256
+    ) {
+      fail("P1-007 pending work-item governance record mismatch");
+    }
+
+    const leakedRelease = releases.releases.some(
+      (release) =>
+        release.migration_refs?.includes(
+          P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_MIGRATION_ID,
+        ) ||
+        release.work_item_refs?.includes(
+          P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_WORK_ITEM_ID,
+        ) ||
+        release.decision_refs?.includes(
+          P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_DECISION_ID,
+        ),
+    );
+
+    if (leakedRelease) {
+      fail("P1-007 pending candidate must not have a release");
+    }
+
+    return true;
   }
 
   if (
     p1007Digest(decision) !==
-    P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_PENDING_DECISION_SHA256
+    P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSED_DECISION_SHA256
   ) {
-    fail("P1-007 pending decision governance record mismatch");
+    fail("P1-007 accepted decision governance record mismatch");
   }
 
   if (
     p1007Digest(workItem) !==
-    P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_PENDING_WORK_ITEM_SHA256
+    P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSED_WORK_ITEM_SHA256
   ) {
-    fail("P1-007 pending work-item governance record mismatch");
+    fail("P1-007 completed work-item governance record mismatch");
   }
 
-  const leakedRelease = releases.releases.some(
-    (release) =>
-      release.migration_refs?.includes(
+  const release = p1007ExactlyOne(
+    releases.releases,
+    "release_id",
+    P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_RELEASE_ID,
+    "release",
+  );
+
+  requireExactFields(release, RELEASE_FIELDS, "P1-007 release");
+
+  if (
+    p1007Digest(release) !==
+    P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSED_RELEASE_SHA256
+  ) {
+    fail("P1-007 release governance record mismatch");
+  }
+
+  const references = releases.releases.filter(
+    (item) =>
+      item.migration_refs?.includes(
         P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_MIGRATION_ID,
       ) ||
-      release.work_item_refs?.includes(
+      item.work_item_refs?.includes(
         P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_WORK_ITEM_ID,
       ) ||
-      release.decision_refs?.includes(
+      item.decision_refs?.includes(
         P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_DECISION_ID,
       ),
   );
 
-  if (leakedRelease) {
-    fail("P1-007 pending candidate must not have a release");
+  if (
+    references.length !== 1 ||
+    references[0].release_id !==
+      P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_RELEASE_ID
+  ) {
+    fail("P1-007 release linkage is duplicated or inconsistent");
   }
+
+  const evidence = readJson(
+    P1_SCHEDULING_REQUEST_BOOKING_BOOKABILITY_CLOSURE_EVIDENCE_PATH,
+  );
+
+  validateP1SchedulingRequestBookingBookabilityClosure(
+    migration,
+    sql,
+    evidence,
+  );
 
   return true;
 }
