@@ -550,11 +550,11 @@
         "Invented weekday numbering, duration rules, pending-request caps, cancellation/refund policy, jurisdiction-specific regulatory outcomes, or counsel-gated policy values",
         "Production, OLD, source/development database mutation, or P1-008 and later work"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "owner": "Rosuno P1-007 implementation owner",
       "reviewer": {
         "identity": "Rosuno",
-        "status": "pending"
+        "status": "approved"
       },
       "priority": "P1",
       "authority_refs": [
@@ -586,13 +586,13 @@
         "pnpm run rosuno:check --base <base> --head <head> --branch <branch> --allow <approved-path>"
       ],
       "environment": "staging",
-      "release_refs": [],
+      "release_refs": ["REL-20260916-P1-007-STAGING-APPLICATION"],
       "migration_refs": [
         "20260914231532_p1_scheduling_request_booking_bookability_foundation"
       ],
       "rollback_reference": "tools/p0/p1-007-rollback.mjs",
       "created_at": "2026-09-15T03:23:17Z",
-      "updated_at": "2026-09-15T03:23:17Z"
+      "updated_at": "2026-09-16T04:59:13Z"
     }
   ]
 }

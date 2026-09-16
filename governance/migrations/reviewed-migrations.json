@@ -215,14 +215,14 @@
         "WI-P1-007-SCHEDULING-REQUEST-BOOKING-BOOKABILITY-FOUNDATION"
       ],
       "decision_refs": ["DEC-20260914-P1-007-BOUNDED-CANDIDATE"],
-      "release_refs": [],
-      "reviewed": false,
-      "reviewed_by": "pending designated human PR review",
-      "reviewed_at": null,
-      "applied_environment": "none",
-      "non_production_validation": false,
-      "drift_check": "Not yet executed. This is an unreviewed, unapplied local P1-007 candidate; no database validation or persistent application has occurred.",
-      "rollback_plan": "A separately authorized rollback-only Rosuno Staging validation must execute the exact protected candidate transactionally and independently prove exact restoration of the accepted eight-migration baseline before any persistent Staging application.",
+      "release_refs": ["REL-20260916-P1-007-STAGING-APPLICATION"],
+      "reviewed": true,
+      "reviewed_by": "Rosuno",
+      "reviewed_at": "2026-09-15T13:23:21Z",
+      "applied_environment": "staging",
+      "non_production_validation": true,
+      "drift_check": "Rosuno Staging rollback-only validation passed exact restoration of the accepted eight-migration baseline; persistent application then passed exact nine-version history, 38/38 RLS, zero P1-007 business rows, exact 38-table catalog fingerprint, and zero unapproved security-advisor findings.",
+      "rollback_plan": "If a later independently verified defect requires Staging rollback, remove only the sequence-9 P1-007 change through a separately reviewed forward-only non-production rollback migration; never edit historical migration bytes or migration history directly, and preserve all earlier accepted controls.",
       "depends_on": ["20260914000658_p1_marketplace_referral_foundation"]
     }
   ]
