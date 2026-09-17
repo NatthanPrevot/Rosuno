@@ -321,6 +321,40 @@
         "governance/schema-drift/baseline.json"
       ],
       "expiry": null
+    },
+
+    {
+      "decision_id": "DEC-20260917-P1-008-BOUNDED-CANDIDATE",
+      "title": "Implement the bounded P1-008 Consultation / Engagement / Media foundation",
+      "status": "accepted",
+      "scope": "Bounded local Physical 1H Consultation / Engagement / Media foundation implementation only; no branch publication, protected review, remote mutation, database execution, or later P1 work.",
+      "decision": "Implement exactly consultations, engagements, media_rooms, media_sessions, and session_participation_records using the frozen P1-008 physical contract, and complete the deferred bookings.consultation_id to consultations.id restrictive foreign key forward-only. Preserve immutable accepted-Request provenance and the actual Consultation attorney, reject self-consultation, use started_at for the authoritative Consultation indexes, apply RESTRICT on update and delete to established P1-008 relationships, represent Engagement version history structurally without choosing effectiveness semantics, enforce one logical Media Room per Consultation with subordinate provider Media Sessions, keep Participation evidence append-only at the ordinary application permission layer, and enforce relationship-scoped RLS with bounded trusted service_role mutation. Provider/media observations remain noncanonical and Payment state remains separate. G-1 Engagement effectiveness and G-5 Consultation creation remain unresolved.",
+      "rationale": "The ten current locked Rosuno authority documents place Consultation persistence, Engagement context, Media Room and provider-session correlation, and durable Participation evidence in Physical 1H, while P1-007 intentionally deferred the Booking-to-Consultation foreign key until consultations exists. The approved P1-008 interpretation gates resolve only the started_at index typo, otherwise-unspecified established-relationship referential actions, append-only Participation evidence permissions, and structural Engagement version-history integrity. They do not choose the G-1 effectiveness event, the G-5 Consultation creation trigger, Payment semantics, provider-driven Consultation completion, or later workflow.",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-008-CONSULTATION-ENGAGEMENT-MEDIA-FOUNDATION"],
+      "owner": "Rosuno P1-008 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-09-17T20:50:25Z",
+      "updated_at": "2026-09-17T20:50:25Z",
+      "supersedes": [],
+      "impact": "Authorizes only the bounded local P1-008 candidate implementation gate, including local validation and the controlled local candidate commit per the current Operating Model. It does not authorize branch publication, pull request creation, review, merge, database contact, rollback execution, persistent Staging application, release creation, production, OLD access, P1-009 or later work, or an end-to-end Consultation / Engagement / Media capability claim.",
+      "evidence": [
+        "supabase/migrations/20260917045031_p1_consultation_engagement_media_foundation.sql",
+        "tools/p0/lib/p1-008-contract-data.mjs",
+        "tools/p0/tests/p1-008-contract.test.mjs",
+        "tools/p0/p1-008-rollback.mjs"
+      ],
+      "expiry": null
     }
   ]
 }

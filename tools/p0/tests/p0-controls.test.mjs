@@ -47,6 +47,8 @@ import {
   validateP1SchedulingRequestBookingBookabilityCandidate,
   validateP1SchedulingRequestBookingBookabilityClosure,
   validateP1SchedulingRequestBookingBookabilityTraceability,
+  validateP1ConsultationEngagementMediaCandidate,
+  validateP1ConsultationEngagementMediaTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
   validateP1RegulatoryCatalog,
@@ -2725,7 +2727,7 @@ test("P1-006 accepted closure remains valid under the current P1-007 baseline", 
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-007-20260916-v1");
   assert.equal(baseline.migration_inventory.length, 9);
-  assert.equal(migrations.migrations.length, 9);
+  assert.equal(migrations.migrations.length, 10);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
@@ -2893,7 +2895,7 @@ test("P1-007 accepted closure requires exact lifecycle evidence and nine-migrati
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-007-20260916-v1");
   assert.equal(baseline.migration_inventory.length, 9);
-  assert.equal(migrations.migrations.length, 9);
+  assert.equal(migrations.migrations.length, 10);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
@@ -3022,6 +3024,111 @@ test("P1-007 accepted closure requires exact lifecycle evidence and nine-migrati
       pendingWorkItems,
       pendingDecisions,
       pendingReleases,
+    ),
+  );
+});
+
+test("P1-008 pending candidate is exact above the accepted P1-007 Staging baseline", () => {
+  const migrations = readJson("governance/migrations/reviewed-migrations.json");
+  const workItems = readJson("governance/work-items/index.json");
+  const decisions = readJson("governance/decision-log.json");
+  const releases = readJson("governance/releases/traceability.json");
+  const baseline = readJson("governance/schema-drift/baseline.json");
+
+  const migrationId =
+    "20260917045031_p1_consultation_engagement_media_foundation";
+  const decisionId = "DEC-20260917-P1-008-BOUNDED-CANDIDATE";
+  const workItemId = "WI-P1-008-CONSULTATION-ENGAGEMENT-MEDIA-FOUNDATION";
+
+  const migration = migrations.migrations.find(
+    (item) => item.migration_id === migrationId,
+  );
+
+  assert.ok(migration);
+
+  const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+
+  assert.equal(
+    validateP1ConsultationEngagementMediaCandidate(migration, sql),
+    "pending",
+  );
+
+  assert.doesNotThrow(() =>
+    validateP1ConsultationEngagementMediaTraceability(
+      migrations,
+      workItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-007-20260916-v1");
+  assert.equal(baseline.migration_inventory.length, 9);
+  assert.equal(migrations.migrations.length, 10);
+
+  assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
+
+  const byteDriftSql = `${sql}\n-- unauthorized P1-008 byte drift\n`;
+
+  assert.throws(() =>
+    validateP1ConsultationEngagementMediaCandidate(migration, byteDriftSql),
+  );
+
+  const invalidLifecycle = structuredClone(migration);
+  invalidLifecycle.reviewed = true;
+
+  assert.throws(() =>
+    validateP1ConsultationEngagementMediaCandidate(invalidLifecycle, sql),
+  );
+
+  const staleDecisions = structuredClone(decisions);
+  const staleDecision = staleDecisions.decisions.find(
+    (item) => item.decision_id === decisionId,
+  );
+
+  assert.ok(staleDecision);
+  staleDecision.title += " drift";
+
+  assert.throws(() =>
+    validateP1ConsultationEngagementMediaTraceability(
+      migrations,
+      workItems,
+      staleDecisions,
+      releases,
+    ),
+  );
+
+  const staleWorkItems = structuredClone(workItems);
+  const staleWorkItem = staleWorkItems.work_items.find(
+    (item) => item.work_item_id === workItemId,
+  );
+
+  assert.ok(staleWorkItem);
+  staleWorkItem.objective += " drift";
+
+  assert.throws(() =>
+    validateP1ConsultationEngagementMediaTraceability(
+      migrations,
+      staleWorkItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  const leakedReleases = structuredClone(releases);
+  leakedReleases.releases.push({
+    release_id: "REL-P1-008-UNAUTHORIZED-TEST",
+    migration_refs: [migrationId],
+    work_item_refs: [workItemId],
+    decision_refs: [decisionId],
+  });
+
+  assert.throws(() =>
+    validateP1ConsultationEngagementMediaTraceability(
+      migrations,
+      workItems,
+      decisions,
+      leakedReleases,
     ),
   );
 });
