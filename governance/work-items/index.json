@@ -593,6 +593,78 @@
       "rollback_reference": "tools/p0/p1-007-rollback.mjs",
       "created_at": "2026-09-15T03:23:17Z",
       "updated_at": "2026-09-16T04:59:13Z"
+    },
+    {
+      "work_item_id": "WI-P1-008-CONSULTATION-ENGAGEMENT-MEDIA-FOUNDATION",
+      "title": "P1-008 Consultation / Engagement / Media physical foundation",
+      "objective": "Implement the smallest authority-defined Physical 1H persistence and security foundation for the canonical Consultation event, versioned Engagement context, one stable Media Room, subordinate provider Media Sessions, and durable Participation evidence while completing the deferred Booking-to-Consultation foreign key and preserving the unresolved G-1 and G-5 boundaries.",
+      "in_scope": [
+        "Exactly public.consultations, public.engagements, public.media_rooms, public.media_sessions, and public.session_participation_records",
+        "Forward-only restrictive bookings.consultation_id to consultations.id foreign key completion after Consultation persistence exists",
+        "Immutable Consultation Request provenance, direct actual-attorney history, accepted-Request prerequisite, and self-consultation rejection without deciding G-5",
+        "Authoritative Consultation indexes using started_at and RESTRICT on update and delete for established P1-008 relationships",
+        "Versioned Engagement history with positive per-Consultation version numbers, same-Consultation supersession, and at most one structurally current/effective row without deciding G-1",
+        "One logical Media Room per Consultation with subordinate provider Media Sessions and unique provider-session correlation identity",
+        "Durable append-only Session Participation evidence restricted to canonical Consultation participants without treating insertion as business or legal finalization",
+        "Immediate relationship-scoped RLS across all five relations, fail-closed ordinary mutation, and bounded trusted service_role privileges",
+        "Provider/media observations remain noncanonical and separate from Consultation, Engagement, Payment, fee-earned, and refund authority",
+        "Exact authority-supported indexes plus local contract, governance, validator, and rollback-generation tooling; database execution remains a separately authorized later gate"
+      ],
+      "out_of_scope": [
+        "Branch publication, pull request, review, merge, release creation, rollback execution, or persistent Staging application",
+        "Any database contact during the local implementation gate",
+        "Resolution of G-1 Engagement effectiveness or G-5 Consultation creation",
+        "Payment capture, fee-earned, refund, cancellation-policy, or other Payment-state semantics",
+        "Provider-driven Consultation completion, provider observations as canonical legal state, or Participation insertion as finalization",
+        "Communications, payment relations, later workflow relations, application UI, or later-phase P1 persistence",
+        "A complete end-to-end Consultation, Engagement, or Media application workflow",
+        "Production, OLD, source/development database mutation, or P1-009 and later work"
+      ],
+      "status": "in_progress",
+      "owner": "Rosuno P1-008 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260917-P1-008-BOUNDED-CANDIDATE"],
+      "dependencies": [
+        "WI-P1-007-SCHEDULING-REQUEST-BOOKING-BOOKABILITY-FOUNDATION"
+      ],
+      "acceptance_criteria": [
+        "Exactly five Physical 1H persistent relations are introduced and no later-phase relation is added",
+        "The deferred Booking-to-Consultation foreign key is added forward-only with restrictive update and delete actions without modifying historical P1-007 bytes",
+        "Consultation stores immutable accepted-Request provenance and the actual attorney directly, rejects self-consultation, and does not decide the G-5 creation trigger",
+        "The authoritative Consultation indexes use started_at and established P1-008 foreign keys use the approved restrictive referential actions",
+        "Engagement history enforces positive unique per-Consultation version numbers, same-Consultation supersession, and at most one structurally current/effective row without deciding G-1",
+        "Exactly one logical Media Room exists per Consultation and provider Media Sessions remain subordinate correlation and infrastructure state",
+        "Session Participation evidence is canonical-participant bound and append-only at the ordinary application permission layer; corrections or later observations require new rows",
+        "Provider and Participation observations cannot independently complete Consultation, determine Engagement effectiveness, or create Payment, fee-earned, or refund semantics",
+        "All five relations enable participant-scoped RLS; authenticated users receive SELECT-only relationship access and trusted service_role mutation remains exactly column-bounded",
+        "Local targeted tests and the complete canonical Fast-Control validation pass on frozen candidate bytes before the controlled local candidate commit",
+        "Any database rollback validation or persistent Staging application occurs only under later separate authorization",
+        "Completion is described only as the Physical 1H foundation, not an end-to-end operational Consultation / Engagement / Media capability"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p1-008-contract.test.mjs",
+        "pnpm run rosuno:check --base <base> --head <head> --branch <branch> --allow <approved-path>"
+      ],
+      "environment": "staging",
+      "release_refs": [],
+      "migration_refs": [
+        "20260917045031_p1_consultation_engagement_media_foundation"
+      ],
+      "rollback_reference": "tools/p0/p1-008-rollback.mjs",
+      "created_at": "2026-09-17T20:50:25Z",
+      "updated_at": "2026-09-17T20:50:25Z"
     }
   ]
 }
