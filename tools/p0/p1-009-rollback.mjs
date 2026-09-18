@@ -102,20 +102,22 @@ export function buildRollbackValidation() {
   add(`insert into auth.users(id) values
     (${u(101)}),
     (${u(102)}),
-    (${u(103)});`);
+    (${u(103)}),
+    (${u(104)});`);
 
   add(`
 insert into public.users(id, auth_user_id, account_state)
 values
   (${u(1)}, ${u(101)}, 'active'),
   (${u(2)}, ${u(102)}, 'active'),
-  (${u(20)}, ${u(103)}, 'active');`);
+  (${u(20)}, ${u(103)}, 'active'),
+  (${u(21)}, ${u(104)}, 'active');`);
 
   add(`
 insert into public.client_profiles(id, user_id)
 values
   (${u(3)}, ${u(1)}),
-  (${u(23)}, ${u(20)});`);
+  (${u(23)}, ${u(21)});`);
 
   add(`
 insert into public.intakes(id, client_id, state)

@@ -289,6 +289,39 @@ test("P1-009 privilege surface grants no target DELETE and no authenticated muta
   );
 });
 
+test("P1-009 rollback Client Profile contradiction fixture avoids uniqueness collision", () => {
+  const built = buildRollbackValidation();
+  const fixtureId = (n) =>
+    `00900000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+
+  assert.ok(
+    built.sql.includes(
+      `('${fixtureId(20)}'::uuid, '${fixtureId(103)}'::uuid, 'active'),
+  ('${fixtureId(21)}'::uuid, '${fixtureId(104)}'::uuid, 'active');`,
+    ),
+  );
+
+  assert.ok(
+    built.sql.includes(
+      `('${fixtureId(3)}'::uuid, '${fixtureId(1)}'::uuid),
+  ('${fixtureId(23)}'::uuid, '${fixtureId(21)}'::uuid);`,
+    ),
+  );
+
+  assert.ok(
+    built.sql.includes(
+      `update public.client_profiles
+     set user_id=''${fixtureId(20)}''::uuid
+     where id=''${fixtureId(3)}''::uuid`,
+    ),
+  );
+
+  assert.equal(
+    built.sql.includes(`('${fixtureId(23)}'::uuid, '${fixtureId(20)}'::uuid);`),
+    false,
+  );
+});
+
 test("P1-009 rollback generator is import-safe, rollback-only, and covers frozen failure boundaries", () => {
   const built = buildRollbackValidation();
 
