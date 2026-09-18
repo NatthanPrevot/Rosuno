@@ -1,0 +1,251 @@
+{
+  "version": 1,
+  "evidence_id": "P1-009-GATE5A-PRESTATE-CONTRACT-V1",
+  "work_item_id": "WI-P1-009-RESOURCES-COMMUNICATIONS-FOUNDATION",
+  "decision_id": "DEC-20260918-P1-009-GATE5A-PRESTATE-VERIFICATION",
+  "status": "contract_defined_not_executed",
+  "environment": {
+    "name": "Rosuno Staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb"
+  },
+  "historical_p1_008": {
+    "baseline_id": "rosuno-staging-p1-008-20260918-v1",
+    "sha256": "1926821eee5d37194358f5a0a0e30f2577f7bb08c9be5478ab21dd300e32ba04",
+    "canonical_byte_length": 410432,
+    "row_count": 1263,
+    "provenance_status": "accepted historical evidence; exact generating query and raw execution artifact were not retained and have not been recovered",
+    "preserved_immutable": true,
+    "reproduction_claimed": false,
+    "replaced_or_repaired": false
+  },
+  "verification_contract": {
+    "contract_id": "rosuno-p1-009-gate5-prestate-v1",
+    "canonicalization_contract": "rosuno-p1-catalog-v1",
+    "isolation": "REPEATABLE READ",
+    "read_only": true,
+    "tables": [
+      "public.ai_suggestions",
+      "public.application_sessions",
+      "public.attorney_profiles",
+      "public.availability_rules",
+      "public.blackouts",
+      "public.bookability_evaluations",
+      "public.bookings",
+      "public.capability_definitions",
+      "public.capability_grants",
+      "public.client_profiles",
+      "public.consultation_requests",
+      "public.consultations",
+      "public.discipline_records",
+      "public.eligibility_evaluations",
+      "public.engagements",
+      "public.instant_availability_intents",
+      "public.insurance_records",
+      "public.intakes",
+      "public.jurisdiction_assessments",
+      "public.jurisdiction_regulatory_modes",
+      "public.jurisdictions",
+      "public.launch_authorizations",
+      "public.launch_gate_evaluations",
+      "public.launch_gates",
+      "public.licenses",
+      "public.media_rooms",
+      "public.media_sessions",
+      "public.policy_authority_references",
+      "public.policy_types",
+      "public.policy_versions",
+      "public.practice_area_authorisations",
+      "public.practice_areas",
+      "public.referral_eligible_pool_entries",
+      "public.referral_presentations",
+      "public.referrals",
+      "public.regulatory_modes",
+      "public.service_areas",
+      "public.session_participation_records",
+      "public.slot_holds",
+      "public.staff_profiles",
+      "public.users",
+      "public.verification_evidence",
+      "public.verification_evidence_subjects"
+    ],
+    "functions": [
+      {
+        "schema": "public",
+        "name": "enforce_bookability_eligibility_consistency",
+        "identity_args": ""
+      },
+      {
+        "schema": "public",
+        "name": "enforce_consultation_relationships",
+        "identity_args": ""
+      },
+      {
+        "schema": "public",
+        "name": "enforce_consultation_request_relationships",
+        "identity_args": ""
+      },
+      {
+        "schema": "public",
+        "name": "enforce_instant_intent_session_binding",
+        "identity_args": ""
+      },
+      {
+        "schema": "public",
+        "name": "enforce_jurisdiction_live_authorization",
+        "identity_args": ""
+      },
+      {
+        "schema": "public",
+        "name": "enforce_policy_authority_provenance",
+        "identity_args": ""
+      },
+      {
+        "schema": "public",
+        "name": "enforce_request_hold_consistency",
+        "identity_args": ""
+      },
+      {
+        "schema": "public",
+        "name": "enforce_scheduling_conflicts",
+        "identity_args": ""
+      },
+      {
+        "schema": "public",
+        "name": "enforce_session_participant_relationship",
+        "identity_args": ""
+      },
+      {
+        "schema": "public",
+        "name": "has_manage_attorney_verification_scope",
+        "identity_args": "required_jurisdiction uuid, allow_any_jurisdiction boolean"
+      },
+      {
+        "schema": "public",
+        "name": "rls_auto_enable",
+        "identity_args": ""
+      },
+      {
+        "schema": "public",
+        "name": "set_updated_at",
+        "identity_args": ""
+      }
+    ],
+    "principals": ["PUBLIC", "anon", "authenticated", "service_role", "owner"],
+    "categories": [
+      "table",
+      "column",
+      "constraint",
+      "index",
+      "foreign_key",
+      "rls",
+      "policy",
+      "trigger",
+      "function",
+      "table_privilege",
+      "function_privilege"
+    ]
+  },
+  "artifacts": {
+    "query": {
+      "path": "tools/p0/catalog/p1-009-gate5-prestate.sql",
+      "sha256": "ddd1d63f95da26dacd54ed95c71d1ca788d24862be70623764786638f1ecc8de",
+      "bytes": 11764
+    },
+    "runner": {
+      "path": "tools/p0/p1-009-gate5-fingerprint.mjs",
+      "sha256": "efb84d990c78e0212bef71e4acd5db741b35da907469e5404028a1fd5fba8645",
+      "bytes": 11351
+    },
+    "canonicalizer": {
+      "path": "tools/p0/lib/catalog-fingerprint.mjs",
+      "sha256": "cedcca81b2604192f596c0e3a3f34a31aa4bfba86134a36d31595af42f5fdbb1",
+      "bytes": 20778,
+      "export": "canonicalizeCatalogRows"
+    }
+  },
+  "preconditions": {
+    "migration_history": [
+      "20260828192126_p0_restrict_rls_auto_enable_execution",
+      "20260829000015_p1_platform_foundation",
+      "20260829171701_p1_authorization_foundation",
+      "20260830023823_p1_jurisdiction_policy_launch_foundation",
+      "20260901012518_p1_authorization_scope_correction",
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+      "20260911062917_p1_client_intake_ai_foundation",
+      "20260914000658_p1_marketplace_referral_foundation",
+      "20260914231532_p1_scheduling_request_booking_bookability_foundation",
+      "20260917045031_p1_consultation_engagement_media_foundation"
+    ],
+    "public_table_count": 43,
+    "rls_enabled_count": 43,
+    "p1_009_relations_present": 0,
+    "security_advisor": {
+      "info_count": 19,
+      "warn_count": 1,
+      "unapproved_count": 0,
+      "info_identities": [
+        "rls_enabled_no_policy:public.application_sessions",
+        "rls_enabled_no_policy:public.bookability_evaluations",
+        "rls_enabled_no_policy:public.bookings",
+        "rls_enabled_no_policy:public.capability_definitions",
+        "rls_enabled_no_policy:public.capability_grants",
+        "rls_enabled_no_policy:public.jurisdiction_regulatory_modes",
+        "rls_enabled_no_policy:public.jurisdictions",
+        "rls_enabled_no_policy:public.launch_authorizations",
+        "rls_enabled_no_policy:public.launch_gate_evaluations",
+        "rls_enabled_no_policy:public.launch_gates",
+        "rls_enabled_no_policy:public.policy_authority_references",
+        "rls_enabled_no_policy:public.policy_types",
+        "rls_enabled_no_policy:public.policy_versions",
+        "rls_enabled_no_policy:public.referral_eligible_pool_entries",
+        "rls_enabled_no_policy:public.referral_presentations",
+        "rls_enabled_no_policy:public.referrals",
+        "rls_enabled_no_policy:public.regulatory_modes",
+        "rls_enabled_no_policy:public.service_areas",
+        "rls_enabled_no_policy:public.slot_holds"
+      ],
+      "warn": {
+        "code": "authenticated_security_definer_function_executable",
+        "schema": "public",
+        "function": "has_manage_attorney_verification_scope",
+        "identity_args": "required_jurisdiction uuid, allow_any_jurisdiction boolean"
+      }
+    },
+    "public_function_count": 12
+  },
+  "retention_contract": {
+    "exact_query_artifact_retained": true,
+    "canonicalizer_source_identity_retained": true,
+    "raw_pre_rows_required": true,
+    "canonical_pre_snapshot_required": true,
+    "raw_post_rows_required": true,
+    "canonical_post_snapshot_required": true,
+    "each_run_artifact_requires": ["identity", "sha256", "bytes", "row_count"],
+    "future_execution_evidence_must_retain_bytes_or_content_addressed_artifact": true
+  },
+  "execution_policy": {
+    "pre_anchor": "Compute a fresh fingerprint from the exact retained P1-009 Gate 5 query and canonicalizer; do not compare it to or claim reproduction of the historical P1-008 fingerprint.",
+    "post_requirement": "After rollback, rerun the exact same retained query and canonicalizer and require exact PRE/POST canonical-byte equality.",
+    "advisor_requirement": "Gate 5 remains provisional until independent Supabase security-advisor verification confirms exactly 19 INFO, the one pre-existing approved WARN, and zero unapproved findings.",
+    "gate5_pass_requires": [
+      "rollback validator exits successfully and ends in explicit ROLLBACK",
+      "migration history is unchanged",
+      "P1-009 relations do not persist",
+      "POST canonical catalog bytes equal PRE canonical catalog bytes exactly",
+      "persistent state evidence required by Gate 5 is unchanged",
+      "independent post-rollback security-advisor state is accepted exactly"
+    ],
+    "database_execution_authorized": false
+  },
+  "boundaries": {
+    "p1_009_migration_modified": false,
+    "p1_009_rollback_modified": false,
+    "p1_008_historical_evidence_rewritten": false,
+    "database_contact_authorized_by_gate5a": false,
+    "persistent_staging_application_authorized": false,
+    "production_authorized": false,
+    "old_authorized": false,
+    "governance_closure_authorized": false,
+    "later_work_authorized": false
+  }
+}

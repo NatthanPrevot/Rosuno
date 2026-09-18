@@ -9,6 +9,25 @@ import {
   validateCatalogBaseline,
 } from "./catalog-fingerprint.mjs";
 
+import {
+  P1009_GATE5_CATEGORIES,
+  P1009_GATE5_CONTRACT_ID,
+  P1009_GATE5_DECISION_ID,
+  P1009_GATE5_EVIDENCE_ID,
+  P1009_GATE5_INFO_ADVISOR_IDENTITIES,
+  P1009_GATE5_MIGRATION_HISTORY,
+  P1009_GATE5_PRINCIPALS,
+  P1009_GATE5_PROJECT_REF,
+  P1009_GATE5_RUNNER_PATH,
+  P1009_GATE5_SQL_PATH,
+  P1009_GATE5_TARGET_FUNCTIONS,
+  P1009_GATE5_TARGET_TABLES,
+  P1009_GATE5_WARN_ADVISOR,
+  P1009_HISTORICAL_P1008,
+  buildP1009Gate5PrestateSql,
+  readP1009Gate5PrestateSql,
+} from "../p1-009-gate5-fingerprint.mjs";
+
 const ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../..",
@@ -748,11 +767,14 @@ export function validateEnvironmentExample(example, expectedEnvironment) {
 function migrationArtifactPaths(files) {
   return files.filter(
     (file) =>
-      (file.startsWith("governance/migrations/") &&
+      file !== "tools/p0/catalog/p1-009-gate5-prestate.sql" &&
+      ((file.startsWith("governance/migrations/") &&
         file !== "governance/migrations/reviewed-migrations.json") ||
-      (!file.startsWith("governance/") &&
-        (file.endsWith(".sql") ||
-          /^(?:db|database|drizzle|migrations|prisma|supabase)\//i.test(file))),
+        (!file.startsWith("governance/") &&
+          (file.endsWith(".sql") ||
+            /^(?:db|database|drizzle|migrations|prisma|supabase)\//i.test(
+              file,
+            )))),
   );
 }
 
@@ -6355,6 +6377,195 @@ export function validateNeutralPaths(files, packageJson) {
   }
 }
 
+export function validateP1009Gate5PrestateContract(
+  evidence,
+  decisions = readJson("governance/decision-log.json"),
+) {
+  const context = "P1-009 Gate 5A prestate contract";
+
+  requireExactFields(
+    evidence,
+    [
+      "version",
+      "evidence_id",
+      "work_item_id",
+      "decision_id",
+      "status",
+      "environment",
+      "historical_p1_008",
+      "verification_contract",
+      "artifacts",
+      "preconditions",
+      "retention_contract",
+      "execution_policy",
+      "boundaries",
+    ],
+    context,
+  );
+
+  if (
+    evidence.version !== 1 ||
+    evidence.evidence_id !== P1009_GATE5_EVIDENCE_ID ||
+    evidence.work_item_id !== "WI-P1-009-RESOURCES-COMMUNICATIONS-FOUNDATION" ||
+    evidence.decision_id !== P1009_GATE5_DECISION_ID ||
+    evidence.status !== "contract_defined_not_executed" ||
+    evidence.environment?.name !== "Rosuno Staging" ||
+    evidence.environment?.project_ref !== P1009_GATE5_PROJECT_REF
+  ) {
+    fail(`${context} identity is invalid`);
+  }
+
+  const historical = evidence.historical_p1_008;
+
+  if (
+    historical?.baseline_id !== P1009_HISTORICAL_P1008.baseline_id ||
+    historical?.sha256 !== P1009_HISTORICAL_P1008.sha256 ||
+    historical?.canonical_byte_length !==
+      P1009_HISTORICAL_P1008.canonical_byte_length ||
+    historical?.row_count !== P1009_HISTORICAL_P1008.row_count ||
+    historical?.provenance_status !==
+      "accepted historical evidence; exact generating query and raw execution artifact were not retained and have not been recovered" ||
+    historical?.preserved_immutable !== true ||
+    historical?.reproduction_claimed !== false ||
+    historical?.replaced_or_repaired !== false
+  ) {
+    fail(`${context} historical P1-008 boundary is invalid`);
+  }
+
+  const contract = evidence.verification_contract;
+
+  if (
+    contract?.contract_id !== P1009_GATE5_CONTRACT_ID ||
+    contract?.canonicalization_contract !== "rosuno-p1-catalog-v1" ||
+    contract?.isolation !== "REPEATABLE READ" ||
+    contract?.read_only !== true ||
+    JSON.stringify(contract.tables) !==
+      JSON.stringify(
+        P1009_GATE5_TARGET_TABLES.map((table) => `public.${table}`),
+      ) ||
+    JSON.stringify(contract.functions) !==
+      JSON.stringify(P1009_GATE5_TARGET_FUNCTIONS) ||
+    JSON.stringify(contract.principals) !==
+      JSON.stringify(P1009_GATE5_PRINCIPALS) ||
+    JSON.stringify(contract.categories) !==
+      JSON.stringify(P1009_GATE5_CATEGORIES)
+  ) {
+    fail(`${context} exact verification scope is invalid`);
+  }
+
+  const sqlSource = readP1009Gate5PrestateSql();
+
+  if (sqlSource !== buildP1009Gate5PrestateSql()) {
+    fail(`${context} retained SQL is not deterministically derived`);
+  }
+
+  const hashArtifact = (artifact, expectedPath) => {
+    if (artifact?.path !== expectedPath) {
+      fail(`${context} artifact path changed: ${expectedPath}`);
+    }
+
+    const bytes = readFileSync(path.join(ROOT, expectedPath));
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+
+    if (artifact.sha256 !== sha256 || artifact.bytes !== bytes.length) {
+      fail(`${context} artifact digest changed: ${expectedPath}`);
+    }
+  };
+
+  hashArtifact(evidence.artifacts?.query, P1009_GATE5_SQL_PATH);
+  hashArtifact(evidence.artifacts?.runner, P1009_GATE5_RUNNER_PATH);
+  hashArtifact(
+    evidence.artifacts?.canonicalizer,
+    "tools/p0/lib/catalog-fingerprint.mjs",
+  );
+
+  if (evidence.artifacts?.canonicalizer?.export !== "canonicalizeCatalogRows") {
+    fail(`${context} canonicalizer source identity is invalid`);
+  }
+
+  const preconditions = evidence.preconditions;
+
+  if (
+    JSON.stringify(preconditions?.migration_history) !==
+      JSON.stringify(P1009_GATE5_MIGRATION_HISTORY) ||
+    preconditions?.public_table_count !== 43 ||
+    preconditions?.public_function_count !== 12 ||
+    preconditions?.rls_enabled_count !== 43 ||
+    preconditions?.p1_009_relations_present !== 0 ||
+    preconditions?.security_advisor?.info_count !== 19 ||
+    preconditions?.security_advisor?.warn_count !== 1 ||
+    preconditions?.security_advisor?.unapproved_count !== 0 ||
+    JSON.stringify(preconditions?.security_advisor?.info_identities) !==
+      JSON.stringify(P1009_GATE5_INFO_ADVISOR_IDENTITIES) ||
+    JSON.stringify(preconditions?.security_advisor?.warn) !==
+      JSON.stringify(P1009_GATE5_WARN_ADVISOR)
+  ) {
+    fail(`${context} accepted Staging preconditions are invalid`);
+  }
+
+  const retention = evidence.retention_contract;
+
+  if (
+    retention?.exact_query_artifact_retained !== true ||
+    retention?.canonicalizer_source_identity_retained !== true ||
+    retention?.raw_pre_rows_required !== true ||
+    retention?.canonical_pre_snapshot_required !== true ||
+    retention?.raw_post_rows_required !== true ||
+    retention?.canonical_post_snapshot_required !== true ||
+    retention?.each_run_artifact_requires?.join("|") !==
+      "identity|sha256|bytes|row_count" ||
+    retention?.future_execution_evidence_must_retain_bytes_or_content_addressed_artifact !==
+      true
+  ) {
+    fail(`${context} retention contract is weakened`);
+  }
+
+  const policy = evidence.execution_policy;
+
+  if (
+    policy?.pre_anchor !==
+      "Compute a fresh fingerprint from the exact retained P1-009 Gate 5 query and canonicalizer; do not compare it to or claim reproduction of the historical P1-008 fingerprint." ||
+    policy?.post_requirement !==
+      "After rollback, rerun the exact same retained query and canonicalizer and require exact PRE/POST canonical-byte equality." ||
+    policy?.advisor_requirement !==
+      "Gate 5 remains provisional until independent Supabase security-advisor verification confirms exactly 19 INFO, the one pre-existing approved WARN, and zero unapproved findings." ||
+    policy?.database_execution_authorized !== false ||
+    policy?.gate5_pass_requires?.length !== 6
+  ) {
+    fail(`${context} execution policy is invalid`);
+  }
+
+  if (
+    Object.values(evidence.boundaries ?? {}).some((value) => value !== false)
+  ) {
+    fail(`${context} authorization boundary is invalid`);
+  }
+
+  const decision = decisions.decisions?.find(
+    (item) => item.decision_id === P1009_GATE5_DECISION_ID,
+  );
+
+  if (
+    !decision ||
+    decision.status !== "accepted" ||
+    decision.reviewer?.identity !== "Rosuno" ||
+    decision.reviewer?.status !== "pending" ||
+    !decision.evidence?.includes(
+      "governance/evidence/p1-009-gate5-prestate-contract.json",
+    ) ||
+    !decision.evidence?.includes(P1009_GATE5_SQL_PATH) ||
+    !decision.evidence?.includes(P1009_GATE5_RUNNER_PATH)
+  ) {
+    fail(`${context} decision traceability is invalid`);
+  }
+
+  if (scanSecretLikeText(JSON.stringify(evidence), context).length > 0) {
+    fail(`${context} contains secret-like content`);
+  }
+
+  return true;
+}
+
 export function validateRepository() {
   const packageJson = readJson("package.json");
   const workspace = readFileSync(
@@ -6487,6 +6698,10 @@ export function validateRepository() {
   validateDriftReport(
     readJson("governance/schema-drift/baseline.json"),
     migrations,
+  );
+  validateP1009Gate5PrestateContract(
+    readJson("governance/evidence/p1-009-gate5-prestate-contract.json"),
+    decisions,
   );
   validateReleaseRegister(releases, references, (sha) => {
     try {
