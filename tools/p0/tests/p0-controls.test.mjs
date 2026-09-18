@@ -50,6 +50,8 @@ import {
   validateP1ConsultationEngagementMediaCandidate,
   validateP1ConsultationEngagementMediaClosure,
   validateP1ConsultationEngagementMediaTraceability,
+  validateP1ResourcesCommunicationsCandidate,
+  validateP1ResourcesCommunicationsTraceability,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
   validateP1RegulatoryCatalog,
@@ -2077,6 +2079,19 @@ test("product source and deployment paths outside conventional roots are rejecte
   );
 });
 
+test("P1-009 migration path is allowed by the neutral repository control", () => {
+  const packageJson = readJson("package.json");
+
+  assert.doesNotThrow(() =>
+    validateNeutralPaths(
+      [
+        "supabase/migrations/20260918060600_p1_resources_communications_foundation.sql",
+      ],
+      packageJson,
+    ),
+  );
+});
+
 test("CI rejects shallow history that would break historical release validation", () => {
   const workflow = readFileSync(
     path.join(ROOT, ".github/workflows/p0-controls.yml"),
@@ -2728,7 +2743,7 @@ test("P1-006 accepted closure remains valid under the current P1-008 baseline", 
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-008-20260918-v1");
   assert.equal(baseline.migration_inventory.length, 10);
-  assert.equal(migrations.migrations.length, 10);
+  assert.equal(migrations.migrations.length, 11);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "1926821eee5d37194358f5a0a0e30f2577f7bb08c9be5478ab21dd300e32ba04",
@@ -2896,7 +2911,7 @@ test("P1-007 accepted closure remains valid under the current P1-008 baseline", 
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-008-20260918-v1");
   assert.equal(baseline.migration_inventory.length, 10);
-  assert.equal(migrations.migrations.length, 10);
+  assert.equal(migrations.migrations.length, 11);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "1926821eee5d37194358f5a0a0e30f2577f7bb08c9be5478ab21dd300e32ba04",
@@ -3069,7 +3084,7 @@ test("P1-008 accepted closure requires exact lifecycle evidence and ten-migratio
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-008-20260918-v1");
   assert.equal(baseline.migration_inventory.length, 10);
-  assert.equal(migrations.migrations.length, 10);
+  assert.equal(migrations.migrations.length, 11);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "1926821eee5d37194358f5a0a0e30f2577f7bb08c9be5478ab21dd300e32ba04",
@@ -3202,5 +3217,109 @@ test("P1-008 accepted closure requires exact lifecycle evidence and ten-migratio
   );
   assert.doesNotThrow(() =>
     validateDriftReport(pendingBaseline, pendingMigrations),
+  );
+});
+
+test("P1-009 pending candidate is exact above the accepted P1-008 Staging baseline", () => {
+  const migrations = readJson("governance/migrations/reviewed-migrations.json");
+  const workItems = readJson("governance/work-items/index.json");
+  const decisions = readJson("governance/decision-log.json");
+  const releases = readJson("governance/releases/traceability.json");
+  const baseline = readJson("governance/schema-drift/baseline.json");
+
+  const migrationId = "20260918060600_p1_resources_communications_foundation";
+  const decisionId = "DEC-20260918-P1-009-BOUNDED-CANDIDATE";
+  const workItemId = "WI-P1-009-RESOURCES-COMMUNICATIONS-FOUNDATION";
+
+  const migration = migrations.migrations.find(
+    (item) => item.migration_id === migrationId,
+  );
+
+  assert.ok(migration);
+
+  const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+
+  assert.equal(
+    validateP1ResourcesCommunicationsCandidate(migration, sql),
+    "pending",
+  );
+
+  assert.doesNotThrow(() =>
+    validateP1ResourcesCommunicationsTraceability(
+      migrations,
+      workItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-008-20260918-v1");
+  assert.equal(baseline.migration_inventory.length, 10);
+  assert.equal(migrations.migrations.length, 11);
+
+  assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
+
+  const byteDriftSql = `${sql}\n-- unauthorized P1-009 byte drift\n`;
+
+  assert.throws(() =>
+    validateP1ResourcesCommunicationsCandidate(migration, byteDriftSql),
+  );
+
+  const invalidLifecycle = structuredClone(migration);
+  invalidLifecycle.reviewed = true;
+
+  assert.throws(() =>
+    validateP1ResourcesCommunicationsCandidate(invalidLifecycle, sql),
+  );
+
+  const staleDecisions = structuredClone(decisions);
+  const staleDecision = staleDecisions.decisions.find(
+    (item) => item.decision_id === decisionId,
+  );
+
+  assert.ok(staleDecision);
+  staleDecision.title += " drift";
+
+  assert.throws(() =>
+    validateP1ResourcesCommunicationsTraceability(
+      migrations,
+      workItems,
+      staleDecisions,
+      releases,
+    ),
+  );
+
+  const staleWorkItems = structuredClone(workItems);
+  const staleWorkItem = staleWorkItems.work_items.find(
+    (item) => item.work_item_id === workItemId,
+  );
+
+  assert.ok(staleWorkItem);
+  staleWorkItem.objective += " drift";
+
+  assert.throws(() =>
+    validateP1ResourcesCommunicationsTraceability(
+      migrations,
+      staleWorkItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  const leakedReleases = structuredClone(releases);
+  leakedReleases.releases.push({
+    release_id: "REL-P1-009-UNAUTHORIZED-TEST",
+    migration_refs: [migrationId],
+    work_item_refs: [workItemId],
+    decision_refs: [decisionId],
+  });
+
+  assert.throws(() =>
+    validateP1ResourcesCommunicationsTraceability(
+      migrations,
+      workItems,
+      decisions,
+      leakedReleases,
+    ),
   );
 });

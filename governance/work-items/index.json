@@ -665,6 +665,84 @@
       "rollback_reference": "tools/p0/p1-008-rollback.mjs",
       "created_at": "2026-09-17T20:50:25Z",
       "updated_at": "2026-09-18T02:29:30Z"
+    },
+    {
+      "work_item_id": "WI-P1-009-RESOURCES-COMMUNICATIONS-FOUNDATION",
+      "title": "P1-009 Resources / Communications physical foundation",
+      "objective": "Implement the smallest authority-defined Physical 1I persistence and security foundation for protected Resources, Documents, Voice Memos, explicit Resource Sharing Grants, consultation-scoped Messages, Notifications, delivery-attempt evidence, and generalized durable Operational Jobs while preserving the frozen Gate 0 access, ownership, history, and later-phase boundaries.",
+      "in_scope": [
+        "Exactly public.resources, public.documents, public.voice_memos, public.resource_sharing_grants, public.messages, public.notifications, public.notification_attempts, and public.operational_jobs",
+        "Voice Memo Resource/Intake equality and backing Resource ownership by the User behind the Intake-owning Client Profile, enforced database-side using deferred final-state integrity checks without defining a broader reassociation workflow",
+        "One Resource identity per physical Storage bucket/object path without a closed resource_kind taxonomy or cross-subtype exclusivity",
+        "Recipient-specific Sharing Grant history with no simultaneous authorization from duplicate same resource/recipient/context/purpose grants",
+        "Corrected Resource metadata RLS: direct owner, Client-owned Intake relationship, or currently valid explicit Sharing Grant; Consultation association alone does not disclose a client Resource to an attorney",
+        "Raw Storage bucket/path withheld from ordinary authenticated reads; actual byte access remains outside this migration behind the later server-authorized signed-URL boundary",
+        "Consultation-scoped Message participant integrity and immutable sent Message identity/content; no pre-Consultation/open-inbox Message persistence",
+        "Notification lifecycle, append-only delivery attempts, and Operational Job execution/retry persistence remain separate authorities",
+        "Fourteen concrete P1-009 foreign keys use the approved RESTRICT/RESTRICT actions; generic context/source/subject references remain non-FK",
+        "Immediate RLS, fail-closed ordinary mutation, bounded service_role privileges, authority-supported indexes plus only indexes required by frozen integrity/RLS predicates, local governance/contract controls, and rollback-generation tooling"
+      ],
+      "out_of_scope": [
+        "Git commit, branch publication/push, pull request creation, review, merge, release creation, rollback execution, persistent Staging application, or any database contact during this Gate 1 local implementation",
+        "Explicit Document lineage fields/relations or a completed Document replacement workflow",
+        "Resource subtype exclusivity, closed resource_kind literals/taxonomy, or speculative Resource abstractions",
+        "DOC-DEL resolution, deletion/purge/erasure execution, retention timers, or Legal Hold implementation",
+        "Fixed post-Consultation messaging-window duration or unrestricted pre-Consultation messaging",
+        "Storage bucket creation, signed-URL endpoint implementation, provider integrations, or application UI/workflows",
+        "Fee Calculation, Payment Transaction, Ledger Entry, Payout, Reconciliation Exception, External Event Receipt, Audit Event, Retention Rule, Legal Hold, Complaint Case, Review, California regulatory-mode objects, P1-010, or later work",
+        "Production mutation, OLD mutation/use as canonical state, source/development database mutation, or fake production/business data"
+      ],
+      "status": "in_progress",
+      "owner": "Rosuno P1-009 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260918-P1-009-BOUNDED-CANDIDATE"],
+      "dependencies": ["WI-P1-008-CONSULTATION-ENGAGEMENT-MEDIA-FOUNDATION"],
+      "acceptance_criteria": [
+        "Exactly eight Physical 1I persistent relations are introduced and no 1J/1K/1L or later relation is added",
+        "The migration preserves the exact locked relation columns and all fourteen approved concrete foreign keys use RESTRICT on update and delete while generic polymorphic references remain non-FK",
+        "Resource physical identity is unique by storage_bucket/storage_object_path and raw Storage locator columns are not directly readable by ordinary authenticated users",
+        "Voice Memo Resource Intake and client-owner facts cannot become contradictory through Voice Memo, Resource, Intake-client, or Client-Profile-user writes, while deferred enforcement avoids defining a broader reassociation workflow through trigger timing",
+        "No cross-table Document/Voice-Memo exclusivity or closed resource_kind vocabulary is introduced, and explicit Document lineage remains deferred",
+        "No two same resource/recipient/context/purpose Sharing Grants can simultaneously authorize access; grant identity/terms and prior revocation history cannot be silently rewritten",
+        "Client own-Intake Resource metadata access is preserved, attorney access to client Resources requires explicit sharing rather than consultation_id alone, and actual Storage bytes remain outside ordinary RLS access",
+        "Messages are bound to canonical Consultation participants; sent identity/content is immutable; no unrestricted pre-Consultation Message relation exists",
+        "Notification owns communication lifecycle, Notification Attempts remain append-only provider evidence, and Operational Jobs own durable execution/retry state",
+        "No target relation grants DELETE; authenticated users receive no direct mutation privileges and service_role mutation remains column-bounded",
+        "Local targeted tests plus the complete canonical format/typecheck/build/P0/security validation pass on the uncommitted candidate bytes",
+        "Any commit, publication, protected review, database rollback validation, persistent Staging application, Production action, OLD action, or later work requires a separate authorization gate"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p1-009-contract.test.mjs",
+        "node tools/p0/p1-009-rollback.mjs /tmp/p1-009-rollback-validation.sql",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "staging",
+      "release_refs": [],
+      "migration_refs": [
+        "20260918060600_p1_resources_communications_foundation"
+      ],
+      "rollback_reference": "tools/p0/p1-009-rollback.mjs",
+      "created_at": "2026-09-18T08:08:25Z",
+      "updated_at": "2026-09-18T08:08:25Z"
     }
   ]
 }

@@ -356,6 +356,39 @@
         "governance/schema-drift/baseline.json"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260918-P1-009-BOUNDED-CANDIDATE",
+      "title": "Implement the bounded P1-009 Resources / Communications foundation",
+      "status": "accepted",
+      "scope": "Bounded uncommitted local Physical 1I Resources / Communications foundation implementation and local validation only; no commit, branch publication, protected review, remote mutation, database contact/execution, or later P1 work.",
+      "decision": "Implement exactly resources, documents, voice_memos, resource_sharing_grants, messages, notifications, notification_attempts, and operational_jobs using the frozen P1-009 Gate 0 contract. Keep explicit Document lineage and Resource subtype/resource_kind taxonomy deferred; enforce Voice Memo Resource/Intake equality and client ownership; use one Resource identity per Storage bucket/path; prevent two same resource/recipient/context/purpose grants from simultaneously authorizing access while retaining grant history; implement corrected Resource metadata access so clients may read direct-owned or own-Intake resources while attorney access to client resources requires explicit sharing; withhold raw Storage locator columns from ordinary authenticated reads; preserve Storage-byte access as a later signed-URL boundary; bind Messages to canonical Consultation participants with immutable sent identity/content; keep Notification, delivery-attempt evidence, and Operational Job execution state separate; and apply FK-1 ON UPDATE RESTRICT / ON DELETE RESTRICT to all fourteen concrete P1-009 foreign keys. DOC-DEL, G-1, and G-5 remain unresolved/untouched and no 1J/1K/1L object is pulled forward.",
+      "rationale": "Gate 0 reconciled locked Physical, Relational, Domain, Blueprint, Build, Technical Architecture, and Implementation Plan boundaries and froze the smallest correct 1I foundation. D1 and D3 remain intentionally deferred rather than invented. D2a/D2b, I1/I2/I3, and FK-1 are bounded decisions already accepted for this work item. Implementation must preserve recipient-specific sharing, Intake ownership, explicit attorney disclosure, immutable Message content, durable communication/job evidence, jurisdiction neutrality, and the separate Storage signed-URL authorization boundary without resolving later deletion, financial, compliance, or regulatory work.",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-009-RESOURCES-COMMUNICATIONS-FOUNDATION"],
+      "owner": "Rosuno P1-009 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-09-18T08:08:25Z",
+      "updated_at": "2026-09-18T08:08:25Z",
+      "supersedes": [],
+      "impact": "Authorizes only the bounded uncommitted local P1-009 implementation and local validation on branch p1-009-resources-communications-foundation. It does not authorize git commit, branch publication/push, pull request creation, review, merge, database contact, rollback execution, persistent Staging application, release creation, Production mutation, OLD mutation/use as canonical state, P1-010, or an end-to-end Resources / Communications capability claim.",
+      "evidence": [
+        "supabase/migrations/20260918060600_p1_resources_communications_foundation.sql",
+        "tools/p0/lib/p1-009-contract-data.mjs",
+        "tools/p0/tests/p1-009-contract.test.mjs",
+        "tools/p0/p1-009-rollback.mjs"
+      ],
+      "expiry": null
     }
   ]
 }
