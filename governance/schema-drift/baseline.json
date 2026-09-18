@@ -1,10 +1,10 @@
 {
   "version": 1,
   "product_schema_present": true,
-  "baseline_id": "rosuno-staging-p1-007-20260916-v1",
-  "baseline_digest": "sha256:c4f2151ac71875a55e91c5ce050740a702a6069c194bbf7f99ef4ce8df8d0609",
+  "baseline_id": "rosuno-staging-p1-008-20260918-v1",
+  "baseline_digest": "sha256:13132316de50cdec1317e779601211d070a059f44e0402a0e6d48c337d472993",
   "checked_environment": "staging",
-  "checked_at": "2026-09-16T04:43:44.771854Z",
+  "checked_at": "2026-09-18T00:39:58.454972Z",
   "project": {
     "name": "Rosuno Staging",
     "project_ref": "mxjlvmowmodzdtdfgqpb"
@@ -63,6 +63,12 @@
       "migration_id": "20260914231532_p1_scheduling_request_booking_bookability_foundation",
       "artifact_path": "supabase/migrations/20260914231532_p1_scheduling_request_booking_bookability_foundation.sql",
       "sha256": "4865a0643ffab7d8afcd9d26aeecc180e9fe51d6f261cc83717cfb1ab3bf370f"
+    },
+    {
+      "sequence": 10,
+      "migration_id": "20260917045031_p1_consultation_engagement_media_foundation",
+      "artifact_path": "supabase/migrations/20260917045031_p1_consultation_engagement_media_foundation.sql",
+      "sha256": "aa33c207eacf407165809f893a622b3407708280527991ff772320d2b29dea60"
     }
   ],
   "accepted_evidence": [
@@ -93,13 +99,17 @@
     {
       "path": "governance/evidence/p1-007-governance-lifecycle-closure.json",
       "sha256": "91d8f56ed23f85478b798866606d8bf051d8c26a0c899adc2dfccf7588688f78"
+    },
+    {
+      "path": "governance/evidence/p1-008-governance-lifecycle-closure.json",
+      "sha256": "07121d8f64e8a1245de1002ed4db02aded1690446edeaef73337f286e150dc3b"
     }
   ],
   "catalog_fingerprint": {
     "format": "rosuno-p1-catalog-v1",
-    "sha256": "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
-    "canonical_byte_length": 348401,
-    "row_count": 1089
+    "sha256": "1926821eee5d37194358f5a0a0e30f2577f7bb08c9be5478ab21dd300e32ba04",
+    "canonical_byte_length": 410432,
+    "row_count": 1263
   },
   "evidence": [
     "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json",
@@ -108,7 +118,8 @@
     "governance/evidence/p1-004-governance-lifecycle-closure.json",
     "governance/evidence/p1-005-governance-lifecycle-closure.json",
     "governance/evidence/p1-006-governance-lifecycle-closure.json",
-    "governance/evidence/p1-007-governance-lifecycle-closure.json"
+    "governance/evidence/p1-007-governance-lifecycle-closure.json",
+    "governance/evidence/p1-008-governance-lifecycle-closure.json"
   ],
   "drift_status": "clean",
   "drift_items": []

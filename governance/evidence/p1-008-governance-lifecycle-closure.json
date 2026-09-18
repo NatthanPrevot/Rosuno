@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "evidence_id": "P1-008-GOVERNANCE-LIFECYCLE-CLOSURE-20260918",
+  "work_item_id": "WI-P1-008-CONSULTATION-ENGAGEMENT-MEDIA-FOUNDATION",
+  "lifecycle": "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED",
+  "lifecycle_state": {
+    "repository_closure": true,
+    "staging_application": true,
+    "postapplication_readonly_verification": true
+  },
+  "repository": {
+    "canonical_main": "a3c7ee7d020a3a224fed81e689518b84123c665b",
+    "canonical_tree": "e0478294eacb807dfc2bbf053a5223834765533a",
+    "protected_main": true,
+    "implementation": {
+      "pull_request": 25,
+      "title": "P1-008: consultation engagement media foundation",
+      "base": "384c9b7c43e05446e6ee5fbdfa94b5fb805d9d3c",
+      "head": "7e7fa906a93835f54805d59fdce2687f82104f67",
+      "tree": "e0478294eacb807dfc2bbf053a5223834765533a",
+      "merge_commit": "a3c7ee7d020a3a224fed81e689518b84123c665b",
+      "ordered_parents": [
+        "384c9b7c43e05446e6ee5fbdfa94b5fb805d9d3c",
+        "7e7fa906a93835f54805d59fdce2687f82104f67"
+      ],
+      "review_id": "5242533993",
+      "approved_at": "2026-09-17T23:53:09Z",
+      "merged_at": "2026-09-17T23:59:38Z",
+      "workflow_run_id": 35287236118,
+      "workflow_conclusion": "success"
+    }
+  },
+  "migration": {
+    "id": "20260917045031_p1_consultation_engagement_media_foundation",
+    "sha256": "aa33c207eacf407165809f893a622b3407708280527991ff772320d2b29dea60",
+    "sequence": 10,
+    "history_versions": 10,
+    "history": [
+      "20260828192126_p0_restrict_rls_auto_enable_execution",
+      "20260829000015_p1_platform_foundation",
+      "20260829171701_p1_authorization_foundation",
+      "20260830023823_p1_jurisdiction_policy_launch_foundation",
+      "20260901012518_p1_authorization_scope_correction",
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+      "20260911062917_p1_client_intake_ai_foundation",
+      "20260914000658_p1_marketplace_referral_foundation",
+      "20260914231532_p1_scheduling_request_booking_bookability_foundation",
+      "20260917045031_p1_consultation_engagement_media_foundation"
+    ]
+  },
+  "gate5": {
+    "result": "PASS",
+    "generated_sql_sha256": "7cecb43fceba3f28956aff49354b96e9a6e43bca1a5d9f102f84c4c1b00f78cb",
+    "generated_sql_lines": 1661,
+    "generated_sql_bytes": 58506,
+    "application_exit": 0,
+    "final_transaction_action": "ROLLBACK",
+    "pre_post_state": "EXACT_MATCH",
+    "persistent_migration_history_change": "NONE",
+    "persistent_p1_008_ddl_dml": "NONE"
+  },
+  "gate6": {
+    "result": "PASS",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "supabase_cli": "2.116.0",
+    "dry_run_migrations": [
+      "20260917045031_p1_consultation_engagement_media_foundation.sql"
+    ],
+    "application_exit": 0,
+    "migration_history_count": 10,
+    "public_tables": 43,
+    "public_rls": 43,
+    "p1_008_rows": {
+      "consultations": 0,
+      "engagements": 0,
+      "media_rooms": 0,
+      "media_sessions": 0,
+      "session_participation_records": 0
+    }
+  },
+  "fingerprints": {
+    "fresh_reconciliation_at": "2026-09-18T00:39:58.454972Z",
+    "transaction_read_only": true,
+    "prior_38_table": {
+      "sha256": "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
+      "canonical_byte_length": 348401,
+      "row_count": 1089
+    },
+    "final_43_table": {
+      "sha256": "1926821eee5d37194358f5a0a0e30f2577f7bb08c9be5478ab21dd300e32ba04",
+      "canonical_byte_length": 410432,
+      "row_count": 1263,
+      "category_counts": {
+        "table": 43,
+        "column": 389,
+        "constraint": 259,
+        "index": 109,
+        "foreign_key": 90,
+        "rls": 43,
+        "policy": 24,
+        "trigger": 31,
+        "function": 10,
+        "table_privilege": 215,
+        "function_privilege": 50
+      }
+    }
+  },
+  "security_advisor": {
+    "info_count": 19,
+    "warn_count": 1,
+    "unapproved_count": 0,
+    "p1_008_info_targets": [],
+    "warning": {
+      "code": "authenticated_security_definer_function_executable",
+      "schema": "public",
+      "function": "has_manage_attorney_verification_scope",
+      "arguments": "required_jurisdiction uuid, allow_any_jurisdiction boolean",
+      "security_definer": true,
+      "pre_existing": true
+    },
+    "observed_at": "2026-09-18T00:39:26.948Z",
+    "info_targets": [
+      "public.application_sessions",
+      "public.bookability_evaluations",
+      "public.bookings",
+      "public.capability_definitions",
+      "public.capability_grants",
+      "public.jurisdiction_regulatory_modes",
+      "public.jurisdictions",
+      "public.launch_authorizations",
+      "public.launch_gate_evaluations",
+      "public.launch_gates",
+      "public.policy_authority_references",
+      "public.policy_types",
+      "public.policy_versions",
+      "public.referral_eligible_pool_entries",
+      "public.referral_presentations",
+      "public.referrals",
+      "public.regulatory_modes",
+      "public.service_areas",
+      "public.slot_holds"
+    ]
+  },
+  "release": {
+    "id": "REL-20260918-P1-008-STAGING-APPLICATION",
+    "commit_sha": "a3c7ee7d020a3a224fed81e689518b84123c665b",
+    "environment": "staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "migration_id": "20260917045031_p1_consultation_engagement_media_foundation",
+    "migration_digest": "sha256:aa33c207eacf407165809f893a622b3407708280527991ff772320d2b29dea60",
+    "evidence_link": "governance/evidence/p1-008-governance-lifecycle-closure.json",
+    "supabase_cli": "2.116.0",
+    "application_exit": 0,
+    "created_at": "2026-09-18T02:29:30.827Z",
+    "created_at_semantics": "traceability record creation"
+  },
+  "boundaries": {
+    "production_authorized": false,
+    "old_supabase_mutation_authorized": false,
+    "p1_009_authorized": false,
+    "database_mutation_during_closure": false
+  },
+  "integrity": {
+    "historical_migrations_unchanged": true,
+    "p1_008_migration_sha256": "aa33c207eacf407165809f893a622b3407708280527991ff772320d2b29dea60",
+    "no_fake_business_data": true,
+    "no_new_capability_seed": true,
+    "no_new_security_definer_helper": true,
+    "g1_engagement_effectiveness_unresolved_preserved": true,
+    "g5_consultation_creation_unresolved_preserved": true
+  }
+}
