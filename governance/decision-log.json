@@ -41,10 +41,7 @@
       ],
       "work_item_refs": ["WI-P1-001-PLATFORM-FOUNDATION"],
       "owner": "P1 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "created_at": "2026-08-29T00:04:49Z",
       "updated_at": "2026-08-29T15:16:33Z",
       "supersedes": [],
@@ -72,10 +69,7 @@
       ],
       "work_item_refs": ["WI-P1-002-AUTHORIZATION-FOUNDATION"],
       "owner": "P1 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "created_at": "2026-08-29T17:17:01Z",
       "updated_at": "2026-08-30T01:32:02Z",
       "supersedes": [],
@@ -105,10 +99,7 @@
       ],
       "work_item_refs": ["WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION"],
       "owner": "P1 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "created_at": "2026-08-30T02:38:23Z",
       "updated_at": "2026-08-30T20:29:17Z",
       "supersedes": [],
@@ -136,10 +127,7 @@
       ],
       "work_item_refs": ["WI-P1-002-AUTHORIZATION-SCOPE-CORRECTION"],
       "owner": "P1 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "created_at": "2026-08-31T21:49:51Z",
       "updated_at": "2026-09-01T18:27:41Z",
       "supersedes": [],
@@ -168,10 +156,7 @@
       ],
       "work_item_refs": ["WI-P1-002-GOVERNANCE-CONTROL-CORRECTION"],
       "owner": "P1 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "created_at": "2026-09-02T00:00:00Z",
       "updated_at": "2026-09-09T18:09:50Z",
       "supersedes": [],
@@ -201,10 +186,7 @@
         "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION"
       ],
       "owner": "Rosuno P1-004 technical builder",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "created_at": "2026-09-10T07:59:39Z",
       "updated_at": "2026-09-10T18:27:37Z",
       "supersedes": [],
@@ -235,10 +217,7 @@
       ],
       "work_item_refs": ["WI-P1-005-CLIENT-INTAKE-AI-FOUNDATION"],
       "owner": "Rosuno P1-005 technical builder",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "created_at": "2026-09-11T06:29:18Z",
       "updated_at": "2026-09-12T22:31:52Z",
       "supersedes": [],
@@ -269,10 +248,7 @@
       ],
       "work_item_refs": ["WI-P1-006-MARKETPLACE-REFERRAL-FOUNDATION"],
       "owner": "Rosuno P1-006 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "created_at": "2026-09-14T00:11:59Z",
       "updated_at": "2026-09-14T05:18:06Z",
       "supersedes": [],
@@ -305,10 +281,7 @@
         "WI-P1-007-SCHEDULING-REQUEST-BOOKING-BOOKABILITY-FOUNDATION"
       ],
       "owner": "Rosuno P1-007 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "created_at": "2026-09-15T03:23:17Z",
       "updated_at": "2026-09-16T04:59:13Z",
       "supersedes": [],
@@ -339,10 +312,7 @@
       ],
       "work_item_refs": ["WI-P1-008-CONSULTATION-ENGAGEMENT-MEDIA-FOUNDATION"],
       "owner": "Rosuno P1-008 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "created_at": "2026-09-17T20:50:25Z",
       "updated_at": "2026-09-18T02:29:30Z",
       "supersedes": [],
@@ -360,9 +330,9 @@
       "decision_id": "DEC-20260918-P1-009-BOUNDED-CANDIDATE",
       "title": "Implement the bounded P1-009 Resources / Communications foundation",
       "status": "accepted",
-      "scope": "Bounded uncommitted local Physical 1I Resources / Communications foundation implementation and local validation only; no commit, branch publication, protected review, remote mutation, database contact/execution, or later P1 work.",
+      "scope": "Original authorization: bounded local P1-009 implementation only. Current accepted lifecycle records later separately authorized protected review, Gate 5A provenance hardening, rollback-validator correction, rollback-only Staging validation, persistent Staging application, and governance closure.",
       "decision": "Implement exactly resources, documents, voice_memos, resource_sharing_grants, messages, notifications, notification_attempts, and operational_jobs using the frozen P1-009 Gate 0 contract. Keep explicit Document lineage and Resource subtype/resource_kind taxonomy deferred; enforce Voice Memo Resource/Intake equality and client ownership; use one Resource identity per Storage bucket/path; prevent two same resource/recipient/context/purpose grants from simultaneously authorizing access while retaining grant history; implement corrected Resource metadata access so clients may read direct-owned or own-Intake resources while attorney access to client resources requires explicit sharing; withhold raw Storage locator columns from ordinary authenticated reads; preserve Storage-byte access as a later signed-URL boundary; bind Messages to canonical Consultation participants with immutable sent identity/content; keep Notification, delivery-attempt evidence, and Operational Job execution state separate; and apply FK-1 ON UPDATE RESTRICT / ON DELETE RESTRICT to all fourteen concrete P1-009 foreign keys. DOC-DEL, G-1, and G-5 remain unresolved/untouched and no 1J/1K/1L object is pulled forward.",
-      "rationale": "Gate 0 reconciled locked Physical, Relational, Domain, Blueprint, Build, Technical Architecture, and Implementation Plan boundaries and froze the smallest correct 1I foundation. D1 and D3 remain intentionally deferred rather than invented. D2a/D2b, I1/I2/I3, and FK-1 are bounded decisions already accepted for this work item. Implementation must preserve recipient-specific sharing, Intake ownership, explicit attorney disclosure, immutable Message content, durable communication/job evidence, jurisdiction neutrality, and the separate Storage signed-URL authorization boundary without resolving later deletion, financial, compliance, or regulatory work.",
+      "rationale": "The original implementation decision did not authorize protected review, Gate 5A provenance hardening, rollback-validator correction, database validation, persistent Staging application, release, or repository closure. Those later events occurred under separate explicit gates and are retained in the closure evidence. Historical migration bytes remain unchanged; explicit Document lineage, Resource subtype/resource_kind taxonomy, DOC-DEL, G-1, and G-5 remain deferred or unresolved rather than invented.",
       "authority_refs": [
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
         "DOMAIN-MODEL-V1.4-LOCKED",
@@ -373,19 +343,19 @@
       ],
       "work_item_refs": ["WI-P1-009-RESOURCES-COMMUNICATIONS-FOUNDATION"],
       "owner": "Rosuno P1-009 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "created_at": "2026-09-18T08:08:25Z",
-      "updated_at": "2026-09-18T08:08:25Z",
+      "updated_at": "2026-09-18T21:00:07Z",
       "supersedes": [],
-      "impact": "Authorizes only the bounded uncommitted local P1-009 implementation and local validation on branch p1-009-resources-communications-foundation. It does not authorize git commit, branch publication/push, pull request creation, review, merge, database contact, rollback execution, persistent Staging application, release creation, Production mutation, OLD mutation/use as canonical state, P1-010, or an end-to-end Resources / Communications capability claim.",
+      "impact": "Records current accepted P1-009 lifecycle completion without broadening the original implementation authorization. No Production, OLD Supabase mutation/use as canonical state, P1-010, later-work authorization, DOC-DEL resolution, G-1 resolution, G-5 resolution, signed-URL endpoint implementation, or end-to-end Resources / Communications capability claim is granted.",
       "evidence": [
         "supabase/migrations/20260918060600_p1_resources_communications_foundation.sql",
-        "tools/p0/lib/p1-009-contract-data.mjs",
-        "tools/p0/tests/p1-009-contract.test.mjs",
-        "tools/p0/p1-009-rollback.mjs"
+        "tools/p0/p1-009-rollback.mjs",
+        "governance/evidence/p1-009-gate5-prestate-contract.json",
+        "tools/p0/catalog/p1-009-postapplication.sql",
+        "governance/evidence/p1-009-governance-lifecycle-closure.json",
+        "governance/releases/traceability.json",
+        "governance/schema-drift/baseline.json"
       ],
       "expiry": null
     },
@@ -406,12 +376,9 @@
       ],
       "work_item_refs": ["WI-P1-009-RESOURCES-COMMUNICATIONS-FOUNDATION"],
       "owner": "Rosuno P1-009 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "pending"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "created_at": "2026-09-18T17:16:17Z",
-      "updated_at": "2026-09-18T17:16:17Z",
+      "updated_at": "2026-09-18T17:50:42Z",
       "supersedes": [],
       "impact": "Adds only reproducible Gate 5 verification tooling and contract evidence. It does not authorize Gate 5 database execution or change any P1-009/P1-008 migration, rollback, baseline, release, or closure state.",
       "evidence": [

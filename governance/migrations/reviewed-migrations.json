@@ -225,7 +225,6 @@
       "rollback_plan": "If a later independently verified defect requires Staging rollback, remove only the sequence-9 P1-007 change through a separately reviewed forward-only non-production rollback migration; never edit historical migration bytes or migration history directly, and preserve all earlier accepted controls.",
       "depends_on": ["20260914000658_p1_marketplace_referral_foundation"]
     },
-
     {
       "migration_id": "20260917045031_p1_consultation_engagement_media_foundation",
       "migration_kind": "product",
@@ -268,14 +267,14 @@
       ],
       "work_item_refs": ["WI-P1-009-RESOURCES-COMMUNICATIONS-FOUNDATION"],
       "decision_refs": ["DEC-20260918-P1-009-BOUNDED-CANDIDATE"],
-      "release_refs": [],
-      "reviewed": false,
-      "reviewed_by": "pending designated human PR review",
-      "reviewed_at": null,
-      "applied_environment": "none",
-      "non_production_validation": false,
-      "drift_check": "Not yet executed. This is an unreviewed, unapplied local P1-009 candidate; no database validation or persistent application has occurred.",
-      "rollback_plan": "A separately authorized rollback-only Rosuno Staging validation must execute the exact protected candidate transactionally and independently prove exact restoration of the accepted ten-migration P1-008 baseline before any persistent Staging application.",
+      "release_refs": ["REL-20260918-P1-009-STAGING-APPLICATION"],
+      "reviewed": true,
+      "reviewed_by": "Rosuno",
+      "reviewed_at": "2026-09-18T15:57:40Z",
+      "applied_environment": "staging",
+      "non_production_validation": true,
+      "drift_check": "Rosuno Staging rollback-only validation passed exact restoration of the accepted ten-migration P1-008 baseline; persistent application then passed exact eleven-version history, 51/51 RLS, zero P1-009 business rows, exact retained-query 51-table catalog fingerprint, and the accepted 21 INFO / 2 WARN security-advisor posture with zero unexplained findings.",
+      "rollback_plan": "If a later independently verified defect requires Staging rollback, remove only the sequence-11 P1-009 change through a separately reviewed forward-only non-production rollback migration; never edit historical migration bytes or migration history directly, and preserve all earlier accepted controls.",
       "depends_on": [
         "20260917045031_p1_consultation_engagement_media_foundation"
       ]

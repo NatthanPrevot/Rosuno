@@ -1,0 +1,275 @@
+{
+  "version": 1,
+  "evidence_id": "P1-009-GOVERNANCE-LIFECYCLE-CLOSURE-20260918",
+  "work_item_id": "WI-P1-009-RESOURCES-COMMUNICATIONS-FOUNDATION",
+  "lifecycle": "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED",
+  "lifecycle_state": {
+    "repository_closure": true,
+    "staging_application": true,
+    "postapplication_readonly_verification": true
+  },
+  "repository": {
+    "canonical_main": "0d8fc6b259487a2bc9b11cbc748d4d1054576e69",
+    "canonical_tree": "f48e6b39dd0b6b561ab540216d4aebb33044fdea",
+    "protected_main": true,
+    "implementation": {
+      "pull_request": 27,
+      "title": "P1-009: resources communications foundation",
+      "base": "c854a73e913d309c2a4a2349d83ac24aab3b901d",
+      "head": "7ddebf99865dc78299b709bcc60a1c8ad2a18d3a",
+      "tree": "e2acd0c1b4fde7e9484e625c1ed6e342dba6e09d",
+      "merge_commit": "2821cfa38bd80d160495853d81702f408ad66db1",
+      "ordered_parents": [
+        "c854a73e913d309c2a4a2349d83ac24aab3b901d",
+        "7ddebf99865dc78299b709bcc60a1c8ad2a18d3a"
+      ],
+      "review_id": "5249860713",
+      "approved_at": "2026-09-18T15:57:40Z",
+      "merged_at": "2026-09-18T16:00:02Z",
+      "workflow_run_id": 35365273756,
+      "workflow_conclusion": "success"
+    },
+    "gate5a_prestate_verification": {
+      "pull_request": 28,
+      "title": "P1-009 Gate 5A: add reproducible prestate verification contract",
+      "base": "2821cfa38bd80d160495853d81702f408ad66db1",
+      "head": "b3ac143e79c0605c2d5cf2ff6ed3e6d38760b492",
+      "tree": "0bdf1e3268ebe16389dd724701429ed746582c92",
+      "merge_commit": "7f9b6f97593ab9115a09e0e21d9f72201ce9a39d",
+      "ordered_parents": [
+        "2821cfa38bd80d160495853d81702f408ad66db1",
+        "b3ac143e79c0605c2d5cf2ff6ed3e6d38760b492"
+      ],
+      "review_id": "5250908322",
+      "approved_at": "2026-09-18T17:50:42Z",
+      "merged_at": "2026-09-18T18:07:59Z",
+      "workflow_run_id": 35376163612,
+      "workflow_conclusion": "success"
+    },
+    "rollback_validator_fixture_correction": {
+      "pull_request": 29,
+      "title": "P1-009 Gate 5: fix rollback validator fixture collision",
+      "base": "7f9b6f97593ab9115a09e0e21d9f72201ce9a39d",
+      "head": "e863d5b7baad3497e06235314c6c6d03e6472845",
+      "tree": "f48e6b39dd0b6b561ab540216d4aebb33044fdea",
+      "merge_commit": "0d8fc6b259487a2bc9b11cbc748d4d1054576e69",
+      "ordered_parents": [
+        "7f9b6f97593ab9115a09e0e21d9f72201ce9a39d",
+        "e863d5b7baad3497e06235314c6c6d03e6472845"
+      ],
+      "review_id": "5251520533",
+      "approved_at": "2026-09-18T19:01:23Z",
+      "merged_at": "2026-09-18T19:02:36Z",
+      "workflow_run_id": 35383048272,
+      "workflow_conclusion": "success"
+    }
+  },
+  "migration": {
+    "id": "20260918060600_p1_resources_communications_foundation",
+    "sha256": "82db84c3e2fe5d20b5cf0a66c0b05d3cd481d68270d6ef50735dbaf8b7437487",
+    "sequence": 11,
+    "history_versions": 11,
+    "history": [
+      "20260828192126_p0_restrict_rls_auto_enable_execution",
+      "20260829000015_p1_platform_foundation",
+      "20260829171701_p1_authorization_foundation",
+      "20260830023823_p1_jurisdiction_policy_launch_foundation",
+      "20260901012518_p1_authorization_scope_correction",
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+      "20260911062917_p1_client_intake_ai_foundation",
+      "20260914000658_p1_marketplace_referral_foundation",
+      "20260914231532_p1_scheduling_request_booking_bookability_foundation",
+      "20260917045031_p1_consultation_engagement_media_foundation",
+      "20260918060600_p1_resources_communications_foundation"
+    ]
+  },
+  "gate5": {
+    "result": "PASS",
+    "contract_id": "rosuno-p1-009-gate5-prestate-v1",
+    "historical_failed_attempt": {
+      "result": "FAILED_VALIDATOR_FIXTURE_COLLISION_RESTORED",
+      "rollback_execution_exit": 3,
+      "failure_code_observed": "23505",
+      "intended_negative_test_code": "23514",
+      "failure_constraint": "client_profiles_user_id_key",
+      "pre_post_catalog": "EXACT_MATCH",
+      "pre_post_persistent_state": "EXACT_MATCH",
+      "pre_canonical_sha256": "ab8ea910607718a73632cca63cd7afc7f7d73fb7dadaed8b4e14e9a3adc9382a",
+      "post_canonical_sha256": "ab8ea910607718a73632cca63cd7afc7f7d73fb7dadaed8b4e14e9a3adc9382a",
+      "pre_persistent_state_sha256": "550cf8f57ab82f8e07947cc3a1775447b50de4558beeae21eb5a382039ede1d1",
+      "post_persistent_state_sha256": "550cf8f57ab82f8e07947cc3a1775447b50de4558beeae21eb5a382039ede1d1",
+      "rollback_execution_log_sha256": "d33ffdd67fdc1ac56bef4ce3c17cd7fdc494f589dd334d08d57f6c6d38cbe039",
+      "preserved_as_history": true
+    },
+    "corrected_rerun": {
+      "result": "PASS",
+      "corrected_generator_sha256": "77ee116eb9adfb6260f423406c7681c71328282455dcd38b66726d9b630dcbfa",
+      "generated_sql_sha256": "b983c061c1d7ecdeef6015c77d57652de1dc3a9a0dc4c4a0aba8d5d19f435815",
+      "generated_sql_lines": 1283,
+      "generated_sql_bytes": 45296,
+      "validation_checks": 20,
+      "execution_exit": 0,
+      "final_transaction_action": "ROLLBACK",
+      "pre_post_catalog": "EXACT_BYTE_MATCH",
+      "pre_post_persistent_state": "EXACT_MATCH",
+      "canonical_sha256": "ab8ea910607718a73632cca63cd7afc7f7d73fb7dadaed8b4e14e9a3adc9382a",
+      "canonical_byte_length": 416302,
+      "canonical_row_count": 1275,
+      "persistent_state_sha256": "550cf8f57ab82f8e07947cc3a1775447b50de4558beeae21eb5a382039ede1d1",
+      "evidence_index_sha256": "3bb89af807f198126d3e0a96b815b4197661d725293a2f2d7a264a5553b5f03b"
+    }
+  },
+  "gate6": {
+    "result": "PASS",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "supabase_cli": "2.116.0",
+    "dry_run_migrations": [
+      "20260918060600_p1_resources_communications_foundation.sql"
+    ],
+    "dry_run_exit": 0,
+    "application_attempts": 1,
+    "application_exit": 0,
+    "evidence_index_sha256": "12c3004b4e142af241d4e18c80a07eca07a49149977f76a3bd034170c8135cfe",
+    "migration_history_count": 11,
+    "public_tables": 51,
+    "public_rls": 51,
+    "public_functions": 16,
+    "p1_009_rows": {
+      "resources": 0,
+      "documents": 0,
+      "voice_memos": 0,
+      "resource_sharing_grants": 0,
+      "messages": 0,
+      "notifications": 0,
+      "notification_attempts": 0,
+      "operational_jobs": 0
+    }
+  },
+  "fingerprints": {
+    "gate5_prestate": {
+      "contract_id": "rosuno-p1-009-gate5-prestate-v1",
+      "sha256": "ab8ea910607718a73632cca63cd7afc7f7d73fb7dadaed8b4e14e9a3adc9382a",
+      "canonical_byte_length": 416302,
+      "row_count": 1275
+    },
+    "postapplication_51_table": {
+      "format": "rosuno-p1-catalog-v1",
+      "query_path": "tools/p0/catalog/p1-009-postapplication.sql",
+      "query_sha256": "4d3641ef6ba94ea6ef79f8e42b7649689c211b4c1cb702d1eee59fb9c783b728",
+      "query_bytes": 12266,
+      "canonicalizer_path": "tools/p0/lib/catalog-fingerprint.mjs",
+      "canonicalizer_sha256": "cedcca81b2604192f596c0e3a3f34a31aa4bfba86134a36d31595af42f5fdbb1",
+      "canonicalizer_bytes": 20778,
+      "sha256": "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
+      "canonical_byte_length": 499763,
+      "row_count": 1535,
+      "category_counts": {
+        "table": 51,
+        "column": 467,
+        "constraint": 318,
+        "index": 125,
+        "foreign_key": 104,
+        "rls": 51,
+        "policy": 30,
+        "trigger": 38,
+        "function": 16,
+        "table_privilege": 255,
+        "function_privilege": 80
+      },
+      "checked_at": "2026-09-18T19:52:44.158139Z",
+      "transaction_read_only": true
+    },
+    "historical_p1_008_provenance_gap_preserved": true
+  },
+  "security_advisor": {
+    "info_count": 21,
+    "warn_count": 2,
+    "unapproved_count": 0,
+    "unexplained_count": 0,
+    "info_identities": [
+      "public.application_sessions",
+      "public.bookability_evaluations",
+      "public.bookings",
+      "public.capability_definitions",
+      "public.capability_grants",
+      "public.jurisdiction_regulatory_modes",
+      "public.jurisdictions",
+      "public.launch_authorizations",
+      "public.launch_gate_evaluations",
+      "public.launch_gates",
+      "public.notification_attempts",
+      "public.operational_jobs",
+      "public.policy_authority_references",
+      "public.policy_types",
+      "public.policy_versions",
+      "public.referral_eligible_pool_entries",
+      "public.referral_presentations",
+      "public.referrals",
+      "public.regulatory_modes",
+      "public.service_areas",
+      "public.slot_holds"
+    ],
+    "warnings": [
+      {
+        "code": "authenticated_security_definer_function_executable",
+        "schema": "public",
+        "function": "has_manage_attorney_verification_scope",
+        "arguments": "required_jurisdiction uuid, allow_any_jurisdiction boolean",
+        "security_definer": true,
+        "pre_existing": true
+      },
+      {
+        "code": "authenticated_security_definer_function_executable",
+        "schema": "public",
+        "function": "has_resource_metadata_access",
+        "arguments": "required_resource_id uuid",
+        "security_definer": true,
+        "p1_009_intentional": true
+      }
+    ],
+    "observed_at": "2026-09-18T19:53:24.436Z"
+  },
+  "release": {
+    "id": "REL-20260918-P1-009-STAGING-APPLICATION",
+    "commit_sha": "0d8fc6b259487a2bc9b11cbc748d4d1054576e69",
+    "environment": "staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "migration_id": "20260918060600_p1_resources_communications_foundation",
+    "migration_digest": "sha256:82db84c3e2fe5d20b5cf0a66c0b05d3cd481d68270d6ef50735dbaf8b7437487",
+    "evidence_link": "governance/evidence/p1-009-governance-lifecycle-closure.json",
+    "postapplication_query": "tools/p0/catalog/p1-009-postapplication.sql",
+    "supabase_cli": "2.116.0",
+    "application_exit": 0,
+    "created_at": "2026-09-18T21:00:07Z",
+    "created_at_semantics": "traceability record creation"
+  },
+  "boundaries": {
+    "production_authorized": false,
+    "old_supabase_mutation_authorized": false,
+    "p1_010_authorized": false,
+    "database_mutation_during_closure": false
+  },
+  "integrity": {
+    "historical_migrations_unchanged": true,
+    "p1_009_migration_sha256": "82db84c3e2fe5d20b5cf0a66c0b05d3cd481d68270d6ef50735dbaf8b7437487",
+    "exact_physical_slice_1i": true,
+    "exact_relation_count_8": true,
+    "fourteen_restrictive_foreign_keys": true,
+    "no_fake_business_data": true,
+    "no_seed_data": true,
+    "raw_storage_locator_withheld_from_authenticated": true,
+    "signed_url_boundary_preserved_for_later_work": true,
+    "document_lineage_deferred_preserved": true,
+    "resource_kind_taxonomy_deferred_preserved": true,
+    "doc_del_unresolved_preserved": true,
+    "g1_unresolved_preserved": true,
+    "g5_unresolved_preserved": true,
+    "jurisdiction_neutrality_preserved": true,
+    "marketplace_legal_services_boundary_preserved": true,
+    "ai_authority_not_expanded": true,
+    "later_1j_1k_1l_not_pulled_forward": true,
+    "failed_gate5_history_preserved": true,
+    "p1_008_fingerprint_provenance_gap_preserved": true,
+    "postapplication_query_retained": true
+  }
+}

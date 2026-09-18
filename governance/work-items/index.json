@@ -56,10 +56,7 @@
       ],
       "status": "completed",
       "owner": "P1 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "priority": "P1",
       "authority_refs": [
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
@@ -119,10 +116,7 @@
       ],
       "status": "completed",
       "owner": "P1 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "priority": "P1",
       "authority_refs": [
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
@@ -185,10 +179,7 @@
       ],
       "status": "completed",
       "owner": "P1 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "priority": "P1",
       "authority_refs": [
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
@@ -253,10 +244,7 @@
       ],
       "status": "completed",
       "owner": "P1 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "priority": "P1",
       "authority_refs": [
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
@@ -311,10 +299,7 @@
       ],
       "status": "completed",
       "owner": "P1 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "priority": "P1",
       "authority_refs": [
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
@@ -366,10 +351,7 @@
       ],
       "status": "completed",
       "owner": "Rosuno P1-004 technical builder",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "priority": "P1",
       "authority_refs": [
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
@@ -426,10 +408,7 @@
       ],
       "status": "completed",
       "owner": "Rosuno P1-005 technical builder",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "priority": "P1",
       "authority_refs": [
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
@@ -490,10 +469,7 @@
       ],
       "status": "completed",
       "owner": "Rosuno P1-006 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "priority": "P1",
       "authority_refs": [
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
@@ -552,10 +528,7 @@
       ],
       "status": "completed",
       "owner": "Rosuno P1-007 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "priority": "P1",
       "authority_refs": [
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
@@ -622,10 +595,7 @@
       ],
       "status": "completed",
       "owner": "Rosuno P1-008 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "approved"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "priority": "P1",
       "authority_refs": [
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
@@ -692,12 +662,9 @@
         "Fee Calculation, Payment Transaction, Ledger Entry, Payout, Reconciliation Exception, External Event Receipt, Audit Event, Retention Rule, Legal Hold, Complaint Case, Review, California regulatory-mode objects, P1-010, or later work",
         "Production mutation, OLD mutation/use as canonical state, source/development database mutation, or fake production/business data"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "owner": "Rosuno P1-009 implementation owner",
-      "reviewer": {
-        "identity": "Rosuno",
-        "status": "pending"
-      },
+      "reviewer": { "identity": "Rosuno", "status": "approved" },
       "priority": "P1",
       "authority_refs": [
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
@@ -736,13 +703,13 @@
         "git diff --check"
       ],
       "environment": "staging",
-      "release_refs": [],
+      "release_refs": ["REL-20260918-P1-009-STAGING-APPLICATION"],
       "migration_refs": [
         "20260918060600_p1_resources_communications_foundation"
       ],
       "rollback_reference": "tools/p0/p1-009-rollback.mjs",
       "created_at": "2026-09-18T08:08:25Z",
-      "updated_at": "2026-09-18T08:08:25Z"
+      "updated_at": "2026-09-18T21:00:07Z"
     }
   ]
 }
