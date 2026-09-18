@@ -1,10 +1,10 @@
 {
   "version": 1,
   "product_schema_present": true,
-  "baseline_id": "rosuno-staging-p1-008-20260918-v1",
-  "baseline_digest": "sha256:13132316de50cdec1317e779601211d070a059f44e0402a0e6d48c337d472993",
+  "baseline_id": "rosuno-staging-p1-009-20260918-v1",
+  "baseline_digest": "sha256:5e947c8e0e30aac85d883de4844c748293d599d764c2917ecfde22b7b7f547ca",
   "checked_environment": "staging",
-  "checked_at": "2026-09-18T00:39:58.454972Z",
+  "checked_at": "2026-09-18T19:52:44.158139Z",
   "project": {
     "name": "Rosuno Staging",
     "project_ref": "mxjlvmowmodzdtdfgqpb"
@@ -69,6 +69,12 @@
       "migration_id": "20260917045031_p1_consultation_engagement_media_foundation",
       "artifact_path": "supabase/migrations/20260917045031_p1_consultation_engagement_media_foundation.sql",
       "sha256": "aa33c207eacf407165809f893a622b3407708280527991ff772320d2b29dea60"
+    },
+    {
+      "sequence": 11,
+      "migration_id": "20260918060600_p1_resources_communications_foundation",
+      "artifact_path": "supabase/migrations/20260918060600_p1_resources_communications_foundation.sql",
+      "sha256": "82db84c3e2fe5d20b5cf0a66c0b05d3cd481d68270d6ef50735dbaf8b7437487"
     }
   ],
   "accepted_evidence": [
@@ -103,13 +109,17 @@
     {
       "path": "governance/evidence/p1-008-governance-lifecycle-closure.json",
       "sha256": "07121d8f64e8a1245de1002ed4db02aded1690446edeaef73337f286e150dc3b"
+    },
+    {
+      "path": "governance/evidence/p1-009-governance-lifecycle-closure.json",
+      "sha256": "2c000a4baa19c8829ea5fa1ee80a4b13b5c02877950fc511ecb356f8bb4941e5"
     }
   ],
   "catalog_fingerprint": {
     "format": "rosuno-p1-catalog-v1",
-    "sha256": "1926821eee5d37194358f5a0a0e30f2577f7bb08c9be5478ab21dd300e32ba04",
-    "canonical_byte_length": 410432,
-    "row_count": 1263
+    "sha256": "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
+    "canonical_byte_length": 499763,
+    "row_count": 1535
   },
   "evidence": [
     "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json",
@@ -119,7 +129,8 @@
     "governance/evidence/p1-005-governance-lifecycle-closure.json",
     "governance/evidence/p1-006-governance-lifecycle-closure.json",
     "governance/evidence/p1-007-governance-lifecycle-closure.json",
-    "governance/evidence/p1-008-governance-lifecycle-closure.json"
+    "governance/evidence/p1-008-governance-lifecycle-closure.json",
+    "governance/evidence/p1-009-governance-lifecycle-closure.json"
   ],
   "drift_status": "clean",
   "drift_items": []

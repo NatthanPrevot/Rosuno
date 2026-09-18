@@ -768,6 +768,7 @@ function migrationArtifactPaths(files) {
   return files.filter(
     (file) =>
       file !== "tools/p0/catalog/p1-009-gate5-prestate.sql" &&
+      file !== "tools/p0/catalog/p1-009-postapplication.sql" &&
       ((file.startsWith("governance/migrations/") &&
         file !== "governance/migrations/reviewed-migrations.json") ||
         (!file.startsWith("governance/") &&
@@ -5648,18 +5649,22 @@ export function validateDriftReport(report, migrationRegister = null) {
     report.baseline_id === "rosuno-staging-p1-007-20260916-v1";
   const closedP1008 =
     report.baseline_id === "rosuno-staging-p1-008-20260918-v1";
+  const closedP1009 =
+    report.baseline_id === "rosuno-staging-p1-009-20260918-v1";
 
-  const expectedCheckedAt = closedP1008
-    ? "2026-09-18T00:39:58.454972Z"
-    : closedP1007
-      ? "2026-09-16T04:43:44.771854Z"
-      : closedP1006
-        ? "2026-09-14T05:00:30.987864Z"
-        : closedP1005
-          ? P1_CLIENT_INTAKE_OBSERVED_AT
-          : closedP1004
-            ? "2026-09-10T22:48:00.544397Z"
-            : P1_AUTHORIZATION_CORRECTION_VALIDATED_AT;
+  const expectedCheckedAt = closedP1009
+    ? "2026-09-18T19:52:44.158139Z"
+    : closedP1008
+      ? "2026-09-18T00:39:58.454972Z"
+      : closedP1007
+        ? "2026-09-16T04:43:44.771854Z"
+        : closedP1006
+          ? "2026-09-14T05:00:30.987864Z"
+          : closedP1005
+            ? P1_CLIENT_INTAKE_OBSERVED_AT
+            : closedP1004
+              ? "2026-09-10T22:48:00.544397Z"
+              : P1_AUTHORIZATION_CORRECTION_VALIDATED_AT;
 
   if (
     report.version !== 1 ||
@@ -5668,6 +5673,7 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1006 &&
       !closedP1007 &&
       !closedP1008 &&
+      !closedP1009 &&
       report.baseline_id !== FOUNDATION_BASELINE_ID) ||
     report.checked_environment !== "staging" ||
     report.checked_at !== expectedCheckedAt ||
@@ -5714,7 +5720,14 @@ export function validateDriftReport(report, migrationRegister = null) {
     sha256: P1_CONSULTATION_ENGAGEMENT_MEDIA_MIGRATION_SHA256,
   };
 
-  const expectedInventory = closedP1008
+  const p1009Migration = {
+    sequence: 11,
+    migration_id: P1_RESOURCES_COMMUNICATIONS_MIGRATION_ID,
+    artifact_path: P1_RESOURCES_COMMUNICATIONS_MIGRATION_PATH,
+    sha256: P1_RESOURCES_COMMUNICATIONS_MIGRATION_SHA256,
+  };
+
+  const expectedInventory = closedP1009
     ? [
         ...FOUNDATION_BASELINE_MIGRATIONS,
         p1004Migration,
@@ -5722,27 +5735,41 @@ export function validateDriftReport(report, migrationRegister = null) {
         p1006Migration,
         p1007Migration,
         p1008Migration,
+        p1009Migration,
       ]
-    : closedP1007
+    : closedP1008
       ? [
           ...FOUNDATION_BASELINE_MIGRATIONS,
           p1004Migration,
           p1005Migration,
           p1006Migration,
           p1007Migration,
+          p1008Migration,
         ]
-      : closedP1006
+      : closedP1007
         ? [
             ...FOUNDATION_BASELINE_MIGRATIONS,
             p1004Migration,
             p1005Migration,
             p1006Migration,
+            p1007Migration,
           ]
-        : closedP1005
-          ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration, p1005Migration]
-          : closedP1004
-            ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration]
-            : FOUNDATION_BASELINE_MIGRATIONS;
+        : closedP1006
+          ? [
+              ...FOUNDATION_BASELINE_MIGRATIONS,
+              p1004Migration,
+              p1005Migration,
+              p1006Migration,
+            ]
+          : closedP1005
+            ? [
+                ...FOUNDATION_BASELINE_MIGRATIONS,
+                p1004Migration,
+                p1005Migration,
+              ]
+            : closedP1004
+              ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration]
+              : FOUNDATION_BASELINE_MIGRATIONS;
 
   if (
     JSON.stringify(report.migration_inventory) !==
@@ -5794,6 +5821,9 @@ export function validateDriftReport(report, migrationRegister = null) {
       "P1-007 baseline requires nine accepted migrations plus at most two bounded overlays",
     );
 
+  if (closedP1009 && register.migrations.length !== 11)
+    fail("P1-009 baseline requires exactly eleven accepted migrations");
+
   if (closedP1008 && ![10, 11].includes(register.migrations.length))
     fail(
       "P1-008 baseline requires ten accepted migrations plus at most one bounded P1-009 overlay",
@@ -5805,6 +5835,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1006 &&
     !closedP1007 &&
     !closedP1008 &&
+    !closedP1009 &&
     register.migrations.length === 7
   ) {
     fail("P1-005 overlay requires the accepted P1-004 baseline");
@@ -5816,6 +5847,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1006 &&
     !closedP1007 &&
     !closedP1008 &&
+    !closedP1009 &&
     register.migrations.length === 8
   ) {
     fail("P1-006 overlay requires an accepted P1-004 or P1-005 baseline");
@@ -5827,6 +5859,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1006 &&
     !closedP1007 &&
     !closedP1008 &&
+    !closedP1009 &&
     register.migrations.length === 9
   ) {
     fail("P1-007 overlay requires an accepted P1 baseline lineage");
@@ -5838,6 +5871,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1006 &&
     !closedP1007 &&
     !closedP1008 &&
+    !closedP1009 &&
     register.migrations.length === 10
   ) {
     fail("P1-008 overlay requires an accepted P1 baseline lineage");
@@ -5849,6 +5883,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1006 &&
     !closedP1007 &&
     !closedP1008 &&
+    !closedP1009 &&
     register.migrations.length === 11
   ) {
     fail("P1-009 overlay requires an accepted P1 baseline lineage");
@@ -5868,7 +5903,8 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1005 &&
       !closedP1006 &&
       !closedP1007 &&
-      !closedP1008
+      !closedP1008 &&
+      !closedP1009
     )
       fail("seven migrations require an accepted P1-004 or P1-005 baseline");
 
@@ -5881,7 +5917,8 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1005 &&
       !closedP1006 &&
       !closedP1007 &&
-      !closedP1008
+      !closedP1008 &&
+      !closedP1009
     )
       fail("eight migrations require an accepted P1-004 or P1-005 baseline");
 
@@ -5894,7 +5931,8 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1005 &&
       !closedP1006 &&
       !closedP1007 &&
-      !closedP1008
+      !closedP1008 &&
+      !closedP1009
     )
       fail("nine migrations require an accepted P1 baseline lineage");
 
@@ -5907,7 +5945,8 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1005 &&
       !closedP1006 &&
       !closedP1007 &&
-      !closedP1008
+      !closedP1008 &&
+      !closedP1009
     )
       fail("ten migrations require an accepted P1 baseline lineage");
 
@@ -5920,7 +5959,8 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1005 &&
       !closedP1006 &&
       !closedP1007 &&
-      !closedP1008
+      !closedP1008 &&
+      !closedP1009
     )
       fail("eleven migrations require an accepted P1 baseline lineage");
 
@@ -5993,7 +6033,18 @@ export function validateDriftReport(report, migrationRegister = null) {
       .digest("hex"),
   };
 
-  const expectedEvidence = closedP1008
+  const p1009Evidence = {
+    path: P1_RESOURCES_COMMUNICATIONS_CLOSURE_EVIDENCE_PATH,
+    sha256: createHash("sha256")
+      .update(
+        readFileSync(
+          path.join(ROOT, P1_RESOURCES_COMMUNICATIONS_CLOSURE_EVIDENCE_PATH),
+        ),
+      )
+      .digest("hex"),
+  };
+
+  const expectedEvidence = closedP1009
     ? [
         ...FOUNDATION_BASELINE_EVIDENCE,
         p1004Evidence,
@@ -6001,27 +6052,37 @@ export function validateDriftReport(report, migrationRegister = null) {
         p1006Evidence,
         p1007Evidence,
         p1008Evidence,
+        p1009Evidence,
       ]
-    : closedP1007
+    : closedP1008
       ? [
           ...FOUNDATION_BASELINE_EVIDENCE,
           p1004Evidence,
           p1005Evidence,
           p1006Evidence,
           p1007Evidence,
+          p1008Evidence,
         ]
-      : closedP1006
+      : closedP1007
         ? [
             ...FOUNDATION_BASELINE_EVIDENCE,
             p1004Evidence,
             p1005Evidence,
             p1006Evidence,
+            p1007Evidence,
           ]
-        : closedP1005
-          ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence, p1005Evidence]
-          : closedP1004
-            ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence]
-            : FOUNDATION_BASELINE_EVIDENCE;
+        : closedP1006
+          ? [
+              ...FOUNDATION_BASELINE_EVIDENCE,
+              p1004Evidence,
+              p1005Evidence,
+              p1006Evidence,
+            ]
+          : closedP1005
+            ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence, p1005Evidence]
+            : closedP1004
+              ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence]
+              : FOUNDATION_BASELINE_EVIDENCE;
 
   if (
     JSON.stringify(report.accepted_evidence) !==
@@ -6041,46 +6102,53 @@ export function validateDriftReport(report, migrationRegister = null) {
       fail(`schema drift evidence digest is invalid for ${artifact.path}`);
   }
 
-  const expectedCatalog = closedP1008
+  const expectedCatalog = closedP1009
     ? {
         sha256:
-          "1926821eee5d37194358f5a0a0e30f2577f7bb08c9be5478ab21dd300e32ba04",
-        bytes: 410432,
-        rows: 1263,
+          "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
+        bytes: 499763,
+        rows: 1535,
       }
-    : closedP1007
+    : closedP1008
       ? {
           sha256:
-            "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
-          bytes: 348401,
-          rows: 1089,
+            "1926821eee5d37194358f5a0a0e30f2577f7bb08c9be5478ab21dd300e32ba04",
+          bytes: 410432,
+          rows: 1263,
         }
-      : closedP1006
+      : closedP1007
         ? {
             sha256:
-              "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
-            bytes: 253195,
-            rows: 816,
+              "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
+            bytes: 348401,
+            rows: 1089,
           }
-        : closedP1005
+        : closedP1006
           ? {
               sha256:
-                "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
-              bytes: 231062,
-              rows: 744,
+                "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
+              bytes: 253195,
+              rows: 816,
             }
-          : closedP1004
+          : closedP1005
             ? {
                 sha256:
-                  "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508",
-                bytes: 90175,
-                rows: 279,
+                  "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
+                bytes: 231062,
+                rows: 744,
               }
-            : {
-                sha256: P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256,
-                bytes: P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES,
-                rows: P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS,
-              };
+            : closedP1004
+              ? {
+                  sha256:
+                    "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508",
+                  bytes: 90175,
+                  rows: 279,
+                }
+              : {
+                  sha256: P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256,
+                  bytes: P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES,
+                  rows: P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS,
+                };
 
   if (
     report.catalog_fingerprint?.format !== "rosuno-p1-catalog-v1" ||
@@ -6112,6 +6180,7 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1006 &&
       !closedP1007 &&
       !closedP1008 &&
+      !closedP1009 &&
       digest !== FOUNDATION_BASELINE_DIGEST)
   ) {
     fail("schema drift baseline identity/digest is invalid");
@@ -6549,7 +6618,8 @@ export function validateP1009Gate5PrestateContract(
     !decision ||
     decision.status !== "accepted" ||
     decision.reviewer?.identity !== "Rosuno" ||
-    decision.reviewer?.status !== "pending" ||
+    decision.reviewer?.status !== "approved" ||
+    decision.updated_at !== "2026-09-18T17:50:42Z" ||
     !decision.evidence?.includes(
       "governance/evidence/p1-009-gate5-prestate-contract.json",
     ) ||
@@ -8647,11 +8717,12 @@ export function validateP1ConsultationEngagementMediaTraceability(
   validateP1ConsultationEngagementMediaClosure(migration, sql, evidence);
   return true;
 }
-/* P1-009 bounded pending-candidate controls.
- * The accepted Staging baseline remains the closed P1-008 ten-migration
- * baseline. P1-009 is permitted here only as one exact local, unreviewed,
- * unapplied sequence-11 overlay. Commit, publication, review, database
- * execution, release, and closure remain separately authorized later gates.
+/* P1-009 bounded lifecycle controls.
+ * Historical pending-candidate validation remains supported, while the
+ * reviewed branch requires the exact protected review, Gate 5 proof,
+ * persistent Staging application, retained post-application query,
+ * closure evidence, release traceability, and accepted eleven-migration
+ * state. Historical migration bytes remain immutable.
  */
 const P1_RESOURCES_COMMUNICATIONS_ID =
   /^([0-9]{14})_p1_resources_communications_foundation$/;
@@ -8667,19 +8738,104 @@ const P1_RESOURCES_COMMUNICATIONS_DECISION_ID =
   "DEC-20260918-P1-009-BOUNDED-CANDIDATE";
 const P1_RESOURCES_COMMUNICATIONS_WORK_ITEM_ID =
   "WI-P1-009-RESOURCES-COMMUNICATIONS-FOUNDATION";
+const P1_RESOURCES_COMMUNICATIONS_RELEASE_ID =
+  "REL-20260918-P1-009-STAGING-APPLICATION";
+const P1_RESOURCES_COMMUNICATIONS_CLOSURE_EVIDENCE_PATH =
+  "governance/evidence/p1-009-governance-lifecycle-closure.json";
+const P1_RESOURCES_COMMUNICATIONS_POSTAPPLICATION_QUERY_PATH =
+  "tools/p0/catalog/p1-009-postapplication.sql";
+
+const P1_RESOURCES_COMMUNICATIONS_REVIEWED_AT = "2026-09-18T15:57:40Z";
 
 const P1_RESOURCES_COMMUNICATIONS_PENDING_RECORD_SHA256 =
   "ed4967803d8d5e7f5a46cd6dd25c3ed9ed081298d00ec47b7f450e45330a9676";
+const P1_RESOURCES_COMMUNICATIONS_CLOSED_RECORD_SHA256 =
+  "9416f0eb0e5f56d6103887be297331aa59e3d4270d3458b2eefa7c44512f59a3";
+
 const P1_RESOURCES_COMMUNICATIONS_PENDING_DECISION_SHA256 =
   "2a8fcd8886ac1fdaeb986b0cf98eaade102be5012a0c20fcfd82fc1144fad10d";
+const P1_RESOURCES_COMMUNICATIONS_CLOSED_DECISION_SHA256 =
+  "5de71e1ac0ede3e9c8afc8407c119bf2e8f5d9bea6a1e583a7261bec36641a21";
+
 const P1_RESOURCES_COMMUNICATIONS_PENDING_WORK_ITEM_SHA256 =
   "ad7b0dac237549c8646c94fd30f21d5138315b53d1613feac68f2eef9bcc13e8";
+const P1_RESOURCES_COMMUNICATIONS_CLOSED_WORK_ITEM_SHA256 =
+  "56a1b7d3175411874157f43d329d444a918c52b5e567fc8becb8bad3dda20267";
+
+const P1_RESOURCES_COMMUNICATIONS_CLOSED_RELEASE_SHA256 =
+  "82bfd2dd2125ea064f8317de2ac42cf9df2a8573363c692af7bf0cedbda5053b";
+
+const P1_RESOURCES_COMMUNICATIONS_CLOSURE_CANONICAL_SHA256 =
+  "d9b5a7ad1a227602dbef2c4402519c3a385959138f9402051a85ee216fbfdcd7";
+const P1_RESOURCES_COMMUNICATIONS_CLOSURE_RAW_SHA256 =
+  "2c000a4baa19c8829ea5fa1ee80a4b13b5c02877950fc511ecb356f8bb4941e5";
+const P1_RESOURCES_COMMUNICATIONS_CLOSURE_BYTES = 11111;
+
+const P1_RESOURCES_COMMUNICATIONS_POSTAPPLICATION_QUERY_SHA256 =
+  "4d3641ef6ba94ea6ef79f8e42b7649689c211b4c1cb702d1eee59fb9c783b728";
+const P1_RESOURCES_COMMUNICATIONS_POSTAPPLICATION_QUERY_BYTES = 12266;
+
+const P1_RESOURCES_COMMUNICATIONS_FINAL_CATALOG_SHA256 =
+  "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723";
+const P1_RESOURCES_COMMUNICATIONS_FINAL_CATALOG_BYTES = 499763;
+const P1_RESOURCES_COMMUNICATIONS_FINAL_CATALOG_ROWS = 1535;
+const P1_RESOURCES_COMMUNICATIONS_FINAL_CHECKED_AT =
+  "2026-09-18T19:52:44.158139Z";
 
 const P1_RESOURCES_COMMUNICATIONS_PENDING_DRIFT =
   "Not yet executed. This is an unreviewed, unapplied local P1-009 candidate; no database validation or persistent application has occurred.";
 
 const P1_RESOURCES_COMMUNICATIONS_PENDING_ROLLBACK =
   "A separately authorized rollback-only Rosuno Staging validation must execute the exact protected candidate transactionally and independently prove exact restoration of the accepted ten-migration P1-008 baseline before any persistent Staging application.";
+
+const P1_RESOURCES_COMMUNICATIONS_CLOSED_DRIFT =
+  "Rosuno Staging rollback-only validation passed exact restoration of the accepted ten-migration P1-008 baseline; persistent application then passed exact eleven-version history, 51/51 RLS, zero P1-009 business rows, exact retained-query 51-table catalog fingerprint, and the accepted 21 INFO / 2 WARN security-advisor posture with zero unexplained findings.";
+
+const P1_RESOURCES_COMMUNICATIONS_CLOSED_ROLLBACK =
+  "If a later independently verified defect requires Staging rollback, remove only the sequence-11 P1-009 change through a separately reviewed forward-only non-production rollback migration; never edit historical migration bytes or migration history directly, and preserve all earlier accepted controls.";
+
+const P1_RESOURCES_COMMUNICATIONS_SECURITY_INFO_IDENTITIES = [
+  "public.application_sessions",
+  "public.bookability_evaluations",
+  "public.bookings",
+  "public.capability_definitions",
+  "public.capability_grants",
+  "public.jurisdiction_regulatory_modes",
+  "public.jurisdictions",
+  "public.launch_authorizations",
+  "public.launch_gate_evaluations",
+  "public.launch_gates",
+  "public.notification_attempts",
+  "public.operational_jobs",
+  "public.policy_authority_references",
+  "public.policy_types",
+  "public.policy_versions",
+  "public.referral_eligible_pool_entries",
+  "public.referral_presentations",
+  "public.referrals",
+  "public.regulatory_modes",
+  "public.service_areas",
+  "public.slot_holds",
+];
+
+const P1_RESOURCES_COMMUNICATIONS_SECURITY_WARNINGS = [
+  {
+    code: "authenticated_security_definer_function_executable",
+    schema: "public",
+    function: "has_manage_attorney_verification_scope",
+    arguments: "required_jurisdiction uuid, allow_any_jurisdiction boolean",
+    security_definer: true,
+    pre_existing: true,
+  },
+  {
+    code: "authenticated_security_definer_function_executable",
+    schema: "public",
+    function: "has_resource_metadata_access",
+    arguments: "required_resource_id uuid",
+    security_definer: true,
+    p1_009_intentional: true,
+  },
+];
 
 function p1009Canonical(value) {
   if (Array.isArray(value)) return value.map(p1009Canonical);
@@ -8705,7 +8861,7 @@ function p1009ExactlyOne(records, field, value, label) {
   const found = records.filter((record) => record[field] === value);
 
   if (found.length !== 1) {
-    fail(`P1-009 ${label}: missing or duplicate ${value}`);
+    fail("P1-009 " + label + ": missing or duplicate " + value);
   }
 
   return found[0];
@@ -8762,8 +8918,251 @@ function validateP1ResourcesCommunicationsIdentity(migration, sql) {
   }
 }
 
+export function validateP1ResourcesCommunicationsClosure(
+  migration,
+  sql,
+  evidence,
+) {
+  validateP1ResourcesCommunicationsIdentity(migration, sql);
+
+  requireStringArrayExact(
+    migration.release_refs,
+    [P1_RESOURCES_COMMUNICATIONS_RELEASE_ID],
+    "P1-009 release_refs",
+  );
+
+  if (
+    migration.reviewed !== true ||
+    migration.reviewed_by !== "Rosuno" ||
+    migration.reviewed_at !== P1_RESOURCES_COMMUNICATIONS_REVIEWED_AT ||
+    migration.applied_environment !== "staging" ||
+    migration.non_production_validation !== true ||
+    migration.drift_check !== P1_RESOURCES_COMMUNICATIONS_CLOSED_DRIFT ||
+    migration.rollback_plan !== P1_RESOURCES_COMMUNICATIONS_CLOSED_ROLLBACK ||
+    p1009Digest(migration) !== P1_RESOURCES_COMMUNICATIONS_CLOSED_RECORD_SHA256
+  ) {
+    fail("P1-009 closed migration lifecycle is invalid");
+  }
+
+  requireExactFields(
+    evidence,
+    [
+      "version",
+      "evidence_id",
+      "work_item_id",
+      "lifecycle",
+      "lifecycle_state",
+      "repository",
+      "migration",
+      "gate5",
+      "gate6",
+      "fingerprints",
+      "security_advisor",
+      "release",
+      "boundaries",
+      "integrity",
+    ],
+    "P1-009 closure evidence",
+  );
+
+  if (
+    evidence.version !== 1 ||
+    evidence.evidence_id !== "P1-009-GOVERNANCE-LIFECYCLE-CLOSURE-20260918" ||
+    evidence.work_item_id !== P1_RESOURCES_COMMUNICATIONS_WORK_ITEM_ID ||
+    evidence.lifecycle !==
+      "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED" ||
+    p1009Digest(evidence) !==
+      P1_RESOURCES_COMMUNICATIONS_CLOSURE_CANONICAL_SHA256
+  ) {
+    fail("P1-009 closure evidence identity is invalid");
+  }
+
+  const evidenceText = readFileSync(
+    path.join(ROOT, P1_RESOURCES_COMMUNICATIONS_CLOSURE_EVIDENCE_PATH),
+    "utf8",
+  );
+
+  if (
+    Buffer.byteLength(evidenceText, "utf8") !==
+      P1_RESOURCES_COMMUNICATIONS_CLOSURE_BYTES ||
+    createHash("sha256").update(evidenceText).digest("hex") !==
+      P1_RESOURCES_COMMUNICATIONS_CLOSURE_RAW_SHA256
+  ) {
+    fail("P1-009 closure evidence bytes are invalid");
+  }
+
+  if (
+    scanSecretLikeText(JSON.stringify(evidence), "P1-009 closure").length > 0
+  ) {
+    fail("P1-009 closure contains a secret-like value");
+  }
+
+  const postQueryBytes = readFileSync(
+    path.join(ROOT, P1_RESOURCES_COMMUNICATIONS_POSTAPPLICATION_QUERY_PATH),
+  );
+
+  const postQueryText = postQueryBytes.toString("utf8");
+
+  if (
+    postQueryBytes.length !==
+      P1_RESOURCES_COMMUNICATIONS_POSTAPPLICATION_QUERY_BYTES ||
+    createHash("sha256").update(postQueryBytes).digest("hex") !==
+      P1_RESOURCES_COMMUNICATIONS_POSTAPPLICATION_QUERY_SHA256 ||
+    !postQueryText.startsWith(
+      "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;",
+    ) ||
+    !postQueryText.trimEnd().endsWith("ROLLBACK;") ||
+    /^[\t ]*(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE)\b/im.test(
+      postQueryText,
+    )
+  ) {
+    fail("P1-009 retained post-application query is invalid");
+  }
+
+  if (
+    evidence.repository?.canonical_main !==
+      "0d8fc6b259487a2bc9b11cbc748d4d1054576e69" ||
+    evidence.repository?.canonical_tree !==
+      "f48e6b39dd0b6b561ab540216d4aebb33044fdea" ||
+    evidence.repository?.protected_main !== true ||
+    evidence.migration?.id !== P1_RESOURCES_COMMUNICATIONS_MIGRATION_ID ||
+    evidence.migration?.sha256 !==
+      P1_RESOURCES_COMMUNICATIONS_MIGRATION_SHA256 ||
+    evidence.migration?.sequence !== 11 ||
+    evidence.migration?.history_versions !== 11
+  ) {
+    fail("P1-009 closure repository/migration proof is invalid");
+  }
+
+  if (
+    evidence.gate5?.result !== "PASS" ||
+    evidence.gate5?.corrected_rerun?.result !== "PASS" ||
+    evidence.gate5?.corrected_rerun?.execution_exit !== 0 ||
+    evidence.gate5?.corrected_rerun?.final_transaction_action !== "ROLLBACK" ||
+    evidence.gate5?.corrected_rerun?.pre_post_catalog !== "EXACT_BYTE_MATCH" ||
+    evidence.gate5?.corrected_rerun?.pre_post_persistent_state !==
+      "EXACT_MATCH" ||
+    evidence.gate5?.historical_failed_attempt?.preserved_as_history !== true
+  ) {
+    fail("P1-009 Gate 5 closure proof is invalid");
+  }
+
+  if (
+    evidence.gate6?.result !== "PASS" ||
+    evidence.gate6?.project_ref !== "mxjlvmowmodzdtdfgqpb" ||
+    evidence.gate6?.migration_history_count !== 11 ||
+    evidence.gate6?.public_tables !== 51 ||
+    evidence.gate6?.public_rls !== 51 ||
+    evidence.gate6?.public_functions !== 16 ||
+    Object.values(evidence.gate6?.p1_009_rows ?? {}).some(
+      (value) => value !== 0,
+    )
+  ) {
+    fail("P1-009 Gate 6 closure proof is invalid");
+  }
+
+  const finalFingerprint = evidence.fingerprints?.postapplication_51_table;
+
+  if (
+    finalFingerprint?.format !== "rosuno-p1-catalog-v1" ||
+    finalFingerprint?.query_path !==
+      P1_RESOURCES_COMMUNICATIONS_POSTAPPLICATION_QUERY_PATH ||
+    finalFingerprint?.query_sha256 !==
+      P1_RESOURCES_COMMUNICATIONS_POSTAPPLICATION_QUERY_SHA256 ||
+    finalFingerprint?.query_bytes !==
+      P1_RESOURCES_COMMUNICATIONS_POSTAPPLICATION_QUERY_BYTES ||
+    finalFingerprint?.canonicalizer_path !==
+      "tools/p0/lib/catalog-fingerprint.mjs" ||
+    finalFingerprint?.canonicalizer_sha256 !==
+      "cedcca81b2604192f596c0e3a3f34a31aa4bfba86134a36d31595af42f5fdbb1" ||
+    finalFingerprint?.canonicalizer_bytes !== 20778 ||
+    finalFingerprint?.sha256 !==
+      P1_RESOURCES_COMMUNICATIONS_FINAL_CATALOG_SHA256 ||
+    finalFingerprint?.canonical_byte_length !==
+      P1_RESOURCES_COMMUNICATIONS_FINAL_CATALOG_BYTES ||
+    finalFingerprint?.row_count !==
+      P1_RESOURCES_COMMUNICATIONS_FINAL_CATALOG_ROWS ||
+    finalFingerprint?.checked_at !==
+      P1_RESOURCES_COMMUNICATIONS_FINAL_CHECKED_AT ||
+    finalFingerprint?.transaction_read_only !== true
+  ) {
+    fail("P1-009 final catalog fingerprint proof is invalid");
+  }
+
+  if (
+    evidence.security_advisor?.info_count !== 21 ||
+    evidence.security_advisor?.warn_count !== 2 ||
+    evidence.security_advisor?.unapproved_count !== 0 ||
+    evidence.security_advisor?.unexplained_count !== 0 ||
+    JSON.stringify(evidence.security_advisor?.info_identities) !==
+      JSON.stringify(P1_RESOURCES_COMMUNICATIONS_SECURITY_INFO_IDENTITIES) ||
+    JSON.stringify(evidence.security_advisor?.warnings) !==
+      JSON.stringify(P1_RESOURCES_COMMUNICATIONS_SECURITY_WARNINGS)
+  ) {
+    fail("P1-009 security-advisor closure proof is invalid");
+  }
+
+  if (
+    Object.values(evidence.boundaries ?? {}).some((value) => value !== false)
+  ) {
+    fail("P1-009 closure authorization boundary is invalid");
+  }
+
+  const integrityKeys = [
+    "historical_migrations_unchanged",
+    "p1_009_migration_sha256",
+    "exact_physical_slice_1i",
+    "exact_relation_count_8",
+    "fourteen_restrictive_foreign_keys",
+    "no_fake_business_data",
+    "no_seed_data",
+    "raw_storage_locator_withheld_from_authenticated",
+    "signed_url_boundary_preserved_for_later_work",
+    "document_lineage_deferred_preserved",
+    "resource_kind_taxonomy_deferred_preserved",
+    "doc_del_unresolved_preserved",
+    "g1_unresolved_preserved",
+    "g5_unresolved_preserved",
+    "jurisdiction_neutrality_preserved",
+    "marketplace_legal_services_boundary_preserved",
+    "ai_authority_not_expanded",
+    "later_1j_1k_1l_not_pulled_forward",
+    "failed_gate5_history_preserved",
+    "p1_008_fingerprint_provenance_gap_preserved",
+    "postapplication_query_retained",
+  ];
+
+  requireExactFields(
+    evidence.integrity,
+    integrityKeys,
+    "P1-009 closure integrity",
+  );
+
+  if (
+    evidence.integrity.p1_009_migration_sha256 !==
+      P1_RESOURCES_COMMUNICATIONS_MIGRATION_SHA256 ||
+    integrityKeys
+      .filter((key) => key !== "p1_009_migration_sha256")
+      .some((key) => evidence.integrity[key] !== true)
+  ) {
+    fail("P1-009 closure integrity proof is invalid");
+  }
+
+  return true;
+}
+
 export function validateP1ResourcesCommunicationsCandidate(migration, sql) {
   validateP1ResourcesCommunicationsIdentity(migration, sql);
+
+  if (migration.reviewed === true) {
+    validateP1ResourcesCommunicationsClosure(
+      migration,
+      sql,
+      readJson(P1_RESOURCES_COMMUNICATIONS_CLOSURE_EVIDENCE_PATH),
+    );
+
+    return "closed";
+  }
 
   if (
     migration.reviewed !== false ||
@@ -8824,43 +9223,91 @@ export function validateP1ResourcesCommunicationsTraceability(
   );
 
   requireExactFields(decision, DECISION_FIELDS, "P1-009 decision");
+
   requireExactFields(workItem, WORK_ITEM_FIELDS, "P1-009 work item");
 
   const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
 
-  if (
-    validateP1ResourcesCommunicationsCandidate(migration, sql) !== "pending"
-  ) {
-    fail("P1-009 must remain pending during the local candidate gate");
+  const state = validateP1ResourcesCommunicationsCandidate(migration, sql);
+
+  if (state === "pending") {
+    if (
+      p1009Digest(decision) !==
+        P1_RESOURCES_COMMUNICATIONS_PENDING_DECISION_SHA256 ||
+      p1009Digest(workItem) !==
+        P1_RESOURCES_COMMUNICATIONS_PENDING_WORK_ITEM_SHA256
+    ) {
+      fail("P1-009 pending traceability record mismatch");
+    }
+
+    const leakedRelease = releases.releases.some(
+      (release) =>
+        release.migration_refs?.includes(
+          P1_RESOURCES_COMMUNICATIONS_MIGRATION_ID,
+        ) ||
+        release.work_item_refs?.includes(
+          P1_RESOURCES_COMMUNICATIONS_WORK_ITEM_ID,
+        ) ||
+        release.decision_refs?.includes(
+          P1_RESOURCES_COMMUNICATIONS_DECISION_ID,
+        ),
+    );
+
+    if (leakedRelease) {
+      fail("P1-009 pending candidate must not have a release");
+    }
+
+    return true;
   }
 
   if (
     p1009Digest(decision) !==
-    P1_RESOURCES_COMMUNICATIONS_PENDING_DECISION_SHA256
-  ) {
-    fail("P1-009 pending decision governance record mismatch");
-  }
-
-  if (
+      P1_RESOURCES_COMMUNICATIONS_CLOSED_DECISION_SHA256 ||
     p1009Digest(workItem) !==
-    P1_RESOURCES_COMMUNICATIONS_PENDING_WORK_ITEM_SHA256
+      P1_RESOURCES_COMMUNICATIONS_CLOSED_WORK_ITEM_SHA256
   ) {
-    fail("P1-009 pending work-item governance record mismatch");
+    fail("P1-009 closed traceability record mismatch");
   }
 
-  const leakedRelease = releases.releases.some(
-    (release) =>
-      release.migration_refs?.includes(
-        P1_RESOURCES_COMMUNICATIONS_MIGRATION_ID,
-      ) ||
-      release.work_item_refs?.includes(
-        P1_RESOURCES_COMMUNICATIONS_WORK_ITEM_ID,
-      ) ||
-      release.decision_refs?.includes(P1_RESOURCES_COMMUNICATIONS_DECISION_ID),
+  const release = p1009ExactlyOne(
+    releases.releases,
+    "release_id",
+    P1_RESOURCES_COMMUNICATIONS_RELEASE_ID,
+    "release",
   );
 
-  if (leakedRelease) {
-    fail("P1-009 pending candidate must not have a release");
+  requireExactFields(release, RELEASE_FIELDS, "P1-009 release");
+
+  if (
+    p1009Digest(release) !== P1_RESOURCES_COMMUNICATIONS_CLOSED_RELEASE_SHA256
+  ) {
+    fail("P1-009 release governance record mismatch");
+  }
+
+  const linked = releases.releases.filter(
+    (item) =>
+      item.migration_refs?.includes(P1_RESOURCES_COMMUNICATIONS_MIGRATION_ID) ||
+      item.work_item_refs?.includes(P1_RESOURCES_COMMUNICATIONS_WORK_ITEM_ID) ||
+      item.decision_refs?.includes(P1_RESOURCES_COMMUNICATIONS_DECISION_ID),
+  );
+
+  if (
+    linked.length !== 1 ||
+    linked[0].release_id !== P1_RESOURCES_COMMUNICATIONS_RELEASE_ID
+  ) {
+    fail("P1-009 release linkage is duplicated or inconsistent");
+  }
+
+  const evidence = readJson(P1_RESOURCES_COMMUNICATIONS_CLOSURE_EVIDENCE_PATH);
+
+  validateP1ResourcesCommunicationsClosure(migration, sql, evidence);
+
+  if (
+    evidence.release?.id !== release.release_id ||
+    evidence.release?.commit_sha !== release.commit_sha ||
+    evidence.release?.created_at !== release.created_at
+  ) {
+    fail("P1-009 closure/release traceability differs");
   }
 
   return true;
