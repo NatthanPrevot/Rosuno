@@ -620,11 +620,11 @@
         "A complete end-to-end Consultation, Engagement, or Media application workflow",
         "Production, OLD, source/development database mutation, or P1-009 and later work"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "owner": "Rosuno P1-008 implementation owner",
       "reviewer": {
         "identity": "Rosuno",
-        "status": "pending"
+        "status": "approved"
       },
       "priority": "P1",
       "authority_refs": [
@@ -658,13 +658,13 @@
         "pnpm run rosuno:check --base <base> --head <head> --branch <branch> --allow <approved-path>"
       ],
       "environment": "staging",
-      "release_refs": [],
+      "release_refs": ["REL-20260918-P1-008-STAGING-APPLICATION"],
       "migration_refs": [
         "20260917045031_p1_consultation_engagement_media_foundation"
       ],
       "rollback_reference": "tools/p0/p1-008-rollback.mjs",
       "created_at": "2026-09-17T20:50:25Z",
-      "updated_at": "2026-09-17T20:50:25Z"
+      "updated_at": "2026-09-18T02:29:30Z"
     }
   ]
 }
