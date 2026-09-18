@@ -52,6 +52,7 @@ import {
   validateP1ConsultationEngagementMediaTraceability,
   validateP1ResourcesCommunicationsCandidate,
   validateP1ResourcesCommunicationsTraceability,
+  validateP1009Gate5PrestateContract,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
   validateP1RegulatoryCatalog,
@@ -2125,6 +2126,10 @@ test("P1-004 local overlay preserves the exact five-migration foundation", async
           recursive: true,
         });
       }
+      cpSync(
+        path.join(ROOT, "tools/p0/p1-009-gate5-fingerprint.mjs"),
+        path.join(root, "tools/p0/p1-009-gate5-fingerprint.mjs"),
+      );
       execFileSync("git", ["init", "-q", root]);
       const controls = await import(
         pathToFileURL(path.join(root, "tools/p0/lib/controls.mjs"))
@@ -3322,4 +3327,46 @@ test("P1-009 pending candidate is exact above the accepted P1-008 Staging baseli
       leakedReleases,
     ),
   );
+});
+
+test("P1-009 Gate 5A prestate contract fails closed on provenance or scope weakening", () => {
+  const evidence = readJson(
+    "governance/evidence/p1-009-gate5-prestate-contract.json",
+  );
+  const decisions = readJson("governance/decision-log.json");
+
+  assert.equal(validateP1009Gate5PrestateContract(evidence, decisions), true);
+
+  const cases = [
+    (copy) => {
+      copy.historical_p1_008.reproduction_claimed = true;
+    },
+    (copy) => {
+      copy.historical_p1_008.replaced_or_repaired = true;
+    },
+    (copy) => {
+      copy.verification_contract.tables.pop();
+    },
+    (copy) => {
+      copy.verification_contract.functions.pop();
+    },
+    (copy) => {
+      copy.preconditions.public_function_count = 13;
+    },
+    (copy) => {
+      copy.preconditions.security_advisor.info_count = 18;
+    },
+    (copy) => {
+      copy.preconditions.security_advisor.unapproved_count = 1;
+    },
+    (copy) => {
+      copy.execution_policy.database_execution_authorized = true;
+    },
+  ];
+
+  for (const mutate of cases) {
+    const copy = structuredClone(evidence);
+    mutate(copy);
+    assert.throws(() => validateP1009Gate5PrestateContract(copy, decisions));
+  }
 });

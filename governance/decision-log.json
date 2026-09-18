@@ -322,7 +322,6 @@
       ],
       "expiry": null
     },
-
     {
       "decision_id": "DEC-20260917-P1-008-BOUNDED-CANDIDATE",
       "title": "Implement the bounded P1-008 Consultation / Engagement / Media foundation",
@@ -387,6 +386,38 @@
         "tools/p0/lib/p1-009-contract-data.mjs",
         "tools/p0/tests/p1-009-contract.test.mjs",
         "tools/p0/p1-009-rollback.mjs"
+      ],
+      "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260918-P1-009-GATE5A-PRESTATE-VERIFICATION",
+      "title": "Define the P1-009 Gate 5 reproducible prestate verification contract",
+      "status": "accepted",
+      "scope": "Gate 5A verification-contract implementation only; no database execution, migration change, rollback change, persistent application, closure, Production, OLD, or later P1 work.",
+      "decision": "Preserve the accepted P1-008 baseline and fingerprint as immutable historical evidence with an explicit unrecovered generating-query provenance gap. Define a new versioned P1-009 Gate 5 prestate contract with a retained exact query artifact, exact table/function/principal scope, pinned rosuno-p1-catalog-v1 canonicalization source identity, and required raw/canonical PRE and POST execution evidence. The new PRE fingerprint is a P1-009 Gate 5 execution anchor only and does not reproduce, replace, repair, or supersede the historical P1-008 fingerprint.",
+      "rationale": "The historical P1-008 fingerprint result remains accepted, but exhaustive read-only recovery did not prove its exact generating query or raw execution artifact. Forward-only remediation preserves history while making P1-009 Gate 5 independently reproducible and fail-closed.",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-009-RESOURCES-COMMUNICATIONS-FOUNDATION"],
+      "owner": "Rosuno P1-009 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-09-18T17:16:17Z",
+      "updated_at": "2026-09-18T17:16:17Z",
+      "supersedes": [],
+      "impact": "Adds only reproducible Gate 5 verification tooling and contract evidence. It does not authorize Gate 5 database execution or change any P1-009/P1-008 migration, rollback, baseline, release, or closure state.",
+      "evidence": [
+        "governance/evidence/p1-009-gate5-prestate-contract.json",
+        "tools/p0/catalog/p1-009-gate5-prestate.sql",
+        "tools/p0/p1-009-gate5-fingerprint.mjs"
       ],
       "expiry": null
     }
