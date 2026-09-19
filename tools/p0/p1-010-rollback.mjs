@@ -416,7 +416,7 @@ values (
     `update public.payment_transactions
      set payment_policy_version_id=${u(12)}
      where id=${u(40)}`,
-    "23514",
+    "42501",
     "provenance",
   );
 
