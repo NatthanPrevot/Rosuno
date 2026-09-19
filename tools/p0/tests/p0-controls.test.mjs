@@ -53,6 +53,8 @@ import {
   validateP1ResourcesCommunicationsCandidate,
   validateP1ResourcesCommunicationsClosure,
   validateP1ResourcesCommunicationsTraceability,
+  validateP1FinancialFoundationCandidate,
+  validateP1FinancialFoundationTraceability,
   validateP1009Gate5PrestateContract,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
@@ -2772,7 +2774,7 @@ test("P1-006 accepted closure remains valid under the current P1-009 baseline", 
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-009-20260918-v1");
   assert.equal(baseline.migration_inventory.length, 11);
-  assert.equal(migrations.migrations.length, 11);
+  assert.equal(migrations.migrations.length, 12);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
@@ -2940,7 +2942,7 @@ test("P1-007 accepted closure remains valid under the current P1-009 baseline", 
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-009-20260918-v1");
   assert.equal(baseline.migration_inventory.length, 11);
-  assert.equal(migrations.migrations.length, 11);
+  assert.equal(migrations.migrations.length, 12);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
@@ -3113,7 +3115,7 @@ test("P1-008 accepted closure remains valid under the current P1-009 baseline", 
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-009-20260918-v1");
   assert.equal(baseline.migration_inventory.length, 11);
-  assert.equal(migrations.migrations.length, 11);
+  assert.equal(migrations.migrations.length, 12);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
@@ -3411,4 +3413,93 @@ test("P1-009 Gate 5A prestate contract fails closed on provenance or scope weake
     mutate(copy);
     assert.throws(() => validateP1009Gate5PrestateContract(copy, decisions));
   }
+});
+
+test("P1-010 pending Financial foundation overlays but does not rewrite the accepted P1-009 Staging baseline", () => {
+  const migrations = readJson("governance/migrations/reviewed-migrations.json");
+  const workItems = readJson("governance/work-items/index.json");
+  const decisions = readJson("governance/decision-log.json");
+  const releases = readJson("governance/releases/traceability.json");
+  const authority = readJson("governance/authority-references.json");
+  const baseline = readJson("governance/schema-drift/baseline.json");
+
+  const migration = migrations.migrations.find(
+    (item) => item.migration_id === "20260919000112_p1_financial_foundation",
+  );
+
+  assert.ok(migration);
+  assert.equal(migration.sequence, 12);
+  assert.equal(migration.reviewed, false);
+  assert.equal(migration.applied_environment, "none");
+
+  const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+
+  assert.equal(
+    validateP1FinancialFoundationCandidate(migration, sql),
+    "pending",
+  );
+
+  assert.doesNotThrow(() =>
+    validateP1FinancialFoundationTraceability(
+      migrations,
+      workItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  const fp1 = authority.references.find(
+    (item) =>
+      item.authority_id ===
+      "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+  );
+
+  assert.deepEqual(fp1, {
+    authority_id: "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+    title:
+      "Rosuno Financial Provenance Physical Correction / Bounded Authority Amendment FP-1",
+    location: "external locked authority package",
+    locked: true,
+    content_copied: false,
+    reinterpreted: false,
+    integrity:
+      "sha256:ca7d257b6fbf6081c7bd48194a0d39b6fad7a6a6af0f4191e734f9af0d2af1c0",
+    usage: "reference-only",
+    status: "active",
+  });
+
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-009-20260918-v1");
+  assert.equal(baseline.migration_inventory.length, 11);
+  assert.equal(migrations.migrations.length, 12);
+  assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
+
+  const missingFp1 = structuredClone(migration);
+  missingFp1.authority_refs = missingFp1.authority_refs.filter(
+    (item) => item !== "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+  );
+
+  assert.throws(
+    () => validateP1FinancialFoundationCandidate(missingFp1, sql),
+    /authority_refs|governance record/,
+  );
+
+  assert.throws(
+    () =>
+      validateP1FinancialFoundationCandidate(
+        migration,
+        sql + "\n-- unauthorized byte drift\n",
+      ),
+    /byte length|SHA-256/,
+  );
+});
+
+test("P1-010 migration path is allowed by the neutral repository control", () => {
+  const packageJson = readJson("package.json");
+
+  assert.doesNotThrow(() =>
+    validateNeutralPaths(
+      ["supabase/migrations/20260919000112_p1_financial_foundation.sql"],
+      packageJson,
+    ),
+  );
 });

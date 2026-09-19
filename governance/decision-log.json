@@ -387,6 +387,41 @@
         "tools/p0/p1-009-gate5-fingerprint.mjs"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260918-P1-010-BOUNDED-CANDIDATE",
+      "title": "Implement the bounded P1-010 Financial foundation",
+      "status": "accepted",
+      "scope": "Bounded local P1-010 Gate 1 candidate implementation only from canonical main at 74141e50a656d9f3ddff918c9494e224da53bceb under the eleven-artifact authority package including locked FP-1. No publication, protected review, database contact, persistent Staging application, Production, OLD, P1-011, or later work is authorized by this decision.",
+      "decision": "Implement exactly fee_calculations, payment_transactions, ledger_entries, reconciliation_exceptions, and external_event_receipts for the Physical 1J financial foundation. Do not create payouts. Preserve FP-1 immutable Payment Transaction jurisdiction, Regulatory Mode, and independent referral/payment/fee/payment_flow/engagement/cancellation/refund policy provenance; enforce structural/time validity through jurisdiction_regulatory_modes without interpreting approval_status; preserve Fee Calculation immutability, append-only Ledger history, provider receipts as observations, Reconciliation Exception as noncanonical disagreement evidence, NULL-only ledger_entries.payout_id while Payout is inactive, and fail-closed financial access. G-1 through G-5 remain unresolved.",
+      "rationale": "Gate 0C reconciled the accepted P1-009 repository/Staging baseline and froze the bounded Physical 1J contract after FP-1 became locked authority artifact #11. P1-010 must make the required financial provenance physically representable without inventing counsel-controlled payment sequencing, fund-holding, engagement-effectiveness, Consultation-creation, approval_status, or Production-launch semantics.",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-010-FINANCIAL-FOUNDATION"],
+      "owner": "Rosuno P1-010 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "created_at": "2026-09-19T01:51:20Z",
+      "updated_at": "2026-09-19T01:51:20Z",
+      "supersedes": [],
+      "impact": "Creates only the local unreviewed Physical 1J Financial foundation candidate and associated governance/control tooling. No Payout relation, Audit Event, Retention Rule, Legal Hold, Complaint Case, provider execution, Production financial configuration, database execution, P1-011, or end-to-end payment capability is authorized.",
+      "evidence": [
+        "supabase/migrations/20260919000112_p1_financial_foundation.sql",
+        "tools/p0/lib/p1-010-contract-data.mjs",
+        "tools/p0/p1-010-rollback.mjs",
+        "tools/p0/tests/p1-010-contract.test.mjs",
+        "FP-1 sha256:ca7d257b6fbf6081c7bd48194a0d39b6fad7a6a6af0f4191e734f9af0d2af1c0"
+      ],
+      "expiry": null
     }
   ]
 }

@@ -77,6 +77,17 @@
       "integrity": "verified during P1-003 authority review",
       "usage": "reference-only",
       "status": "active"
+    },
+    {
+      "authority_id": "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+      "title": "Rosuno Financial Provenance Physical Correction / Bounded Authority Amendment FP-1",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "sha256:ca7d257b6fbf6081c7bd48194a0d39b6fad7a6a6af0f4191e734f9af0d2af1c0",
+      "usage": "reference-only",
+      "status": "active"
     }
   ]
 }

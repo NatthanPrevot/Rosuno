@@ -710,6 +710,85 @@
       "rollback_reference": "tools/p0/p1-009-rollback.mjs",
       "created_at": "2026-09-18T08:08:25Z",
       "updated_at": "2026-09-18T21:00:07Z"
+    },
+    {
+      "work_item_id": "WI-P1-010-FINANCIAL-FOUNDATION",
+      "title": "P1-010 Financial physical foundation",
+      "objective": "Implement the smallest jurisdiction-neutral Physical 1J persistence and security foundation for immutable Fee Calculations, canonical Payment Transactions with complete frozen FP-1 provenance, append-only Ledger Entries, Reconciliation Exceptions, and generalized External Event Receipts while preserving the unresolved payment/engagement gates and conditional Payout boundary.",
+      "in_scope": [
+        "Exactly public.fee_calculations, public.payment_transactions, public.ledger_entries, public.reconciliation_exceptions, and public.external_event_receipts",
+        "FP-1 required Payment Transaction jurisdiction_id, regulatory_mode_id, and independent referral/payment/fee/payment_flow/engagement/cancellation/refund Policy Version provenance",
+        "Database-enforced Policy Version type and jurisdiction/regulatory-scope consistency without collapsing policy categories or using JSON as canonical provenance",
+        "Structural/time-valid jurisdiction_regulatory_modes mapping at Payment Transaction creation using active_from/active_until only; approval_status semantics remain uninterpreted",
+        "Immutable Fee Calculation correction history using one root and a linear same-Request supersession chain",
+        "Payment Transaction consistency with its Fee Calculation, Consultation Request, and later Consultation without resolving G-1 through G-5",
+        "Append-only Ledger Entries with currency consistency and NULL-only payout_id while the conditional Payout relation remains inactive",
+        "Generalized provider-event receipt uniqueness and minimized payload evidence; provider observations remain noncanonical",
+        "Reconciliation Exception persistence for unresolved provider/canonical disagreement without becoming competing canonical state",
+        "Immediate RLS, no ordinary authenticated direct financial-table privileges, no DELETE, and bounded trusted service_role mutation",
+        "Exactly seventeen concrete P1-010 foreign keys using RESTRICT on update and delete",
+        "Local governance, contract, rollback-generation, and P0 validator tooling; any database execution remains a later separately authorized gate"
+      ],
+      "out_of_scope": [
+        "Branch publication/push, pull request, protected review, merge, release, database rollback execution, persistent Staging application, or any database contact during Gate 1",
+        "public.payouts or any distinct Rosuno-owned payout obligation before separately approved settlement architecture",
+        "Resolution of G-1 Engagement effectiveness, G-2 Instant payment sequencing, G-3 Scheduled payment sequencing, G-4 fund holding/trust treatment, or G-5 Consultation creation",
+        "Interpretation, invention, or whitelisting of jurisdiction_regulatory_modes.approval_status values",
+        "Production payment configuration, California fee percentages, Stripe/provider settlement architecture, trust/IOLTA treatment, client-side fees, attorney-side referral economics, or real payment execution",
+        "Persistent fake business/test rows or seed data; later rollback validation fixtures must be transient and rollback-only",
+        "Audit Event, Retention Rule, Legal Hold, Complaint Case, Review, P1-011, application UI/workflows, or later-phase persistence",
+        "Production, OLD, source/development database mutation, or any claim of end-to-end operational payment capability"
+      ],
+      "status": "in_progress",
+      "owner": "Rosuno P1-010 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260918-P1-010-BOUNDED-CANDIDATE"],
+      "dependencies": ["WI-P1-009-RESOURCES-COMMUNICATIONS-FOUNDATION"],
+      "acceptance_criteria": [
+        "Exactly five Physical 1J persistent relations are introduced and public.payouts is absent",
+        "The migration preserves the locked columns and exactly seventeen concrete foreign keys use ON UPDATE RESTRICT / ON DELETE RESTRICT while payout_id and generic reconciliation references remain non-FK as frozen",
+        "All nine FP-1 Payment Transaction provenance fields are required and immutable, referenced Policy Versions have the correct independent policy types, and scoped policies cannot contradict transaction jurisdiction/Regulatory Mode",
+        "Payment Transaction creation requires a matching jurisdiction_regulatory_modes row whose active interval contains transaction created_at, without interpreting approval_status",
+        "Fee Calculation is immutable and same-Request supersession forms one linear correction chain with one root and no branch",
+        "Payment Transaction request, Fee Calculation fee policy/currency, Request referral/engagement provenance, and later Consultation provenance cannot contradict each other",
+        "Ledger Entry is append-only, payout_id remains NULL-only while Payout is inactive, and Payment-linked Ledger currency matches Payment Transaction currency",
+        "Provider event identity is unique by provider_code/provider_event_reference, minimal_payload remains optional/minimized, and provider receipts do not become canonical business-state authority",
+        "All five relations enable RLS; authenticated/anon/public receive no direct table privileges; trusted service_role mutation is column-bounded and no target relation grants DELETE",
+        "No G-1 through G-5 answer, approval_status semantic, production policy value, persistent seed row, fake business record, or provider-specific canonical state is introduced",
+        "Local targeted tests plus the complete canonical format/typecheck/build/P0/security validation pass on stable candidate bytes before the controlled local candidate commit",
+        "Any publication, protected review, database rollback validation, persistent Staging application, Production action, OLD action, P1-011, or later work requires a separate authorization gate"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p1-010-contract.test.mjs",
+        "node tools/p0/p1-010-rollback.mjs /tmp/p1-010-rollback-validation.sql",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "staging",
+      "release_refs": [],
+      "migration_refs": ["20260919000112_p1_financial_foundation"],
+      "rollback_reference": "tools/p0/p1-010-rollback.mjs",
+      "created_at": "2026-09-19T01:51:20Z",
+      "updated_at": "2026-09-19T01:51:20Z"
     }
   ]
 }
