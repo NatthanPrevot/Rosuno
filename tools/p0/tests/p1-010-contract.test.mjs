@@ -214,6 +214,33 @@ test("P1-010 preserves unresolved G-1 through G-5 and seeds no persistent policy
   assert.doesNotMatch(sql, /insert into public\.policy_types/i);
 });
 
+test("P1-010 rollback provenance mutation fails at the service-role privilege boundary", () => {
+  const built = buildRollbackValidation();
+  const marker = "Payment Transaction provenance update is rejected";
+  const markerAt = built.sql.indexOf(marker);
+
+  assert.ok(markerAt >= 0);
+
+  const serviceRoleAt = built.sql.lastIndexOf(
+    "SET LOCAL ROLE service_role;",
+    markerAt,
+  );
+  const resetRoleAt = built.sql.lastIndexOf("RESET ROLE;", markerAt);
+
+  assert.ok(serviceRoleAt >= 0);
+  assert.ok(serviceRoleAt > resetRoleAt);
+
+  const statementWindow = built.sql.slice(
+    Math.max(0, markerAt - 250),
+    markerAt,
+  );
+  const resultWindow = built.sql.slice(markerAt, markerAt + 400);
+
+  assert.match(statementWindow, /update public\.payment_transactions/i);
+  assert.match(statementWindow, /payment_policy_version_id/i);
+  assert.match(resultWindow, /SQLSTATE '42501'/);
+});
+
 test("P1-010 rollback generator is import-safe, rollback-only, and covers frozen failure boundaries", () => {
   const built = buildRollbackValidation();
   assert.match(built.sql, /^BEGIN;/);
