@@ -40,7 +40,10 @@
       ],
       "artifact_digest": "sha256:67dfd44b2bd7525a588e6eb59c33a0056f3a5c67eec5f45dd93e6aab37f7afc8",
       "environment": "staging",
-      "reviewer": { "identity": "Rosuno", "status": "approved" },
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-08-29T15:16:33Z"
     },
@@ -65,7 +68,10 @@
       ],
       "artifact_digest": "sha256:6471ac68949234e29ae1cc492eaa2f77dc15ca010998f72898284b8c9a855fec",
       "environment": "staging",
-      "reviewer": { "identity": "Rosuno", "status": "approved" },
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-08-30T01:32:02Z"
     },
@@ -93,7 +99,10 @@
       ],
       "artifact_digest": "sha256:94e9b746cf303154790bc51e8160f9184b2e9765e82ec2702e03030f7a79b7ee",
       "environment": "staging",
-      "reviewer": { "identity": "Rosuno", "status": "approved" },
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-08-30T20:29:17Z"
     },
@@ -118,7 +127,10 @@
       ],
       "artifact_digest": "sha256:bf0cdabed8ffa41a65e793b9041c00dc7d2ca47eeef40c2750770e195b47d6c5",
       "environment": "staging",
-      "reviewer": { "identity": "Rosuno", "status": "approved" },
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
       "rollback_reference": "governance/evidence/p1-002-authorization-scope-correction.json",
       "created_at": "2026-09-01T18:27:41Z"
     },
@@ -141,7 +153,10 @@
       ],
       "artifact_digest": "sha256:09107387d2bd699189a7cdf970c1de18f89ca5cde5074d596274d63361d59231",
       "environment": "staging",
-      "reviewer": { "identity": "Rosuno", "status": "approved" },
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
       "rollback_reference": "governance/evidence/p1-004-attorney-verification-eligibility-foundation.json",
       "created_at": "2026-09-10T18:27:37Z"
     },
@@ -160,7 +175,10 @@
       ],
       "artifact_digest": "sha256:13be2baeaa808d38a5e209071c94a9c9565fbd1280aeae0395abc50502e2b375",
       "environment": "staging",
-      "reviewer": { "identity": "Rosuno", "status": "approved" },
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
       "rollback_reference": "tools/p0/p1-005-rollback.mjs",
       "created_at": "2026-09-12T22:31:52Z"
     },
@@ -179,7 +197,10 @@
       ],
       "artifact_digest": "sha256:9035b76466c5b201e54667ee537eb4f9342c191ce5aa35d9e13d44f0def3e094",
       "environment": "staging",
-      "reviewer": { "identity": "Rosuno", "status": "approved" },
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
       "rollback_reference": "tools/p0/p1-006-rollback.mjs",
       "created_at": "2026-09-14T05:18:06Z"
     },
@@ -202,7 +223,10 @@
       ],
       "artifact_digest": "sha256:4865a0643ffab7d8afcd9d26aeecc180e9fe51d6f261cc83717cfb1ab3bf370f",
       "environment": "staging",
-      "reviewer": { "identity": "Rosuno", "status": "approved" },
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
       "rollback_reference": "tools/p0/p1-007-rollback.mjs",
       "created_at": "2026-09-16T04:59:13Z"
     },
@@ -223,7 +247,10 @@
       ],
       "artifact_digest": "sha256:aa33c207eacf407165809f893a622b3407708280527991ff772320d2b29dea60",
       "environment": "staging",
-      "reviewer": { "identity": "Rosuno", "status": "approved" },
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
       "rollback_reference": "tools/p0/p1-008-rollback.mjs",
       "created_at": "2026-09-18T02:29:30.827Z"
     },
@@ -246,9 +273,35 @@
       ],
       "artifact_digest": "sha256:82db84c3e2fe5d20b5cf0a66c0b05d3cd481d68270d6ef50735dbaf8b7437487",
       "environment": "staging",
-      "reviewer": { "identity": "Rosuno", "status": "approved" },
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
       "rollback_reference": "tools/p0/p1-009-rollback.mjs",
       "created_at": "2026-09-18T21:00:07Z"
+    },
+    {
+      "release_id": "REL-20260921-P1-010-STAGING-APPLICATION",
+      "commit_sha": "18b8939b3c8f36836abbe341b99241228d5604e4",
+      "work_item_refs": ["WI-P1-010-FINANCIAL-FOUNDATION"],
+      "decision_refs": ["DEC-20260918-P1-010-BOUNDED-CANDIDATE"],
+      "migration_refs": ["20260919000112_p1_financial_foundation"],
+      "validation_evidence": [
+        "governance/evidence/p1-010-governance-lifecycle-closure.json",
+        "supabase/migrations/20260919000112_p1_financial_foundation.sql",
+        "tools/p0/p1-010-rollback.mjs",
+        "tools/p0/catalog/p1-010-postapplication.sql",
+        "pnpm run p0:validate",
+        "pnpm run p0:test"
+      ],
+      "artifact_digest": "sha256:c36f75cd5539d5961981c25a4a284e3af589ba770ff7cb3934d3cd307cc310d5",
+      "environment": "staging",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "rollback_reference": "tools/p0/p1-010-rollback.mjs",
+      "created_at": "2026-09-21T01:51:36Z"
     }
   ]
 }

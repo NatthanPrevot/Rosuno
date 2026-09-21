@@ -54,6 +54,7 @@ import {
   validateP1ResourcesCommunicationsClosure,
   validateP1ResourcesCommunicationsTraceability,
   validateP1FinancialFoundationCandidate,
+  validateP1FinancialFoundationClosure,
   validateP1FinancialFoundationTraceability,
   validateP1009Gate5PrestateContract,
   validateP1PlatformEvidence,
@@ -70,7 +71,7 @@ import {
   validateWorkItem,
 } from "../lib/controls.mjs";
 
-test("P1-005 accepted closure remains valid under the current P1-009 baseline", () => {
+test("P1-005 accepted closure remains valid under the current P1-010 baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -112,17 +113,17 @@ test("P1-005 accepted closure remains valid under the current P1-009 baseline", 
 
   const baseline = readJson("governance/schema-drift/baseline.json");
 
-  assert.equal(baseline.baseline_id, "rosuno-staging-p1-009-20260918-v1");
-  assert.equal(baseline.migration_inventory.length, 11);
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-010-20260921-v1");
+  assert.equal(baseline.migration_inventory.length, 12);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
-    "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
+    "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
   );
-  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 499763);
-  assert.equal(baseline.catalog_fingerprint.row_count, 1535);
+  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 595722);
+  assert.equal(baseline.catalog_fingerprint.row_count, 1794);
   assert.equal(
     baseline.baseline_digest,
-    "sha256:5e947c8e0e30aac85d883de4844c748293d599d764c2917ecfde22b7b7f547ca",
+    "sha256:f5776fa5d14843e3bd0f57a0dcfeb161581c077bfcae957b6130f49d287dd96f",
   );
 
   assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
@@ -1873,7 +1874,7 @@ test("unregistered migration artifacts are rejected", () => {
   );
 });
 
-test("only exact P1-009 catalog SQL evidence queries bypass migration inventory", () => {
+test("only exact retained P1-009/P1-010 catalog SQL evidence queries bypass migration inventory", () => {
   assert.doesNotThrow(() =>
     validateMigrationRegister(
       { product_migrations_present: false, migrations: [] },
@@ -1881,6 +1882,7 @@ test("only exact P1-009 catalog SQL evidence queries bypass migration inventory"
       [
         "tools/p0/catalog/p1-009-gate5-prestate.sql",
         "tools/p0/catalog/p1-009-postapplication.sql",
+        "tools/p0/catalog/p1-010-postapplication.sql",
       ],
     ),
   );
@@ -1891,6 +1893,16 @@ test("only exact P1-009 catalog SQL evidence queries bypass migration inventory"
         { product_migrations_present: false, migrations: [] },
         {},
         ["tools/p0/catalog/p1-009-unregistered.sql"],
+      ),
+    /inventory/,
+  );
+
+  assert.throws(
+    () =>
+      validateMigrationRegister(
+        { product_migrations_present: false, migrations: [] },
+        {},
+        ["tools/p0/catalog/p1-010-unregistered.sql"],
       ),
     /inventory/,
   );
@@ -2734,7 +2746,7 @@ test("Fast-Control package scripts remain explicit and dependency-neutral", () =
   assert.throws(() => validatePackageJson(broadenedDependencies));
 });
 
-test("P1-006 accepted closure remains valid under the current P1-009 baseline", () => {
+test("P1-006 accepted closure remains valid under the current P1-010 baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -2772,18 +2784,18 @@ test("P1-006 accepted closure remains valid under the current P1-009 baseline", 
 
   const baseline = readJson("governance/schema-drift/baseline.json");
 
-  assert.equal(baseline.baseline_id, "rosuno-staging-p1-009-20260918-v1");
-  assert.equal(baseline.migration_inventory.length, 11);
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-010-20260921-v1");
+  assert.equal(baseline.migration_inventory.length, 12);
   assert.equal(migrations.migrations.length, 12);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
-    "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
+    "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
   );
-  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 499763);
-  assert.equal(baseline.catalog_fingerprint.row_count, 1535);
+  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 595722);
+  assert.equal(baseline.catalog_fingerprint.row_count, 1794);
   assert.equal(
     baseline.baseline_digest,
-    "sha256:5e947c8e0e30aac85d883de4844c748293d599d764c2917ecfde22b7b7f547ca",
+    "sha256:f5776fa5d14843e3bd0f57a0dcfeb161581c077bfcae957b6130f49d287dd96f",
   );
 
   assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
@@ -2893,7 +2905,7 @@ test("P1-006 accepted closure remains valid under the current P1-009 baseline", 
     ),
   );
 });
-test("P1-007 accepted closure remains valid under the current P1-009 baseline", () => {
+test("P1-007 accepted closure remains valid under the current P1-010 baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -2940,18 +2952,18 @@ test("P1-007 accepted closure remains valid under the current P1-009 baseline", 
     ),
   );
 
-  assert.equal(baseline.baseline_id, "rosuno-staging-p1-009-20260918-v1");
-  assert.equal(baseline.migration_inventory.length, 11);
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-010-20260921-v1");
+  assert.equal(baseline.migration_inventory.length, 12);
   assert.equal(migrations.migrations.length, 12);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
-    "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
+    "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
   );
-  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 499763);
-  assert.equal(baseline.catalog_fingerprint.row_count, 1535);
+  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 595722);
+  assert.equal(baseline.catalog_fingerprint.row_count, 1794);
   assert.equal(
     baseline.baseline_digest,
-    "sha256:5e947c8e0e30aac85d883de4844c748293d599d764c2917ecfde22b7b7f547ca",
+    "sha256:f5776fa5d14843e3bd0f57a0dcfeb161581c077bfcae957b6130f49d287dd96f",
   );
 
   assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
@@ -3075,7 +3087,7 @@ test("P1-007 accepted closure remains valid under the current P1-009 baseline", 
   );
 });
 
-test("P1-008 accepted closure remains valid under the current P1-009 baseline", () => {
+test("P1-008 accepted closure remains valid under the current P1-010 baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -3113,18 +3125,18 @@ test("P1-008 accepted closure remains valid under the current P1-009 baseline", 
     ),
   );
 
-  assert.equal(baseline.baseline_id, "rosuno-staging-p1-009-20260918-v1");
-  assert.equal(baseline.migration_inventory.length, 11);
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-010-20260921-v1");
+  assert.equal(baseline.migration_inventory.length, 12);
   assert.equal(migrations.migrations.length, 12);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
-    "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
+    "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
   );
-  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 499763);
-  assert.equal(baseline.catalog_fingerprint.row_count, 1535);
+  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 595722);
+  assert.equal(baseline.catalog_fingerprint.row_count, 1794);
   assert.equal(
     baseline.baseline_digest,
-    "sha256:5e947c8e0e30aac85d883de4844c748293d599d764c2917ecfde22b7b7f547ca",
+    "sha256:f5776fa5d14843e3bd0f57a0dcfeb161581c077bfcae957b6130f49d287dd96f",
   );
   assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
 
@@ -3236,7 +3248,9 @@ test("P1-008 accepted closure remains valid under the current P1-009 baseline", 
       item.path !==
         "governance/evidence/p1-008-governance-lifecycle-closure.json" &&
       item.path !==
-        "governance/evidence/p1-009-governance-lifecycle-closure.json",
+        "governance/evidence/p1-009-governance-lifecycle-closure.json" &&
+      item.path !==
+        "governance/evidence/p1-010-governance-lifecycle-closure.json",
   );
   pendingBaseline.catalog_fingerprint = {
     format: "rosuno-p1-catalog-v1",
@@ -3247,14 +3261,15 @@ test("P1-008 accepted closure remains valid under the current P1-009 baseline", 
   pendingBaseline.evidence = pendingBaseline.evidence.filter(
     (path) =>
       path !== "governance/evidence/p1-008-governance-lifecycle-closure.json" &&
-      path !== "governance/evidence/p1-009-governance-lifecycle-closure.json",
+      path !== "governance/evidence/p1-009-governance-lifecycle-closure.json" &&
+      path !== "governance/evidence/p1-010-governance-lifecycle-closure.json",
   );
   assert.doesNotThrow(() =>
     validateDriftReport(pendingBaseline, pendingMigrations),
   );
 });
 
-test("P1-009 accepted closure requires exact lifecycle evidence and eleven-migration baseline", () => {
+test("P1-009 accepted closure remains valid under the current P1-010 baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -3293,17 +3308,17 @@ test("P1-009 accepted closure requires exact lifecycle evidence and eleven-migra
     ),
   );
 
-  assert.equal(baseline.baseline_id, "rosuno-staging-p1-009-20260918-v1");
-  assert.equal(baseline.migration_inventory.length, 11);
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-010-20260921-v1");
+  assert.equal(baseline.migration_inventory.length, 12);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
-    "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
+    "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
   );
-  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 499763);
-  assert.equal(baseline.catalog_fingerprint.row_count, 1535);
+  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 595722);
+  assert.equal(baseline.catalog_fingerprint.row_count, 1794);
   assert.equal(
     baseline.baseline_digest,
-    "sha256:5e947c8e0e30aac85d883de4844c748293d599d764c2917ecfde22b7b7f547ca",
+    "sha256:f5776fa5d14843e3bd0f57a0dcfeb161581c077bfcae957b6130f49d287dd96f",
   );
 
   assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
@@ -3415,7 +3430,7 @@ test("P1-009 Gate 5A prestate contract fails closed on provenance or scope weake
   }
 });
 
-test("P1-010 pending Financial foundation overlays but does not rewrite the accepted P1-009 Staging baseline", () => {
+test("P1-010 accepted closure requires exact lifecycle evidence and twelve-migration baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -3429,14 +3444,24 @@ test("P1-010 pending Financial foundation overlays but does not rewrite the acce
 
   assert.ok(migration);
   assert.equal(migration.sequence, 12);
-  assert.equal(migration.reviewed, false);
-  assert.equal(migration.applied_environment, "none");
+  assert.equal(migration.reviewed, true);
+  assert.equal(migration.reviewed_by, "Rosuno");
+  assert.equal(migration.reviewed_at, "2026-09-19T03:45:19Z");
+  assert.equal(migration.applied_environment, "staging");
+  assert.equal(migration.non_production_validation, true);
 
   const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+  const evidence = readJson(
+    "governance/evidence/p1-010-governance-lifecycle-closure.json",
+  );
 
   assert.equal(
     validateP1FinancialFoundationCandidate(migration, sql),
-    "pending",
+    "closed",
+  );
+
+  assert.doesNotThrow(() =>
+    validateP1FinancialFoundationClosure(migration, sql, evidence),
   );
 
   assert.doesNotThrow(() =>
@@ -3468,10 +3493,81 @@ test("P1-010 pending Financial foundation overlays but does not rewrite the acce
     status: "active",
   });
 
-  assert.equal(baseline.baseline_id, "rosuno-staging-p1-009-20260918-v1");
-  assert.equal(baseline.migration_inventory.length, 11);
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-010-20260921-v1");
+  assert.equal(baseline.checked_at, null);
+  assert.equal(baseline.migration_inventory.length, 12);
   assert.equal(migrations.migrations.length, 12);
+  assert.equal(
+    baseline.catalog_fingerprint.sha256,
+    "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
+  );
+  assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 595722);
+  assert.equal(baseline.catalog_fingerprint.row_count, 1794);
+  assert.equal(
+    baseline.baseline_digest,
+    "sha256:f5776fa5d14843e3bd0f57a0dcfeb161581c077bfcae957b6130f49d287dd96f",
+  );
+
   assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
+
+  const queryBytes = readFileSync(
+    "tools/p0/catalog/p1-010-postapplication.sql",
+  );
+
+  assert.equal(
+    createHash("sha256").update(queryBytes).digest("hex"),
+    "6225d1027e0dee034c81c2819934f974218b31c8d22bb0179a14599b146a885a",
+  );
+  assert.equal(queryBytes.length, 12917);
+
+  const staleGate6 = structuredClone(evidence);
+  staleGate6.gate6.successful_application.persistent_application_attempts = 2;
+
+  assert.throws(() =>
+    validateP1FinancialFoundationClosure(migration, sql, staleGate6),
+  );
+
+  const inventedTimestamp = structuredClone(evidence);
+  inventedTimestamp.fingerprints.postapplication_56_table.exact_observation_timestamp_retained = true;
+
+  assert.throws(() =>
+    validateP1FinancialFoundationClosure(migration, sql, inventedTimestamp),
+  );
+
+  const weakenedAdvisor = structuredClone(evidence);
+  weakenedAdvisor.security_advisor.info_count = 25;
+
+  assert.throws(() =>
+    validateP1FinancialFoundationClosure(migration, sql, weakenedAdvisor),
+  );
+
+  const broadenedBoundary = structuredClone(evidence);
+  broadenedBoundary.boundaries.production_authorized = true;
+
+  assert.throws(() =>
+    validateP1FinancialFoundationClosure(migration, sql, broadenedBoundary),
+  );
+
+  const staleMigration = structuredClone(migration);
+  staleMigration.applied_environment = "none";
+
+  assert.throws(() =>
+    validateP1FinancialFoundationClosure(staleMigration, sql, evidence),
+  );
+
+  const staleReleases = structuredClone(releases);
+  staleReleases.releases.find(
+    (item) => item.release_id === "REL-20260921-P1-010-STAGING-APPLICATION",
+  ).commit_sha = "0".repeat(40);
+
+  assert.throws(() =>
+    validateP1FinancialFoundationTraceability(
+      migrations,
+      workItems,
+      decisions,
+      staleReleases,
+    ),
+  );
 
   const missingFp1 = structuredClone(migration);
   missingFp1.authority_refs = missingFp1.authority_refs.filter(
@@ -3480,7 +3576,7 @@ test("P1-010 pending Financial foundation overlays but does not rewrite the acce
 
   assert.throws(
     () => validateP1FinancialFoundationCandidate(missingFp1, sql),
-    /authority_refs|governance record/,
+    /authority_refs|provenance/,
   );
 
   assert.throws(
@@ -3489,7 +3585,85 @@ test("P1-010 pending Financial foundation overlays but does not rewrite the acce
         migration,
         sql + "\n-- unauthorized byte drift\n",
       ),
-    /byte length|SHA-256/,
+    /bytes|byte length|SHA-256/,
+  );
+
+  /*
+   * Historical pending-candidate representation remains deterministic.
+   * These are test-only copies of the exact pre-closure governance records.
+   */
+  const pendingMigration = structuredClone(migration);
+
+  pendingMigration.release_refs = [];
+  pendingMigration.reviewed = false;
+  pendingMigration.reviewed_by = "pending designated human PR review";
+  pendingMigration.reviewed_at = null;
+  pendingMigration.applied_environment = "none";
+  pendingMigration.non_production_validation = false;
+  pendingMigration.drift_check =
+    "Not yet executed. This is an unreviewed, unapplied local P1-010 candidate; no database validation or persistent application has occurred.";
+  pendingMigration.rollback_plan =
+    "A separately authorized rollback-only Rosuno Staging validation must execute the exact protected P1-010 candidate transactionally with transient fixtures and independently prove exact restoration of the accepted eleven-migration P1-009 baseline before any persistent Staging application.";
+
+  assert.equal(
+    validateP1FinancialFoundationCandidate(pendingMigration, sql),
+    "pending",
+  );
+
+  const pendingMigrations = structuredClone(migrations);
+  pendingMigrations.migrations[
+    pendingMigrations.migrations.findIndex(
+      (item) => item.migration_id === "20260919000112_p1_financial_foundation",
+    )
+  ] = pendingMigration;
+
+  const pendingDecisions = structuredClone(decisions);
+  const pendingDecision = pendingDecisions.decisions.find(
+    (item) => item.decision_id === "DEC-20260918-P1-010-BOUNDED-CANDIDATE",
+  );
+
+  pendingDecision.reviewer = {
+    identity: "pending designated human PR review",
+    status: "pending",
+  };
+  pendingDecision.updated_at = "2026-09-19T01:51:20Z";
+  pendingDecision.scope =
+    "Bounded local P1-010 Gate 1 candidate implementation only from canonical main at 74141e50a656d9f3ddff918c9494e224da53bceb under the eleven-artifact authority package including locked FP-1. No publication, protected review, database contact, persistent Staging application, Production, OLD, P1-011, or later work is authorized by this decision.";
+  pendingDecision.impact =
+    "Creates only the local unreviewed Physical 1J Financial foundation candidate and associated governance/control tooling. No Payout relation, Audit Event, Retention Rule, Legal Hold, Complaint Case, provider execution, Production financial configuration, database execution, P1-011, or end-to-end payment capability is authorized.";
+  pendingDecision.evidence = [
+    "supabase/migrations/20260919000112_p1_financial_foundation.sql",
+    "tools/p0/lib/p1-010-contract-data.mjs",
+    "tools/p0/p1-010-rollback.mjs",
+    "tools/p0/tests/p1-010-contract.test.mjs",
+    "FP-1 sha256:ca7d257b6fbf6081c7bd48194a0d39b6fad7a6a6af0f4191e734f9af0d2af1c0",
+  ];
+
+  const pendingWorkItems = structuredClone(workItems);
+  const pendingWork = pendingWorkItems.work_items.find(
+    (item) => item.work_item_id === "WI-P1-010-FINANCIAL-FOUNDATION",
+  );
+
+  pendingWork.status = "in_progress";
+  pendingWork.reviewer = {
+    identity: "pending designated human PR review",
+    status: "pending",
+  };
+  pendingWork.release_refs = [];
+  pendingWork.updated_at = "2026-09-19T01:51:20Z";
+
+  const pendingReleases = structuredClone(releases);
+  pendingReleases.releases = pendingReleases.releases.filter(
+    (item) => item.release_id !== "REL-20260921-P1-010-STAGING-APPLICATION",
+  );
+
+  assert.doesNotThrow(() =>
+    validateP1FinancialFoundationTraceability(
+      pendingMigrations,
+      pendingWorkItems,
+      pendingDecisions,
+      pendingReleases,
+    ),
   );
 });
 
