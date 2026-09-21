@@ -769,6 +769,7 @@ function migrationArtifactPaths(files) {
     (file) =>
       file !== "tools/p0/catalog/p1-009-gate5-prestate.sql" &&
       file !== "tools/p0/catalog/p1-009-postapplication.sql" &&
+      file !== "tools/p0/catalog/p1-010-postapplication.sql" &&
       ((file.startsWith("governance/migrations/") &&
         file !== "governance/migrations/reviewed-migrations.json") ||
         (!file.startsWith("governance/") &&
@@ -5657,20 +5658,24 @@ export function validateDriftReport(report, migrationRegister = null) {
     report.baseline_id === "rosuno-staging-p1-008-20260918-v1";
   const closedP1009 =
     report.baseline_id === "rosuno-staging-p1-009-20260918-v1";
+  const closedP1010 =
+    report.baseline_id === "rosuno-staging-p1-010-20260921-v1";
 
-  const expectedCheckedAt = closedP1009
-    ? "2026-09-18T19:52:44.158139Z"
-    : closedP1008
-      ? "2026-09-18T00:39:58.454972Z"
-      : closedP1007
-        ? "2026-09-16T04:43:44.771854Z"
-        : closedP1006
-          ? "2026-09-14T05:00:30.987864Z"
-          : closedP1005
-            ? P1_CLIENT_INTAKE_OBSERVED_AT
-            : closedP1004
-              ? "2026-09-10T22:48:00.544397Z"
-              : P1_AUTHORIZATION_CORRECTION_VALIDATED_AT;
+  const expectedCheckedAt = closedP1010
+    ? null
+    : closedP1009
+      ? "2026-09-18T19:52:44.158139Z"
+      : closedP1008
+        ? "2026-09-18T00:39:58.454972Z"
+        : closedP1007
+          ? "2026-09-16T04:43:44.771854Z"
+          : closedP1006
+            ? "2026-09-14T05:00:30.987864Z"
+            : closedP1005
+              ? P1_CLIENT_INTAKE_OBSERVED_AT
+              : closedP1004
+                ? "2026-09-10T22:48:00.544397Z"
+                : P1_AUTHORIZATION_CORRECTION_VALIDATED_AT;
 
   if (
     report.version !== 1 ||
@@ -5680,6 +5685,7 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1007 &&
       !closedP1008 &&
       !closedP1009 &&
+      !closedP1010 &&
       report.baseline_id !== FOUNDATION_BASELINE_ID) ||
     report.checked_environment !== "staging" ||
     report.checked_at !== expectedCheckedAt ||
@@ -5733,7 +5739,14 @@ export function validateDriftReport(report, migrationRegister = null) {
     sha256: P1_RESOURCES_COMMUNICATIONS_MIGRATION_SHA256,
   };
 
-  const expectedInventory = closedP1009
+  const p1010Migration = {
+    sequence: 12,
+    migration_id: P1_FINANCIAL_FOUNDATION_MIGRATION_ID,
+    artifact_path: P1_FINANCIAL_FOUNDATION_MIGRATION_PATH,
+    sha256: P1_FINANCIAL_FOUNDATION_MIGRATION_SHA256,
+  };
+
+  const expectedInventory = closedP1010
     ? [
         ...FOUNDATION_BASELINE_MIGRATIONS,
         p1004Migration,
@@ -5742,8 +5755,9 @@ export function validateDriftReport(report, migrationRegister = null) {
         p1007Migration,
         p1008Migration,
         p1009Migration,
+        p1010Migration,
       ]
-    : closedP1008
+    : closedP1009
       ? [
           ...FOUNDATION_BASELINE_MIGRATIONS,
           p1004Migration,
@@ -5751,31 +5765,41 @@ export function validateDriftReport(report, migrationRegister = null) {
           p1006Migration,
           p1007Migration,
           p1008Migration,
+          p1009Migration,
         ]
-      : closedP1007
+      : closedP1008
         ? [
             ...FOUNDATION_BASELINE_MIGRATIONS,
             p1004Migration,
             p1005Migration,
             p1006Migration,
             p1007Migration,
+            p1008Migration,
           ]
-        : closedP1006
+        : closedP1007
           ? [
               ...FOUNDATION_BASELINE_MIGRATIONS,
               p1004Migration,
               p1005Migration,
               p1006Migration,
+              p1007Migration,
             ]
-          : closedP1005
+          : closedP1006
             ? [
                 ...FOUNDATION_BASELINE_MIGRATIONS,
                 p1004Migration,
                 p1005Migration,
+                p1006Migration,
               ]
-            : closedP1004
-              ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration]
-              : FOUNDATION_BASELINE_MIGRATIONS;
+            : closedP1005
+              ? [
+                  ...FOUNDATION_BASELINE_MIGRATIONS,
+                  p1004Migration,
+                  p1005Migration,
+                ]
+              : closedP1004
+                ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration]
+                : FOUNDATION_BASELINE_MIGRATIONS;
 
   if (
     JSON.stringify(report.migration_inventory) !==
@@ -5838,6 +5862,9 @@ export function validateDriftReport(report, migrationRegister = null) {
       "P1-009 baseline requires eleven accepted migrations plus at most one bounded P1-010 overlay",
     );
 
+  if (closedP1010 && register.migrations.length !== 12)
+    fail("P1-010 baseline requires exactly twelve accepted migrations");
+
   if (closedP1008 && ![10, 11, 12].includes(register.migrations.length))
     fail(
       "P1-008 baseline requires ten accepted migrations plus at most bounded P1-009 and P1-010 overlays",
@@ -5850,6 +5877,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1007 &&
     !closedP1008 &&
     !closedP1009 &&
+    !closedP1010 &&
     register.migrations.length === 7
   ) {
     fail("P1-005 overlay requires the accepted P1-004 baseline");
@@ -5862,6 +5890,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1007 &&
     !closedP1008 &&
     !closedP1009 &&
+    !closedP1010 &&
     register.migrations.length === 8
   ) {
     fail("P1-006 overlay requires an accepted P1-004 or P1-005 baseline");
@@ -5874,6 +5903,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1007 &&
     !closedP1008 &&
     !closedP1009 &&
+    !closedP1010 &&
     register.migrations.length === 9
   ) {
     fail("P1-007 overlay requires an accepted P1 baseline lineage");
@@ -5886,6 +5916,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1007 &&
     !closedP1008 &&
     !closedP1009 &&
+    !closedP1010 &&
     register.migrations.length === 10
   ) {
     fail("P1-008 overlay requires an accepted P1 baseline lineage");
@@ -5898,6 +5929,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1007 &&
     !closedP1008 &&
     !closedP1009 &&
+    !closedP1010 &&
     register.migrations.length === 11
   ) {
     fail("P1-009 overlay requires an accepted P1 baseline lineage");
@@ -5910,6 +5942,7 @@ export function validateDriftReport(report, migrationRegister = null) {
     !closedP1007 &&
     !closedP1008 &&
     !closedP1009 &&
+    !closedP1010 &&
     register.migrations.length === 12
   ) {
     fail("P1-010 overlay requires an accepted P1 baseline lineage");
@@ -5930,7 +5963,8 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1006 &&
       !closedP1007 &&
       !closedP1008 &&
-      !closedP1009
+      !closedP1009 &&
+      !closedP1010
     )
       fail("seven migrations require an accepted P1-004 or P1-005 baseline");
 
@@ -5944,7 +5978,8 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1006 &&
       !closedP1007 &&
       !closedP1008 &&
-      !closedP1009
+      !closedP1009 &&
+      !closedP1010
     )
       fail("eight migrations require an accepted P1-004 or P1-005 baseline");
 
@@ -5958,7 +5993,8 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1006 &&
       !closedP1007 &&
       !closedP1008 &&
-      !closedP1009
+      !closedP1009 &&
+      !closedP1010
     )
       fail("nine migrations require an accepted P1 baseline lineage");
 
@@ -5972,7 +6008,8 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1006 &&
       !closedP1007 &&
       !closedP1008 &&
-      !closedP1009
+      !closedP1009 &&
+      !closedP1010
     )
       fail("ten migrations require an accepted P1 baseline lineage");
 
@@ -5986,7 +6023,8 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1006 &&
       !closedP1007 &&
       !closedP1008 &&
-      !closedP1009
+      !closedP1009 &&
+      !closedP1010
     )
       fail("eleven migrations require an accepted P1 baseline lineage");
 
@@ -6000,7 +6038,8 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1006 &&
       !closedP1007 &&
       !closedP1008 &&
-      !closedP1009
+      !closedP1009 &&
+      !closedP1010
     )
       fail("twelve migrations require an accepted P1 baseline lineage");
 
@@ -6084,7 +6123,18 @@ export function validateDriftReport(report, migrationRegister = null) {
       .digest("hex"),
   };
 
-  const expectedEvidence = closedP1009
+  const p1010Evidence = {
+    path: P1_FINANCIAL_FOUNDATION_CLOSURE_EVIDENCE_PATH,
+    sha256: createHash("sha256")
+      .update(
+        readFileSync(
+          path.join(ROOT, P1_FINANCIAL_FOUNDATION_CLOSURE_EVIDENCE_PATH),
+        ),
+      )
+      .digest("hex"),
+  };
+
+  const expectedEvidence = closedP1010
     ? [
         ...FOUNDATION_BASELINE_EVIDENCE,
         p1004Evidence,
@@ -6093,8 +6143,9 @@ export function validateDriftReport(report, migrationRegister = null) {
         p1007Evidence,
         p1008Evidence,
         p1009Evidence,
+        p1010Evidence,
       ]
-    : closedP1008
+    : closedP1009
       ? [
           ...FOUNDATION_BASELINE_EVIDENCE,
           p1004Evidence,
@@ -6102,27 +6153,37 @@ export function validateDriftReport(report, migrationRegister = null) {
           p1006Evidence,
           p1007Evidence,
           p1008Evidence,
+          p1009Evidence,
         ]
-      : closedP1007
+      : closedP1008
         ? [
             ...FOUNDATION_BASELINE_EVIDENCE,
             p1004Evidence,
             p1005Evidence,
             p1006Evidence,
             p1007Evidence,
+            p1008Evidence,
           ]
-        : closedP1006
+        : closedP1007
           ? [
               ...FOUNDATION_BASELINE_EVIDENCE,
               p1004Evidence,
               p1005Evidence,
               p1006Evidence,
+              p1007Evidence,
             ]
-          : closedP1005
-            ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence, p1005Evidence]
-            : closedP1004
-              ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence]
-              : FOUNDATION_BASELINE_EVIDENCE;
+          : closedP1006
+            ? [
+                ...FOUNDATION_BASELINE_EVIDENCE,
+                p1004Evidence,
+                p1005Evidence,
+                p1006Evidence,
+              ]
+            : closedP1005
+              ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence, p1005Evidence]
+              : closedP1004
+                ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence]
+                : FOUNDATION_BASELINE_EVIDENCE;
 
   if (
     JSON.stringify(report.accepted_evidence) !==
@@ -6142,53 +6203,60 @@ export function validateDriftReport(report, migrationRegister = null) {
       fail(`schema drift evidence digest is invalid for ${artifact.path}`);
   }
 
-  const expectedCatalog = closedP1009
+  const expectedCatalog = closedP1010
     ? {
         sha256:
-          "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
-        bytes: 499763,
-        rows: 1535,
+          "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
+        bytes: 595722,
+        rows: 1794,
       }
-    : closedP1008
+    : closedP1009
       ? {
           sha256:
-            "1926821eee5d37194358f5a0a0e30f2577f7bb08c9be5478ab21dd300e32ba04",
-          bytes: 410432,
-          rows: 1263,
+            "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
+          bytes: 499763,
+          rows: 1535,
         }
-      : closedP1007
+      : closedP1008
         ? {
             sha256:
-              "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
-            bytes: 348401,
-            rows: 1089,
+              "1926821eee5d37194358f5a0a0e30f2577f7bb08c9be5478ab21dd300e32ba04",
+            bytes: 410432,
+            rows: 1263,
           }
-        : closedP1006
+        : closedP1007
           ? {
               sha256:
-                "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
-              bytes: 253195,
-              rows: 816,
+                "841ae8ef5f67443ecf9d8b135ffb28affb9b0758597dfd2e174b7b8c61104635",
+              bytes: 348401,
+              rows: 1089,
             }
-          : closedP1005
+          : closedP1006
             ? {
                 sha256:
-                  "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
-                bytes: 231062,
-                rows: 744,
+                  "ebbd9913e99aa9337c6e293d4f61c3244dc2c0a72a26aaaeb600b362f561b9c4",
+                bytes: 253195,
+                rows: 816,
               }
-            : closedP1004
+            : closedP1005
               ? {
                   sha256:
-                    "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508",
-                  bytes: 90175,
-                  rows: 279,
+                    "ae06fdc7035eee732689487dda79caeb48754502e988aba6ed7c6781780ddf6c",
+                  bytes: 231062,
+                  rows: 744,
                 }
-              : {
-                  sha256: P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256,
-                  bytes: P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES,
-                  rows: P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS,
-                };
+              : closedP1004
+                ? {
+                    sha256:
+                      "f79a78d39870ed25ac94ac58d646ea997c9bacf15199d0c1d1abe6dbfe634508",
+                    bytes: 90175,
+                    rows: 279,
+                  }
+                : {
+                    sha256: P1_AUTHORIZATION_CORRECTION_CATALOG_SHA256,
+                    bytes: P1_AUTHORIZATION_CORRECTION_CATALOG_BYTES,
+                    rows: P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS,
+                  };
 
   if (
     report.catalog_fingerprint?.format !== "rosuno-p1-catalog-v1" ||
@@ -6221,6 +6289,7 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1007 &&
       !closedP1008 &&
       !closedP1009 &&
+      !closedP1010 &&
       digest !== FOUNDATION_BASELINE_DIGEST)
   ) {
     fail("schema drift baseline identity/digest is invalid");
@@ -9362,10 +9431,12 @@ export function validateP1ResourcesCommunicationsTraceability(
   return true;
 }
 
-/* P1-010 bounded pending-candidate controls.
- * Gate 1 is local-only. The accepted P1-009 Staging baseline remains the
- * authoritative database state while sequence 12 is unreviewed and unapplied.
- * FP-1 is external locked authority and is referenced, not copied.
+/* P1-010 bounded lifecycle controls.
+ * Historical pending-candidate validation remains supported. The reviewed
+ * branch requires exact protected review/correction history, Gate 5 proof,
+ * persistent Staging application, retained post-application query, closure
+ * evidence, release traceability, and the accepted twelve-migration state.
+ * FP-1 remains external locked authority and is referenced, not copied.
  */
 const P1_FINANCIAL_FOUNDATION_ID = /^([0-9]{14})_p1_financial_foundation$/;
 const P1_FINANCIAL_FOUNDATION_MIGRATION_ID =
@@ -9391,10 +9462,43 @@ const P1_FINANCIAL_FOUNDATION_PENDING_DECISION_SHA256 =
 const P1_FINANCIAL_FOUNDATION_PENDING_WORK_ITEM_SHA256 =
   "1c9986fe88a5d335453290b56bf7733a67be80e8b6c5e8614dc14639395cadc1";
 
+const P1_FINANCIAL_FOUNDATION_RELEASE_ID =
+  "REL-20260921-P1-010-STAGING-APPLICATION";
+const P1_FINANCIAL_FOUNDATION_CLOSURE_EVIDENCE_PATH =
+  "governance/evidence/p1-010-governance-lifecycle-closure.json";
+const P1_FINANCIAL_FOUNDATION_POSTAPPLICATION_QUERY_PATH =
+  "tools/p0/catalog/p1-010-postapplication.sql";
+const P1_FINANCIAL_FOUNDATION_REVIEWED_AT = "2026-09-19T03:45:19Z";
+
+const P1_FINANCIAL_FOUNDATION_CLOSED_RECORD_SHA256 =
+  "db738c81e47c4902a951e7c575964d4265ed4956bba2464a6d70f719fee5bb1c";
+const P1_FINANCIAL_FOUNDATION_CLOSED_DECISION_SHA256 =
+  "ed58a562b31d1a8c36cf32b02da3327a58c71bf066cedbf13c08c5f172a27e02";
+const P1_FINANCIAL_FOUNDATION_CLOSED_WORK_ITEM_SHA256 =
+  "c670a51c02dcc8f6526e60328187cfaf4a3a73ea40273bcd43de9b3b5a972c8b";
+const P1_FINANCIAL_FOUNDATION_CLOSED_RELEASE_SHA256 =
+  "3646c4d37a050097c063c3d69c8e8e9c4b28b5bfad649b5768f00b77f335eec9";
+
+const P1_FINANCIAL_FOUNDATION_CLOSURE_CANONICAL_SHA256 =
+  "b1ccf346433e1a707de6122425cdb167f09f19937036174b12d455a26aaf4cfb";
+const P1_FINANCIAL_FOUNDATION_CLOSURE_RAW_SHA256 =
+  "6640331e0a8f2e3acdff7d46ba861b724af1cbe1ebe5b3d9b17810e2f8f08801";
+const P1_FINANCIAL_FOUNDATION_CLOSURE_BYTES = 10677;
+
+const P1_FINANCIAL_FOUNDATION_POSTAPPLICATION_QUERY_SHA256 =
+  "6225d1027e0dee034c81c2819934f974218b31c8d22bb0179a14599b146a885a";
+const P1_FINANCIAL_FOUNDATION_POSTAPPLICATION_QUERY_BYTES = 12917;
+
 const P1_FINANCIAL_FOUNDATION_PENDING_DRIFT =
   "Not yet executed. This is an unreviewed, unapplied local P1-010 candidate; no database validation or persistent application has occurred.";
 const P1_FINANCIAL_FOUNDATION_PENDING_ROLLBACK =
   "A separately authorized rollback-only Rosuno Staging validation must execute the exact protected P1-010 candidate transactionally with transient fixtures and independently prove exact restoration of the accepted eleven-migration P1-009 baseline before any persistent Staging application.";
+
+const P1_FINANCIAL_FOUNDATION_CLOSED_DRIFT =
+  "Rosuno Staging rollback-only validation passed exact restoration of the accepted eleven-migration P1-009 baseline; persistent application then passed exact twelve-version history, 56/56 RLS, zero P1-010 business rows, exact retained-query 56-table catalog fingerprint, and the accepted 26 INFO / 2 WARN security-advisor posture with zero unexplained findings.";
+
+const P1_FINANCIAL_FOUNDATION_CLOSED_ROLLBACK =
+  "If a later independently verified defect requires Staging rollback, correct only the sequence-12 P1-010 change through a separately reviewed forward-only non-production rollback migration; never edit historical migration bytes or migration history directly, and preserve all earlier accepted controls.";
 
 const P1_FINANCIAL_FOUNDATION_AUTHORITY_REFS = [
   "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
@@ -9496,8 +9600,175 @@ function validateP1FinancialFoundationIdentity(migration, sql) {
   );
 }
 
+export function validateP1FinancialFoundationClosure(migration, sql, evidence) {
+  validateP1FinancialFoundationIdentity(migration, sql);
+
+  requireStringArrayExact(
+    migration.release_refs,
+    [P1_FINANCIAL_FOUNDATION_RELEASE_ID],
+    "P1-010 release_refs",
+  );
+
+  if (
+    migration.reviewed !== true ||
+    migration.reviewed_by !== "Rosuno" ||
+    migration.reviewed_at !== P1_FINANCIAL_FOUNDATION_REVIEWED_AT ||
+    migration.applied_environment !== "staging" ||
+    migration.non_production_validation !== true ||
+    migration.drift_check !== P1_FINANCIAL_FOUNDATION_CLOSED_DRIFT ||
+    migration.rollback_plan !== P1_FINANCIAL_FOUNDATION_CLOSED_ROLLBACK ||
+    p1010Digest(migration) !== P1_FINANCIAL_FOUNDATION_CLOSED_RECORD_SHA256
+  ) {
+    fail("P1-010 closed migration lifecycle is invalid");
+  }
+
+  requireExactFields(
+    evidence,
+    [
+      "version",
+      "evidence_id",
+      "work_item_id",
+      "lifecycle",
+      "lifecycle_state",
+      "repository",
+      "migration",
+      "gate5",
+      "gate6",
+      "fingerprints",
+      "security_advisor",
+      "release",
+      "boundaries",
+      "integrity",
+    ],
+    "P1-010 closure evidence",
+  );
+
+  const raw = readFileSync(
+    path.join(ROOT, P1_FINANCIAL_FOUNDATION_CLOSURE_EVIDENCE_PATH),
+    "utf8",
+  );
+
+  if (
+    evidence.version !== 1 ||
+    evidence.evidence_id !== "P1-010-GOVERNANCE-LIFECYCLE-CLOSURE-20260921" ||
+    evidence.work_item_id !== P1_FINANCIAL_FOUNDATION_WORK_ITEM_ID ||
+    evidence.lifecycle !==
+      "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED" ||
+    p1010Digest(evidence) !==
+      P1_FINANCIAL_FOUNDATION_CLOSURE_CANONICAL_SHA256 ||
+    Buffer.byteLength(raw, "utf8") !== P1_FINANCIAL_FOUNDATION_CLOSURE_BYTES ||
+    createHash("sha256").update(raw).digest("hex") !==
+      P1_FINANCIAL_FOUNDATION_CLOSURE_RAW_SHA256
+  ) {
+    fail("P1-010 closure evidence identity or bytes are invalid");
+  }
+
+  const query = readFileSync(
+    path.join(ROOT, P1_FINANCIAL_FOUNDATION_POSTAPPLICATION_QUERY_PATH),
+  );
+
+  if (
+    query.length !== P1_FINANCIAL_FOUNDATION_POSTAPPLICATION_QUERY_BYTES ||
+    createHash("sha256").update(query).digest("hex") !==
+      P1_FINANCIAL_FOUNDATION_POSTAPPLICATION_QUERY_SHA256
+  ) {
+    fail("P1-010 retained postapplication query bytes are invalid");
+  }
+
+  if (
+    evidence.repository?.canonical_main !==
+      "18b8939b3c8f36836abbe341b99241228d5604e4" ||
+    evidence.repository?.canonical_tree !==
+      "1b05c5aa01cb2cab2faf1851094ef8cf9563a339" ||
+    evidence.repository?.implementation?.pull_request !== 31 ||
+    evidence.repository?.rollback_validator_correction?.pull_request !== 32 ||
+    evidence.gate5?.result !== "PASS" ||
+    evidence.gate5?.connected_technical_validation
+      ?.uom_user_execution_boundary_satisfied !== false ||
+    evidence.gate5?.user_confirmation?.final_transaction_action !==
+      "ROLLBACK" ||
+    evidence.gate5?.user_confirmation?.pre_post_catalog !== "EXACT_MATCH" ||
+    evidence.gate5?.user_confirmation?.pre_post_persistent_state !==
+      "EXACT_MATCH" ||
+    evidence.gate6?.result !== "PASS" ||
+    evidence.gate6?.first_attempt?.persistent_application_executed !== false ||
+    evidence.gate6?.successful_application?.persistent_application_attempts !==
+      1 ||
+    evidence.gate6?.successful_application?.migration_history_count !== 12 ||
+    evidence.gate6?.successful_application?.public_tables !== 56 ||
+    evidence.gate6?.successful_application?.public_rls !== 56 ||
+    evidence.gate6?.successful_application?.payouts_present !== false
+  ) {
+    fail("P1-010 Gate 5/6 closure evidence is invalid");
+  }
+
+  const finalFingerprint = evidence.fingerprints?.postapplication_56_table;
+
+  if (
+    finalFingerprint?.format !== "rosuno-p1-catalog-v1" ||
+    finalFingerprint?.query_path !==
+      P1_FINANCIAL_FOUNDATION_POSTAPPLICATION_QUERY_PATH ||
+    finalFingerprint?.query_sha256 !==
+      P1_FINANCIAL_FOUNDATION_POSTAPPLICATION_QUERY_SHA256 ||
+    finalFingerprint?.query_bytes !==
+      P1_FINANCIAL_FOUNDATION_POSTAPPLICATION_QUERY_BYTES ||
+    finalFingerprint?.sha256 !==
+      "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238" ||
+    finalFingerprint?.canonical_byte_length !== 595722 ||
+    finalFingerprint?.row_count !== 1794 ||
+    finalFingerprint?.transaction_read_only !== true ||
+    finalFingerprint?.exact_observation_timestamp_retained !== false
+  ) {
+    fail("P1-010 final catalog fingerprint proof is invalid");
+  }
+
+  if (
+    evidence.security_advisor?.info_count !== 26 ||
+    evidence.security_advisor?.warn_count !== 2 ||
+    evidence.security_advisor?.unapproved_count !== 0 ||
+    evidence.security_advisor?.unexplained_count !== 0 ||
+    evidence.release?.id !== P1_FINANCIAL_FOUNDATION_RELEASE_ID ||
+    evidence.release?.commit_sha !==
+      "18b8939b3c8f36836abbe341b99241228d5604e4" ||
+    evidence.release?.created_at !== "2026-09-21T01:51:36Z" ||
+    evidence.integrity?.historical_migrations_unchanged !== true ||
+    evidence.integrity?.payout_relation_absent !== true ||
+    evidence.integrity?.g1_through_g5_unresolved_preserved !== true ||
+    evidence.integrity?.postapplication_query_retained !== true
+  ) {
+    fail("P1-010 final closure evidence is invalid");
+  }
+
+  if (
+    evidence.boundaries?.production_authorized !== false ||
+    evidence.boundaries?.old_supabase_mutation_authorized !== false ||
+    evidence.boundaries?.branch_deletion_authorized !== false ||
+    evidence.boundaries?.p1_011_authorized !== false ||
+    evidence.boundaries?.database_mutation_during_closure !== false
+  ) {
+    fail("P1-010 closure authorization boundary is invalid");
+  }
+
+  if (
+    scanSecretLikeText(JSON.stringify(evidence), "P1-010 closure").length > 0
+  ) {
+    fail("P1-010 closure contains a secret-like value");
+  }
+
+  return true;
+}
+
 export function validateP1FinancialFoundationCandidate(migration, sql) {
   validateP1FinancialFoundationIdentity(migration, sql);
+
+  if (migration.reviewed === true) {
+    validateP1FinancialFoundationClosure(
+      migration,
+      sql,
+      readJson(P1_FINANCIAL_FOUNDATION_CLOSURE_EVIDENCE_PATH),
+    );
+    return "closed";
+  }
 
   if (
     migration.reviewed !== false ||
@@ -9507,15 +9778,10 @@ export function validateP1FinancialFoundationCandidate(migration, sql) {
     migration.non_production_validation !== false ||
     migration.release_refs.length !== 0 ||
     migration.drift_check !== P1_FINANCIAL_FOUNDATION_PENDING_DRIFT ||
-    migration.rollback_plan !== P1_FINANCIAL_FOUNDATION_PENDING_ROLLBACK
-  ) {
-    fail("P1-010 pending migration lifecycle is invalid");
-  }
-
-  if (
+    migration.rollback_plan !== P1_FINANCIAL_FOUNDATION_PENDING_ROLLBACK ||
     p1010Digest(migration) !== P1_FINANCIAL_FOUNDATION_PENDING_RECORD_SHA256
   ) {
-    fail("P1-010 pending migration governance record mismatch");
+    fail("P1-010 pending migration lifecycle is invalid");
   }
 
   return "pending";
@@ -9542,12 +9808,14 @@ export function validateP1FinancialFoundationTraceability(
     P1_FINANCIAL_FOUNDATION_MIGRATION_ID,
     "migration",
   );
+
   const decision = p1010ExactlyOne(
     decisions.decisions,
     "decision_id",
     P1_FINANCIAL_FOUNDATION_DECISION_ID,
     "decision",
   );
+
   const workItem = p1010ExactlyOne(
     workItems.work_items,
     "work_item_id",
@@ -9556,17 +9824,12 @@ export function validateP1FinancialFoundationTraceability(
   );
 
   requireExactFields(decision, DECISION_FIELDS, "P1-010 decision");
+
   requireExactFields(workItem, WORK_ITEM_FIELDS, "P1-010 work item");
 
   const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
-  validateP1FinancialFoundationCandidate(migration, sql);
 
-  if (
-    p1010Digest(decision) !== P1_FINANCIAL_FOUNDATION_PENDING_DECISION_SHA256 ||
-    p1010Digest(workItem) !== P1_FINANCIAL_FOUNDATION_PENDING_WORK_ITEM_SHA256
-  ) {
-    fail("P1-010 pending traceability record mismatch");
-  }
+  const state = validateP1FinancialFoundationCandidate(migration, sql);
 
   if (
     !decision.authority_refs.includes(P1_FINANCIAL_FOUNDATION_FP1_ID) ||
@@ -9577,6 +9840,7 @@ export function validateP1FinancialFoundationTraceability(
   }
 
   const authority = readJson("governance/authority-references.json");
+
   const fp1 = p1010ExactlyOne(
     authority.references,
     "authority_id",
@@ -9598,15 +9862,73 @@ export function validateP1FinancialFoundationTraceability(
     fail("P1-010 FP-1 authority reference identity is invalid");
   }
 
-  const leakedRelease = releases.releases.some(
-    (release) =>
-      release.migration_refs?.includes(P1_FINANCIAL_FOUNDATION_MIGRATION_ID) ||
-      release.work_item_refs?.includes(P1_FINANCIAL_FOUNDATION_WORK_ITEM_ID) ||
-      release.decision_refs?.includes(P1_FINANCIAL_FOUNDATION_DECISION_ID),
+  if (state === "pending") {
+    if (
+      p1010Digest(decision) !==
+        P1_FINANCIAL_FOUNDATION_PENDING_DECISION_SHA256 ||
+      p1010Digest(workItem) !== P1_FINANCIAL_FOUNDATION_PENDING_WORK_ITEM_SHA256
+    ) {
+      fail("P1-010 pending traceability record mismatch");
+    }
+
+    const leakedRelease = releases.releases.some(
+      (item) =>
+        item.migration_refs?.includes(P1_FINANCIAL_FOUNDATION_MIGRATION_ID) ||
+        item.work_item_refs?.includes(P1_FINANCIAL_FOUNDATION_WORK_ITEM_ID) ||
+        item.decision_refs?.includes(P1_FINANCIAL_FOUNDATION_DECISION_ID),
+    );
+
+    if (leakedRelease) {
+      fail("P1-010 pending candidate must not have a release");
+    }
+
+    return true;
+  }
+
+  if (
+    p1010Digest(decision) !== P1_FINANCIAL_FOUNDATION_CLOSED_DECISION_SHA256 ||
+    p1010Digest(workItem) !== P1_FINANCIAL_FOUNDATION_CLOSED_WORK_ITEM_SHA256
+  ) {
+    fail("P1-010 closed traceability record mismatch");
+  }
+
+  const release = p1010ExactlyOne(
+    releases.releases,
+    "release_id",
+    P1_FINANCIAL_FOUNDATION_RELEASE_ID,
+    "release",
   );
 
-  if (leakedRelease) {
-    fail("P1-010 pending candidate must not have a release");
+  requireExactFields(release, RELEASE_FIELDS, "P1-010 release");
+
+  if (p1010Digest(release) !== P1_FINANCIAL_FOUNDATION_CLOSED_RELEASE_SHA256) {
+    fail("P1-010 release governance record mismatch");
+  }
+
+  const linked = releases.releases.filter(
+    (item) =>
+      item.migration_refs?.includes(P1_FINANCIAL_FOUNDATION_MIGRATION_ID) ||
+      item.work_item_refs?.includes(P1_FINANCIAL_FOUNDATION_WORK_ITEM_ID) ||
+      item.decision_refs?.includes(P1_FINANCIAL_FOUNDATION_DECISION_ID),
+  );
+
+  if (
+    linked.length !== 1 ||
+    linked[0].release_id !== P1_FINANCIAL_FOUNDATION_RELEASE_ID
+  ) {
+    fail("P1-010 release linkage is duplicated or inconsistent");
+  }
+
+  const evidence = readJson(P1_FINANCIAL_FOUNDATION_CLOSURE_EVIDENCE_PATH);
+
+  validateP1FinancialFoundationClosure(migration, sql, evidence);
+
+  if (
+    evidence.release?.id !== release.release_id ||
+    evidence.release?.commit_sha !== release.commit_sha ||
+    evidence.release?.created_at !== release.created_at
+  ) {
+    fail("P1-010 closure/release traceability differs");
   }
 
   return true;

@@ -1,0 +1,266 @@
+{
+  "version": 1,
+  "evidence_id": "P1-010-GOVERNANCE-LIFECYCLE-CLOSURE-20260921",
+  "work_item_id": "WI-P1-010-FINANCIAL-FOUNDATION",
+  "lifecycle": "ACCEPTED \u2014 COMPLETED \u2014 REVIEWED \u2014 STAGING \u2014 RELEASED \u2014 CLOSED",
+  "lifecycle_state": {
+    "repository_closure": true,
+    "staging_application": true,
+    "postapplication_readonly_verification": true
+  },
+  "repository": {
+    "canonical_main": "18b8939b3c8f36836abbe341b99241228d5604e4",
+    "canonical_tree": "1b05c5aa01cb2cab2faf1851094ef8cf9563a339",
+    "protected_main": true,
+    "implementation": {
+      "pull_request": 31,
+      "title": "P1-010: financial foundation",
+      "base": "74141e50a656d9f3ddff918c9494e224da53bceb",
+      "head": "b3ce4174ee52ec58e176f1e9f47e09c8310c2fd9",
+      "tree": "ed70d0fac9e99ceec558e60645e16a21846bc8a5",
+      "merge_commit": "d0b52194c576eab23691fc98468a4032cdd15d0e",
+      "ordered_parents": [
+        "74141e50a656d9f3ddff918c9494e224da53bceb",
+        "b3ce4174ee52ec58e176f1e9f47e09c8310c2fd9"
+      ],
+      "review_id": "5254403540",
+      "approved_at": "2026-09-19T03:45:19Z",
+      "merged_at": "2026-09-19T03:47:35Z",
+      "workflow_run_id": 35419335050,
+      "workflow_conclusion": "success"
+    },
+    "rollback_validator_correction": {
+      "pull_request": 32,
+      "title": "P1-010 Gate 5: fix rollback validator privilege expectation",
+      "base": "d0b52194c576eab23691fc98468a4032cdd15d0e",
+      "head": "8d6cc98e5e455effd22716645489f6e7eb36c90c",
+      "tree": "1b05c5aa01cb2cab2faf1851094ef8cf9563a339",
+      "merge_commit": "18b8939b3c8f36836abbe341b99241228d5604e4",
+      "ordered_parents": [
+        "d0b52194c576eab23691fc98468a4032cdd15d0e",
+        "8d6cc98e5e455effd22716645489f6e7eb36c90c"
+      ],
+      "review_id": "5254552773",
+      "approved_at": "2026-09-19T04:20:39Z",
+      "merged_at": "2026-09-19T04:21:56Z",
+      "workflow_run_id": 35420859632,
+      "workflow_conclusion": "success",
+      "changed_paths": [
+        "tools/p0/p1-010-rollback.mjs",
+        "tools/p0/tests/p1-010-contract.test.mjs"
+      ]
+    }
+  },
+  "migration": {
+    "id": "20260919000112_p1_financial_foundation",
+    "sha256": "c36f75cd5539d5961981c25a4a284e3af589ba770ff7cb3934d3cd307cc310d5",
+    "byte_length": 31512,
+    "sequence": 12,
+    "history_versions": 12,
+    "history": [
+      "20260828192126_p0_restrict_rls_auto_enable_execution",
+      "20260829000015_p1_platform_foundation",
+      "20260829171701_p1_authorization_foundation",
+      "20260830023823_p1_jurisdiction_policy_launch_foundation",
+      "20260901012518_p1_authorization_scope_correction",
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+      "20260911062917_p1_client_intake_ai_foundation",
+      "20260914000658_p1_marketplace_referral_foundation",
+      "20260914231532_p1_scheduling_request_booking_bookability_foundation",
+      "20260917045031_p1_consultation_engagement_media_foundation",
+      "20260918060600_p1_resources_communications_foundation",
+      "20260919000112_p1_financial_foundation"
+    ]
+  },
+  "gate5": {
+    "result": "PASS",
+    "preexecution_validator_defect": {
+      "result": "STOPPED_BEFORE_TRANSACTIONAL_MIGRATION_EXECUTION",
+      "protected_test": "Payment Transaction provenance update is rejected",
+      "original_expected_sqlstate": "23514",
+      "corrected_expected_sqlstate": "42501",
+      "reason": "service_role intentionally lacks UPDATE privilege on payment_policy_version_id, so PostgreSQL rejects the mutation at the privilege boundary before the provenance trigger",
+      "migration_execution_occurred_before_correction": false,
+      "historical_migration_bytes_changed": false
+    },
+    "connected_technical_validation": {
+      "result": "TECHNICAL_PASS_NOT_GATE_COMPLETION",
+      "execution_surface": "connected Rosuno Staging Supabase",
+      "uom_user_execution_boundary_satisfied": false,
+      "generated_sql_sha256": "1c97fe8d15213cfb78dd20d5de325260d3ccfb4aaf634667ab40b6523a7901a1",
+      "generated_sql_bytes": 49944,
+      "generated_sql_lines": 1478,
+      "validation_checks": 15,
+      "final_transaction_action": "ROLLBACK",
+      "persistent_state_changed": false,
+      "history_preserved": true
+    },
+    "user_confirmation": {
+      "result": "PASS",
+      "execution_surface": "user Replit Shell via P0_STAGING_DB_URL",
+      "generated_sql_sha256": "1c97fe8d15213cfb78dd20d5de325260d3ccfb4aaf634667ab40b6523a7901a1",
+      "final_transaction_action": "ROLLBACK",
+      "pre_post_catalog": "EXACT_MATCH",
+      "catalog_sha256": "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
+      "catalog_bytes": 499763,
+      "catalog_rows": 1535,
+      "pre_post_persistent_state": "EXACT_MATCH",
+      "persistent_state_sha256": "843d018a2208c33d72a4ec991d7872b2ac31c58c28e0babb284acd03f72c8fbc",
+      "migration_history_change": "NONE"
+    }
+  },
+  "gate6": {
+    "result": "PASS",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "first_attempt": {
+      "result": "STOPPED_LOCAL_PREFLIGHT",
+      "reason": "Supabase CLI version capture included pnpm dlx progress and advisory output, causing the exact-string preflight check to fail",
+      "dry_run_executed": false,
+      "persistent_application_executed": false
+    },
+    "successful_application": {
+      "supabase_cli": "2.116.0",
+      "dry_run_migrations": ["20260919000112_p1_financial_foundation.sql"],
+      "persistent_application_attempts": 1,
+      "application_migrations": ["20260919000112_p1_financial_foundation.sql"],
+      "application_exit": 0,
+      "migration_history_count": 12,
+      "public_tables": 56,
+      "public_rls": 56,
+      "public_functions": 24,
+      "p1_010_rows": {
+        "fee_calculations": 0,
+        "payment_transactions": 0,
+        "ledger_entries": 0,
+        "reconciliation_exceptions": 0,
+        "external_event_receipts": 0
+      },
+      "payouts_present": false
+    }
+  },
+  "fingerprints": {
+    "preapplication_p1_009": {
+      "sha256": "39d07a15df8730c904495abc298cb00032ec56b378d73157d8d3059857dd3723",
+      "canonical_byte_length": 499763,
+      "row_count": 1535
+    },
+    "postapplication_56_table": {
+      "format": "rosuno-p1-catalog-v1",
+      "query_path": "tools/p0/catalog/p1-010-postapplication.sql",
+      "query_sha256": "6225d1027e0dee034c81c2819934f974218b31c8d22bb0179a14599b146a885a",
+      "query_bytes": 12917,
+      "sha256": "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
+      "canonical_byte_length": 595722,
+      "row_count": 1794,
+      "category_counts": {
+        "table": 56,
+        "column": 544,
+        "constraint": 377,
+        "index": 138,
+        "foreign_key": 121,
+        "rls": 56,
+        "policy": 30,
+        "trigger": 48,
+        "function": 24,
+        "table_privilege": 280,
+        "function_privilege": 120
+      },
+      "transaction_read_only": true,
+      "exact_observation_timestamp_retained": false,
+      "timestamp_provenance_note": "The independent postapplication read-only verification is retained by its exact query and fingerprint evidence; an exact tool-call observation timestamp was not retained and is not invented."
+    }
+  },
+  "security_advisor": {
+    "info_count": 26,
+    "warn_count": 2,
+    "unapproved_count": 0,
+    "unexplained_count": 0,
+    "info_identities": [
+      "public.application_sessions",
+      "public.bookability_evaluations",
+      "public.bookings",
+      "public.capability_definitions",
+      "public.capability_grants",
+      "public.external_event_receipts",
+      "public.fee_calculations",
+      "public.jurisdiction_regulatory_modes",
+      "public.jurisdictions",
+      "public.launch_authorizations",
+      "public.launch_gate_evaluations",
+      "public.launch_gates",
+      "public.ledger_entries",
+      "public.notification_attempts",
+      "public.operational_jobs",
+      "public.payment_transactions",
+      "public.policy_authority_references",
+      "public.policy_types",
+      "public.policy_versions",
+      "public.reconciliation_exceptions",
+      "public.referral_eligible_pool_entries",
+      "public.referral_presentations",
+      "public.referrals",
+      "public.regulatory_modes",
+      "public.service_areas",
+      "public.slot_holds"
+    ],
+    "warnings": [
+      {
+        "code": "authenticated_security_definer_function_executable",
+        "schema": "public",
+        "function": "has_manage_attorney_verification_scope",
+        "arguments": "required_jurisdiction uuid, allow_any_jurisdiction boolean",
+        "security_definer": true,
+        "pre_existing": true
+      },
+      {
+        "code": "authenticated_security_definer_function_executable",
+        "schema": "public",
+        "function": "has_resource_metadata_access",
+        "arguments": "required_resource_id uuid",
+        "security_definer": true,
+        "p1_009_intentional": true
+      }
+    ]
+  },
+  "release": {
+    "id": "REL-20260921-P1-010-STAGING-APPLICATION",
+    "commit_sha": "18b8939b3c8f36836abbe341b99241228d5604e4",
+    "environment": "staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "migration_id": "20260919000112_p1_financial_foundation",
+    "migration_digest": "sha256:c36f75cd5539d5961981c25a4a284e3af589ba770ff7cb3934d3cd307cc310d5",
+    "evidence_link": "governance/evidence/p1-010-governance-lifecycle-closure.json",
+    "postapplication_query": "tools/p0/catalog/p1-010-postapplication.sql",
+    "supabase_cli": "2.116.0",
+    "application_exit": 0,
+    "created_at": "2026-09-21T01:51:36Z",
+    "created_at_semantics": "traceability record creation"
+  },
+  "boundaries": {
+    "production_authorized": false,
+    "old_supabase_mutation_authorized": false,
+    "branch_deletion_authorized": false,
+    "p1_011_authorized": false,
+    "database_mutation_during_closure": false
+  },
+  "integrity": {
+    "historical_migrations_unchanged": true,
+    "p1_010_migration_sha256": "c36f75cd5539d5961981c25a4a284e3af589ba770ff7cb3934d3cd307cc310d5",
+    "exact_physical_slice_1j": true,
+    "exact_relation_count_5": true,
+    "seventeen_restrictive_foreign_keys": true,
+    "payout_relation_absent": true,
+    "no_fake_business_data": true,
+    "no_seed_data": true,
+    "no_new_security_definer": true,
+    "g1_through_g5_unresolved_preserved": true,
+    "jurisdiction_neutrality_preserved": true,
+    "marketplace_legal_services_boundary_preserved": true,
+    "ai_authority_not_expanded": true,
+    "later_1k_1l_not_pulled_forward": true,
+    "rollback_validator_defect_history_preserved": true,
+    "connected_gate5_execution_boundary_gap_preserved": true,
+    "failed_gate6_preflight_history_preserved": true,
+    "postapplication_query_retained": true
+  }
+}
