@@ -822,6 +822,77 @@
       "rollback_reference": "tools/p0/p1-010-rollback.mjs",
       "created_at": "2026-09-19T01:51:20Z",
       "updated_at": "2026-09-21T01:51:36Z"
+    },
+    {
+      "work_item_id": "WI-P1-011-COMPLIANCE-FOUNDATION",
+      "title": "P1-011 Compliance physical foundation",
+      "objective": "Implement the smallest jurisdiction-neutral Physical 1K persistence and security foundation for append-only Audit Events, effective-dated/versioned Retention Rules, scoped Legal Holds, and restricted Complaint Cases while preserving unresolved counsel/policy/deletion/California boundaries.",
+      "in_scope": [
+        "Exactly public.audit_events, public.retention_rules, public.legal_holds, and public.complaint_cases",
+        "Audit Event append-only historical evidence with nullable actor/jurisdiction provenance and no end-user authoritative mutation",
+        "Retention Rule policy-version provenance, effective dating, structured parameters, and jurisdiction-scope consistency without hard-coded retention periods",
+        "Legal Hold scoped disposition-control history with immutable scope/origin provenance and release evidence without defining DOC-DEL execution",
+        "Complaint Case restricted persistence with only the locked nullable Consultation, Referral, Jurisdiction, assignee, category, and resolution fields",
+        "Exactly eleven concrete foreign keys with ON UPDATE RESTRICT / ON DELETE RESTRICT; generic Audit resource and Legal Hold scope references remain non-FK",
+        "Immediate RLS, fail-closed ordinary end-user access, no DELETE grants, and bounded trusted service_role mutation",
+        "Only authority-supported Audit and Legal Hold indexes plus Complaint updated_at behavior",
+        "Local governance, contract, rollback-generation, and P0 validator tooling; any database execution remains a later separately authorized gate"
+      ],
+      "out_of_scope": [
+        "Commit, branch publication/push, pull request, protected review, merge, release, database rollback execution, persistent Staging application, or any database contact during Gate 1",
+        "Closed actor/action/resource, retention-status, Legal-Hold-status, Complaint-state/category/routing/resolution taxonomies or other invented policy vocabularies",
+        "Exact retention periods, Legal Hold triggering/release circumstances, DOC-DEL deletion/purge/erasure behavior, or a generic physical deletion executor",
+        "Complaint workflow UI, exact California complaint-routing/escalation language, or California 1L regulatory-mode persistence",
+        "Review persistence, Payout behavior, provider execution, application workflows, or later-phase persistence",
+        "Production, OLD, source/development database mutation, persistent fake business/test data, P1-012, or later work"
+      ],
+      "status": "in_progress",
+      "owner": "Rosuno P1-011 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260921-P1-011-BOUNDED-CANDIDATE"],
+      "dependencies": ["WI-P1-010-FINANCIAL-FOUNDATION"],
+      "acceptance_criteria": [
+        "Exactly four Physical 1K persistent relations are introduced and no Review, Payout, 1L California, or later relation is added",
+        "The migration preserves the locked columns and exactly eleven concrete foreign keys use ON UPDATE RESTRICT / ON DELETE RESTRICT while polymorphic resource/scope references remain non-FK",
+        "Audit Event is append-only historical evidence, cannot become current-state storage, and receives no ordinary end-user write authority",
+        "Retention Rule references policy type retention, preserves jurisdiction/policy provenance, and contains no hard-coded universal retention duration",
+        "Legal Hold preserves scope/origin history and release evidence without introducing a universal deleted flag or deletion/purge executor",
+        "Complaint Case remains restricted and uses free policy-controlled state/category/resolution fields rather than an invented closed vocabulary",
+        "All four relations enable RLS; public/anon/authenticated receive no direct table privileges; trusted service_role mutation is column-bounded and no target relation grants DELETE",
+        "No exact retention period, Legal Hold circumstance, DOC-DEL behavior, California complaint rule, 1L object, Payout behavior, persistent seed row, or fake business record is introduced",
+        "Local targeted tests plus complete canonical format/typecheck/build/P0/security validation pass on stable candidate bytes before any later commit authorization",
+        "Any commit, publication, protected review, database rollback validation, persistent Staging application, Production action, OLD action, branch deletion, P1-012, or later work requires a separate authorization gate"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p1-011-contract.test.mjs",
+        "node tools/p0/p1-011-rollback.mjs /tmp/p1-011-rollback-validation.sql",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "staging",
+      "release_refs": [],
+      "migration_refs": ["20260921051204_p1_compliance_foundation"],
+      "rollback_reference": "tools/p0/p1-011-rollback.mjs",
+      "created_at": "2026-09-21T05:12:04Z",
+      "updated_at": "2026-09-21T05:12:04Z"
     }
   ]
 }

@@ -56,6 +56,8 @@ import {
   validateP1FinancialFoundationCandidate,
   validateP1FinancialFoundationClosure,
   validateP1FinancialFoundationTraceability,
+  validateP1ComplianceFoundationCandidate,
+  validateP1ComplianceFoundationTraceability,
   validateP1009Gate5PrestateContract,
   validateP1PlatformEvidence,
   validateP1PlatformMigration,
@@ -2786,7 +2788,7 @@ test("P1-006 accepted closure remains valid under the current P1-010 baseline", 
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-010-20260921-v1");
   assert.equal(baseline.migration_inventory.length, 12);
-  assert.equal(migrations.migrations.length, 12);
+  assert.equal(migrations.migrations.length, 13);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
@@ -2954,7 +2956,7 @@ test("P1-007 accepted closure remains valid under the current P1-010 baseline", 
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-010-20260921-v1");
   assert.equal(baseline.migration_inventory.length, 12);
-  assert.equal(migrations.migrations.length, 12);
+  assert.equal(migrations.migrations.length, 13);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
@@ -3127,7 +3129,7 @@ test("P1-008 accepted closure remains valid under the current P1-010 baseline", 
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-010-20260921-v1");
   assert.equal(baseline.migration_inventory.length, 12);
-  assert.equal(migrations.migrations.length, 12);
+  assert.equal(migrations.migrations.length, 13);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
@@ -3496,7 +3498,7 @@ test("P1-010 accepted closure requires exact lifecycle evidence and twelve-migra
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-010-20260921-v1");
   assert.equal(baseline.checked_at, null);
   assert.equal(baseline.migration_inventory.length, 12);
-  assert.equal(migrations.migrations.length, 12);
+  assert.equal(migrations.migrations.length, 13);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
@@ -3673,6 +3675,75 @@ test("P1-010 migration path is allowed by the neutral repository control", () =>
   assert.doesNotThrow(() =>
     validateNeutralPaths(
       ["supabase/migrations/20260919000112_p1_financial_foundation.sql"],
+      packageJson,
+    ),
+  );
+});
+test("P1-011 pending Compliance foundation overlays but does not rewrite the accepted P1-010 Staging baseline", () => {
+  const migrations = readJson("governance/migrations/reviewed-migrations.json");
+  const workItems = readJson("governance/work-items/index.json");
+  const decisions = readJson("governance/decision-log.json");
+  const releases = readJson("governance/releases/traceability.json");
+  const baseline = readJson("governance/schema-drift/baseline.json");
+
+  const migration = migrations.migrations.find(
+    (item) => item.migration_id === "20260921051204_p1_compliance_foundation",
+  );
+
+  assert.ok(migration);
+  assert.equal(migration.sequence, 13);
+  assert.equal(migration.reviewed, false);
+  assert.equal(migration.applied_environment, "none");
+
+  const sql = readFileSync(path.join(ROOT, migration.artifact_path), "utf8");
+
+  assert.equal(
+    validateP1ComplianceFoundationCandidate(migration, sql),
+    "pending",
+  );
+  assert.doesNotThrow(() =>
+    validateP1ComplianceFoundationTraceability(
+      migrations,
+      workItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  assert.equal(baseline.baseline_id, "rosuno-staging-p1-010-20260921-v1");
+  assert.equal(baseline.migration_inventory.length, 12);
+  assert.equal(migrations.migrations.length, 13);
+  assert.doesNotThrow(() => validateDriftReport(baseline, migrations));
+
+  const weakenedWorkItems = structuredClone(workItems);
+  weakenedWorkItems.work_items.find(
+    (item) => item.work_item_id === "WI-P1-011-COMPLIANCE-FOUNDATION",
+  ).status = "completed";
+
+  assert.throws(() =>
+    validateP1ComplianceFoundationTraceability(
+      migrations,
+      weakenedWorkItems,
+      decisions,
+      releases,
+    ),
+  );
+
+  assert.throws(
+    () =>
+      validateP1ComplianceFoundationCandidate(
+        migration,
+        sql + "\n-- unauthorized byte drift\n",
+      ),
+    /byte length|SHA-256/,
+  );
+});
+
+test("P1-011 migration path is allowed by the neutral repository control", () => {
+  const packageJson = readJson("package.json");
+  assert.doesNotThrow(() =>
+    validateNeutralPaths(
+      ["supabase/migrations/20260921051204_p1_compliance_foundation.sql"],
       packageJson,
     ),
   );
