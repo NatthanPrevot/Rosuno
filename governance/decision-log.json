@@ -519,11 +519,11 @@
       "work_item_refs": ["WI-P1-010-FINANCIAL-FOUNDATION"],
       "owner": "Rosuno P1-010 implementation owner",
       "reviewer": {
-        "identity": "pending designated human PR review",
-        "status": "pending"
+        "identity": "Rosuno",
+        "status": "approved"
       },
       "created_at": "2026-09-24T16:49:28Z",
-      "updated_at": "2026-09-24T16:49:28Z",
+      "updated_at": "2026-09-24T18:54:46Z",
       "supersedes": [],
       "impact": "Adds governance/test protection for the existing P1-010 processing-cost capability only. Historical P1-010 migration bytes and the original P1-010 decision, work item, release, closure evidence, migration registry, baseline, controls.mjs, contract-data, Staging, Production, OLD, Payout boundary, G-1 through G-5, and P1-012 remain unchanged. No universal payer, provider, jurisdiction, fee percentage, provider execution rule, or production financial configuration is authorized.",
       "evidence": [
@@ -532,7 +532,11 @@
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED — Financial Model",
         "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED — Financial Model",
         "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
-        "tools/p0/tests/p1-010-contract.test.mjs"
+        "tools/p0/tests/p1-010-contract.test.mjs",
+        "GitHub PR #36 reviewed exact head 38ab8d298d6ad7e65ca99981fc08a61b9be9b65b",
+        "Rosuno review PRR_kwDOUHT1sc8AAAABPGnUfA APPROVED at 2026-09-24T18:29:59Z",
+        "GitHub PR #36 merged as bb53d07869c204901982911160fedc0e4f10ad1d at 2026-09-24T18:31:33Z",
+        "GitHub Actions P0 control foundation run #73 (36041842993) succeeded on bb53d07869c204901982911160fedc0e4f10ad1d"
       ],
       "expiry": null
     }

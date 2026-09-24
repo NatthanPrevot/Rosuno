@@ -289,9 +289,28 @@ test("P1-010 processing-cost allocation contract is policy-driven, provider-neut
   assert.deepEqual(decision.work_item_refs, ["WI-P1-010-FINANCIAL-FOUNDATION"]);
   assert.deepEqual(decision.supersedes, []);
   assert.deepEqual(decision.reviewer, {
-    identity: "pending designated human PR review",
-    status: "pending",
+    identity: "Rosuno",
+    status: "approved",
   });
+  assert.equal(decision.created_at, "2026-09-24T16:49:28Z");
+  assert.match(decision.updated_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.ok(
+    Date.parse(decision.updated_at) >= Date.parse("2026-09-24T18:31:33Z"),
+  );
+
+  for (const evidence of [
+    "GitHub PR #36 reviewed exact head 38ab8d298d6ad7e65ca99981fc08a61b9be9b65b",
+    "Rosuno review PRR_kwDOUHT1sc8AAAABPGnUfA APPROVED at 2026-09-24T18:29:59Z",
+    "GitHub PR #36 merged as bb53d07869c204901982911160fedc0e4f10ad1d at 2026-09-24T18:31:33Z",
+    "GitHub Actions P0 control foundation run #73 (36041842993) succeeded on bb53d07869c204901982911160fedc0e4f10ad1d",
+  ]) {
+    assert.ok(
+      decision.evidence.includes(evidence),
+      "missing protected lifecycle evidence: " + evidence,
+    );
+  }
+
+  assert.notEqual(decision.reviewer.status, "pending");
 
   assert.deepEqual(decision.authority_refs, [
     "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
