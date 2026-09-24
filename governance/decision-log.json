@@ -467,7 +467,7 @@
       "decision_id": "DEC-20260921-P1-011-BOUNDED-CANDIDATE",
       "title": "Implement the bounded P1-011 Compliance foundation",
       "status": "accepted",
-      "scope": "Bounded local P1-011 Gate 1 candidate implementation only from canonical main at 2ee5946883a195c37dbe69f8042c5480f7ca2897. No commit, publication, protected review, database contact, persistent Staging application, Production, OLD, branch deletion, P1-012, or later work is authorized by this decision.",
+      "scope": "Original authorization: bounded local P1-011 implementation only. Current accepted lifecycle records later separately authorized publication, protected review, merge, rollback-only Staging validation, persistent Staging application, and governance closure.",
       "decision": "Implement exactly audit_events, retention_rules, legal_holds, and complaint_cases for the Physical 1K compliance foundation. Preserve Audit Event as append-only server-controlled evidence; Retention Rule as effective-dated/versioned policy without hard-coded periods; Legal Hold as scoped disposition control without resolving DOC-DEL; and Complaint Case as restricted foundation without invented state/category/routing/resolution vocabularies. Do not create Payout behavior, Review, California 1L objects, deletion/purge execution, or later persistence.",
       "rationale": "Gate 0 reconciled canonical P1-010 closure and derived the next locked Physical slice as 1K Compliance. The bounded foundation must make the four locked compliance relations physically representable while leaving exact retention periods, Legal Hold circumstances, deletion semantics, complaint routing language, and California regulatory-mode behavior under their existing authority gates.",
       "authority_refs": [
@@ -481,18 +481,22 @@
       "work_item_refs": ["WI-P1-011-COMPLIANCE-FOUNDATION"],
       "owner": "Rosuno P1-011 implementation owner",
       "reviewer": {
-        "identity": "pending designated human PR review",
-        "status": "pending"
+        "identity": "Rosuno",
+        "status": "approved"
       },
       "created_at": "2026-09-21T05:12:04Z",
-      "updated_at": "2026-09-21T05:12:04Z",
+      "updated_at": "2026-09-23T03:17:12Z",
       "supersedes": [],
-      "impact": "Creates only the local unreviewed Physical 1K Compliance foundation candidate and associated governance/control tooling. No Review, Payout, California 1L relation, deletion executor, database execution, Production, OLD, P1-012, or end-to-end compliance/operations workflow is authorized.",
+      "impact": "Records current accepted P1-011 lifecycle completion without broadening the original implementation authorization. No Production, OLD Supabase mutation or use as canonical state, branch deletion, P1-012, later-work authorization, DOC-DEL resolution, retention-period decision, California 1L behavior, Review persistence, deletion/purge executor, or end-to-end compliance/operations workflow claim is granted.",
       "evidence": [
         "supabase/migrations/20260921051204_p1_compliance_foundation.sql",
         "tools/p0/lib/p1-011-contract-data.mjs",
         "tools/p0/p1-011-rollback.mjs",
-        "tools/p0/tests/p1-011-contract.test.mjs"
+        "tools/p0/tests/p1-011-contract.test.mjs",
+        "tools/p0/catalog/p1-011-postapplication.sql",
+        "governance/evidence/p1-011-governance-lifecycle-closure.json",
+        "governance/releases/traceability.json",
+        "governance/schema-drift/baseline.json"
       ],
       "expiry": null
     }

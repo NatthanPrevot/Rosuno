@@ -1,0 +1,233 @@
+{
+  "version": 1,
+  "evidence_id": "P1-011-GOVERNANCE-LIFECYCLE-CLOSURE-20260923",
+  "work_item_id": "WI-P1-011-COMPLIANCE-FOUNDATION",
+  "lifecycle": "ACCEPTED — COMPLETED — REVIEWED — STAGING — RELEASED — CLOSED",
+  "lifecycle_state": {
+    "repository_closure": true,
+    "staging_application": true,
+    "postapplication_readonly_verification": true
+  },
+  "repository": {
+    "canonical_main": "370ab0c2fa2d6cb1fac4da924c03c0c26185bac7",
+    "canonical_tree": "32af2b1db3d6d3b0552e1181e58618c9e4d00a7d",
+    "protected_main": true,
+    "implementation": {
+      "pull_request": 34,
+      "title": "P1-011: implement compliance foundation",
+      "base": "2ee5946883a195c37dbe69f8042c5480f7ca2897",
+      "head": "4deea99bf95dba59b3df913024918bb6433c69b1",
+      "tree": "32af2b1db3d6d3b0552e1181e58618c9e4d00a7d",
+      "merge_commit": "370ab0c2fa2d6cb1fac4da924c03c0c26185bac7",
+      "ordered_parents": [
+        "2ee5946883a195c37dbe69f8042c5480f7ca2897",
+        "4deea99bf95dba59b3df913024918bb6433c69b1"
+      ],
+      "review_id": "5274347267",
+      "approved_at": "2026-09-22T05:16:16Z",
+      "merged_at": "2026-09-22T05:26:21Z",
+      "workflow_run_id": 35689910162,
+      "workflow_conclusion": "success"
+    }
+  },
+  "gate1": {
+    "result": "PASS_AFTER_BOUNDED_CONTROL_CORRECTION",
+    "first_full_p0": {
+      "passed": 1080,
+      "total": 1082,
+      "failures": 2
+    },
+    "first_failure_classification": "bounded local control defect",
+    "first_failure_reason": "The new thirteen-migration drift guard incorrectly required historical-baseline validation to present specifically the closed P1-010 baseline.",
+    "authority_conflict": false,
+    "schema_defect": false,
+    "database_contact": false,
+    "final_validation": {
+      "targeted_contract": "10/10",
+      "complete_p0": "1089/1089",
+      "format_check": "PASS",
+      "typecheck": "PASS",
+      "build": "PASS",
+      "p0_validate": "PASS",
+      "secrets_check": "PASS",
+      "dependency_check": "PASS",
+      "diff_check": "PASS"
+    }
+  },
+  "migration": {
+    "id": "20260921051204_p1_compliance_foundation",
+    "sha256": "d23dc72d6c36f544b8b50bbf053a96f9ecc9b2add7f02d87ce3ed4bc586880e4",
+    "byte_length": 11634,
+    "sequence": 13,
+    "history_versions": 13,
+    "history": [
+      "20260828192126_p0_restrict_rls_auto_enable_execution",
+      "20260829000015_p1_platform_foundation",
+      "20260829171701_p1_authorization_foundation",
+      "20260830023823_p1_jurisdiction_policy_launch_foundation",
+      "20260901012518_p1_authorization_scope_correction",
+      "20260910075939_p1_attorney_verification_eligibility_foundation",
+      "20260911062917_p1_client_intake_ai_foundation",
+      "20260914000658_p1_marketplace_referral_foundation",
+      "20260914231532_p1_scheduling_request_booking_bookability_foundation",
+      "20260917045031_p1_consultation_engagement_media_foundation",
+      "20260918060600_p1_resources_communications_foundation",
+      "20260919000112_p1_financial_foundation",
+      "20260921051204_p1_compliance_foundation"
+    ]
+  },
+  "gate5": {
+    "result": "PASS",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "prestate": {
+      "migration_history_count": 12,
+      "latest_migration": "20260919000112_p1_financial_foundation",
+      "target_relations_present": 0,
+      "catalog_sha256": "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
+      "catalog_bytes": 595722,
+      "catalog_rows": 1794
+    },
+    "rollback_validation": {
+      "generated_sql_sha256": "4146d4e56066077f6326860021c7540c5e4504b46250c37371ee1c57aa225872",
+      "validation_checks": 8,
+      "final_transaction_action": "ROLLBACK",
+      "application_exit": 0,
+      "post_catalog_sha256": "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
+      "post_catalog_bytes": 595722,
+      "post_catalog_rows": 1794,
+      "restoration": "EXACT",
+      "persistent_state_changed": false
+    }
+  },
+  "gate6": {
+    "result": "PASS",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "successful_application": {
+      "supabase_cli": "2.116.0",
+      "dry_run_migrations": ["20260921051204_p1_compliance_foundation.sql"],
+      "persistent_application_attempts": 1,
+      "application_migrations": ["20260921051204_p1_compliance_foundation.sql"],
+      "application_exit": 0,
+      "migration_history_count": 13,
+      "latest_migration": "20260921051204_p1_compliance_foundation",
+      "public_tables": 60,
+      "public_rls": 60,
+      "public_functions": 27,
+      "p1_011_rows": {
+        "audit_events": 0,
+        "retention_rules": 0,
+        "legal_holds": 0,
+        "complaint_cases": 0
+      },
+      "repository_source_unchanged": true
+    }
+  },
+  "fingerprints": {
+    "preapplication_p1_010": {
+      "sha256": "3d4cd0c09940e5f55bc5b67fbbee7edad5676af5edc34f50273682efb5b43238",
+      "canonical_byte_length": 595722,
+      "row_count": 1794
+    },
+    "postapplication_60_table": {
+      "format": "rosuno-p1-catalog-v1",
+      "query_path": "tools/p0/catalog/p1-011-postapplication.sql",
+      "query_sha256": "8ab63a71d029a9641b8f9918f60afe323572b1f0ade6a5451d6801a59d7af6ef",
+      "query_bytes": 13200,
+      "sha256": "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
+      "canonical_byte_length": 640365,
+      "row_count": 1938,
+      "category_counts": {
+        "table": 60,
+        "column": 589,
+        "constraint": 409,
+        "index": 144,
+        "foreign_key": 132,
+        "rls": 60,
+        "policy": 30,
+        "trigger": 52,
+        "function": 27,
+        "table_privilege": 300,
+        "function_privilege": 135
+      },
+      "transaction_read_only": true,
+      "observation_completed_at": "2026-09-23T03:14:20Z",
+      "target_rows": {
+        "audit_events": 0,
+        "retention_rules": 0,
+        "legal_holds": 0,
+        "complaint_cases": 0
+      }
+    }
+  },
+  "security_advisor": {
+    "info_count": 30,
+    "warn_count": 2,
+    "unapproved_count": 0,
+    "unexplained_count": 0,
+    "expected_p1_011_info": [
+      "public.audit_events",
+      "public.retention_rules",
+      "public.legal_holds",
+      "public.complaint_cases"
+    ],
+    "warnings": [
+      {
+        "code": "authenticated_security_definer_function_executable",
+        "schema": "public",
+        "function": "has_manage_attorney_verification_scope",
+        "arguments": "required_jurisdiction uuid, allow_any_jurisdiction boolean",
+        "security_definer": true,
+        "pre_existing": true
+      },
+      {
+        "code": "authenticated_security_definer_function_executable",
+        "schema": "public",
+        "function": "has_resource_metadata_access",
+        "arguments": "required_resource_id uuid",
+        "security_definer": true,
+        "pre_existing": true
+      }
+    ],
+    "p1_011_new_warn_count": 0
+  },
+  "release": {
+    "id": "REL-20260923-P1-011-STAGING-APPLICATION",
+    "commit_sha": "370ab0c2fa2d6cb1fac4da924c03c0c26185bac7",
+    "environment": "staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "migration_id": "20260921051204_p1_compliance_foundation",
+    "migration_digest": "sha256:d23dc72d6c36f544b8b50bbf053a96f9ecc9b2add7f02d87ce3ed4bc586880e4",
+    "evidence_link": "governance/evidence/p1-011-governance-lifecycle-closure.json",
+    "postapplication_query": "tools/p0/catalog/p1-011-postapplication.sql",
+    "supabase_cli": "2.116.0",
+    "application_exit": 0,
+    "created_at": "2026-09-23T03:17:12Z",
+    "created_at_semantics": "traceability record creation"
+  },
+  "boundaries": {
+    "production_authorized": false,
+    "old_supabase_mutation_authorized": false,
+    "branch_deletion_authorized": false,
+    "p1_012_authorized": false,
+    "database_mutation_during_closure": false
+  },
+  "integrity": {
+    "historical_migrations_unchanged": true,
+    "p1_011_migration_sha256": "d23dc72d6c36f544b8b50bbf053a96f9ecc9b2add7f02d87ce3ed4bc586880e4",
+    "exact_physical_slice_1k": true,
+    "exact_relation_count_4": true,
+    "eleven_restrictive_foreign_keys": true,
+    "no_fake_business_data": true,
+    "no_seed_data": true,
+    "no_new_security_definer": true,
+    "audit_append_only_preserved": true,
+    "retention_periods_unresolved_preserved": true,
+    "doc_del_unresolved_preserved": true,
+    "complaint_vocabularies_unresolved_preserved": true,
+    "california_1l_not_pulled_forward": true,
+    "review_persistence_not_pulled_forward": true,
+    "gate1_control_defect_history_preserved": true,
+    "postapplication_query_retained": true,
+    "postapplication_target_rows_zero": true
+  }
+}
