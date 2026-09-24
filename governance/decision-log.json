@@ -499,6 +499,42 @@
         "governance/schema-drift/baseline.json"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260924-P1-010-PROCESSING-COST-ALLOCATION-CONTRACT",
+      "title": "Clarify P1-010 processing-cost allocation contract",
+      "status": "accepted",
+      "scope": "Supplemental forward-only contract clarification for closed P1-010 only. Processing-cost allocation uses the existing policy, immutable Fee Calculation snapshot, frozen Payment Transaction provenance, append-only Ledger, reconciliation, and provider-adapter boundaries. No schema, migration, database, Payout, G-1 through G-5, jurisdiction-specific production economics, provider-specific economics, or P1-012 change is authorized.",
+      "decision": "Processing-cost economics are jurisdiction/policy-driven and payment-provider-neutral. The applicable approved versioned financial policy may allocate processing cost to the attorney, Rosuno, the client, split it among parties, or use another future approved allocation; no universal processing-cost bearer is established. The immutable Fee Calculation calculation_snapshot must preserve enough provider-neutral information to reconstruct the processing-cost economic treatment that applied, including relevant policy/pricing provenance and resulting client, attorney, and Rosuno economic effects. This clarification defines no exact JSON property vocabulary or object shape. Frozen transaction policy provenance preserves historical economics, and later Policy Versions cannot retroactively alter earlier transaction economics. Actual provider processing costs and variances belong to append-only Ledger and reconciliation history rather than rewriting the original Fee Calculation. Payment-provider adapters execute approved economics and report provider observations; they do not define Rosuno economics.",
+      "rationale": "The locked financial authority already requires independent processing-cost calculation, versioned policy provenance, immutable Fee Calculations, provider isolation, append-only Ledger history, and reconciliation. The existing physical model therefore already has the required capability through calculation_snapshot, frozen Payment Transaction policy references, generic Ledger entries, and Reconciliation Exceptions. This supplemental decision makes that existing capability explicit and testable without inventing schema or a processing-cost JSON vocabulary.",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P1-010-FINANCIAL-FOUNDATION"],
+      "owner": "Rosuno P1-010 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "created_at": "2026-09-24T16:49:28Z",
+      "updated_at": "2026-09-24T16:49:28Z",
+      "supersedes": [],
+      "impact": "Adds governance/test protection for the existing P1-010 processing-cost capability only. Historical P1-010 migration bytes and the original P1-010 decision, work item, release, closure evidence, migration registry, baseline, controls.mjs, contract-data, Staging, Production, OLD, Payout boundary, G-1 through G-5, and P1-012 remain unchanged. No universal payer, provider, jurisdiction, fee percentage, provider execution rule, or production financial configuration is authorized.",
+      "evidence": [
+        "ROSUNO MASTER BLUEPRINT — financial-engine processing-cost, ledger, and reconciliation requirements",
+        "DOMAIN-MODEL-V1.4-LOCKED — Payment & Engagement financial model",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED — Financial Model",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED — Financial Model",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+        "tools/p0/tests/p1-010-contract.test.mjs"
+      ],
+      "expiry": null
     }
   ]
 }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   columns,
@@ -262,6 +263,91 @@ test("P1-010 rollback generator is import-safe, rollback-only, and covers frozen
     assert.match(
       built.sql,
       new RegExp(phrase.replace(/[.*+?^$()|[\]\\{}]/g, "\\$&")),
+    );
+  }
+});
+
+test("P1-010 processing-cost allocation contract is policy-driven, provider-neutral, and historically reconstructable", () => {
+  const decisionLog = JSON.parse(
+    readFileSync(
+      new URL("../../../governance/decision-log.json", import.meta.url),
+      "utf8",
+    ),
+  );
+
+  const decisions = decisionLog.decisions.filter(
+    (item) =>
+      item.decision_id ===
+      "DEC-20260924-P1-010-PROCESSING-COST-ALLOCATION-CONTRACT",
+  );
+
+  assert.equal(decisions.length, 1);
+
+  const decision = decisions[0];
+
+  assert.equal(decision.status, "accepted");
+  assert.deepEqual(decision.work_item_refs, ["WI-P1-010-FINANCIAL-FOUNDATION"]);
+  assert.deepEqual(decision.supersedes, []);
+  assert.deepEqual(decision.reviewer, {
+    identity: "pending designated human PR review",
+    status: "pending",
+  });
+
+  assert.deepEqual(decision.authority_refs, [
+    "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+    "DOMAIN-MODEL-V1.4-LOCKED",
+    "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+    "SCHEMA-INVENTORY-V0.7-LOCKED",
+    "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+    "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+    "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+  ]);
+
+  const contract = [
+    decision.scope,
+    decision.decision,
+    decision.rationale,
+    decision.impact,
+  ].join(" ");
+
+  for (const phrase of [
+    "jurisdiction/policy-driven and payment-provider-neutral",
+    "attorney, Rosuno, the client, split it among parties, or use another future approved allocation",
+    "no universal processing-cost bearer is established",
+    "immutable Fee Calculation calculation_snapshot",
+    "relevant policy/pricing provenance",
+    "resulting client, attorney, and Rosuno economic effects",
+    "defines no exact JSON property vocabulary or object shape",
+    "Frozen transaction policy provenance preserves historical economics",
+    "later Policy Versions cannot retroactively alter earlier transaction economics",
+    "Actual provider processing costs and variances belong to append-only Ledger and reconciliation history rather than rewriting the original Fee Calculation",
+    "Payment-provider adapters execute approved economics and report provider observations; they do not define Rosuno economics",
+  ]) {
+    assert.ok(contract.includes(phrase), "missing contract phrase: " + phrase);
+  }
+
+  assert.doesNotMatch(contract, /\b(?:Stripe|Arizona|California)\b/i);
+
+  assert.match(
+    tableBody("fee_calculations"),
+    /^  calculation_snapshot jsonb not null,?$/im,
+  );
+  assert.match(sql, /Fee Calculation is immutable/i);
+  assert.match(sql, /Payment Transaction identity\/provenance is immutable/i);
+  assert.match(sql, /Ledger Entry is append-only/i);
+  assert.match(
+    sql,
+    /Provider receipt state is not Rosuno business-state authority/i,
+  );
+
+  for (const column of [
+    "payment_policy_version_id",
+    "fee_policy_version_id",
+    "payment_flow_policy_version_id",
+  ]) {
+    assert.match(
+      tableBody("payment_transactions"),
+      new RegExp("^  " + column + " uuid not null,?$", "im"),
     );
   }
 });
