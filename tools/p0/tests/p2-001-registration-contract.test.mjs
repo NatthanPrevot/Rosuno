@@ -20,11 +20,29 @@ test("P2-001 registration preserves the bounded Application Shell contract", () 
   assert.equal(decisionMatches.length, 1);
 
   const decision = decisionMatches[0];
-  assert.equal(decision.status, "proposed");
+  assert.equal(decision.status, "accepted");
   assert.deepEqual(decision.reviewer, {
-    identity: "pending designated human PR review",
-    status: "pending",
+    identity: "Rosuno",
+    status: "approved",
   });
+  assert.equal(decision.created_at, "2026-09-25T03:23:31Z");
+  assert.match(decision.updated_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.ok(
+    Date.parse(decision.updated_at) > Date.parse("2026-09-25T03:50:30Z"),
+  );
+
+  for (const evidence of [
+    "GitHub PR #41 reviewed exact head 20783253c6e1e4d2e95887a43850eb2924cf3514",
+    "Rosuno review PRR_kwDOUHT1sc8AAAABPK7DKA APPROVED at 2026-09-25T03:46:57Z",
+    "GitHub PR #41 merged as b99c9e198bff1a3f917fbd02d884917e5e76982b at 2026-09-25T03:50:30Z",
+    "GitHub Actions P0 control foundation run #83 (36091994647) succeeded on b99c9e198bff1a3f917fbd02d884917e5e76982b",
+  ]) {
+    assert.ok(
+      decision.evidence.includes(evidence),
+      "missing protected lifecycle evidence: " + evidence,
+    );
+  }
+
   assert.deepEqual(decision.work_item_refs, ["WI-P2-001-APPLICATION-SHELL"]);
 
   const matches = workItems.work_items.filter(
@@ -35,14 +53,16 @@ test("P2-001 registration preserves the bounded Application Shell contract", () 
   const item = matches[0];
 
   assert.equal(item.priority, "P2");
-  assert.equal(item.status, "proposed");
+  assert.equal(item.status, "approved");
   assert.equal(item.environment, "development");
   assert.deepEqual(item.release_refs, []);
   assert.deepEqual(item.migration_refs, []);
   assert.deepEqual(item.reviewer, {
-    identity: "pending designated human PR review",
-    status: "pending",
+    identity: "Rosuno",
+    status: "approved",
   });
+  assert.equal(item.created_at, "2026-09-25T03:23:31Z");
+  assert.equal(item.updated_at, decision.updated_at);
 
   assert.deepEqual(item.decision_refs, [
     "DEC-20260924-P1-CLOSURE-P2-TRANSITION",
