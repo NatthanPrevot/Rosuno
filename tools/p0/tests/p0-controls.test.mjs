@@ -1649,6 +1649,40 @@ test("incomplete work items are rejected", () => {
   );
 });
 
+test("work-item priority controls admit exactly P0, P1, and P2", () => {
+  for (const priority of ["P0", "P1", "P2"]) {
+    const record = validWorkItem();
+    record.priority = priority;
+    record.work_item_id = `WI-${priority}-TEST`;
+    assert.doesNotThrow(() => validateWorkItem(record));
+  }
+
+  const p3 = validWorkItem();
+  p3.priority = "P3";
+  p3.work_item_id = "WI-P3-TEST";
+  assert.throws(() => validateWorkItem(p3), /priority must be P0, P1, or P2/);
+
+  const mismatched = validWorkItem();
+  mismatched.priority = "P2";
+  mismatched.work_item_id = "WI-P1-TEST";
+  assert.throws(() => validateWorkItem(mismatched), /must match its priority/);
+
+  const schema = readJson("governance/work-items/schema.json");
+  assert.deepEqual(schema.properties.priority.enum, ["P0", "P1", "P2"]);
+  assert.equal(
+    schema.properties.work_item_id.pattern,
+    "^WI-P(?:0|1|2)-[A-Z0-9][A-Z0-9-]*$",
+  );
+
+  const idPattern = new RegExp(schema.properties.work_item_id.pattern);
+
+  for (const id of ["WI-P0-TEST", "WI-P1-TEST", "WI-P2-TEST"]) {
+    assert.equal(idPattern.test(id), true);
+  }
+
+  assert.equal(idPattern.test("WI-P3-TEST"), false);
+});
+
 test("decision timestamps, chronology, expiry, and evidence are enforced", () => {
   for (const mutate of [
     (record) => {

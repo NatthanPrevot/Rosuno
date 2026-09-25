@@ -29,7 +29,7 @@
   "properties": {
     "work_item_id": {
       "type": "string",
-      "pattern": "^WI-P(?:0|1)-[A-Z0-9][A-Z0-9-]*$"
+      "pattern": "^WI-P(?:0|1|2)-[A-Z0-9][A-Z0-9-]*$"
     },
     "title": { "type": "string", "minLength": 1, "maxLength": 200 },
     "objective": { "type": "string", "minLength": 1, "maxLength": 2000 },
@@ -80,7 +80,7 @@
         }
       ]
     },
-    "priority": { "enum": ["P0", "P1"] },
+    "priority": { "enum": ["P0", "P1", "P2"] },
     "authority_refs": {
       "type": "array",
       "minItems": 1,

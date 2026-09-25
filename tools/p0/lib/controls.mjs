@@ -614,8 +614,8 @@ export function validateWorkItem(
   references = {},
 ) {
   requireExactFields(record, WORK_ITEM_FIELDS, context);
-  if (!["P0", "P1"].includes(record.priority)) {
-    fail(`${context}.priority must be P0 or P1`);
+  if (!["P0", "P1", "P2"].includes(record.priority)) {
+    fail(`${context}.priority must be P0, P1, or P2`);
   }
   if (
     ![
@@ -640,7 +640,7 @@ export function validateWorkItem(
   ) {
     fail(`${context}.environment is not allowed`);
   }
-  if (!/^WI-P(?:0|1)-[A-Z0-9][A-Z0-9-]*$/.test(record.work_item_id)) {
+  if (!/^WI-P(?:0|1|2)-[A-Z0-9][A-Z0-9-]*$/.test(record.work_item_id)) {
     fail(`${context}.work_item_id has an invalid format`);
   }
   if (!record.work_item_id.startsWith(`WI-${record.priority}-`)) {
