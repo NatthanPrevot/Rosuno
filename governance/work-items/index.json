@@ -950,6 +950,80 @@
       "rollback_reference": "Governance-only conditional/deferred state. No database rollback applies. Before protected acceptance the local candidate may be discarded; after acceptance, any correction must be forward-only and must not rewrite prior accepted P1 history.",
       "created_at": "2026-09-24T23:29:21Z",
       "updated_at": "2026-09-25T01:43:29Z"
+    },
+    {
+      "work_item_id": "WI-P2-001-APPLICATION-SHELL",
+      "title": "P2-001 Application Shell foundation",
+      "objective": "Establish the smallest runnable jurisdiction-neutral Rosuno application shell under apps/web using Next.js, React, and TypeScript, with routing, shared layout, deterministic error/loading handling, form-handling patterns, a server-owned session boundary, and explicit API/service boundaries while introducing no feature-specific business workflow or database mutation.",
+      "in_scope": [
+        "One Next.js + React + TypeScript application under apps/web within Rosuno's modular-monolith architecture",
+        "Application routing foundation and shared/root layout",
+        "Deterministic loading, not-found, and error-handling boundaries with user-safe error presentation",
+        "Reusable behavioral form submission, validation, success, and failure patterns without feature-specific business logic or design-system styling",
+        "A server-owned session representation boundary capable of representing anonymous and authenticated session state without implementing signup, sign-in, sign-out, recovery, verification, profiles, role resolution, or capability authorization",
+        "Explicit presentation-to-application/service boundaries so browser/UI code collects intent and displays server state without becoming authoritative business state",
+        "Minimum application bootstrap, build, run, TypeScript, pnpm-workspace, and root configuration changes required to integrate apps/web",
+        "Future implementation path limited to apps/web/** plus only the minimum required root package.json, pnpm-lock.yaml, pnpm-workspace.yaml, applicable tsconfig files, and .replit when demonstrably required for the runnable application",
+        "Targeted application-shell tests and integration with the existing canonical validation suite"
+      ],
+      "out_of_scope": [
+        "P2-002 / 2B Design System including final typography, spacing system, visual button library, styled form library, tables, status indicators, dialogs, notifications, or broader responsive visual system",
+        "P2-003 / 2C Security Shell including authenticated-route enforcement, role/principal resolution, capability authorization, privileged mutation policy, or complete security-shell behavior",
+        "P3 identity/authentication workflows including account creation, sign-in, sign-out, recovery, verification, User, Client Profile, Attorney Profile, Staff Profile, or stronger-authentication flows",
+        "Client, attorney, admin, discovery, intake, referral, scheduling, consultation, payment, engagement, media, resource, messaging, notification, review, complaint, compliance, or other feature-specific workflows",
+        "Any Supabase migration, schema, SQL, RLS, ACL, Storage policy, database data, seed data, jurisdiction data, policy data, launch data, or database connection",
+        "Stripe, Daily, Resend, verification-provider, webhook, or other provider integration",
+        "Arizona-specific or other jurisdiction-specific legal/regulatory behavior, Physical 1L implementation, or resolution of any counsel/policy gate",
+        "Browser/localStorage authority for canonical business state, fake/demo/fallback business records, or client-controlled authoritative identity/business state",
+        "Replit Agent, Replit AI, Production, OLD, branch publication, PR, review, merge, or later P2 work without separate authorization"
+      ],
+      "status": "proposed",
+      "owner": "Rosuno P2-001 implementation owner",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20260924-P1-CLOSURE-P2-TRANSITION",
+        "DEC-20260925-P2-001-APPLICATION-SHELL-CONTRACT"
+      ],
+      "dependencies": ["WI-P1-011-COMPLIANCE-FOUNDATION"],
+      "acceptance_criteria": [
+        "A single apps/web Next.js + React + TypeScript shell is runnable and buildable within the existing pnpm repository without introducing a competing application architecture",
+        "Routing, root/shared layout, loading behavior, unknown-route handling, and error boundaries operate deterministically",
+        "The reusable form-handling pattern distinguishes user input, validation failure, server failure, and success without embedding feature-specific business logic or the later P2-002 visual design system",
+        "Session handling is represented through a server-owned boundary and no browser-supplied identity, role, capability, or authentication assertion becomes authoritative",
+        "No P3 authentication lifecycle or P2-003 authorization/security-shell implementation is introduced by P2-001",
+        "Presentation code displays server state and submits user intent through explicit application/service boundaries rather than becoming a second owner of domain state",
+        "User-facing errors are redacted and do not expose secrets, credentials, sensitive internal payloads, or authoritative server-only details",
+        "No migration, schema, RLS, database data, Storage policy, provider integration, jurisdiction-specific rule, counsel-gated value, or fake production/business record is introduced",
+        "Targeted tests cover the shell routing/error/form/session/client-trust boundaries and the complete canonical format/typecheck/build/P0/security validation passes on stable candidate bytes",
+        "P1-012 remains conditional/deferred and blocked independently; jurisdiction-neutral P2-001 does not classify or activate Arizona",
+        "Any Claude invocation, local application implementation, commit, publication, PR, protected review, merge, database action, Staging, Production/OLD, P2-002, P2-003, P3, or later work requires its separately authorized gate"
+      ],
+      "validation_commands": [
+        "pnpm run p2:application-shell:test",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "development",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository-only application work. Before protected acceptance the local candidate may be discarded. After protected acceptance corrections are forward-only. No database rollback applies.",
+      "created_at": "2026-09-25T03:23:31Z",
+      "updated_at": "2026-09-25T03:23:31Z"
     }
   ]
 }

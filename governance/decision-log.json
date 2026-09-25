@@ -583,6 +583,39 @@
         "GitHub Actions P0 control foundation run #77 (36082104358) succeeded on d827170dc4851b6a42419f8ecaafdd131b33ac45"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260925-P2-001-APPLICATION-SHELL-CONTRACT",
+      "title": "Register bounded P2-001 Application Shell contract and implementation stack",
+      "status": "proposed",
+      "scope": "Governance registration only for the first P2 / Application Foundation execution slice. Records the bounded P2-001 Application Shell contract and the approved Next.js + React + TypeScript implementation-stack decision under apps/web. No application implementation, Claude invocation, database contact or mutation, provider integration, Staging, Production/OLD, publication, PR, review, merge, or later P2 work is authorized by this decision.",
+      "decision": "Register WI-P2-001-APPLICATION-SHELL as the first bounded P2 work item. P2-001 implements only Implementation Master Plan P2/2A: routing, layout, error handling, loading states, form-handling patterns, authenticated-session handling boundary, and API/service boundaries. Use Next.js + React + TypeScript as a bounded implementation choice under apps/web within Rosuno's single modular-monolith application architecture. The session boundary represents server-owned anonymous/authenticated session state but does not implement the P3 authentication lifecycle, role/principal authorization, or capability enforcement. P2-2B Design System and P2-2C Security Shell remain later separately controlled work.",
+      "rationale": "The locked Implementation Master Plan orders P2 Application Foundation as 2A Application Shell, then 2B Design System, then 2C Security Shell. Canonical main contains no application source tree or previously selected web framework. Next.js + React + TypeScript under apps/web is therefore an implementation choice, not locked Rosuno authority. It provides the required routing, shared layout, loading/error boundaries, form/server handling surface, and server/client boundary within one codebase while preserving the Technical Architecture requirement for a modular monolith, server authority, canonical Supabase/Postgres business state, and strict separation between presentation and authoritative business logic.",
+      "authority_refs": [
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-001-APPLICATION-SHELL"],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "created_at": "2026-09-25T03:23:31Z",
+      "updated_at": "2026-09-25T03:23:31Z",
+      "supersedes": [],
+      "impact": "If later reviewed and accepted, this establishes only the P2-001 application-shell implementation contract and stack choice. It does not create apps/web, install dependencies, implement authentication or authorization, create product workflows, change database/schema/RLS/storage, resolve Arizona or other jurisdiction-specific requirements, alter P1-012, contact providers, invoke Claude, or authorize any later gate.",
+      "evidence": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED — P2 section 16 orders 2A Application Shell before 2B Design System and 2C Security Shell",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED — modular monolith, application-layer separation, server authority, and API/client trust boundary",
+        "DOMAIN-MODEL-V1.4-LOCKED — canonical state ownership and derived-state boundaries",
+        "DEC-20260924-P1-CLOSURE-P2-TRANSITION — accepted P1 to P2 transition with Physical 1L remaining conditional/deferred",
+        "Canonical main reconciled at 6b8b3ed906e7c4ec0f8735d3a8872f110719f43a",
+        "GitHub Actions P0 control foundation run #81 (36088177022) succeeded on 6b8b3ed906e7c4ec0f8735d3a8872f110719f43a",
+        "Human project decision approved Next.js + React + TypeScript under apps/web for the bounded P2-001 implementation stack"
+      ],
+      "expiry": null
     }
   ]
 }
