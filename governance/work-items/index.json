@@ -893,6 +893,63 @@
       "rollback_reference": "tools/p0/p1-011-rollback.mjs",
       "created_at": "2026-09-21T05:12:04Z",
       "updated_at": "2026-09-23T03:17:12Z"
+    },
+    {
+      "work_item_id": "WI-P1-012-PHYSICAL-1L",
+      "title": "Physical 1L conditional jurisdiction-specific extension",
+      "objective": "Preserve Physical 1L as a conditional jurisdiction-specific extension at Gate 0 STOP pending Arizona counsel/regulatory determination while allowing the completed jurisdiction-neutral P1 Database/RLS Foundation to transition toward P2 without inventing Arizona legal or regulatory requirements.",
+      "in_scope": [
+        "Governance-only representation of P1-012 / Physical 1L as CONDITIONAL / DEFERRED at Gate 0 STOP pending Arizona counsel/regulatory determination",
+        "Arizona recorded only as Rosuno's intended first-launch jurisdiction with regulatory mode unresolved",
+        "Preservation of the existing jurisdiction-neutral Jurisdiction, Service Area, Regulatory Mode, policy/provenance, launch-gate, attorney verification/eligibility, and audit/compliance substrate as the currently established P1 foundation",
+        "Roadmap transition treatment in which the jurisdiction-neutral P1 Database/RLS Foundation is closed for transition purposes and P2 / Application Foundation Gate 0 is the next eligible controlled work"
+      ],
+      "out_of_scope": [
+        "Any Arizona legal or regulatory classification, including READY, LIVE, approved-for-launch, ABS, non-ABS, LRS, non-LRS, or any equivalent classification",
+        "Any Arizona-specific or California/LRS-specific relation, schema, migration, SQL, RLS change, policy data, jurisdiction seed data, regulatory-mode data, launch authorization, report structure, or speculative future-regulatory persistence",
+        "Any change to reviewed migrations, release traceability, the accepted schema-drift baseline, or the current Staging database/schema/security baseline",
+        "P2 implementation, P2 work-item registration, Claude handoff, Claude invocation, Lovable, Replit Agent, Replit AI, branch creation, commit, publication, push, PR, review, merge, database mutation, Production, OLD, or any later gate"
+      ],
+      "status": "blocked",
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "pending designated human PR review",
+        "status": "pending"
+      },
+      "priority": "P1",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "SCHEMA-INVENTORY-V0.7-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": ["DEC-20260924-P1-CLOSURE-P2-TRANSITION"],
+      "dependencies": ["WI-P1-011-COMPLIANCE-FOUNDATION"],
+      "acceptance_criteria": [
+        "P1-001 through P1-011 remain completed/closed and their accepted governance, migration, release, evidence, and Staging baseline are unchanged",
+        "P1-012 remains CONDITIONAL / DEFERRED at Gate 0 STOP and is not represented as PASS, completed, zero-scope, or implicitly resolved",
+        "Arizona is represented only as the intended first-launch jurisdiction; its regulatory mode remains unresolved and no legal/regulatory classification is asserted",
+        "No jurisdiction-specific Physical 1L persistence is created until independently justified by Arizona counsel/regulatory determination and separately authorized controlled work",
+        "The jurisdiction-neutral P1 Database/RLS Foundation is closed for transition purposes and P2 / Application Foundation Gate 0 is the next eligible controlled work without starting P2",
+        "The accepted thirteen-migration Staging baseline, sixty public/RLS-enabled tables, twenty-seven public functions, reviewed migration registry, release traceability, and schema-drift baseline remain unchanged",
+        "Any future P1-012 contract, P2 implementation, Claude handoff, commit, publication, review, merge, database action, Production/OLD action, or later gate requires separate authorization"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p1-p2-transition-contract.test.mjs",
+        "pnpm run format:check",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "git diff --check"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Governance-only conditional/deferred state. No database rollback applies. Before protected acceptance the local candidate may be discarded; after acceptance, any correction must be forward-only and must not rewrite prior accepted P1 history.",
+      "created_at": "2026-09-24T23:29:21Z",
+      "updated_at": "2026-09-24T23:29:21Z"
     }
   ]
 }
