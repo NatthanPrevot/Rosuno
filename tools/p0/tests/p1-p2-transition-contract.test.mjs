@@ -49,11 +49,28 @@ test("P1 closure preserves deferred Physical 1L and the accepted database baseli
   );
   assert.equal(decisionMatches.length, 1);
   const decision = decisionMatches[0];
-  assert.equal(decision.status, "proposed");
+  assert.equal(decision.status, "accepted");
   assert.deepEqual(decision.reviewer, {
-    identity: "pending designated human PR review",
-    status: "pending",
+    identity: "Rosuno",
+    status: "approved",
   });
+  assert.equal(decision.created_at, "2026-09-24T23:29:21Z");
+  assert.match(decision.updated_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.ok(
+    Date.parse(decision.updated_at) > Date.parse("2026-09-25T01:28:08Z"),
+  );
+
+  for (const evidence of [
+    "GitHub PR #38 reviewed exact head 28a705f516b6cdf716dbdacb2198d2c969bd7ae1",
+    "Rosuno review PRR_kwDOUHT1sc8AAAABPKIYcg APPROVED at 2026-09-25T01:25:15Z",
+    "GitHub PR #38 merged as d827170dc4851b6a42419f8ecaafdd131b33ac45 at 2026-09-25T01:27:36Z",
+    "GitHub Actions P0 control foundation run #77 (36082104358) succeeded on d827170dc4851b6a42419f8ecaafdd131b33ac45",
+  ]) {
+    assert.ok(
+      decision.evidence.includes(evidence),
+      "missing protected lifecycle evidence: " + evidence,
+    );
+  }
   assert.deepEqual(decision.work_item_refs, [
     "WI-P1-011-COMPLIANCE-FOUNDATION",
     "WI-P1-012-PHYSICAL-1L",
@@ -65,6 +82,12 @@ test("P1 closure preserves deferred Physical 1L and the accepted database baseli
   assert.equal(p1012Matches.length, 1);
   const p1012 = p1012Matches[0];
   assert.equal(p1012.status, "blocked");
+  assert.deepEqual(p1012.reviewer, {
+    identity: "Rosuno",
+    status: "approved",
+  });
+  assert.equal(p1012.created_at, "2026-09-24T23:29:21Z");
+  assert.equal(p1012.updated_at, decision.updated_at);
   assert.equal(p1012.environment, "none");
   assert.deepEqual(p1012.release_refs, []);
   assert.deepEqual(p1012.migration_refs, []);

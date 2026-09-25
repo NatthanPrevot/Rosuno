@@ -543,7 +543,7 @@
     {
       "decision_id": "DEC-20260924-P1-CLOSURE-P2-TRANSITION",
       "title": "Close jurisdiction-neutral P1 foundation and defer conditional Physical 1L",
-      "status": "proposed",
+      "status": "accepted",
       "scope": "Governance-only P1 closure / P1→P2 transition candidate. Records only the closed P1-001 through P1-011 foundation, conditional/deferred P1-012 Gate 0 STOP, Arizona intended-launch input without legal classification, and P2 Gate 0 as the next eligible controlled work. No implementation, migration, database, launch, Production/OLD, P2, Claude handoff, publication, review, merge, or later-gate action is authorized.",
       "decision": "Record P1-001 through P1-011 as closed. Record P1-012 / Physical 1L as CONDITIONAL / DEFERRED at Gate 0 STOP pending Arizona counsel/regulatory determination. Record Arizona only as Rosuno's intended first-launch jurisdiction; Arizona's regulatory mode remains unresolved and Arizona is not READY, LIVE, approved for launch, ABS, non-ABS, LRS, non-LRS, or otherwise legally classified by this decision. Close the jurisdiction-neutral P1 Database/RLS Foundation for transition purposes. P2 / Application Foundation Gate 0 is the next eligible controlled work.",
       "rationale": "Locked Rosuno authority makes Physical 1L jurisdiction-conditional: California-specific 1L persistence applies only when California is the activated launch mode, and another jurisdiction receives only the mode-specific physical changes independently required for that jurisdiction. P1-001 through P1-011 already establish and close the jurisdiction-neutral Database/RLS foundation through Physical 1K. Arizona's unresolved regulatory classification therefore remains a counsel/regulatory boundary rather than a reason to invent schema or block unrelated jurisdiction-neutral application work.",
@@ -561,11 +561,11 @@
       ],
       "owner": "Rosuno Primary Thinker",
       "reviewer": {
-        "identity": "pending designated human PR review",
-        "status": "pending"
+        "identity": "Rosuno",
+        "status": "approved"
       },
       "created_at": "2026-09-24T23:29:21Z",
-      "updated_at": "2026-09-24T23:29:21Z",
+      "updated_at": "2026-09-25T01:43:29Z",
       "supersedes": [],
       "impact": "If later reviewed and accepted, this closes only the jurisdiction-neutral P1 Database/RLS Foundation for roadmap transition. P1-012 remains conditional/deferred at Gate 0 STOP and may later require a separately authorized jurisdiction-specific physical extension after Arizona counsel/regulatory determination. The accepted Staging schema baseline, reviewed migration inventory, release traceability, jurisdiction/policy data, regulatory-mode data, launch authorization state, Production/OLD, P2 implementation, and Claude handoff remain unchanged and unauthorized by this candidate.",
       "evidence": [
@@ -576,7 +576,11 @@
         "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED — conditional Physical 1L / California regulatory-mode migration boundary",
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED — P1 Database/RLS Foundation → P2 Application Foundation sequence and conditional 1L boundary",
         "TECHNICAL-ARCHITECTURE-V0.2-LOCKED — jurisdiction-neutral regulatory foundation and mode-conditional regulatory extensions",
-        "tools/p0/tests/p1-p2-transition-contract.test.mjs"
+        "tools/p0/tests/p1-p2-transition-contract.test.mjs",
+        "GitHub PR #38 reviewed exact head 28a705f516b6cdf716dbdacb2198d2c969bd7ae1",
+        "Rosuno review PRR_kwDOUHT1sc8AAAABPKIYcg APPROVED at 2026-09-25T01:25:15Z",
+        "GitHub PR #38 merged as d827170dc4851b6a42419f8ecaafdd131b33ac45 at 2026-09-25T01:27:36Z",
+        "GitHub Actions P0 control foundation run #77 (36082104358) succeeded on d827170dc4851b6a42419f8ecaafdd131b33ac45"
       ],
       "expiry": null
     }
