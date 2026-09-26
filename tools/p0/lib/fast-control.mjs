@@ -13,8 +13,12 @@ export const CANONICAL_ORIGIN = "https://github.com/NatthanPrevot/Rosuno.git";
 export const IMMUTABLE_BOOTSTRAP_PATHS = [
   ".replit",
   ".github/workflows/p0-controls.yml",
-  "pnpm-lock.yaml",
 ];
+
+// Scope-controlled paths are still compared with the work-item base, so a
+// committed change cannot bypass the boundary; they may differ only when the
+// exact path is authorized in allowedPaths.
+export const SCOPE_CONTROLLED_BOOTSTRAP_PATHS = ["pnpm-lock.yaml"];
 
 function gitText(args, cwd = ROOT) {
   return execFileSync("git", args, {
@@ -205,10 +209,9 @@ export function collectPreflightObservation({
   }));
 
   const protectedFiles = Object.fromEntries(
-    IMMUTABLE_BOOTSTRAP_PATHS.map((file) => [
-      file,
-      baseFileMatches(root, expectedBase, file),
-    ]),
+    [...IMMUTABLE_BOOTSTRAP_PATHS, ...SCOPE_CONTROLLED_BOOTSTRAP_PATHS].map(
+      (file) => [file, baseFileMatches(root, expectedBase, file)],
+    ),
   );
 
   const status = statusObservation(root);
@@ -325,8 +328,18 @@ export function validatePreflightObservation(
   }
 
   for (const [file, matches] of Object.entries(observation.protectedFiles)) {
-    if (!matches) {
+    if (matches) {
+      continue;
+    }
+
+    if (!SCOPE_CONTROLLED_BOOTSTRAP_PATHS.includes(file)) {
       fail(`protected source bytes changed: ${file}`);
+    }
+
+    if (!allowed.has(file)) {
+      fail(
+        `scope-controlled source bytes changed outside allowed paths: ${file}`,
+      );
     }
   }
 

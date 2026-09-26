@@ -17,8 +17,14 @@ import {
   P1_REGULATORY_CATALOG_SQL,
   P1_ATTORNEY_PENDING,
   P1_ATTORNEY_VALIDATED,
+  PRE_APPLICATION_STATE,
   ROOT,
+  ROOT_SCRIPT_PROFILES,
+  WEB_APPLICATION_STATE,
+  detectApplicationState,
+  isRegistrySemverRange,
   scanSecretLikeText,
+  validateApplicationSurface,
   validateCiWorkflow,
   validateDecisionRecord,
   validateDriftReport,
@@ -66,11 +72,14 @@ import {
   validateP1RegulatoryEvidence,
   validateP1RegulatoryMigration,
   validateP1RegulatoryTraceability,
+  validatePnpmWorkspace,
   validateReleaseRegister,
   validateRepository,
   validateRestoreEvidence,
   validateSchemaArtifact,
   validateTraceabilityConsistency,
+  validateWebApplicationNpmrc,
+  validateWebApplicationPackageJson,
   validateWorkItem,
 } from "../lib/controls.mjs";
 
@@ -2139,44 +2148,51 @@ test("migration and release links must be bidirectional", () => {
 });
 
 test("product source and deployment paths outside conventional roots are rejected", () => {
-  const packageJson = readJson("package.json");
-  assert.throws(
-    () => validateNeutralPaths(["main.ts"], packageJson),
-    /product implementation paths/,
-  );
-  assert.throws(
-    () => validateNeutralPaths(["app/index.mjs"], packageJson),
-    /product implementation paths/,
-  );
-  assert.throws(
-    () => validateNeutralPaths(["index.mjs"], packageJson),
-    /product implementation paths/,
-  );
-  assert.throws(
-    () => validateNeutralPaths(["infra/main.tf"], packageJson),
-    /product implementation paths/,
-  );
-  assert.throws(
-    () => validateNeutralPaths(["deployment/k8s.yaml"], packageJson),
-    /product implementation paths/,
-  );
-  assert.throws(
-    () => validateNeutralPaths([".github/workflows/deploy.yml"], packageJson),
-    /product implementation paths/,
-  );
+  for (const [state, packageJson] of rootPackageFixtures()) {
+    assert.throws(
+      () => validateNeutralPaths(["main.ts"], packageJson, state),
+      /product implementation paths/,
+    );
+    assert.throws(
+      () => validateNeutralPaths(["app/index.mjs"], packageJson, state),
+      /product implementation paths/,
+    );
+    assert.throws(
+      () => validateNeutralPaths(["index.mjs"], packageJson, state),
+      /product implementation paths/,
+    );
+    assert.throws(
+      () => validateNeutralPaths(["infra/main.tf"], packageJson, state),
+      /product implementation paths/,
+    );
+    assert.throws(
+      () => validateNeutralPaths(["deployment/k8s.yaml"], packageJson, state),
+      /product implementation paths/,
+    );
+    assert.throws(
+      () =>
+        validateNeutralPaths(
+          [".github/workflows/deploy.yml"],
+          packageJson,
+          state,
+        ),
+      /product implementation paths/,
+    );
+  }
 });
 
 test("P1-009 migration path is allowed by the neutral repository control", () => {
-  const packageJson = readJson("package.json");
-
-  assert.doesNotThrow(() =>
-    validateNeutralPaths(
-      [
-        "supabase/migrations/20260918060600_p1_resources_communications_foundation.sql",
-      ],
-      packageJson,
-    ),
-  );
+  for (const [state, packageJson] of rootPackageFixtures()) {
+    assert.doesNotThrow(() =>
+      validateNeutralPaths(
+        [
+          "supabase/migrations/20260918060600_p1_resources_communications_foundation.sql",
+        ],
+        packageJson,
+        state,
+      ),
+    );
+  }
 });
 
 test("CI rejects shallow history that would break historical release validation", () => {
@@ -2196,9 +2212,10 @@ test("CI rejects injected deployment commands", () => {
 });
 
 test("package scripts reject executable product or deployment carriers", () => {
-  const packageJson = readJson("package.json");
-  packageJson.scripts.deploy = "node product-server.mjs";
-  assert.throws(() => validatePackageJson(packageJson), /scripts/);
+  for (const [state, packageJson] of rootPackageFixtures()) {
+    packageJson.scripts.deploy = "node product-server.mjs";
+    assert.throws(() => validatePackageJson(packageJson, state), /scripts/);
+  }
 });
 
 // Disposable filesystem fixtures exercise the actual register/drift entry points.
@@ -2767,31 +2784,36 @@ test("P1-004 closed baseline rejects its specific governed-value mutations", asy
 });
 
 test("Fast-Control package scripts remain explicit and dependency-neutral", () => {
-  const packageJson = JSON.parse(
+  const livePackageJson = JSON.parse(
     readFileSync(path.join(ROOT, "package.json"), "utf8"),
   );
 
-  assert.equal(
-    packageJson.scripts["rosuno:preflight"],
-    "node tools/p0/fast-control.mjs preflight",
-  );
+  for (const [state, packageJson] of [
+    [detectApplicationState({ packageJson: livePackageJson }), livePackageJson],
+    ...rootPackageFixtures(),
+  ]) {
+    assert.equal(
+      packageJson.scripts["rosuno:preflight"],
+      "node tools/p0/fast-control.mjs preflight",
+    );
 
-  assert.equal(
-    packageJson.scripts["rosuno:check"],
-    "node tools/p0/fast-control.mjs check",
-  );
+    assert.equal(
+      packageJson.scripts["rosuno:check"],
+      "node tools/p0/fast-control.mjs check",
+    );
 
-  assert.doesNotThrow(() => validatePackageJson(packageJson));
+    assert.doesNotThrow(() => validatePackageJson(packageJson, state));
 
-  const withoutPreflight = structuredClone(packageJson);
-  delete withoutPreflight.scripts["rosuno:preflight"];
+    const withoutPreflight = structuredClone(packageJson);
+    delete withoutPreflight.scripts["rosuno:preflight"];
 
-  assert.throws(() => validatePackageJson(withoutPreflight));
+    assert.throws(() => validatePackageJson(withoutPreflight, state));
 
-  const broadenedDependencies = structuredClone(packageJson);
-  broadenedDependencies.dependencies = { unexpected: "1.0.0" };
+    const broadenedDependencies = structuredClone(packageJson);
+    broadenedDependencies.dependencies = { unexpected: "1.0.0" };
 
-  assert.throws(() => validatePackageJson(broadenedDependencies));
+    assert.throws(() => validatePackageJson(broadenedDependencies, state));
+  }
 });
 
 test("P1-006 accepted closure remains valid under the current P1-011 baseline", () => {
@@ -3719,14 +3741,15 @@ test("P1-010 accepted closure remains valid under the current P1-011 baseline", 
 });
 
 test("P1-010 migration path is allowed by the neutral repository control", () => {
-  const packageJson = readJson("package.json");
-
-  assert.doesNotThrow(() =>
-    validateNeutralPaths(
-      ["supabase/migrations/20260919000112_p1_financial_foundation.sql"],
-      packageJson,
-    ),
-  );
+  for (const [state, packageJson] of rootPackageFixtures()) {
+    assert.doesNotThrow(() =>
+      validateNeutralPaths(
+        ["supabase/migrations/20260919000112_p1_financial_foundation.sql"],
+        packageJson,
+        state,
+      ),
+    );
+  }
 });
 test("P1-011 accepted Compliance closure requires exact lifecycle evidence and thirteen-migration baseline", () => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
@@ -3988,11 +4011,1957 @@ test("P1-011 historical pending representation remains valid against the accepte
 });
 
 test("P1-011 migration path is allowed by the neutral repository control", () => {
-  const packageJson = readJson("package.json");
+  for (const [state, packageJson] of rootPackageFixtures()) {
+    assert.doesNotThrow(() =>
+      validateNeutralPaths(
+        ["supabase/migrations/20260921051204_p1_compliance_foundation.sql"],
+        packageJson,
+        state,
+      ),
+    );
+  }
+});
+
+// P0 -> P2 application-surface control extension. These tests use frozen or
+// synthetic fixtures, or state-agnostic live checks, so the suite remains valid
+// in both the pre-application and the web-application repository state.
+
+test("application-surface fixtures reproduce the frozen pre-application base", () => {
+  assert.equal(
+    sha256Hex(`${JSON.stringify(preApplicationPackage(), null, 2)}\n`),
+    "e26108ebe939b4c41902703dd5824c5bd24f99faef8567c244102906ea5c99f5",
+  );
+  assert.equal(
+    sha256Hex(preApplicationWorkspace()),
+    "92cdb2655cbb147071d1d1e1be873cff94f7b6694fa4f9d49c9dc42a7ed094b7",
+  );
+  assert.equal(
+    sha256Hex(canonicalNpmrc()),
+    "1ded4f26f4851b35dae702edd5719d1be5ff31db6983858d088d5e6593ea7c99",
+  );
+  assert.equal(
+    JSON.stringify(ROOT_SCRIPT_PROFILES[PRE_APPLICATION_STATE]),
+    JSON.stringify(preApplicationPackage().scripts),
+  );
+  assert.deepEqual(
+    { ...ROOT_SCRIPT_PROFILES[WEB_APPLICATION_STATE] },
+    webApplicationPackage().scripts,
+  );
+  assert.ok(Object.isFrozen(ROOT_SCRIPT_PROFILES));
+  assert.ok(Object.isFrozen(ROOT_SCRIPT_PROFILES[PRE_APPLICATION_STATE]));
+  assert.ok(Object.isFrozen(ROOT_SCRIPT_PROFILES[WEB_APPLICATION_STATE]));
+});
+
+test("pre-application surface validates unchanged in the pre-application state", () => {
+  const surface = preApplicationSurface();
+
+  assert.equal(detectApplicationState(surface), PRE_APPLICATION_STATE);
+  assert.equal(validateApplicationSurface(surface), PRE_APPLICATION_STATE);
+  assert.doesNotThrow(() => validatePnpmWorkspace(preApplicationWorkspace()));
   assert.doesNotThrow(() =>
-    validateNeutralPaths(
-      ["supabase/migrations/20260921051204_p1_compliance_foundation.sql"],
+    validateNeutralPaths(neutralRepositoryFiles(), preApplicationPackage()),
+  );
+  assert.doesNotThrow(() => validatePackageJson(preApplicationPackage()));
+});
+
+test("live repository surface validates in its detected application state", () => {
+  const files = liveRepositoryFiles();
+  const packageJson = readJson("package.json");
+  const workspace = readFileSync(
+    path.join(ROOT, "pnpm-workspace.yaml"),
+    "utf8",
+  );
+  const state = detectApplicationState({ files, packageJson, workspace });
+
+  assert.equal(
+    validateApplicationSurface({
+      files,
       packageJson,
+      workspace,
+      webPackageJson: files.includes("apps/web/package.json")
+        ? readJson("apps/web/package.json")
+        : null,
+      npmrc: files.includes(".npmrc")
+        ? readFileSync(path.join(ROOT, ".npmrc"), "utf8")
+        : null,
+    }),
+    state,
+  );
+  assert.doesNotThrow(() =>
+    validateCiWorkflow(
+      readFileSync(
+        path.join(ROOT, ".github/workflows/p0-controls.yml"),
+        "utf8",
+      ),
     ),
   );
 });
+
+test("complete coherent web-application surface validates", () => {
+  const surface = webApplicationSurface();
+
+  assert.equal(detectApplicationState(surface), WEB_APPLICATION_STATE);
+  assert.equal(validateApplicationSurface(surface), WEB_APPLICATION_STATE);
+  assert.equal(
+    validateApplicationSurface(webApplicationSurface({ npmrc: null })),
+    WEB_APPLICATION_STATE,
+  );
+});
+
+for (const [signal, surface, rejection] of [
+  [
+    "an apps/web repository path",
+    () =>
+      preApplicationSurface({
+        files: [...neutralRepositoryFiles(), "apps/web/app/page.tsx"],
+      }),
+    /workspace packages must be exactly apps\/web/,
+  ],
+  [
+    "a workspace declaration of apps/web",
+    () => preApplicationSurface({ workspace: webApplicationWorkspace() }),
+    /package scripts must match the P2 web-application control allowlist/,
+  ],
+  [
+    "the root p2:application-shell:test script",
+    () =>
+      preApplicationSurface({
+        packageJson: withScripts(preApplicationPackage(), {
+          "p2:application-shell:test":
+            "pnpm --filter @rosuno/web run test:application-shell",
+        }),
+      }),
+    /workspace packages must be exactly apps\/web/,
+  ],
+  [
+    "an application-aware root build script",
+    () =>
+      preApplicationSurface({
+        packageJson: withScripts(preApplicationPackage(), {
+          build: "pnpm --filter @rosuno/web run build",
+        }),
+      }),
+    /workspace packages must be exactly apps\/web/,
+  ],
+  [
+    "an application-aware root format:check script",
+    () =>
+      preApplicationSurface({
+        packageJson: withScripts(preApplicationPackage(), {
+          "format:check": webApplicationPackage().scripts["format:check"],
+        }),
+      }),
+    /workspace packages must be exactly apps\/web/,
+  ],
+  [
+    "an application-aware root p0:test script",
+    () =>
+      preApplicationSurface({
+        packageJson: withScripts(preApplicationPackage(), {
+          "p0:test":
+            "node --test tools/p0/tests/*.test.mjs && pnpm run p2:application-shell:test",
+        }),
+      }),
+    /workspace packages must be exactly apps\/web/,
+  ],
+]) {
+  test(`${signal} alone selects the complete web-application contract and fails closed`, () => {
+    assert.equal(detectApplicationState(surface()), WEB_APPLICATION_STATE);
+    assert.throws(() => validateApplicationSurface(surface()), rejection);
+  });
+}
+
+test("partial or mixed web-application configurations fail closed", () => {
+  for (const [name, surface, rejection] of [
+    [
+      "application paths with the neutral workspace",
+      preApplicationSurface({
+        files: webApplicationFiles(),
+        packageJson: webApplicationPackage(),
+        webPackageJson: webApplicationManifest(),
+      }),
+      /workspace packages must be exactly apps\/web/,
+    ],
+    [
+      "workspace apps/web without an application manifest",
+      webApplicationSurface({
+        files: neutralRepositoryFiles(),
+        webPackageJson: null,
+      }),
+      /web-application state requires apps\/web\/package\.json/,
+    ],
+    [
+      "web-application root scripts without the workspace or manifest",
+      preApplicationSurface({ packageJson: webApplicationPackage() }),
+      /workspace packages must be exactly apps\/web/,
+    ],
+    [
+      "web-application workspace and manifest with neutral root scripts",
+      webApplicationSurface({ packageJson: preApplicationPackage() }),
+      /package scripts must match the P2 web-application control allowlist/,
+    ],
+    [
+      "application sources without a listed manifest",
+      webApplicationSurface({
+        files: webApplicationFiles().filter(
+          (file) => file !== "apps/web/package.json",
+        ),
+      }),
+      /web-application state requires apps\/web\/package\.json/,
+    ],
+    [
+      "a listed manifest that was not provided",
+      webApplicationSurface({ webPackageJson: null }),
+      /web-application state requires apps\/web\/package\.json/,
+    ],
+    [
+      "an invalid application manifest",
+      webApplicationSurface({
+        webPackageJson: { ...webApplicationManifest(), private: false },
+      }),
+      /apps\/web\/package\.json must be private/,
+    ],
+    [
+      "a pre-application surface carrying an application manifest",
+      preApplicationSurface({ webPackageJson: webApplicationManifest() }),
+      /pre-application state must not include an application manifest/,
+    ],
+  ]) {
+    assert.throws(() => validateApplicationSurface(surface), rejection, name);
+  }
+});
+
+test("comments and adjacent paths are not application-enablement signals", () => {
+  const commented = `# apps/web is added later by WI-P2-001\n${preApplicationWorkspace()}`;
+
+  assert.equal(
+    validateApplicationSurface(preApplicationSurface({ workspace: commented })),
+    PRE_APPLICATION_STATE,
+  );
+
+  for (const file of [
+    "apps/webx/page.tsx",
+    "apps/web-admin/page.tsx",
+    "apps/web",
+    "apps/api/index.ts",
+  ]) {
+    const surface = preApplicationSurface({
+      files: [...neutralRepositoryFiles(), file],
+    });
+
+    assert.equal(detectApplicationState(surface), PRE_APPLICATION_STATE, file);
+    assert.throws(
+      () => validateApplicationSurface(surface),
+      /product implementation paths/,
+      file,
+    );
+  }
+});
+
+test("unknown application states and malformed surfaces fail closed", () => {
+  for (const state of [
+    "web",
+    "WEB-APPLICATION",
+    "__proto__",
+    "constructor",
+    null,
+    1,
+    {},
+  ]) {
+    assert.throws(
+      () => validatePackageJson(preApplicationPackage(), state),
+      /unknown repository application state/,
+    );
+    assert.throws(
+      () => validatePnpmWorkspace(preApplicationWorkspace(), state),
+      /unknown repository application state/,
+    );
+    assert.throws(
+      () =>
+        validateNeutralPaths(
+          neutralRepositoryFiles(),
+          preApplicationPackage(),
+          state,
+        ),
+      /unknown repository application state/,
+    );
+  }
+
+  assert.throws(
+    () => validatePackageJson(null),
+    /root package\.json must be a JSON object/,
+  );
+  assert.throws(
+    () => validatePnpmWorkspace(undefined),
+    /pnpm-workspace\.yaml must be text/,
+  );
+  assert.throws(
+    () =>
+      validateApplicationSurface({
+        ...preApplicationSurface(),
+        files: "package.json",
+      }),
+    /repository file list must be an array of paths/,
+  );
+  assert.equal(detectApplicationState(), PRE_APPLICATION_STATE);
+  assert.equal(
+    detectApplicationState({
+      files: "apps/web/package.json",
+      packageJson: null,
+      workspace: 1,
+    }),
+    PRE_APPLICATION_STATE,
+  );
+  assert.equal(
+    detectApplicationState({ workspace: "packages: [" }),
+    PRE_APPLICATION_STATE,
+  );
+});
+
+test("web-application state permits apps/web as the only new product root", () => {
+  assert.doesNotThrow(() =>
+    validateNeutralPaths(
+      [
+        ...neutralRepositoryFiles(),
+        "apps/web/package.json",
+        "apps/web/app/layout.tsx",
+        "apps/web/app/page.tsx",
+        "apps/web/app/(shell)/loading.tsx",
+        "apps/web/tests/application-shell.test.mjs",
+        "apps/web/tsconfig.json",
+        "apps/web/next.config.mjs",
+        "apps/web/next-env.d.ts",
+        "apps/web/public/robots.txt",
+        "apps/web/.gitignore",
+      ],
+      webApplicationPackage(),
+      WEB_APPLICATION_STATE,
+    ),
+  );
+
+  for (const [state, packageJson] of rootPackageFixtures()) {
+    for (const file of [
+      "apps/api/index.ts",
+      "apps/admin/page.tsx",
+      "apps/other/index.ts",
+      "apps/web-admin/page.tsx",
+      "apps/webx/page.tsx",
+      "apps/web",
+      "apps/index.ts",
+      "apps/web/../api/index.ts",
+      "apps/web/./page.tsx",
+      "apps/web//page.tsx",
+      "packages/ui/index.ts",
+      "main.ts",
+      "index.mjs",
+      "app/page.tsx",
+      "src/index.ts",
+      "infra/main.tf",
+      "deployment/k8s.yaml",
+      "Dockerfile",
+      ".github/workflows/deploy.yml",
+      ".github/workflows/p2-web.yml",
+    ]) {
+      assert.throws(
+        () => validateNeutralPaths([file], packageJson, state),
+        /product implementation paths/,
+        `${state}: ${file}`,
+      );
+    }
+  }
+
+  assert.throws(
+    () =>
+      validateNeutralPaths(
+        ["apps/web/app/page.tsx"],
+        preApplicationPackage(),
+        PRE_APPLICATION_STATE,
+      ),
+    /product implementation paths/,
+  );
+});
+
+test("workspace formatting variants validate in their application state", () => {
+  const pre = preApplicationWorkspace();
+  const excludes =
+    'minimumReleaseAgeExclude:\n  - "@replit/*"\n  - stripe-replit-sync\n';
+  const variants = [
+    [PRE_APPLICATION_STATE, pre.replaceAll("\n", "\r\n")],
+    [PRE_APPLICATION_STATE, pre.replaceAll("\n", "\r")],
+    [PRE_APPLICATION_STATE, `\uFEFF${pre}`],
+    [PRE_APPLICATION_STATE, `---\n${pre}`],
+    [PRE_APPLICATION_STATE, `--- # pnpm workspace\n${pre}`],
+    [
+      PRE_APPLICATION_STATE,
+      `# Rosuno workspace\n\n${pre.replace(
+        "minimumReleaseAge: 1440",
+        "minimumReleaseAge: 1440 # one day",
+      )}\n# end\n`,
+    ],
+    [
+      PRE_APPLICATION_STATE,
+      "autoInstallPeers: false\npackages: []\nminimumReleaseAgeExclude:\n  - stripe-replit-sync\n  - '@replit/*'\nminimumReleaseAge: 1440\n",
+    ],
+    [PRE_APPLICATION_STATE, pre.replace("packages: []", "packages:  [ ]")],
+    [PRE_APPLICATION_STATE, pre.replace("packages: []", "packages : []")],
+    [
+      PRE_APPLICATION_STATE,
+      pre
+        .replace("packages: []", '"packages": []')
+        .replace("autoInstallPeers", "'autoInstallPeers'"),
+    ],
+    [
+      PRE_APPLICATION_STATE,
+      pre.replace(
+        excludes,
+        'minimumReleaseAgeExclude:\n- "@replit/*"\n- stripe-replit-sync\n',
+      ),
+    ],
+    [
+      PRE_APPLICATION_STATE,
+      pre.replace(
+        excludes,
+        'minimumReleaseAgeExclude:\n    - "@replit/*"\n    - stripe-replit-sync\n',
+      ),
+    ],
+    [
+      PRE_APPLICATION_STATE,
+      pre.replace(
+        excludes,
+        'minimumReleaseAgeExclude: ["@replit/*", stripe-replit-sync]\n',
+      ),
+    ],
+    [
+      PRE_APPLICATION_STATE,
+      pre.replace(
+        excludes,
+        'minimumReleaseAgeExclude: [\n  "@replit/*", # Replit packages\n  "stripe-replit-sync",\n]\n',
+      ),
+    ],
+    [
+      PRE_APPLICATION_STATE,
+      pre.replace("minimumReleaseAge: 1440", "minimumReleaseAge:\n  1440"),
+    ],
+    [
+      PRE_APPLICATION_STATE,
+      pre.replace("minimumReleaseAge: 1440", "minimumReleaseAge: +1440"),
+    ],
+    [
+      PRE_APPLICATION_STATE,
+      pre.replace("autoInstallPeers: false", "autoInstallPeers:\tFalse"),
+    ],
+    [
+      PRE_APPLICATION_STATE,
+      pre.replace("autoInstallPeers: false", "autoInstallPeers: FALSE   "),
+    ],
+    [PRE_APPLICATION_STATE, `${pre}strictPeerDependencies: false\n`],
+    [WEB_APPLICATION_STATE, webApplicationWorkspace()],
+    [WEB_APPLICATION_STATE, webApplicationWorkspace().replaceAll("\n", "\r\n")],
+    [
+      WEB_APPLICATION_STATE,
+      pre.replace("packages: []", "packages: [apps/web]"),
+    ],
+    [
+      WEB_APPLICATION_STATE,
+      pre.replace("packages: []", 'packages: ["apps/web"]'),
+    ],
+    [
+      WEB_APPLICATION_STATE,
+      pre.replace(
+        "packages: []",
+        "packages:\n- 'apps/web' # the only application workspace",
+      ),
+    ],
+    [
+      WEB_APPLICATION_STATE,
+      pre.replace("packages: []", "packages: [\n  apps/web,\n]"),
+    ],
+    [
+      WEB_APPLICATION_STATE,
+      `packages:\n    - apps/web\n${pre.replace("packages: []\n", "")}`,
+    ],
+    [
+      WEB_APPLICATION_STATE,
+      `${webApplicationWorkspace()}ignoredBuiltDependencies:\n  - esbuild\nstrictDepBuilds: true\n`,
+    ],
+  ];
+
+  for (const [state, text] of variants) {
+    assert.doesNotThrow(
+      () => validatePnpmWorkspace(text, state),
+      `${state}: ${JSON.stringify(text)}`,
+    );
+  }
+});
+
+test("workspace package declarations are exact for each application state", () => {
+  const pre = preApplicationWorkspace();
+  const withPackages = (entries) =>
+    pre.replace(
+      "packages: []",
+      `packages:\n${entries.map((entry) => `  - ${entry}`).join("\n")}`,
+    );
+
+  for (const entries of [
+    ["apps/*"],
+    ["apps/**"],
+    ["packages/*"],
+    ["apps/web", "apps/api"],
+    ["apps/web", "apps/web"],
+    ["apps/web", "packages/*"],
+    ["./apps/web"],
+    ["apps/web/"],
+    ["'!apps/web'"],
+    ["."],
+    [".."],
+    ["apps/web/**"],
+    ['"apps/web "'],
+    ["APPS/WEB"],
+    ["apps"],
+  ]) {
+    assert.throws(
+      () => validatePnpmWorkspace(withPackages(entries), WEB_APPLICATION_STATE),
+      /workspace packages must be exactly apps\/web/,
+      entries.join(", "),
+    );
+    assert.throws(
+      () => validatePnpmWorkspace(withPackages(entries), PRE_APPLICATION_STATE),
+      /workspace packages must remain empty/,
+      entries.join(", "),
+    );
+  }
+
+  assert.throws(
+    () => validatePnpmWorkspace(pre, WEB_APPLICATION_STATE),
+    /workspace packages must be exactly apps\/web/,
+  );
+  assert.throws(
+    () =>
+      validatePnpmWorkspace(webApplicationWorkspace(), PRE_APPLICATION_STATE),
+    /workspace packages must remain empty/,
+  );
+
+  for (const state of [PRE_APPLICATION_STATE, WEB_APPLICATION_STATE]) {
+    for (const text of [
+      pre.replace("packages: []\n", ""),
+      pre.replace("packages: []", "packages:"),
+      pre.replace("packages: []", "packages: # none"),
+    ]) {
+      assert.throws(
+        () => validatePnpmWorkspace(text, state),
+        /pnpm-workspace\.yaml must declare packages/,
+      );
+    }
+
+    for (const text of [
+      pre.replace("packages: []", "packages: apps/web"),
+      pre.replace("packages: []", "packages: {apps/web: null}"),
+      pre.replace("packages: []", "packages:\n  - [apps/web]"),
+      pre.replace("packages: []", "packages: ~"),
+    ]) {
+      assert.throws(
+        () => validatePnpmWorkspace(text, state),
+        /workspace packages must be a sequence of strings/,
+      );
+    }
+  }
+});
+
+test("workspace dependency-safety settings cannot change", () => {
+  const pre = preApplicationWorkspace();
+  const excludes =
+    'minimumReleaseAgeExclude:\n  - "@replit/*"\n  - stripe-replit-sync\n';
+
+  for (const state of [PRE_APPLICATION_STATE, WEB_APPLICATION_STATE]) {
+    const base =
+      state === PRE_APPLICATION_STATE ? pre : webApplicationWorkspace();
+
+    for (const value of [
+      "0",
+      "1441",
+      "1439",
+      "-1440",
+      '"1440"',
+      "'1440'",
+      "1440.0",
+      "0x5A0",
+      "1_440",
+      "01440",
+      "14.4e2",
+      "~",
+      "true",
+      "1440 minutes",
+      "[1440]",
+    ]) {
+      assert.throws(
+        () =>
+          validatePnpmWorkspace(
+            base.replace(
+              "minimumReleaseAge: 1440",
+              `minimumReleaseAge: ${value}`,
+            ),
+            state,
+          ),
+        /workspace minimumReleaseAge must remain 1440/,
+        value,
+      );
+    }
+
+    for (const entries of [
+      [],
+      ['"@replit/*"'],
+      ["stripe-replit-sync"],
+      ['"@replit/*"', "stripe-replit-sync", "next"],
+      ['"@replit/**"', "stripe-replit-sync"],
+      ['"@replit/*"', "stripe-replit-sync", "stripe-replit-sync"],
+      ['"@replit/*"', '"@replit/*"'],
+      ['"*"', "stripe-replit-sync"],
+      ['"@replit/*"', "Stripe-Replit-Sync"],
+    ]) {
+      assert.throws(
+        () =>
+          validatePnpmWorkspace(
+            base.replace(
+              excludes,
+              `minimumReleaseAgeExclude: [${entries.join(", ")}]\n`,
+            ),
+            state,
+          ),
+        /workspace minimumReleaseAgeExclude must remain exactly @replit\/\* and stripe-replit-sync/,
+        entries.join(", "),
+      );
+    }
+
+    for (const value of [
+      "true",
+      "True",
+      '"false"',
+      "'false'",
+      "no",
+      "off",
+      "0",
+      "n",
+      "null",
+      "[false]",
+    ]) {
+      assert.throws(
+        () =>
+          validatePnpmWorkspace(
+            base.replace(
+              "autoInstallPeers: false",
+              `autoInstallPeers: ${value}`,
+            ),
+            state,
+          ),
+        /workspace autoInstallPeers must remain false/,
+        value,
+      );
+    }
+
+    for (const [text, rejection] of [
+      [
+        base.replace("minimumReleaseAge: 1440\n", ""),
+        /must declare minimumReleaseAge$/,
+      ],
+      [base.replace(excludes, ""), /must declare minimumReleaseAgeExclude/],
+      [
+        base.replace(excludes, 'minimumReleaseAgeExclude: "@replit/*"\n'),
+        /workspace minimumReleaseAgeExclude must be a sequence of strings/,
+      ],
+      [
+        base.replace("autoInstallPeers: false\n", ""),
+        /must declare autoInstallPeers/,
+      ],
+      [
+        base.replace("autoInstallPeers: false", "autoInstallPeers:"),
+        /must declare autoInstallPeers/,
+      ],
+      [`${base}autoInstallPeers: true\n`, /must not repeat mapping key/],
+      [`${base}'minimumReleaseAge': 0\n`, /must not repeat mapping key/],
+      [`packages: [apps/web]\n${base}`, /must not repeat mapping key/],
+    ]) {
+      assert.throws(
+        () => validatePnpmWorkspace(text, state),
+        rejection,
+        `${state}: ${JSON.stringify(text)}`,
+      );
+    }
+  }
+});
+
+test("unsupported pnpm-workspace.yaml constructs fail closed", () => {
+  for (const [state, base, declaration, packages] of [
+    [PRE_APPLICATION_STATE, preApplicationWorkspace(), "packages: []", "[]"],
+    [
+      WEB_APPLICATION_STATE,
+      webApplicationWorkspace(),
+      "packages:\n  - apps/web",
+      "[apps/web]",
+    ],
+  ]) {
+    for (const [name, text] of Object.entries({
+      "anchor on a governed setting": base.replace(
+        declaration,
+        `packages: &workspace ${packages}`,
+      ),
+      "alias for a governed setting": base.replace(
+        declaration,
+        `listed: &listed ${packages}\npackages: *listed`,
+      ),
+      "tag on a governed sequence": base.replace(
+        declaration,
+        `packages: !!seq ${packages}`,
+      ),
+      "tag on a governed number": base.replace(
+        "minimumReleaseAge: 1440",
+        "minimumReleaseAge: !!int 1440",
+      ),
+      "tag on a governed boolean": base.replace(
+        "autoInstallPeers: false",
+        "autoInstallPeers: !!bool false",
+      ),
+      "anchor on a governed entry": base.replace(
+        "  - stripe-replit-sync",
+        "  - &sync stripe-replit-sync",
+      ),
+      "merge key": `${base}<<: {packages: [apps/web]}\n`,
+      "complex mapping key": `? packages\n: ${packages}\n${base.replace(`${declaration}\n`, "")}`,
+      "block scalar on a governed setting": base.replace(
+        "minimumReleaseAge: 1440",
+        "minimumReleaseAge: |\n  1440",
+      ),
+      "block scalar on another setting": `${base}note: >\n  folded text\n`,
+      "double-quoted escape": base.replace('"@replit/*"', '"\\x40replit/*"'),
+      "multi-line quoted scalar": base.replace(
+        '  - "@replit/*"',
+        '  - "@replit/\n    *"',
+      ),
+      "multi-line plain scalar": base.replace(
+        "minimumReleaseAge: 1440",
+        "minimumReleaseAge: 14\n  40",
+      ),
+      "plain continuation hiding a later key": `${base}notes:\n  first: some long\n    [text continues\noverrides:\n  react: npm:evil-react@1.0.0\nlast: text ]\n`,
+      "tab indentation": base.replace(
+        "  - stripe-replit-sync",
+        "\t- stripe-replit-sync",
+      ),
+      "YAML directive": `%YAML 1.2\n---\n${base}`,
+      "second document": `${base}---\npackages: [apps/web]\n`,
+      "document end marker": `${base}...\n`,
+      "content on the document start line": `--- {packages: ${packages}}\n`,
+      "unterminated flow collection": base.replace(declaration, "packages: ["),
+      "unbalanced flow collection": base.replace(
+        declaration,
+        `packages: ${packages}]`,
+      ),
+      "mismatched flow collection": base.replace(declaration, "packages: [}"),
+      "empty flow entry": base.replace(declaration, "packages: [apps/web,,]"),
+      "mapping inside a flow sequence": base.replace(
+        declaration,
+        "packages: [apps/web: true]",
+      ),
+      "nested compact sequence": `${base}extra:\n  - - nested\n`,
+      "unexpected indentation": base.replace(
+        "autoInstallPeers: false",
+        "  autoInstallPeers: false",
+      ),
+      "top-level sequence": "- packages\n",
+      "top-level flow mapping": `{packages: ${packages}, minimumReleaseAge: 1440}\n`,
+      "top-level scalar": "packages\n",
+    })) {
+      assert.throws(
+        () => validatePnpmWorkspace(text, state),
+        /unsupported pnpm-workspace\.yaml construct/,
+        `${state}: ${name}`,
+      );
+    }
+  }
+});
+
+test("environment-substituted workspace keys cannot reach governed or prohibited settings", () => {
+  for (const [state, base] of [
+    [PRE_APPLICATION_STATE, preApplicationWorkspace()],
+    [WEB_APPLICATION_STATE, webApplicationWorkspace()],
+  ]) {
+    for (const [line, setting] of [
+      ["${UNSET-minimumReleaseAge}: 0", "packages"],
+      ["${UNSET:-autoInstallPeers}: true", "packages"],
+      ["minimumRelease${AGE_SUFFIX}: 0", "minimumReleaseAge"],
+      ["${PREFIX}ReleaseAgeExclude: []", "minimumReleaseAgeExclude"],
+      ["auto${INSTALL}Peers: true", "autoInstallPeers"],
+    ]) {
+      assert.throws(
+        () => validatePnpmWorkspace(`${base}${line}\n`, state),
+        new RegExp(
+          `may resolve to ${setting} through environment substitution`,
+        ),
+        `${state}: ${line}`,
+      );
+    }
+
+    for (const line of [
+      "\\${UNSET-packages}: literal",
+      "\\\\${UNSET-packages}: escaped",
+      "prefix-${VALUE}: text",
+      "${VALUE}-suffix: text",
+    ]) {
+      assert.doesNotThrow(
+        () => validatePnpmWorkspace(`${base}${line}\n`, state),
+        `${state}: ${line}`,
+      );
+    }
+  }
+
+  for (const [line, setting] of [
+    ["over${SUFFIX}: {}", "overrides"],
+    ["pnpm${SUFFIX}: hooks.cjs", "pnpmfile"],
+    ["${SCOPE}Pnpmfile: hooks.cjs", "globalPnpmfile"],
+    ["${UNSET-only}BuiltDependencies: [evil-package]", "onlyBuiltDependencies"],
+    ["node${SUFFIX}: --require ./preload.cjs", "nodeOptions"],
+    ["script${SUFFIX}: /opt/tools/shell", "scriptShell"],
+  ]) {
+    assert.doesNotThrow(
+      () =>
+        validatePnpmWorkspace(
+          `${preApplicationWorkspace()}${line}\n`,
+          PRE_APPLICATION_STATE,
+        ),
+      line,
+    );
+    assert.throws(
+      () =>
+        validatePnpmWorkspace(
+          `${webApplicationWorkspace()}${line}\n`,
+          WEB_APPLICATION_STATE,
+        ),
+      new RegExp(`may resolve to ${setting} through environment substitution`),
+      line,
+    );
+  }
+});
+
+test("web-application workspace rejects dependency, build-script, hook, and script-runtime settings", () => {
+  const web = webApplicationWorkspace();
+
+  for (const [setting, payload] of Object.entries({
+    overrides: "\n  react: npm:evil-react@1.0.0",
+    packageExtensions:
+      '\n  "react@*":\n    dependencies:\n      evil-package: 1.0.0',
+    patchedDependencies: "\n  react@1.0.0: patches/react.patch",
+    catalog: "\n  react: npm:evil-react@1.0.0",
+    catalogs: "\n  default:\n    react: 1.0.0",
+    configDependencies: "\n  evil-config: 1.0.0",
+    dangerouslyAllowAllBuilds: " true",
+    onlyBuiltDependencies: "\n  - evil-package",
+    onlyBuiltDependenciesFile: " build-allowlist.json",
+    neverBuiltDependencies: " []",
+    allowBuilds: "\n  evil-package: true",
+    pnpmfile: " hooks/pnpmfile.cjs",
+    globalPnpmfile: " /opt/hooks/pnpmfile.cjs",
+    nodeOptions: " --require ./preload.cjs",
+    scriptShell: " /opt/tools/shell",
+  })) {
+    for (const key of [setting, `"${setting}"`, `'${setting}'`]) {
+      assert.throws(
+        () =>
+          validatePnpmWorkspace(
+            `${web}${key}:${payload}\n`,
+            WEB_APPLICATION_STATE,
+          ),
+        new RegExp(
+          `web-application pnpm-workspace\\.yaml must not set ${setting}$`,
+        ),
+        key,
+      );
+    }
+  }
+});
+
+test("web-application workspace rejects a __proto__ mapping that pnpm copies into its settings", () => {
+  const web = webApplicationWorkspace();
+
+  for (const key of ["__proto__", '"__proto__"', "'__proto__'"]) {
+    assert.throws(
+      () =>
+        validatePnpmWorkspace(
+          `${web}${key}:\n  nodeOptions: --require ./preload.cjs\n  overrides:\n    react: npm:evil-react@1.0.0\n`,
+          WEB_APPLICATION_STATE,
+        ),
+      /web-application pnpm-workspace\.yaml must not set __proto__$/,
+      key,
+    );
+  }
+
+  assert.throws(
+    () =>
+      validatePnpmWorkspace(
+        `${web}__proto\${SUFFIX}:\n  scriptShell: /opt/tools/shell\n`,
+        WEB_APPLICATION_STATE,
+      ),
+    /may resolve to __proto__ through environment substitution/,
+  );
+});
+
+test("web-application state rejects the runtime-selection settings pnpm 10.26.1 honors", () => {
+  const rootExecutionEnv = webApplicationPackage();
+  rootExecutionEnv.pnpm = { executionEnv: { nodeVersion: "22.0.0" } };
+  assert.throws(
+    () => validatePackageJson(rootExecutionEnv, WEB_APPLICATION_STATE),
+    /web-application root package\.json must not set pnpm\.executionEnv$/,
+  );
+
+  const web = webApplicationWorkspace();
+  for (const [text, setting] of [
+    [`${web}useNodeVersion: 22.0.0\n`, "useNodeVersion"],
+    [`${web}"useNodeVersion": 22.0.0\n`, "useNodeVersion"],
+    [`${web}executionEnv:\n  nodeVersion: 22.0.0\n`, "executionEnv"],
+    [`${web}'executionEnv': {nodeVersion: 22.0.0}\n`, "executionEnv"],
+  ]) {
+    assert.throws(
+      () => validatePnpmWorkspace(text, WEB_APPLICATION_STATE),
+      new RegExp(
+        `web-application pnpm-workspace\\.yaml must not set ${setting}$`,
+      ),
+      text,
+    );
+  }
+  for (const [line, setting] of [
+    ["useNode${SUFFIX}: 22.0.0", "useNodeVersion"],
+    ["execution${SUFFIX}:\n  nodeVersion: 22.0.0", "executionEnv"],
+  ]) {
+    assert.throws(
+      () => validatePnpmWorkspace(`${web}${line}\n`, WEB_APPLICATION_STATE),
+      new RegExp(`may resolve to ${setting} through environment substitution`),
+      line,
+    );
+  }
+
+  for (const line of [
+    "use-node-version=22.0.0",
+    "  use-node-version = 22.0.0",
+    '"use-node-version"=22.0.0',
+    "use-node-version;note=22.0.0",
+    "[use-node-version]",
+    "use-node-${KIND}=22.0.0",
+  ]) {
+    assert.throws(
+      () => validateWebApplicationNpmrc(`${canonicalNpmrc()}${line}\n`),
+      /web-application root \.npmrc must not set use-node-version \(key /,
+      line,
+    );
+  }
+
+  const manifest = webApplicationManifest();
+  manifest.pnpm = { executionEnv: { nodeVersion: "22.0.0" } };
+  assert.throws(
+    () => validateWebApplicationPackageJson(manifest),
+    /apps\/web\/package\.json must not set pnpm\.executionEnv/,
+  );
+
+  // Spellings and locations that pnpm 10.26.1 does not honor for runtime
+  // selection are not targeted.
+  const nearMissRoot = webApplicationPackage();
+  nearMissRoot.pnpm = { useNodeVersion: "22.0.0" };
+  nearMissRoot.executionEnv = { nodeVersion: "22.0.0" };
+  assert.doesNotThrow(() =>
+    validatePackageJson(nearMissRoot, WEB_APPLICATION_STATE),
+  );
+  assert.doesNotThrow(() =>
+    validatePnpmWorkspace(
+      `${web}use-node-version: 22.0.0\nexecution-env:\n  nodeVersion: 22.0.0\n`,
+      WEB_APPLICATION_STATE,
+    ),
+  );
+  assert.doesNotThrow(() =>
+    validateWebApplicationNpmrc(
+      `${canonicalNpmrc()}execution-env='{"nodeVersion":"22.0.0"}'\nuseNodeVersion=22.0.0\n`,
+    ),
+  );
+
+  assert.equal(
+    validateApplicationSurface(preApplicationSurface()),
+    PRE_APPLICATION_STATE,
+  );
+});
+
+test("web-application state rejects the dependency-audit suppression settings pnpm 10.26.1 honors", () => {
+  for (const auditConfig of [
+    { ignoreCves: ["CVE-0000-0000"] },
+    { ignoreGhsas: ["GHSA-0000-0000-0000"] },
+    {},
+  ]) {
+    const packageJson = webApplicationPackage();
+    packageJson.pnpm = { auditConfig };
+    assert.throws(
+      () => validatePackageJson(packageJson, WEB_APPLICATION_STATE),
+      /web-application root package\.json must not set pnpm\.auditConfig$/,
+    );
+  }
+
+  const web = webApplicationWorkspace();
+  for (const [setting, payload] of [
+    ["auditConfig", "\n  ignoreCves:\n    - CVE-0000-0000"],
+    ["auditConfig", "\n  ignoreGhsas:\n    - GHSA-0000-0000-0000"],
+    ["ignore", "\n  - GHSA-0000-0000-0000"],
+    ["ignoreUnfixable", " true"],
+    ["fix", " true"],
+  ]) {
+    for (const key of [setting, `"${setting}"`, `'${setting}'`]) {
+      assert.throws(
+        () =>
+          validatePnpmWorkspace(
+            `${web}${key}:${payload}\n`,
+            WEB_APPLICATION_STATE,
+          ),
+        new RegExp(
+          `web-application pnpm-workspace\\.yaml must not set ${setting}$`,
+        ),
+        key,
+      );
+    }
+  }
+  for (const [line, setting] of [
+    ["audit${SUFFIX}: {}", "auditConfig"],
+    ["ignore${SUFFIX}: true", "ignore"],
+    ["ignoreUnfix${SUFFIX}: true", "ignoreUnfixable"],
+  ]) {
+    assert.throws(
+      () => validatePnpmWorkspace(`${web}${line}\n`, WEB_APPLICATION_STATE),
+      new RegExp(`may resolve to ${setting} through environment substitution`),
+      line,
+    );
+  }
+
+  // Spellings and locations that pnpm 10.26.1 does not honor for
+  // `pnpm audit --audit-level=high` are not targeted, including the audit
+  // level that the explicit command-line flag overrides.
+  const nearMissRoot = webApplicationPackage();
+  nearMissRoot.auditConfig = { ignoreCves: ["CVE-0000-0000"] };
+  assert.doesNotThrow(() =>
+    validatePackageJson(nearMissRoot, WEB_APPLICATION_STATE),
+  );
+  assert.doesNotThrow(() =>
+    validatePnpmWorkspace(
+      `${web}audit-config:\n  ignoreCves:\n    - CVE-0000-0000\nignore-unfixable: true\nauditLevel: critical\n`,
+      WEB_APPLICATION_STATE,
+    ),
+  );
+  assert.doesNotThrow(() =>
+    validateWebApplicationNpmrc(
+      `${canonicalNpmrc()}audit-config='{"ignoreCves":["CVE-0000-0000"]}'\nignore-unfixable=true\nignore=GHSA-0000-0000-0000\nfix=true\naudit-level=critical\n`,
+    ),
+  );
+
+  assert.equal(
+    validateApplicationSurface(preApplicationSurface()),
+    PRE_APPLICATION_STATE,
+  );
+});
+
+test("web-application root script profile is exact", () => {
+  const web = webApplicationPackage();
+
+  assert.doesNotThrow(() => validatePackageJson(web, WEB_APPLICATION_STATE));
+  assert.doesNotThrow(() =>
+    validatePackageJson(
+      {
+        ...web,
+        scripts: Object.fromEntries(Object.entries(web.scripts).reverse()),
+      },
+      WEB_APPLICATION_STATE,
+    ),
+  );
+  assert.doesNotThrow(() =>
+    validatePackageJson(preApplicationPackage(), PRE_APPLICATION_STATE),
+  );
+  assert.throws(
+    () => validatePackageJson(web, PRE_APPLICATION_STATE),
+    /package scripts must match the P0 control allowlist/,
+  );
+  assert.throws(
+    () => validatePackageJson(preApplicationPackage(), WEB_APPLICATION_STATE),
+    /package scripts must match the P2 web-application control allowlist/,
+  );
+
+  for (const [name, scripts] of [
+    [
+      "missing p2:application-shell:test",
+      { "p2:application-shell:test": undefined },
+    ],
+    [
+      "p0:test without the P2 shell test",
+      { "p0:test": "node --test tools/p0/tests/*.test.mjs" },
+    ],
+    [
+      "p0:test chained with a semicolon",
+      {
+        "p0:test":
+          "node --test tools/p0/tests/*.test.mjs; pnpm run p2:application-shell:test",
+      },
+    ],
+    [
+      "p0:test chained with ||",
+      {
+        "p0:test":
+          "node --test tools/p0/tests/*.test.mjs || pnpm run p2:application-shell:test",
+      },
+    ],
+    [
+      "p0:test running the shell test only",
+      { "p0:test": "pnpm run p2:application-shell:test" },
+    ],
+    [
+      "format:check omitting apps/web",
+      { "format:check": preApplicationPackage().scripts["format:check"] },
+    ],
+    [
+      "format:check with a broader application glob",
+      {
+        "format:check": web.scripts["format:check"].replace(
+          "apps/web/**",
+          "apps/**",
+        ),
+      },
+    ],
+    ["typecheck of every workspace", { typecheck: "pnpm -r run typecheck" }],
+    ["build without the web filter", { build: "pnpm run --recursive build" }],
+    [
+      "shell test of another package",
+      {
+        "p2:application-shell:test":
+          "pnpm --filter @rosuno/api run test:application-shell",
+      },
+    ],
+    ["additional root script", { deploy: "node deploy.mjs" }],
+    [
+      "additional application script",
+      { dev: "pnpm --filter @rosuno/web run dev" },
+    ],
+    ["missing rosuno:check", { "rosuno:check": undefined }],
+  ]) {
+    const packageJson = withScripts(web, scripts);
+    for (const [script, command] of Object.entries(scripts)) {
+      if (command === undefined) {
+        delete packageJson.scripts[script];
+      }
+    }
+
+    assert.throws(
+      () => validatePackageJson(packageJson, WEB_APPLICATION_STATE),
+      /package scripts must match the P2 web-application control allowlist/,
+      name,
+    );
+  }
+
+  assert.throws(
+    () =>
+      validatePackageJson(
+        { ...web, scripts: Object.entries(web.scripts) },
+        WEB_APPLICATION_STATE,
+      ),
+    /P2 web-application control allowlist/,
+  );
+});
+
+test("root package remains dependency-neutral in both application states", () => {
+  for (const [state, packageJson] of rootPackageFixtures()) {
+    const runtime = structuredClone(packageJson);
+    runtime.dependencies = { next: "1.2.3" };
+    assert.throws(
+      () => validatePackageJson(runtime, state),
+      /must not declare runtime dependencies/,
+    );
+
+    const extraDevelopment = structuredClone(packageJson);
+    extraDevelopment.devDependencies.eslint = "1.2.3";
+    assert.throws(
+      () => validatePackageJson(extraDevelopment, state),
+      /limited to Prettier and TypeScript/,
+    );
+
+    const missingDevelopment = structuredClone(packageJson);
+    delete missingDevelopment.devDependencies.typescript;
+    assert.throws(
+      () => validatePackageJson(missingDevelopment, state),
+      /limited to Prettier and TypeScript/,
+    );
+
+    const emptyRuntime = structuredClone(packageJson);
+    emptyRuntime.dependencies = {};
+    assert.doesNotThrow(() => validatePackageJson(emptyRuntime, state));
+  }
+});
+
+test("web-application root package rejects dependency, build-script, and runtime side channels", () => {
+  for (const [name, mutate, rejection] of [
+    [
+      "optionalDependencies",
+      (packageJson) => {
+        packageJson.optionalDependencies = { "evil-package": "1.0.0" };
+      },
+      /must not declare optionalDependencies/,
+    ],
+    [
+      "peerDependencies",
+      (packageJson) => {
+        packageJson.peerDependencies = { react: "1.0.0" };
+      },
+      /must not declare peerDependencies/,
+    ],
+    [
+      "resolutions",
+      (packageJson) => {
+        packageJson.resolutions = { react: "npm:evil-react@1.0.0" };
+      },
+      /must not declare resolutions/,
+    ],
+    [
+      "npm overrides",
+      (packageJson) => {
+        packageJson.overrides = { react: "npm:evil-react@1.0.0" };
+      },
+      /must not declare overrides/,
+    ],
+    [
+      "workspaces array",
+      (packageJson) => {
+        packageJson.workspaces = ["apps/*"];
+      },
+      /must not declare workspaces/,
+    ],
+    [
+      "workspaces object",
+      (packageJson) => {
+        packageJson.workspaces = { packages: [] };
+      },
+      /must not declare workspaces/,
+    ],
+    [
+      "packageManager",
+      (packageJson) => {
+        packageJson.packageManager = "pnpm@9.0.0";
+      },
+      /must not declare packageManager/,
+    ],
+    [
+      "engines.runtime download",
+      (packageJson) => {
+        packageJson.engines = {
+          runtime: { name: "node", version: "22.0.0", onFail: "download" },
+        };
+      },
+      /must not request runtime downloads: engines\.runtime node/,
+    ],
+    [
+      "devEngines.runtime download",
+      (packageJson) => {
+        packageJson.devEngines = {
+          runtime: [{ name: "deno", version: "2.0.0", onFail: "download" }],
+        };
+      },
+      /must not request runtime downloads: devEngines\.runtime deno/,
+    ],
+    ...Object.entries({
+      overrides: { react: "npm:evil-react@1.0.0" },
+      packageExtensions: {
+        "react@*": { dependencies: { "evil-package": "1.0.0" } },
+      },
+      patchedDependencies: { "react@1.0.0": "patches/react.patch" },
+      configDependencies: { "evil-config": "1.0.0" },
+      onlyBuiltDependencies: ["evil-package"],
+      onlyBuiltDependenciesFile: "build-allowlist.json",
+      neverBuiltDependencies: [],
+      allowBuilds: { "evil-package": true },
+    }).map(([setting, value]) => [
+      `pnpm.${setting}`,
+      (packageJson) => {
+        packageJson.pnpm = { [setting]: value };
+      },
+      new RegExp(`must not set pnpm\\.${setting}$`),
+    ]),
+  ]) {
+    const packageJson = webApplicationPackage();
+    mutate(packageJson);
+
+    assert.throws(
+      () => validatePackageJson(packageJson, WEB_APPLICATION_STATE),
+      rejection,
+      name,
+    );
+  }
+
+  const controls = webApplicationPackage();
+  Object.assign(controls, {
+    optionalDependencies: {},
+    peerDependencies: {},
+    resolutions: {},
+    overrides: {},
+    workspaces: [],
+    packageManager: null,
+    pnpm: { ignoredBuiltDependencies: ["esbuild"] },
+    engines: { node: ">=24" },
+    devEngines: {
+      runtime: [
+        { name: "node", version: "24.0.0", onFail: "error" },
+        { name: "node", version: "22.0.0", onFail: "download" },
+      ],
+    },
+  });
+
+  assert.doesNotThrow(() =>
+    validatePackageJson(controls, WEB_APPLICATION_STATE),
+  );
+});
+
+test("compliant @rosuno/web manifest envelopes validate", () => {
+  assert.doesNotThrow(() =>
+    validateWebApplicationPackageJson(webApplicationManifest()),
+  );
+  assert.doesNotThrow(() =>
+    validateWebApplicationPackageJson({
+      name: "@rosuno/web",
+      version: "0.0.0",
+      private: true,
+    }),
+  );
+
+  const subset = webApplicationManifest();
+  delete subset.scripts.dev;
+  delete subset.scripts.start;
+  delete subset.dependencies["react-dom"];
+  delete subset.devDependencies["@types/node"];
+  assert.doesNotThrow(() => validateWebApplicationPackageJson(subset));
+
+  const metadata = webApplicationManifest();
+  Object.assign(metadata, {
+    description: "Rosuno web application shell",
+    license: "UNLICENSED",
+    type: "module",
+    browserslist: ["defaults"],
+    engines: { node: ">=24" },
+    devEngines: {
+      runtime: { name: "node", version: "24.0.0", onFail: "error" },
+    },
+    optionalDependencies: { react: "4.5.6" },
+    peerDependencies: { react: "^4.0.0" },
+    pnpm: { overrides: { react: "4.5.6" } },
+  });
+  assert.doesNotThrow(() => validateWebApplicationPackageJson(metadata));
+});
+
+test("@rosuno/web manifest rejects identity, script, dependency, and package-manager mutations", () => {
+  for (const [name, mutate, rejection] of [
+    [
+      "wrong name",
+      (m) => (m.name = "@rosuno/web-admin"),
+      /name must be @rosuno\/web/,
+    ],
+    ["unscoped name", (m) => (m.name = "web"), /name must be @rosuno\/web/],
+    ["missing name", (m) => delete m.name, /name must be @rosuno\/web/],
+    ["wrong version", (m) => (m.version = "0.0.1"), /version must be 0\.0\.0/],
+    ["numeric version", (m) => (m.version = 0), /version must be 0\.0\.0/],
+    ["private false", (m) => (m.private = false), /must be private/],
+    ["private string", (m) => (m.private = "true"), /must be private/],
+    ["missing private", (m) => delete m.private, /must be private/],
+    [
+      "additional lifecycle script",
+      (m) => (m.scripts.postinstall = "node setup.mjs"),
+      /script is outside the P2 control allowlist: postinstall/,
+    ],
+    [
+      "additional script",
+      (m) => (m.scripts.lint = "next lint"),
+      /script is outside the P2 control allowlist: lint/,
+    ],
+    [
+      "changed build",
+      (m) => (m.scripts.build = "next build && node upload.mjs"),
+      /script build must match the P2 control allowlist/,
+    ],
+    [
+      "changed typecheck",
+      (m) => (m.scripts.typecheck = "tsc"),
+      /script typecheck must match the P2 control allowlist/,
+    ],
+    [
+      "changed shell test",
+      (m) => (m.scripts["test:application-shell"] = "node --test"),
+      /script test:application-shell must match the P2 control allowlist/,
+    ],
+    [
+      "non-object scripts",
+      (m) => (m.scripts = ["next build"]),
+      /scripts must be an object/,
+    ],
+    [
+      "arbitrary runtime dependency",
+      (m) => (m.dependencies.lodash = "4.17.21"),
+      /dependencies name is outside the P2 control allowlist: lodash/,
+    ],
+    [
+      "arbitrary optional dependency",
+      (m) => (m.optionalDependencies = { sharp: "1.2.3" }),
+      /optionalDependencies name is outside the P2 control allowlist: sharp/,
+    ],
+    [
+      "arbitrary peer dependency",
+      (m) => (m.peerDependencies = { "react-native": "1.2.3" }),
+      /peerDependencies name is outside the P2 control allowlist: react-native/,
+    ],
+    [
+      "arbitrary devDependency",
+      (m) => (m.devDependencies.eslint = "9.0.0"),
+      /devDependencies name is outside the P2 control allowlist: eslint/,
+    ],
+    [
+      "runtime dependency declared as devDependency",
+      (m) => (m.devDependencies.next = "1.2.3"),
+      /devDependencies name is outside the P2 control allowlist: next/,
+    ],
+    [
+      "devDependency declared as runtime dependency",
+      (m) => (m.dependencies.typescript = "7.8.9"),
+      /dependencies name is outside the P2 control allowlist: typescript/,
+    ],
+    [
+      "non-object dependencies",
+      (m) => (m.dependencies = ["next"]),
+      /dependencies must be an object/,
+    ],
+    [
+      "git dependency source",
+      (m) =>
+        (m.dependencies.next = "git+https://github.com/vercel/next.js.git"),
+      /dependencies next must use a registry semver specification/,
+    ],
+    [
+      "moving package tag",
+      (m) => (m.dependencies.react = "latest"),
+      /dependencies react must use a registry semver specification/,
+    ],
+    [
+      "package alias",
+      (m) => (m.devDependencies.typescript = "npm:evil-typescript@7.8.9"),
+      /devDependencies typescript must use a registry semver specification/,
+    ],
+    [
+      "packageManager",
+      (m) => (m.packageManager = "yarn@4.0.0"),
+      /must not declare packageManager/,
+    ],
+    [
+      "devEngines.packageManager",
+      (m) =>
+        (m.devEngines = { packageManager: { name: "yarn", version: "4.0.0" } }),
+      /must not declare devEngines\.packageManager/,
+    ],
+    [
+      "workspaces",
+      (m) => (m.workspaces = ["packages/*"]),
+      /must not declare workspaces/,
+    ],
+    [
+      "pnpm.executionEnv",
+      (m) => (m.pnpm = { executionEnv: { nodeVersion: "22.0.0" } }),
+      /must not set pnpm\.executionEnv/,
+    ],
+    [
+      "engines.runtime download",
+      (m) =>
+        (m.engines = {
+          runtime: { name: "node", version: "22.0.0", onFail: "download" },
+        }),
+      /must not request runtime downloads: engines\.runtime node/,
+    ],
+    [
+      "devEngines.runtime download",
+      (m) =>
+        (m.devEngines = {
+          runtime: [{ name: "bun", version: "1.2.0", onFail: "download" }],
+        }),
+      /must not request runtime downloads: devEngines\.runtime bun/,
+    ],
+  ]) {
+    const manifest = webApplicationManifest();
+    mutate(manifest);
+
+    assert.throws(
+      () => validateWebApplicationPackageJson(manifest),
+      rejection,
+      name,
+    );
+  }
+
+  for (const manifest of [null, [], "@rosuno/web"]) {
+    assert.throws(
+      () => validateWebApplicationPackageJson(manifest),
+      /apps\/web\/package\.json must be a JSON object/,
+    );
+  }
+});
+
+test("registry-semver specifications follow the documented node-semver range grammar", () => {
+  for (const specification of [
+    "1.2.3",
+    "=1.2.3",
+    "^1.2.3",
+    "~1.2.3",
+    "^20",
+    "1",
+    "1.x",
+    "1.2.X",
+    "*",
+    "x",
+    "",
+    "<2",
+    "<=1.2.3",
+    ">1.2.3",
+    ">=1.2.3 <2.0.0",
+    "1.2.3 - 2.3.4",
+    "^1.2.3 || ^2.0.0",
+    "^1.2.3||^2.0.0",
+    "1.2.3 || 2.x || *",
+    "1.2.3-rc.1+build.5",
+    "15.0.0-canary.5",
+    "^0.0.1",
+  ]) {
+    assert.equal(isRegistrySemverRange(specification), true, specification);
+
+    const manifest = webApplicationManifest();
+    manifest.dependencies.next = specification;
+    assert.doesNotThrow(
+      () => validateWebApplicationPackageJson(manifest),
+      specification,
+    );
+  }
+
+  for (const specification of [
+    "latest",
+    "next",
+    "canary",
+    "beta",
+    "rc",
+    "v1.2.3",
+    "=v1.2.3",
+    "~>1.2.3",
+    ">= 1.2.3",
+    "01.2.3",
+    "1.2.3beta",
+    " 1.2.3",
+    "1.2.3 ",
+    "1.2.3\t",
+    "1.2.3 -2.3.4",
+    "^1.2.3 latest",
+    "1.2.3 || latest",
+    "1.2.3 |",
+    "file:../next",
+    "link:../next",
+    "workspace:*",
+    "workspace:^1.2.3",
+    "git:github.com/vercel/next.js",
+    "git+ssh://git@github.com/vercel/next.js.git",
+    "git+https://github.com/vercel/next.js.git",
+    "github:vercel/next.js",
+    "vercel/next.js",
+    "http://registry.example.test/next.tgz",
+    "https://registry.example.test/next.tgz",
+    "npm:evil-next@1.2.3",
+    "npm:next@1.2.3",
+    "catalog:",
+    "catalog:default",
+    "jsr:@std/path@1.0.0",
+    "portal:../next",
+    "patch:next@1.2.3#./fix.patch",
+    "runtime:22.0.0",
+    "../next.tgz",
+    "./next",
+    "next.tgz",
+  ]) {
+    assert.equal(isRegistrySemverRange(specification), false, specification);
+
+    const manifest = webApplicationManifest();
+    manifest.dependencies.next = specification;
+    assert.throws(
+      () => validateWebApplicationPackageJson(manifest),
+      /dependencies next must use a registry semver specification/,
+      specification,
+    );
+  }
+
+  for (const specification of [1, true, null, undefined, {}, ["1.2.3"]]) {
+    assert.equal(isRegistrySemverRange(specification), false);
+  }
+});
+
+test("registry-semver matching stays linear on long adversarial specifications", () => {
+  for (const specification of [
+    `${"1".repeat(20000)}!`,
+    `1.2.3-${"a".repeat(20000)}!`,
+    `${"1 ".repeat(10000)}!`,
+    `${"|| ".repeat(10000)}!`,
+    `||${" ".repeat(20000)}||${" ".repeat(20000)}!`,
+    `${"1.2.3 - ".repeat(5000)}!`,
+  ]) {
+    assert.equal(isRegistrySemverRange(specification), false);
+  }
+
+  assert.equal(
+    isRegistrySemverRange(`${"^1.2.3 || ".repeat(2000)}^2.0.0`),
+    true,
+  );
+});
+
+test("web-application state rejects nested or alternative package-manager state", () => {
+  const packageJson = webApplicationPackage();
+
+  for (const name of [
+    ".npmrc",
+    ".pnp.cjs",
+    ".pnp.loader.mjs",
+    ".pnpmfile.cjs",
+    ".yarnrc",
+    ".yarnrc.yml",
+    "bun.lock",
+    "bun.lockb",
+    "bunfig.toml",
+    "deno.lock",
+    "npm-shrinkwrap.json",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "yarn.lock",
+  ]) {
+    for (const file of [`apps/web/${name}`, `apps/web/app/${name}`]) {
+      assert.throws(
+        () =>
+          validateNeutralPaths(
+            [...webApplicationFiles(), file],
+            packageJson,
+            WEB_APPLICATION_STATE,
+          ),
+        new RegExp(
+          `alternative package-manager state is present: ${escapeRegExp(file)}$`,
+        ),
+      );
+    }
+  }
+
+  for (const file of [
+    "apps/web/node_modules/next/package.json",
+    "apps/web/app/node_modules/local.js",
+    "apps/web/.yarn/releases/yarn.cjs",
+    "apps/web/.pnpm-store/v10/index.json",
+  ]) {
+    assert.throws(
+      () =>
+        validateNeutralPaths(
+          [...webApplicationFiles(), file],
+          packageJson,
+          WEB_APPLICATION_STATE,
+        ),
+      /alternative package-manager state is present/,
+      file,
+    );
+  }
+
+  for (const [state, fixture] of rootPackageFixtures()) {
+    for (const file of [
+      "package-lock.json",
+      "yarn.lock",
+      "npm-shrinkwrap.json",
+      "bun.lock",
+      "bun.lockb",
+      "deno.lock",
+      ".yarnrc.yml",
+      ".pnpmfile.cjs",
+      "apps/pnpm-lock.yaml",
+    ]) {
+      assert.throws(
+        () => validateNeutralPaths([file], fixture, state),
+        /product implementation paths/,
+        `${state}: ${file}`,
+      );
+    }
+  }
+});
+
+test("web-application root .npmrc rejects source, hook, build-script, script-runtime, and runtime-mirror settings", () => {
+  assert.doesNotThrow(() => validateWebApplicationNpmrc(canonicalNpmrc()));
+  assert.doesNotThrow(() =>
+    validateWebApplicationNpmrc(
+      `${canonicalNpmrc()}; registry=https://registry.example.test/\n# node-options=--require ./preload.cjs\n`,
+    ),
+  );
+
+  for (const [text, setting] of [
+    ["registry=https://registry.example.test/", "registry"],
+    ["@types:registry=https://registry.example.test/", "@scope:registry"],
+    ["@:registry=https://registry.example.test/", "@scope:registry"],
+    ["pnpmfile=hooks/pnpmfile.cjs", "pnpmfile"],
+    ["global-pnpmfile=/opt/hooks/pnpmfile.cjs", "global-pnpmfile"],
+    ["dangerously-allow-all-builds=true", "dangerously-allow-all-builds"],
+    ["only-built-dependencies[]=evil-package", "only-built-dependencies"],
+    ["only-built-dependencies=evil-package", "only-built-dependencies"],
+    ["node-options=--require ./preload.cjs", "node-options"],
+    ["script-shell=/opt/tools/shell", "script-shell"],
+    ["node-mirror:release=https://mirror.example.test/", "node-mirror:*"],
+    ["node-mirror:nightly=https://mirror.example.test/", "node-mirror:*"],
+    ["  registry = https://registry.example.test/", "registry"],
+    ['"registry"=https://registry.example.test/', "registry"],
+    ["'registry'=https://registry.example.test/", "registry"],
+    ["registry;note=https://registry.example.test/", "registry"],
+    ["registry#note=https://registry.example.test/", "registry"],
+    ["registry[]=https://registry.example.test/", "registry"],
+    ["[registry]\nurl=https://registry.example.test/", "registry"],
+    ["[registry.example]\nurl=https://registry.example.test/", "registry"],
+    ["[node-options]", "node-options"],
+    ["${UNSET-registry}=https://registry.example.test/", "registry"],
+    ["${NPM_SETTING}=https://registry.example.test/", "registry"],
+    ["@${SCOPE}:registry=https://registry.example.test/", "@scope:registry"],
+    ["node-mirror:${CHANNEL}=https://mirror.example.test/", "node-mirror:*"],
+    ["script-${KIND}=/opt/tools/shell", "script-shell"],
+    ["\uFEFFregistry=https://registry.example.test/", "registry"],
+    [
+      `${canonicalNpmrc().replaceAll("\n", "\r\n")}registry=https://registry.example.test/\r\n`,
+      "registry",
+    ],
+  ]) {
+    assert.throws(
+      () => validateWebApplicationNpmrc(text),
+      new RegExp(
+        `web-application root \\.npmrc must not set ${escapeRegExp(setting)} \\(key `,
+      ),
+      JSON.stringify(text),
+    );
+  }
+
+  assert.throws(
+    () =>
+      validateApplicationSurface(
+        webApplicationSurface({
+          npmrc: "registry=https://registry.example.test/\n",
+        }),
+      ),
+    /web-application root \.npmrc must not set registry/,
+  );
+  assert.throws(
+    () => validateWebApplicationNpmrc(undefined),
+    /root \.npmrc must be text/,
+  );
+});
+
+test("unchanged CI workflow is sufficient for both application states", () => {
+  const workflow = readFileSync(
+    path.join(ROOT, ".github/workflows/p0-controls.yml"),
+    "utf8",
+  );
+
+  assert.doesNotThrow(() => validateCiWorkflow(workflow));
+  assert.match(workflow, /^ {6}- run: pnpm run p0:test$/m);
+  assert.equal(
+    ROOT_SCRIPT_PROFILES[WEB_APPLICATION_STATE]["p0:test"],
+    "node --test tools/p0/tests/*.test.mjs && pnpm run p2:application-shell:test",
+  );
+  assert.equal(
+    ROOT_SCRIPT_PROFILES[WEB_APPLICATION_STATE]["p2:application-shell:test"],
+    "pnpm --filter @rosuno/web run test:application-shell",
+  );
+
+  for (const command of [
+    "pnpm run p2:application-shell:test",
+    "pnpm --filter @rosuno/web run build",
+    "pnpm --filter @rosuno/web run test:application-shell",
+    "pnpm run p0:test && pnpm run p2:application-shell:test",
+  ]) {
+    assert.throws(
+      () => validateCiWorkflow(`${workflow}      - run: ${command}\n`),
+      /CI run command is outside the P0 control allowlist/,
+      command,
+    );
+  }
+
+  assert.throws(
+    () =>
+      validateCiWorkflow(
+        `${workflow}\n  web-application:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pnpm run build\n`,
+      ),
+    /CI job set must match the P0 control allowlist/,
+  );
+  assert.throws(
+    () => validateCiWorkflow(`${workflow}      - uses: actions/cache@v4\n`),
+    /CI action set must match the P0 control allowlist/,
+  );
+  assert.throws(
+    () => validateCiWorkflow(`${workflow}    environment: preview\n`),
+    /deployment environments/,
+  );
+  assert.throws(
+    () =>
+      validateCiWorkflow(
+        workflow.replaceAll("fetch-depth: 0", "fetch-depth: 1"),
+      ),
+    /full history/,
+  );
+});
+
+function sha256Hex(text) {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Frozen copy of the canonical pre-application root package.json at base
+// 766d7a8c1b230c62b4e4f58e7107c2267fce14ab (test data only).
+function preApplicationPackage() {
+  return {
+    name: "rosuno",
+    version: "0.0.0",
+    license: "MIT",
+    scripts: {
+      preinstall:
+        'sh -c \'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac\'',
+      typecheck: "tsc --noEmit --incremental false",
+      build: "tsc --noEmit --incremental false",
+      "format:check":
+        'prettier --check "governance/**/*.{md,json,yaml,yml}" ".github/**/*.{md,yml,yaml}" "tools/**/*.mjs" "package.json" "pnpm-workspace.yaml" "tsconfig*.json"',
+      lint: "pnpm run format:check",
+      "p0:validate": "node tools/p0/validate.mjs",
+      "p0:test": "node --test tools/p0/tests/*.test.mjs",
+      "secrets:check": "node tools/p0/secret-scan.mjs",
+      "dependency:check": "pnpm audit --audit-level=high",
+      "rosuno:preflight": "node tools/p0/fast-control.mjs preflight",
+      "rosuno:check": "node tools/p0/fast-control.mjs check",
+    },
+    private: true,
+    devDependencies: {
+      prettier: "^3.9.6",
+      typescript: "~5.9.3",
+    },
+  };
+}
+
+// Synthetic web-application root package.json using the exact packet profile.
+function webApplicationPackage() {
+  const packageJson = preApplicationPackage();
+  packageJson.scripts = {
+    preinstall: packageJson.scripts.preinstall,
+    typecheck: "pnpm --filter @rosuno/web run typecheck",
+    build: "pnpm --filter @rosuno/web run build",
+    "format:check":
+      'prettier --check "governance/**/*.{md,json,yaml,yml}" ".github/**/*.{md,yml,yaml}" "tools/**/*.mjs" "apps/web/**/*.{js,jsx,ts,tsx,json,md,css}" "package.json" "pnpm-workspace.yaml" "tsconfig*.json"',
+    lint: "pnpm run format:check",
+    "p0:validate": "node tools/p0/validate.mjs",
+    "p0:test":
+      "node --test tools/p0/tests/*.test.mjs && pnpm run p2:application-shell:test",
+    "p2:application-shell:test":
+      "pnpm --filter @rosuno/web run test:application-shell",
+    "secrets:check": "node tools/p0/secret-scan.mjs",
+    "dependency:check": "pnpm audit --audit-level=high",
+    "rosuno:preflight": "node tools/p0/fast-control.mjs preflight",
+    "rosuno:check": "node tools/p0/fast-control.mjs check",
+  };
+  return packageJson;
+}
+
+function rootPackageFixtures() {
+  return [
+    [PRE_APPLICATION_STATE, preApplicationPackage()],
+    [WEB_APPLICATION_STATE, webApplicationPackage()],
+  ];
+}
+
+function withScripts(packageJson, scripts) {
+  return { ...packageJson, scripts: { ...packageJson.scripts, ...scripts } };
+}
+
+// Frozen copy of the canonical pre-application pnpm-workspace.yaml.
+function preApplicationWorkspace() {
+  return 'minimumReleaseAge: 1440\n\nminimumReleaseAgeExclude:\n  - "@replit/*"\n  - stripe-replit-sync\n\npackages: []\nautoInstallPeers: false\n';
+}
+
+function webApplicationWorkspace() {
+  return preApplicationWorkspace().replace(
+    "packages: []",
+    "packages:\n  - apps/web",
+  );
+}
+
+// Frozen copy of the canonical root .npmrc.
+function canonicalNpmrc() {
+  return "auto-install-peers=false\nstrict-peer-dependencies=false\n";
+}
+
+// Synthetic manifest: the P0 control extension does not choose application
+// package versions.
+function webApplicationManifest() {
+  return {
+    name: "@rosuno/web",
+    version: "0.0.0",
+    private: true,
+    scripts: {
+      dev: "next dev",
+      build: "next build",
+      start: "next start",
+      typecheck: "tsc --noEmit",
+      "test:application-shell": "node --test tests/*.test.mjs",
+    },
+    dependencies: {
+      next: "1.2.3",
+      react: "4.5.6",
+      "react-dom": "4.5.6",
+    },
+    devDependencies: {
+      typescript: "7.8.9",
+      "@types/node": "1.2.3",
+      "@types/react": "4.5.6",
+      "@types/react-dom": "4.5.6",
+    },
+  };
+}
+
+function liveRepositoryFiles() {
+  return execFileSync("git", ["ls-files", "-co", "--exclude-standard"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  })
+    .split(/\r?\n/)
+    .filter(Boolean);
+}
+
+function neutralRepositoryFiles() {
+  return liveRepositoryFiles().filter((file) => !file.startsWith("apps/web/"));
+}
+
+function webApplicationFiles() {
+  return [
+    ...neutralRepositoryFiles(),
+    "apps/web/package.json",
+    "apps/web/app/layout.tsx",
+    "apps/web/app/page.tsx",
+    "apps/web/tests/application-shell.test.mjs",
+    "apps/web/tsconfig.json",
+  ];
+}
+
+function preApplicationSurface(overrides = {}) {
+  return {
+    files: neutralRepositoryFiles(),
+    packageJson: preApplicationPackage(),
+    workspace: preApplicationWorkspace(),
+    npmrc: canonicalNpmrc(),
+    ...overrides,
+  };
+}
+
+function webApplicationSurface(overrides = {}) {
+  return {
+    files: webApplicationFiles(),
+    packageJson: webApplicationPackage(),
+    workspace: webApplicationWorkspace(),
+    webPackageJson: webApplicationManifest(),
+    npmrc: canonicalNpmrc(),
+    ...overrides,
+  };
+}
