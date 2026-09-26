@@ -53,7 +53,7 @@ test("P2-001 registration preserves the bounded Application Shell contract", () 
   const item = matches[0];
 
   assert.equal(item.priority, "P2");
-  assert.equal(item.status, "approved");
+  assert.equal(item.status, "completed");
   assert.equal(item.environment, "development");
   assert.deepEqual(item.release_refs, []);
   assert.deepEqual(item.migration_refs, []);
@@ -69,6 +69,7 @@ test("P2-001 registration preserves the bounded Application Shell contract", () 
     "DEC-20260924-P1-CLOSURE-P2-TRANSITION",
     "DEC-20260925-P2-001-APPLICATION-SHELL-CONTRACT",
     "DEC-20260926-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION-CLOSURE",
+    "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE",
   ]);
 
   assert.deepEqual(item.dependencies, [
@@ -204,12 +205,101 @@ test("P0 P2 application-surface control prerequisite is durably closed", () => {
     (entry) => entry.work_item_id === "WI-P2-001-APPLICATION-SHELL",
   );
   assert.ok(p2);
-  assert.equal(p2.status, "approved");
+  assert.equal(p2.status, "completed");
   assert.deepEqual(p2.decision_refs, [
     "DEC-20260924-P1-CLOSURE-P2-TRANSITION",
     "DEC-20260925-P2-001-APPLICATION-SHELL-CONTRACT",
     closureId,
+    "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE",
   ]);
   assert.deepEqual(p2.dependencies, ["WI-P1-011-COMPLIANCE-FOUNDATION", p0Id]);
+  assert.ok(Date.parse(p2.updated_at) > Date.parse(closure.updated_at));
+});
+
+test("P2-001 implementation lifecycle is durably closed", () => {
+  const decisions = readJson("governance/decision-log.json");
+  const workItems = readJson("governance/work-items/index.json");
+  const closureId = "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE";
+
+  const matches = decisions.decisions.filter(
+    (entry) => entry.decision_id === closureId,
+  );
+  assert.equal(matches.length, 1);
+
+  const closure = matches[0];
+  assert.equal(closure.status, "accepted");
+  assert.deepEqual(closure.work_item_refs, ["WI-P2-001-APPLICATION-SHELL"]);
+  assert.deepEqual(closure.reviewer, {
+    identity: "Rosuno",
+    status: "approved",
+  });
+  assert.equal(closure.updated_at, closure.created_at);
+  assert.ok(
+    Date.parse(closure.created_at) > Date.parse("2026-09-26T19:25:48Z"),
+  );
+
+  for (const evidence of [
+    "P2-001 candidate commit c9059140e721cbee1fd9768734e74a0aad139328 has sole parent c188c6ea06727e5527a2c0f7c451d8fc81b1a2c9 and tree 1cda77bc89bfb790266241e45efa2cf58e041161",
+    "GitHub PR #45 reviewed exact head c9059140e721cbee1fd9768734e74a0aad139328 against base c188c6ea06727e5527a2c0f7c451d8fc81b1a2c9",
+    "Rosuno review 5327082661 (PRR_kwDOUHT1sc8AAAABPYTUpQ) APPROVED at 2026-09-26T19:21:22Z on exact head c9059140e721cbee1fd9768734e74a0aad139328",
+    "GitHub Actions P0 control foundation run #90 (36265251942) succeeded on c9059140e721cbee1fd9768734e74a0aad139328",
+    "GitHub PR #45 merged as eb3da61ce8192e5c0b475caca4063176f1309075 at 2026-09-26T19:24:59Z",
+    "GitHub Actions P0 control foundation run #91 (36265974561) succeeded on eb3da61ce8192e5c0b475caca4063176f1309075",
+    "Gate 5 N/A — repository-only P2-001 application work; no migration or database candidate exists",
+    "Gate 6 N/A — no persistent Staging application exists for P2-001",
+  ]) {
+    assert.ok(closure.evidence.includes(evidence));
+  }
+
+  assert.ok(
+    closure.evidence.some((entry) =>
+      entry.startsWith("Implementation scope was exactly 17 authorized paths:"),
+    ),
+  );
+
+  const p2 = workItems.work_items.find(
+    (entry) => entry.work_item_id === "WI-P2-001-APPLICATION-SHELL",
+  );
+  assert.ok(p2);
+  assert.equal(p2.status, "completed");
+  assert.equal(p2.environment, "development");
+  assert.deepEqual(p2.release_refs, []);
+  assert.deepEqual(p2.migration_refs, []);
   assert.equal(p2.updated_at, closure.updated_at);
+  assert.ok(p2.decision_refs.includes(closureId));
+
+  for (const phrase of [
+    "Gate 5 is N/A",
+    "Gate 6 is N/A",
+    "P1-012 remains conditional/deferred and blocked",
+  ]) {
+    assert.ok(p2.acceptance_criteria.some((entry) => entry.includes(phrase)));
+  }
+
+  const p1012 = workItems.work_items.find(
+    (entry) => entry.work_item_id === "WI-P1-012-PHYSICAL-1L",
+  );
+  assert.ok(p1012);
+  assert.equal(p1012.status, "blocked");
+
+  const boundary = [
+    closure.scope,
+    closure.decision,
+    closure.rationale,
+    closure.impact,
+    p2.rollback_reference,
+  ].join(" ");
+
+  for (const phrase of [
+    "P1-012",
+    "F-01",
+    "F-02",
+    "F-03",
+    "P2-002",
+    "P2-003",
+    "P3",
+    "No database rollback applies",
+  ]) {
+    assert.ok(boundary.includes(phrase));
+  }
 });

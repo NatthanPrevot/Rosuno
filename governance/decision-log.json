@@ -663,6 +663,46 @@
         "tools/p0/tests/p2-001-registration-contract.test.mjs"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE",
+      "title": "Close P2-001 Application Shell implementation lifecycle",
+      "status": "accepted",
+      "scope": "Retrospective governance-only lifecycle closure for the already implemented, protected-reviewed, merged, and post-merge-validated P2-001 Application Shell. Records exact implementation lifecycle truth, Gate 5/6 N/A determinations, and completion state. It does not claim this local closure candidate itself has completed protected acceptance and authorizes no P2-002, P2-003, P3, database, jurisdiction, or later work.",
+      "decision": "Record WI-P2-001-APPLICATION-SHELL as completed after exact candidate c9059140e721cbee1fd9768734e74a0aad139328, PR #45 designated Rosuno approval, successful exact-head CI, merge-commit integration eb3da61ce8192e5c0b475caca4063176f1309075, and successful post-merge CI. Record Gate 5 as N/A because no migration or database candidate exists and Gate 6 as N/A because no persistent Staging application exists. Preserve P1-012 as blocked/deferred and leave F-01/F-02/F-03, P2-002, P2-003, and P3 outside this closure.",
+      "rationale": "The bounded P2-001 implementation has already completed its protected repository lifecycle: exact local validation, candidate commit, publication, PR #45, designated Rosuno approval, exact-head CI, merge-commit integration, and successful post-merge CI. Canonical governance still records the work item as approved rather than completed. Durable closure is required before any later P2 work may be considered, while preserving the independent P1-012 and F-01/F-02/F-03 boundaries.",
+      "authority_refs": [
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-001-APPLICATION-SHELL"],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-09-26T19:49:50Z",
+      "updated_at": "2026-09-26T19:49:50Z",
+      "supersedes": [],
+      "impact": "Durably records completion of the already-merged P2-001 Application Shell lifecycle only. It does not modify application implementation bytes, create a release or migration, contact or mutate any database, touch Staging/Production/OLD, classify Arizona, alter P1-012, resolve F-01/F-02/F-03, begin P2-002/P2-003/P3, or authorize any later work.",
+      "evidence": [
+        "Retrospective governance closure record for WI-P2-001-APPLICATION-SHELL; canonical record created after the protected implementation lifecycle completed",
+        "P2-001 candidate commit c9059140e721cbee1fd9768734e74a0aad139328 has sole parent c188c6ea06727e5527a2c0f7c451d8fc81b1a2c9 and tree 1cda77bc89bfb790266241e45efa2cf58e041161",
+        "Implementation scope was exactly 17 authorized paths: apps/web/.gitignore; apps/web/app/error.tsx; apps/web/app/global-error.tsx; apps/web/app/layout.tsx; apps/web/app/loading.tsx; apps/web/app/not-found.tsx; apps/web/app/page.tsx; apps/web/next.config.ts; apps/web/package.json; apps/web/src/application/form-operation.ts; apps/web/src/application/session.ts; apps/web/src/application/shell.ts; apps/web/tests/application-shell.test.mjs; apps/web/tsconfig.json; package.json; pnpm-lock.yaml; pnpm-workspace.yaml",
+        "GitHub PR #45 reviewed exact head c9059140e721cbee1fd9768734e74a0aad139328 against base c188c6ea06727e5527a2c0f7c451d8fc81b1a2c9",
+        "Rosuno review 5327082661 (PRR_kwDOUHT1sc8AAAABPYTUpQ) APPROVED at 2026-09-26T19:21:22Z on exact head c9059140e721cbee1fd9768734e74a0aad139328",
+        "GitHub Actions P0 control foundation run #90 (36265251942) succeeded on c9059140e721cbee1fd9768734e74a0aad139328",
+        "GitHub PR #45 merged as eb3da61ce8192e5c0b475caca4063176f1309075 at 2026-09-26T19:24:59Z",
+        "Merge eb3da61ce8192e5c0b475caca4063176f1309075 has ordered parents c188c6ea06727e5527a2c0f7c451d8fc81b1a2c9 then c9059140e721cbee1fd9768734e74a0aad139328 and tree 1cda77bc89bfb790266241e45efa2cf58e041161",
+        "GitHub Actions P0 control foundation run #91 (36265974561) succeeded on eb3da61ce8192e5c0b475caca4063176f1309075",
+        "Gate 5 N/A — repository-only P2-001 application work; no migration or database candidate exists",
+        "Gate 6 N/A — no persistent Staging application exists for P2-001",
+        "P1-012 remains conditional/deferred and blocked; this closure does not classify or activate Arizona",
+        "F-01, F-02, F-03, P2-002, P2-003, and P3 remain separate and are not started or authorized by this closure",
+        "tools/p0/tests/p2-001-registration-contract.test.mjs"
+      ],
+      "expiry": null
     }
   ]
 }
