@@ -6,7 +6,9 @@ import { pathToFileURL } from "node:url";
 import { test } from "node:test";
 import {
   CANONICAL_ORIGIN,
+  IMMUTABLE_BOOTSTRAP_PATHS,
   ROOT,
+  SCOPE_CONTROLLED_BOOTSTRAP_PATHS,
   parseStatusPorcelain,
   validatePreflightObservation,
 } from "../lib/fast-control.mjs";
@@ -220,3 +222,161 @@ test("Fast-Control porcelain parser still detects truly staged status", () => {
 
   assert.deepEqual(parsed.stagedPaths, ["package.json"]);
 });
+
+// P0 -> P2 application-surface control extension: pnpm-lock.yaml is
+// scope-controlled, while .replit, the CI workflow, and historical migrations
+// remain hard-protected regardless of allowedPaths.
+const lockfileAuthorized = {
+  ...expectation,
+  allowedPaths: ["package.json", "pnpm-lock.yaml"],
+};
+
+test("Fast-Control hard-protects only .replit and the CI workflow as immutable bootstrap bytes", () => {
+  assert.deepEqual(IMMUTABLE_BOOTSTRAP_PATHS, [
+    ".replit",
+    ".github/workflows/p0-controls.yml",
+  ]);
+  assert.deepEqual(SCOPE_CONTROLLED_BOOTSTRAP_PATHS, ["pnpm-lock.yaml"]);
+});
+
+const lockfileChanges = {
+  "uncommitted lockfile change": {
+    mutate: (value) => {
+      value.changedPaths.push("pnpm-lock.yaml");
+      value.protectedFiles["pnpm-lock.yaml"] = false;
+    },
+    rejection: /unexpected changed path: pnpm-lock\.yaml/,
+  },
+  "lockfile change already committed on the candidate HEAD": {
+    mutate: (value) => {
+      value.protectedFiles["pnpm-lock.yaml"] = false;
+    },
+    rejection:
+      /scope-controlled source bytes changed outside allowed paths: pnpm-lock\.yaml/,
+  },
+  "deleted lockfile": {
+    mutate: (value) => {
+      value.changedPaths.push(
+        ...parseStatusPorcelain(" D pnpm-lock.yaml\n").changedPaths,
+      );
+      value.protectedFiles["pnpm-lock.yaml"] = false;
+    },
+    rejection: /unexpected changed path: pnpm-lock\.yaml/,
+  },
+};
+
+for (const [name, { mutate, rejection }] of Object.entries(lockfileChanges)) {
+  test(`Fast-Control rejects a ${name} outside allowedPaths`, () => {
+    const observation = acceptedObservation();
+    mutate(observation);
+
+    assert.throws(
+      () => validatePreflightObservation(observation, expectation),
+      rejection,
+    );
+  });
+
+  test(`Fast-Control accepts a ${name} explicitly inside allowedPaths`, () => {
+    const observation = acceptedObservation();
+    mutate(observation);
+
+    assert.doesNotThrow(() =>
+      validatePreflightObservation(observation, lockfileAuthorized),
+    );
+  });
+}
+
+for (const nearMiss of [
+  "./pnpm-lock.yaml",
+  "*",
+  "pnpm-lock.yml",
+  "PNPM-LOCK.YAML",
+  "pnpm-lock.yaml/",
+]) {
+  test(`Fast-Control does not treat ${JSON.stringify(nearMiss)} as authorizing the lockfile`, () => {
+    const observation = acceptedObservation();
+    observation.protectedFiles["pnpm-lock.yaml"] = false;
+
+    assert.throws(
+      () =>
+        validatePreflightObservation(observation, {
+          ...expectation,
+          allowedPaths: ["package.json", nearMiss],
+        }),
+      /scope-controlled source bytes changed outside allowed paths: pnpm-lock\.yaml/,
+    );
+  });
+}
+
+for (const file of [".replit", ".github/workflows/p0-controls.yml"]) {
+  for (const committed of [false, true]) {
+    test(`Fast-Control rejects ${committed ? "committed" : "uncommitted"} ${file} drift even when the path is allowed`, () => {
+      const observation = acceptedObservation();
+      observation.protectedFiles[file] = false;
+
+      if (!committed) {
+        observation.changedPaths.push(file);
+      }
+
+      assert.throws(
+        () =>
+          validatePreflightObservation(observation, {
+            ...lockfileAuthorized,
+            allowedPaths: [...lockfileAuthorized.allowedPaths, file],
+          }),
+        new RegExp(
+          `protected source bytes changed: ${file.replaceAll(".", "\\.")}`,
+        ),
+      );
+    });
+  }
+}
+
+test("Fast-Control cannot authorize an unknown protected path through allowedPaths", () => {
+  const observation = acceptedObservation();
+  observation.protectedFiles["tsconfig.json"] = false;
+
+  assert.throws(
+    () =>
+      validatePreflightObservation(observation, {
+        ...lockfileAuthorized,
+        allowedPaths: [...lockfileAuthorized.allowedPaths, "tsconfig.json"],
+      }),
+    /protected source bytes changed: tsconfig\.json/,
+  );
+});
+
+test("Fast-Control rejects historical migration drift even when the migration path is allowed", () => {
+  const observation = acceptedObservation();
+  const migration = observation.historicalMigrations[0];
+  migration.matches = false;
+  observation.changedPaths.push(migration.path);
+
+  assert.throws(
+    () =>
+      validatePreflightObservation(observation, {
+        ...lockfileAuthorized,
+        allowedPaths: [...lockfileAuthorized.allowedPaths, migration.path],
+      }),
+    /historical migration bytes changed/,
+  );
+});
+
+for (const unrelated of [
+  "pnpm-workspace.yaml",
+  ".npmrc",
+  "apps/web/app/page.tsx",
+]) {
+  test(`Fast-Control lockfile authorization does not admit ${unrelated}`, () => {
+    const observation = acceptedObservation();
+    observation.changedPaths.push("pnpm-lock.yaml", unrelated);
+    observation.protectedFiles["pnpm-lock.yaml"] = false;
+
+    assert.throws(
+      () => validatePreflightObservation(observation, lockfileAuthorized),
+      new RegExp(
+        `unexpected changed path: ${unrelated.replaceAll(".", "\\.")}`,
+      ),
+    );
+  });
+}

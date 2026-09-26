@@ -6578,10 +6578,40 @@ export function validateCiWorkflow(text) {
   }
 }
 
-export function validatePackageJson(packageJson) {
-  const expectedScripts = {
-    preinstall:
-      'sh -c \'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac\'',
+// P0 -> P2 application-surface control extension.
+//
+// The repository must satisfy exactly one of two states: the neutral
+// pre-application state, or the bounded web-application state in which the
+// single application workspace apps/web may exist. Any application-enablement
+// signal selects the complete web-application contract, so a half-enabled or
+// mixed repository fails closed.
+export const PRE_APPLICATION_STATE = "pre-application";
+export const WEB_APPLICATION_STATE = "web-application";
+
+function requireApplicationState(state) {
+  if (state !== PRE_APPLICATION_STATE && state !== WEB_APPLICATION_STATE) {
+    fail(
+      `unknown repository application state: ${
+        typeof state === "string" ? JSON.stringify(state) : typeof state
+      }`,
+    );
+  }
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasOwn(record, key) {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+const ROOT_PREINSTALL_SCRIPT =
+  'sh -c \'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac\'';
+
+export const ROOT_SCRIPT_PROFILES = Object.freeze({
+  [PRE_APPLICATION_STATE]: Object.freeze({
+    preinstall: ROOT_PREINSTALL_SCRIPT,
     typecheck: "tsc --noEmit --incremental false",
     build: "tsc --noEmit --incremental false",
     "format:check":
@@ -6593,9 +6623,1174 @@ export function validatePackageJson(packageJson) {
     "dependency:check": "pnpm audit --audit-level=high",
     "rosuno:preflight": "node tools/p0/fast-control.mjs preflight",
     "rosuno:check": "node tools/p0/fast-control.mjs check",
+  }),
+  [WEB_APPLICATION_STATE]: Object.freeze({
+    preinstall: ROOT_PREINSTALL_SCRIPT,
+    typecheck: "pnpm --filter @rosuno/web run typecheck",
+    build: "pnpm --filter @rosuno/web run build",
+    "format:check":
+      'prettier --check "governance/**/*.{md,json,yaml,yml}" ".github/**/*.{md,yml,yaml}" "tools/**/*.mjs" "apps/web/**/*.{js,jsx,ts,tsx,json,md,css}" "package.json" "pnpm-workspace.yaml" "tsconfig*.json"',
+    lint: "pnpm run format:check",
+    "p0:validate": "node tools/p0/validate.mjs",
+    "p0:test":
+      "node --test tools/p0/tests/*.test.mjs && pnpm run p2:application-shell:test",
+    "p2:application-shell:test":
+      "pnpm --filter @rosuno/web run test:application-shell",
+    "secrets:check": "node tools/p0/secret-scan.mjs",
+    "dependency:check": "pnpm audit --audit-level=high",
+    "rosuno:preflight": "node tools/p0/fast-control.mjs preflight",
+    "rosuno:check": "node tools/p0/fast-control.mjs check",
+  }),
+});
+
+// Root package.json fields that would declare, redirect, or add dependencies
+// or workspace roots outside the apps/web manifest envelope: pnpm 10.26.1
+// installs optionalDependencies and merges resolutions into its overrides,
+// while npm overrides and workspaces take effect under other package managers.
+const WEB_ROOT_PACKAGE_DECLARATIONS = [
+  "optionalDependencies",
+  "peerDependencies",
+  "resolutions",
+  "overrides",
+  "workspaces",
+];
+
+// Root package.json pnpm settings read by pnpm 10.26.1 whose presence can
+// redirect, inject, or patch dependencies, change dependency build scripts,
+// select the Node.js runtime for package scripts (executionEnv), or suppress
+// dependency-audit findings (auditConfig).
+const WEB_ROOT_PNPM_SETTINGS = [
+  "overrides",
+  "packageExtensions",
+  "patchedDependencies",
+  "configDependencies",
+  "onlyBuiltDependencies",
+  "onlyBuiltDependenciesFile",
+  "neverBuiltDependencies",
+  "allowBuilds",
+  "executionEnv",
+  "auditConfig",
+];
+
+function declaresEntries(value) {
+  if (value === undefined || value === null) {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  if (isPlainObject(value)) {
+    return Object.keys(value).length > 0;
+  }
+  return true;
+}
+
+// pnpm 10.26.1 converts the first engines.runtime / devEngines.runtime entry
+// for each runtime name whose onFail is "download" into a runtime dependency.
+function runtimeDownloadDeclarations(manifest) {
+  const declarations = [];
+  for (const field of ["engines", "devEngines"]) {
+    const runtime = isPlainObject(manifest[field])
+      ? manifest[field].runtime
+      : undefined;
+    if (!runtime) {
+      continue;
+    }
+    const entries = Array.isArray(runtime) ? runtime : [runtime];
+    for (const name of ["node", "deno", "bun"]) {
+      const entry = entries.find(
+        (candidate) => isPlainObject(candidate) && candidate.name === name,
+      );
+      if (entry?.onFail === "download") {
+        declarations.push(`${field}.runtime ${name}`);
+      }
+    }
+  }
+  return declarations;
+}
+
+function matchesExactRecord(actual, expected) {
+  if (!isPlainObject(actual)) {
+    return false;
+  }
+  const keys = Object.keys(actual);
+  return (
+    keys.length === Object.keys(expected).length &&
+    keys.every((key) => hasOwn(expected, key) && actual[key] === expected[key])
+  );
+}
+
+function validateWebApplicationRootPackage(packageJson) {
+  for (const field of WEB_ROOT_PACKAGE_DECLARATIONS) {
+    if (declaresEntries(packageJson[field])) {
+      fail(`web-application root package.json must not declare ${field}`);
+    }
+  }
+  if (isPlainObject(packageJson.pnpm)) {
+    for (const setting of WEB_ROOT_PNPM_SETTINGS) {
+      if (hasOwn(packageJson.pnpm, setting)) {
+        fail(`web-application root package.json must not set pnpm.${setting}`);
+      }
+    }
+  }
+  if (packageJson.packageManager != null) {
+    fail("web-application root package.json must not declare packageManager");
+  }
+  const downloads = runtimeDownloadDeclarations(packageJson);
+  if (downloads.length > 0) {
+    fail(
+      `web-application root package.json must not request runtime downloads: ${downloads.join(", ")}`,
+    );
+  }
+}
+
+const WEB_APPLICATION_SCRIPTS = Object.freeze({
+  dev: "next dev",
+  build: "next build",
+  start: "next start",
+  typecheck: "tsc --noEmit",
+  "test:application-shell": "node --test tests/*.test.mjs",
+});
+
+const WEB_APPLICATION_RUNTIME_DEPENDENCIES = ["next", "react", "react-dom"];
+
+const WEB_APPLICATION_DEPENDENCY_NAMES = Object.freeze({
+  dependencies: WEB_APPLICATION_RUNTIME_DEPENDENCIES,
+  optionalDependencies: WEB_APPLICATION_RUNTIME_DEPENDENCIES,
+  peerDependencies: WEB_APPLICATION_RUNTIME_DEPENDENCIES,
+  devDependencies: [
+    "typescript",
+    "@types/node",
+    "@types/react",
+    "@types/react-dom",
+  ],
+});
+
+// Registry-semver specifications follow the documented node-semver Range
+// Grammar and are matched against the raw value without trimming or loose
+// parsing, so tags, aliases, protocols, paths, and URLs are rejected.
+const SEMVER_XR = "(?:x|X|\\*|0|[1-9][0-9]*)";
+const SEMVER_PARTS = "[-0-9A-Za-z]+(?:\\.[-0-9A-Za-z]+)*";
+const SEMVER_PARTIAL = `${SEMVER_XR}(?:\\.${SEMVER_XR}(?:\\.${SEMVER_XR}(?:-${SEMVER_PARTS})?(?:\\+${SEMVER_PARTS})?)?)?`;
+const SEMVER_SIMPLE = `(?:<=|>=|<|>|=|~|\\^)?${SEMVER_PARTIAL}`;
+const SEMVER_RANGE = new RegExp(
+  `^(?:${SEMVER_PARTIAL} - ${SEMVER_PARTIAL}|${SEMVER_SIMPLE}(?: ${SEMVER_SIMPLE})*|)$`,
+);
+
+export function isRegistrySemverRange(specification) {
+  if (typeof specification !== "string") {
+    return false;
+  }
+  // range-set ::= range ( logical-or range ) *
+  // logical-or ::= ( ' ' ) * '||' ( ' ' ) *
+  const ranges = specification.split("||");
+  return ranges.every((range, index) => {
+    let start = 0;
+    let end = range.length;
+    if (index > 0) {
+      while (start < end && range[start] === " ") start += 1;
+    }
+    if (index < ranges.length - 1) {
+      while (end > start && range[end - 1] === " ") end -= 1;
+    }
+    return SEMVER_RANGE.test(range.slice(start, end));
+  });
+}
+
+export function validateWebApplicationPackageJson(manifest) {
+  if (!isPlainObject(manifest)) {
+    fail("apps/web/package.json must be a JSON object");
+  }
+  if (manifest.name !== "@rosuno/web") {
+    fail("apps/web/package.json name must be @rosuno/web");
+  }
+  if (manifest.version !== "0.0.0") {
+    fail("apps/web/package.json version must be 0.0.0");
+  }
+  if (manifest.private !== true) {
+    fail("apps/web/package.json must be private");
+  }
+  if (hasOwn(manifest, "scripts")) {
+    if (!isPlainObject(manifest.scripts)) {
+      fail("apps/web/package.json scripts must be an object");
+    }
+    for (const [name, command] of Object.entries(manifest.scripts)) {
+      if (!hasOwn(WEB_APPLICATION_SCRIPTS, name)) {
+        fail(
+          `apps/web/package.json script is outside the P2 control allowlist: ${name}`,
+        );
+      }
+      if (command !== WEB_APPLICATION_SCRIPTS[name]) {
+        fail(
+          `apps/web/package.json script ${name} must match the P2 control allowlist`,
+        );
+      }
+    }
+  }
+  for (const [field, allowedNames] of Object.entries(
+    WEB_APPLICATION_DEPENDENCY_NAMES,
+  )) {
+    if (!hasOwn(manifest, field)) {
+      continue;
+    }
+    if (!isPlainObject(manifest[field])) {
+      fail(`apps/web/package.json ${field} must be an object`);
+    }
+    for (const [name, specification] of Object.entries(manifest[field])) {
+      if (!allowedNames.includes(name)) {
+        fail(
+          `apps/web/package.json ${field} name is outside the P2 control allowlist: ${name}`,
+        );
+      }
+      if (!isRegistrySemverRange(specification)) {
+        fail(
+          `apps/web/package.json ${field} ${name} must use a registry semver specification`,
+        );
+      }
+    }
+  }
+  if (manifest.packageManager != null) {
+    fail("apps/web/package.json must not declare packageManager");
+  }
+  if (
+    isPlainObject(manifest.devEngines) &&
+    manifest.devEngines.packageManager != null
+  ) {
+    fail("apps/web/package.json must not declare devEngines.packageManager");
+  }
+  if (manifest.workspaces != null) {
+    fail("apps/web/package.json must not declare workspaces");
+  }
+  // pnpm.executionEnv is the only pnpm field pnpm 10.26.1 honors outside the
+  // workspace root; it selects the Node.js runtime used for package scripts.
+  if (isPlainObject(manifest.pnpm) && hasOwn(manifest.pnpm, "executionEnv")) {
+    fail("apps/web/package.json must not set pnpm.executionEnv");
+  }
+  const downloads = runtimeDownloadDeclarations(manifest);
+  if (downloads.length > 0) {
+    fail(
+      `apps/web/package.json must not request runtime downloads: ${downloads.join(", ")}`,
+    );
+  }
+}
+
+// pnpm 10.26.1 applies envReplace to setting keys read from .npmrc and
+// pnpm-workspace.yaml: an unescaped ${NAME} (optionally with a -fallback or
+// :-fallback) becomes arbitrary environment text, while an odd run of
+// backslashes keeps the expression literal and every run is halved.
+const PNPM_ENV_EXPRESSION = /(?<!\\)(\\*)\$\{([^${}]+)\}/g;
+const ANY_TEXT = Symbol("any text");
+
+function appendLiteral(pattern, text) {
+  for (const character of text) {
+    pattern.push(character);
+  }
+}
+
+function pnpmSettingKeyPattern(key) {
+  const pattern = [];
+  let offset = 0;
+  for (const match of key.matchAll(PNPM_ENV_EXPRESSION)) {
+    appendLiteral(pattern, key.slice(offset, match.index));
+    const escape = match[1];
+    if (escape.length % 2 === 1) {
+      appendLiteral(pattern, match[0].slice((escape.length + 1) / 2));
+    } else {
+      appendLiteral(pattern, escape.slice(escape.length / 2));
+      pattern.push(ANY_TEXT);
+    }
+    offset = match.index + match[0].length;
+  }
+  appendLiteral(pattern, key.slice(offset));
+  return pattern;
+}
+
+// Whether some concrete key matches both patterns; ANY_TEXT matches any text,
+// including none.
+function patternsIntersect(left, right) {
+  let below = [];
+  for (let i = left.length; i >= 0; i -= 1) {
+    const row = [];
+    for (let j = right.length; j >= 0; j -= 1) {
+      if (i === left.length && j === right.length) {
+        row[j] = true;
+      } else if (i < left.length && left[i] === ANY_TEXT) {
+        row[j] = below[j] === true || (j < right.length && row[j + 1] === true);
+      } else if (j < right.length && right[j] === ANY_TEXT) {
+        row[j] = row[j + 1] === true || (i < left.length && below[j] === true);
+      } else {
+        row[j] =
+          i < left.length &&
+          j < right.length &&
+          left[i] === right[j] &&
+          below[j + 1] === true;
+      }
+    }
+    below = row;
+  }
+  return below[0] === true;
+}
+
+const WORKSPACE_GOVERNED_SETTINGS = [
+  "packages",
+  "minimumReleaseAge",
+  "minimumReleaseAgeExclude",
+  "autoInstallPeers",
+];
+
+// pnpm-workspace.yaml top-level settings that pnpm 10.26.1 applies verbatim
+// and that can redirect, inject, or patch dependencies, change dependency
+// build-script execution, load pnpmfile hooks, change how package scripts
+// run or which Node.js runtime runs them, or make `pnpm audit` pass despite
+// findings (auditConfig ignores, and the ignore, ignoreUnfixable, and fix
+// modes that return success).
+const WEB_WORKSPACE_PROHIBITED_SETTINGS = [
+  "overrides",
+  "packageExtensions",
+  "patchedDependencies",
+  "catalog",
+  "catalogs",
+  "configDependencies",
+  "dangerouslyAllowAllBuilds",
+  "onlyBuiltDependencies",
+  "onlyBuiltDependenciesFile",
+  "neverBuiltDependencies",
+  "allowBuilds",
+  "pnpmfile",
+  "globalPnpmfile",
+  "nodeOptions",
+  "scriptShell",
+  "executionEnv",
+  "useNodeVersion",
+  "auditConfig",
+  "ignore",
+  "ignoreUnfixable",
+  "fix",
+  // pnpm 10.26.1 copies the entries of a top-level __proto__ mapping into its
+  // settings (replaceEnvInSettings assigns it as a prototype and omit copies
+  // inherited keys), which would reach every setting above.
+  "__proto__",
+];
+
+const YAML_FLOW_INDICATORS = new Set([",", "[", "]", "{", "}"]);
+
+// Reads pnpm-workspace.yaml with a small dependency-free YAML subset reader and
+// returns its top-level mapping. Comments, blank lines, line endings, key
+// order, quoting, indentation, and flow or block sequences are tolerated;
+// constructs outside the subset fail closed instead of being guessed.
+function readPnpmWorkspace(text) {
+  if (typeof text !== "string") {
+    fail("pnpm-workspace.yaml must be text");
+  }
+  const lines = (text.startsWith("\uFEFF") ? text.slice(1) : text).split(
+    /\r\n|\r|\n/,
+  );
+  let row = 0;
+  let column = 0;
+
+  const unsupported = (reason, line = row) =>
+    fail(
+      `unsupported pnpm-workspace.yaml construct at line ${line + 1}: ${reason}`,
+    );
+  const current = (offset = 0) => lines[row]?.[column + offset] ?? "";
+  const isBlank = (character) => character === " " || character === "\t";
+  const skipBlanks = () => {
+    const start = column;
+    while (isBlank(current())) column += 1;
+    return column > start;
   };
-  if (JSON.stringify(packageJson.scripts) !== JSON.stringify(expectedScripts)) {
-    fail("package scripts must match the P0 control allowlist");
+  const atCommentOrEnd = (spaced) =>
+    column >= lines[row].length || (spaced && current() === "#");
+  const nextContentRow = (index) => {
+    let next = index;
+    while (next < lines.length && /^[ \t]*(?:#[\s\S]*)?$/.test(lines[next])) {
+      next += 1;
+    }
+    return next;
+  };
+  const indentation = (index) => {
+    let width = 0;
+    while (lines[index][width] === " ") width += 1;
+    if (lines[index][width] === "\t") {
+      unsupported("tab indentation", index);
+    }
+    return width;
+  };
+  const sequenceEntryAhead = (index) =>
+    lines[row][index] === "-" &&
+    (lines[row][index + 1] === undefined || isBlank(lines[row][index + 1]));
+  const plainScalarStart = (flow) => {
+    const character = current();
+    if (character === "" || isBlank(character)) {
+      return false;
+    }
+    if (character === "-" || character === "?" || character === ":") {
+      const following = current(1);
+      return (
+        following !== "" &&
+        !isBlank(following) &&
+        !(flow && YAML_FLOW_INDICATORS.has(following))
+      );
+    }
+    return !"-?:,[]{}#&*!|>'\"%@`".includes(character);
+  };
+
+  const readPlain = (flow) => {
+    const line = lines[row];
+    const start = column;
+    let end = column;
+    while (column < line.length) {
+      const character = line[column];
+      if (character === "#" && isBlank(line[column - 1])) {
+        break;
+      }
+      if (character === ":") {
+        const following = line[column + 1];
+        if (
+          following === undefined ||
+          isBlank(following) ||
+          (flow && YAML_FLOW_INDICATORS.has(following))
+        ) {
+          break;
+        }
+      }
+      if (flow && YAML_FLOW_INDICATORS.has(character)) {
+        break;
+      }
+      column += 1;
+      if (!isBlank(character)) {
+        end = column;
+      }
+    }
+    column = end;
+    return line.slice(start, end);
+  };
+  const readSingleQuoted = () => {
+    const line = lines[row];
+    let value = "";
+    column += 1;
+    for (;;) {
+      if (column >= line.length) {
+        unsupported("multi-line quoted scalar");
+      }
+      if (line[column] === "'") {
+        if (line[column + 1] !== "'") {
+          column += 1;
+          return value;
+        }
+        column += 1;
+      }
+      value += line[column];
+      column += 1;
+    }
+  };
+  const readDoubleQuoted = () => {
+    const close = lines[row].indexOf('"', column + 1);
+    if (close === -1) {
+      unsupported("multi-line quoted scalar");
+    }
+    const value = lines[row].slice(column + 1, close);
+    if (value.includes("\\")) {
+      unsupported("double-quoted escape sequence");
+    }
+    column = close + 1;
+    return value;
+  };
+  const readProperty = (flow) => {
+    const line = lines[row];
+    if (line[column] === "!" && line[column + 1] === "<") {
+      const close = line.indexOf(">", column + 2);
+      if (close === -1) {
+        unsupported("unterminated verbatim tag");
+      }
+      column = close + 1;
+      return;
+    }
+    const anchorOrAlias = line[column] !== "!";
+    column += 1;
+    while (
+      column < line.length &&
+      !isBlank(line[column]) &&
+      !((anchorOrAlias || flow) && YAML_FLOW_INDICATORS.has(line[column]))
+    ) {
+      column += 1;
+    }
+  };
+
+  // Lookahead only: an implicit single-line mapping key followed by ":" and a
+  // blank or the end of the line.
+  const scanMappingKey = () => {
+    const line = lines[row];
+    const saved = column;
+    try {
+      let value;
+      let style = "plain";
+      if (current() === '"' || current() === "'") {
+        style = current() === '"' ? "double" : "single";
+        value = style === "double" ? readDoubleQuoted() : readSingleQuoted();
+        skipBlanks();
+        if (current() !== ":") {
+          return null;
+        }
+      } else {
+        if (!plainScalarStart(false)) {
+          return null;
+        }
+        value = readPlain(false);
+        skipBlanks();
+        if (current() !== ":") {
+          return null;
+        }
+      }
+      const following = line[column + 1];
+      if (following !== undefined && !isBlank(following)) {
+        return null;
+      }
+      return { value, style, end: column + 1 };
+    } catch {
+      return null;
+    } finally {
+      column = saved;
+    }
+  };
+
+  const parseInlineNode = (flow) => {
+    const line = row;
+    let properties = false;
+    while (current() === "&" || current() === "!") {
+      properties = true;
+      readProperty(flow);
+      const spaced = skipBlanks();
+      if (atCommentOrEnd(spaced) || (!spaced && !flow)) {
+        unsupported("node properties separated from their node");
+      }
+    }
+    const character = current();
+    let node;
+    if (character === "*") {
+      if (properties) {
+        unsupported("properties on an alias");
+      }
+      readProperty(flow);
+      node = { kind: "alias" };
+    } else if (character === "[" || character === "{") {
+      node = parseFlowCollection();
+    } else if (character === '"') {
+      node = { kind: "scalar", style: "double", value: readDoubleQuoted() };
+    } else if (character === "'") {
+      node = { kind: "scalar", style: "single", value: readSingleQuoted() };
+    } else if (character === "|" || character === ">") {
+      unsupported("block scalar");
+    } else if (plainScalarStart(flow)) {
+      node = { kind: "scalar", style: "plain", value: readPlain(flow) };
+    } else {
+      unsupported(`unexpected ${JSON.stringify(character)}`);
+    }
+    return { ...node, properties, line };
+  };
+
+  const skipFlowSeparation = () => {
+    for (;;) {
+      const spaced = skipBlanks();
+      if (
+        column < lines[row].length &&
+        !(current() === "#" && (spaced || column === 0))
+      ) {
+        return;
+      }
+      row += 1;
+      column = 0;
+      if (row >= lines.length) {
+        unsupported("unterminated flow collection", row - 1);
+      }
+    }
+  };
+
+  const parseFlowCollection = () => {
+    const sequence = current() === "[";
+    const closing = sequence ? "]" : "}";
+    const items = [];
+    const entries = new Map();
+    let expectEntry = true;
+    column += 1;
+    for (;;) {
+      skipFlowSeparation();
+      const character = current();
+      if (character === closing) {
+        column += 1;
+        break;
+      }
+      if (character === "]" || character === "}") {
+        unsupported("mismatched flow collection");
+      }
+      if (character === ",") {
+        if (expectEntry) {
+          unsupported("empty flow collection entry");
+        }
+        expectEntry = true;
+        column += 1;
+        continue;
+      }
+      if (!expectEntry) {
+        unsupported("missing comma between flow collection entries");
+      }
+      if (sequence) {
+        items.push(parseInlineNode(true));
+        skipFlowSeparation();
+        if (current() === ":") {
+          unsupported("mapping inside a flow sequence");
+        }
+      } else {
+        const key = parseInlineNode(true);
+        if (key.kind !== "scalar" || key.properties) {
+          unsupported("unsupported flow mapping key", key.line);
+        }
+        if (key.value === "<<") {
+          unsupported("merge key", key.line);
+        }
+        if (entries.has(key.value)) {
+          fail(
+            `pnpm-workspace.yaml must not repeat mapping key ${JSON.stringify(key.value)} (line ${key.line + 1})`,
+          );
+        }
+        skipFlowSeparation();
+        let value = { kind: "null", properties: false, line: row };
+        if (current() === ":") {
+          column += 1;
+          skipFlowSeparation();
+          if (current() !== "," && current() !== "}") {
+            value = parseInlineNode(true);
+          }
+        }
+        entries.set(key.value, value);
+      }
+      expectEntry = false;
+    }
+    return sequence
+      ? { kind: "sequence", items }
+      : { kind: "mapping", entries };
+  };
+
+  // After an inline node: only a comment may follow on its last line, and the
+  // next content line must not continue it (no multi-line scalars).
+  const finishInlineNode = (parentIndent) => {
+    const spaced = skipBlanks();
+    if (!atCommentOrEnd(spaced)) {
+      unsupported("unexpected content after a value");
+    }
+    row = nextContentRow(row + 1);
+    if (row < lines.length && indentation(row) > parentIndent) {
+      unsupported("multi-line scalar or unexpected indented content");
+    }
+  };
+
+  const parseMappingValue = (indent) => {
+    const line = row;
+    const spaced = skipBlanks();
+    if (!atCommentOrEnd(spaced)) {
+      const node = parseInlineNode(false);
+      finishInlineNode(indent);
+      return node;
+    }
+    row = nextContentRow(row + 1);
+    if (row < lines.length) {
+      const next = indentation(row);
+      if (next > indent) {
+        column = next;
+        return parseBlockNode(indent);
+      }
+      if (next === indent && sequenceEntryAhead(next)) {
+        column = next;
+        return parseBlockSequence(next);
+      }
+    }
+    return { kind: "null", properties: false, line };
+  };
+
+  const parseBlockMapping = (indent) => {
+    const entries = new Map();
+    const line = row;
+    for (;;) {
+      const key = scanMappingKey();
+      if (key === null) {
+        unsupported("expected a mapping key");
+      }
+      if (key.value === "<<") {
+        unsupported("merge key");
+      }
+      if (entries.has(key.value)) {
+        fail(
+          `pnpm-workspace.yaml must not repeat mapping key ${JSON.stringify(key.value)} (line ${row + 1})`,
+        );
+      }
+      column = key.end;
+      entries.set(key.value, parseMappingValue(indent));
+      if (row >= lines.length) {
+        break;
+      }
+      const next = indentation(row);
+      if (next < indent) {
+        break;
+      }
+      if (next > indent) {
+        unsupported("unexpected indentation");
+      }
+      column = next;
+    }
+    return { kind: "mapping", entries, properties: false, line };
+  };
+
+  const parseBlockSequence = (indent) => {
+    const items = [];
+    const line = row;
+    for (;;) {
+      const entryLine = row;
+      column = indent + 1;
+      const spaced = skipBlanks();
+      if (atCommentOrEnd(spaced)) {
+        row = nextContentRow(row + 1);
+        if (row < lines.length && indentation(row) > indent) {
+          column = indentation(row);
+          items.push(parseBlockNode(indent));
+        } else {
+          items.push({ kind: "null", properties: false, line: entryLine });
+        }
+      } else if (sequenceEntryAhead(column)) {
+        unsupported("nested compact sequence");
+      } else if (scanMappingKey() !== null) {
+        if (lines[row].slice(indent + 1, column).includes("\t")) {
+          unsupported("tab before a compact mapping");
+        }
+        items.push(parseBlockMapping(column));
+      } else {
+        items.push(parseInlineNode(false));
+        finishInlineNode(indent);
+      }
+      if (row >= lines.length) {
+        break;
+      }
+      const next = indentation(row);
+      if (next > indent) {
+        unsupported("unexpected indentation");
+      }
+      if (next < indent || !sequenceEntryAhead(next)) {
+        break;
+      }
+    }
+    return { kind: "sequence", items, properties: false, line };
+  };
+
+  const parseBlockNode = (parentIndent) => {
+    const indent = column;
+    if (sequenceEntryAhead(indent)) {
+      return parseBlockSequence(indent);
+    }
+    if (scanMappingKey() !== null) {
+      return parseBlockMapping(indent);
+    }
+    const node = parseInlineNode(false);
+    finishInlineNode(parentIndent);
+    return node;
+  };
+
+  row = nextContentRow(0);
+  if (row < lines.length && lines[row].startsWith("%")) {
+    unsupported("YAML directive");
+  }
+  if (row < lines.length && /^---(?:[ \t]|$)/.test(lines[row])) {
+    column = 3;
+    if (!atCommentOrEnd(skipBlanks())) {
+      unsupported("content on the document start line");
+    }
+    row = nextContentRow(row + 1);
+  }
+  if (row >= lines.length) {
+    return new Map();
+  }
+  column = indentation(row);
+  if (sequenceEntryAhead(column) || scanMappingKey() === null) {
+    unsupported("the document must be a block mapping");
+  }
+  const root = parseBlockMapping(column);
+  if (row < lines.length) {
+    unsupported("content outside the top-level mapping");
+  }
+  return root.entries;
+}
+
+function governedWorkspaceNode(workspace, key) {
+  const node = workspace.get(key);
+  if (node === undefined || node.kind === "null") {
+    fail(`pnpm-workspace.yaml must declare ${key}`);
+  }
+  if (node.kind === "alias" || node.properties) {
+    fail(
+      `unsupported pnpm-workspace.yaml construct at line ${node.line + 1}: anchor, alias, or tag on governed setting ${key}`,
+    );
+  }
+  return node;
+}
+
+// Governed entries are compared with strings that every YAML schema resolves
+// as strings, so plain, single-quoted, and double-quoted forms are equivalent.
+function workspaceStringSequence(workspace, key) {
+  const node = governedWorkspaceNode(workspace, key);
+  if (node.kind !== "sequence") {
+    fail(`workspace ${key} must be a sequence of strings`);
+  }
+  return node.items.map((item) => {
+    if (item.kind === "alias" || item.properties) {
+      fail(
+        `unsupported pnpm-workspace.yaml construct at line ${item.line + 1}: anchor, alias, or tag on governed setting ${key}`,
+      );
+    }
+    if (item.kind !== "scalar") {
+      fail(`workspace ${key} must be a sequence of strings`);
+    }
+    return item.value;
+  });
+}
+
+// Only plain scalars resolve to numbers or booleans; the accepted spellings
+// resolve identically under the YAML 1.2 core schema and pnpm's js-yaml loader.
+function workspacePlainScalar(workspace, key) {
+  const node = governedWorkspaceNode(workspace, key);
+  return node.kind === "scalar" && node.style === "plain"
+    ? node.value
+    : undefined;
+}
+
+export function validatePnpmWorkspace(text, state = PRE_APPLICATION_STATE) {
+  requireApplicationState(state);
+  const workspace = readPnpmWorkspace(text);
+  const webApplication = state === WEB_APPLICATION_STATE;
+  const controlledSettings = webApplication
+    ? [...WORKSPACE_GOVERNED_SETTINGS, ...WEB_WORKSPACE_PROHIBITED_SETTINGS]
+    : WORKSPACE_GOVERNED_SETTINGS;
+  for (const key of workspace.keys()) {
+    const pattern = pnpmSettingKeyPattern(key);
+    if (!pattern.includes(ANY_TEXT)) {
+      continue;
+    }
+    const reached = controlledSettings.find((setting) =>
+      patternsIntersect(pattern, [...setting]),
+    );
+    if (reached !== undefined) {
+      fail(
+        `pnpm-workspace.yaml key ${JSON.stringify(key)} may resolve to ${reached} through environment substitution`,
+      );
+    }
+  }
+  if (webApplication) {
+    for (const setting of WEB_WORKSPACE_PROHIBITED_SETTINGS) {
+      if (workspace.has(setting)) {
+        fail(`web-application pnpm-workspace.yaml must not set ${setting}`);
+      }
+    }
+  }
+  const packages = workspaceStringSequence(workspace, "packages");
+  if (!webApplication && packages.length !== 0) {
+    fail("workspace packages must remain empty");
+  }
+  if (webApplication && (packages.length !== 1 || packages[0] !== "apps/web")) {
+    fail("workspace packages must be exactly apps/web");
+  }
+  const minimumReleaseAge = workspacePlainScalar(
+    workspace,
+    "minimumReleaseAge",
+  );
+  if (
+    minimumReleaseAge === undefined ||
+    !/^[-+]?(?:0|[1-9][0-9]*)$/.test(minimumReleaseAge) ||
+    Number(minimumReleaseAge) !== 1440
+  ) {
+    fail("workspace minimumReleaseAge must remain 1440");
+  }
+  const excludes = workspaceStringSequence(
+    workspace,
+    "minimumReleaseAgeExclude",
+  );
+  if (
+    excludes.length !== 2 ||
+    !excludes.includes("@replit/*") ||
+    !excludes.includes("stripe-replit-sync")
+  ) {
+    fail(
+      "workspace minimumReleaseAgeExclude must remain exactly @replit/* and stripe-replit-sync",
+    );
+  }
+  if (
+    !["false", "False", "FALSE"].includes(
+      workspacePlainScalar(workspace, "autoInstallPeers"),
+    )
+  ) {
+    fail("workspace autoInstallPeers must remain false");
+  }
+}
+
+// Mirrors ini@1.3.8 decode as used by pnpm 10.26.1 (through config-chain) to
+// read .npmrc, and returns the resulting top-level setting names, including
+// names produced by [section] headers.
+function iniUnsafe(raw) {
+  const value = (raw || "").trim();
+  if (
+    (value.charAt(0) === '"' && value.slice(-1) === '"') ||
+    (value.charAt(0) === "'" && value.slice(-1) === "'")
+  ) {
+    const quoted =
+      value.charAt(0) === "'" ? value.slice(1, value.length - 1) : value;
+    try {
+      return JSON.parse(quoted);
+    } catch {
+      return quoted;
+    }
+  }
+  let escaped = false;
+  let result = "";
+  for (const character of value) {
+    if (escaped) {
+      result += "\\;#".includes(character) ? character : `\\${character}`;
+      escaped = false;
+    } else if (character === ";" || character === "#") {
+      break;
+    } else if (character === "\\") {
+      escaped = true;
+    } else {
+      result += character;
+    }
+  }
+  if (escaped) {
+    result += "\\";
+  }
+  return result.trim();
+}
+
+function iniDotSplit(value) {
+  return value
+    .replace(/\u0001/g, "\u0002LITERAL\\1LITERAL\u0002")
+    .replace(/\\\./g, "\u0001")
+    .split(/\./)
+    .map((part) =>
+      part
+        .replace(/\u0001/g, "\\.")
+        .replace(/\u0002LITERAL\\1LITERAL\u0002/g, "\u0001"),
+    );
+}
+
+function iniTopLevelKeys(text) {
+  const root = Object.create(null);
+  let target = root;
+  for (const line of text.split(/[\r\n]+/g)) {
+    if (!line || /^\s*[;#]/.test(line)) {
+      continue;
+    }
+    const match = line.match(/^\[([^\]]*)\]$|^([^=]+)(=(.*))?$/i);
+    if (!match) {
+      continue;
+    }
+    if (match[1] !== undefined) {
+      const section = iniUnsafe(match[1]);
+      if (section === "__proto__") {
+        target = Object.create(null);
+        continue;
+      }
+      target = root[section] = root[section] || Object.create(null);
+      continue;
+    }
+    let key = iniUnsafe(match[2]);
+    if (key === "__proto__") {
+      continue;
+    }
+    let value = match[3] ? iniUnsafe(match[4]) : true;
+    if (value === "true" || value === "false" || value === "null") {
+      value = JSON.parse(value);
+    }
+    if (target === null || typeof target !== "object") {
+      continue;
+    }
+    if (typeof key === "string" && key.length > 2 && key.slice(-2) === "[]") {
+      key = key.slice(0, -2);
+      if (key === "__proto__") {
+        continue;
+      }
+      if (!hasOwn(target, key)) {
+        target[key] = [];
+      } else if (!Array.isArray(target[key])) {
+        target[key] = [target[key]];
+      }
+    }
+    if (Array.isArray(target[key])) {
+      target[key].push(value);
+    } else {
+      target[key] = value;
+    }
+  }
+  const moved = [];
+  for (const key of Object.keys(root)) {
+    const value = root[key];
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      continue;
+    }
+    const parts = iniDotSplit(key);
+    const last = parts.pop();
+    const name = last.replace(/\\\./g, ".");
+    let parent = root;
+    for (const part of parts) {
+      if (part === "__proto__") {
+        continue;
+      }
+      if (!parent[part] || typeof parent[part] !== "object") {
+        parent[part] = Object.create(null);
+      }
+      parent = parent[part];
+    }
+    if (parent === root && name === last) {
+      continue;
+    }
+    parent[name] = value;
+    moved.push(key);
+  }
+  for (const key of moved) {
+    delete root[key];
+  }
+  return Object.keys(root);
+}
+
+// Root .npmrc settings that pnpm 10.26.1 reads by exact kebab-case name and
+// that can redirect package sources, load pnpmfile hooks, enable dependency
+// build scripts, change how package scripts run or which Node.js runtime runs
+// them, or redirect runtime downloads.
+const WEB_NPMRC_PROHIBITED_SETTINGS = [
+  ...[
+    "registry",
+    "pnpmfile",
+    "global-pnpmfile",
+    "dangerously-allow-all-builds",
+    "only-built-dependencies",
+    "node-options",
+    "script-shell",
+    "use-node-version",
+  ].map((name) => ({ label: name, pattern: [...name] })),
+  { label: "@scope:registry", pattern: ["@", ANY_TEXT, ...":registry"] },
+  { label: "node-mirror:*", pattern: [..."node-mirror:", ANY_TEXT] },
+];
+
+export function validateWebApplicationNpmrc(text) {
+  if (typeof text !== "string") {
+    fail("root .npmrc must be text");
+  }
+  for (const key of iniTopLevelKeys(text)) {
+    const pattern = pnpmSettingKeyPattern(key);
+    for (const setting of WEB_NPMRC_PROHIBITED_SETTINGS) {
+      if (patternsIntersect(pattern, setting.pattern)) {
+        fail(
+          `web-application root .npmrc must not set ${setting.label} (key ${JSON.stringify(key)})`,
+        );
+      }
+    }
+  }
+}
+
+const APPLICATION_SCRIPT_MARKERS = [
+  "@rosuno/web",
+  "apps/web",
+  "p2:application-shell",
+];
+
+// Any application-enablement signal selects the web-application state, whose
+// complete contract is then enforced; there is no partially enabled state.
+export function detectApplicationState({
+  files = [],
+  packageJson,
+  workspace,
+} = {}) {
+  if (
+    Array.isArray(files) &&
+    files.some(
+      (file) => typeof file === "string" && file.startsWith("apps/web/"),
+    )
+  ) {
+    return WEB_APPLICATION_STATE;
+  }
+  const scripts =
+    isPlainObject(packageJson) && isPlainObject(packageJson.scripts)
+      ? packageJson.scripts
+      : {};
+  if (
+    hasOwn(scripts, "p2:application-shell:test") ||
+    Object.values(scripts).some(
+      (command) =>
+        typeof command === "string" &&
+        APPLICATION_SCRIPT_MARKERS.some((marker) => command.includes(marker)),
+    )
+  ) {
+    return WEB_APPLICATION_STATE;
+  }
+  if (typeof workspace === "string") {
+    let packages;
+    try {
+      packages = readPnpmWorkspace(workspace).get("packages");
+    } catch {
+      // An unreadable workspace is rejected by validatePnpmWorkspace.
+    }
+    if (
+      packages?.kind === "sequence" &&
+      packages.items.some(
+        (item) => item.kind === "scalar" && item.value === "apps/web",
+      )
+    ) {
+      return WEB_APPLICATION_STATE;
+    }
+  }
+  return PRE_APPLICATION_STATE;
+}
+
+export function validateApplicationSurface({
+  files,
+  packageJson,
+  workspace,
+  webPackageJson = null,
+  npmrc = null,
+} = {}) {
+  if (!Array.isArray(files) || files.some((file) => typeof file !== "string")) {
+    fail("repository file list must be an array of paths");
+  }
+  const state = detectApplicationState({ files, packageJson, workspace });
+  validatePnpmWorkspace(workspace, state);
+  validateNeutralPaths(files, packageJson, state);
+  if (state === PRE_APPLICATION_STATE) {
+    if (webPackageJson !== null) {
+      fail("pre-application state must not include an application manifest");
+    }
+    return state;
+  }
+  if (!files.includes("apps/web/package.json") || webPackageJson === null) {
+    fail("web-application state requires apps/web/package.json");
+  }
+  validateWebApplicationPackageJson(webPackageJson);
+  if (npmrc !== null) {
+    validateWebApplicationNpmrc(npmrc);
+  }
+  return state;
+}
+
+export function validatePackageJson(
+  packageJson,
+  state = PRE_APPLICATION_STATE,
+) {
+  requireApplicationState(state);
+  if (!isPlainObject(packageJson)) {
+    fail("root package.json must be a JSON object");
+  }
+  const expectedScripts = ROOT_SCRIPT_PROFILES[state];
+  if (state === PRE_APPLICATION_STATE) {
+    if (
+      JSON.stringify(packageJson.scripts) !== JSON.stringify(expectedScripts)
+    ) {
+      fail("package scripts must match the P0 control allowlist");
+    }
+  } else if (!matchesExactRecord(packageJson.scripts, expectedScripts)) {
+    fail("package scripts must match the P2 web-application control allowlist");
   }
   if (
     packageJson.dependencies &&
@@ -6612,10 +7807,76 @@ export function validatePackageJson(packageJson) {
       "development dependencies must remain limited to Prettier and TypeScript",
     );
   }
+  if (state === WEB_APPLICATION_STATE) {
+    validateWebApplicationRootPackage(packageJson);
+  }
 }
 
-export function validateNeutralPaths(files, packageJson) {
-  validatePackageJson(packageJson);
+// Genuine nested or alternative package-manager state that must not exist
+// under apps/web: lockfiles, workspace roots, configuration, hooks, Plug'n'Play
+// state, and installed or cached dependency directories.
+const APPLICATION_PACKAGE_MANAGER_FILES = new Set([
+  ".npmrc",
+  ".pnp.cjs",
+  ".pnp.loader.mjs",
+  ".pnpmfile.cjs",
+  ".yarnrc",
+  ".yarnrc.yml",
+  "bun.lock",
+  "bun.lockb",
+  "bunfig.toml",
+  "deno.lock",
+  "npm-shrinkwrap.json",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "yarn.lock",
+]);
+
+const APPLICATION_PACKAGE_MANAGER_DIRECTORIES = new Set([
+  ".pnpm-store",
+  ".yarn",
+  "node_modules",
+]);
+
+function isWebApplicationPath(file) {
+  return (
+    file.startsWith("apps/web/") &&
+    file
+      .slice("apps/web/".length)
+      .split("/")
+      .every((segment) => segment !== "" && segment !== "." && segment !== "..")
+  );
+}
+
+function isApplicationPackageManagerState(file) {
+  if (!file.startsWith("apps/web/")) {
+    return false;
+  }
+  const segments = file.split("/");
+  return (
+    APPLICATION_PACKAGE_MANAGER_FILES.has(segments[segments.length - 1]) ||
+    segments.some((segment) =>
+      APPLICATION_PACKAGE_MANAGER_DIRECTORIES.has(segment),
+    )
+  );
+}
+
+export function validateNeutralPaths(
+  files,
+  packageJson,
+  state = PRE_APPLICATION_STATE,
+) {
+  validatePackageJson(packageJson, state);
+  const webApplication = state === WEB_APPLICATION_STATE;
+  if (webApplication) {
+    const packageManagerState = files.filter(isApplicationPackageManagerState);
+    if (packageManagerState.length > 0) {
+      fail(
+        `alternative package-manager state is present: ${packageManagerState.join(", ")}`,
+      );
+    }
+  }
   const allowedRootFiles = new Set([
     ".gitignore",
     ".npmrc",
@@ -6670,7 +7931,8 @@ export function validateNeutralPaths(files, packageJson) {
         file,
       ) &&
       !file.startsWith("governance/") &&
-      !file.startsWith("tools/p0/"),
+      !file.startsWith("tools/p0/") &&
+      !(webApplication && isWebApplicationPath(file)),
   );
   if (forbidden.length > 0) {
     fail(`product implementation paths are present: ${forbidden.join(", ")}`);
@@ -6867,16 +8129,33 @@ export function validateP1009Gate5PrestateContract(
   return true;
 }
 
+function readOptionalText(relativePath) {
+  try {
+    return readFileSync(path.join(ROOT, relativePath), "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return null;
+    }
+    fail(`Unable to read ${relativePath}: ${error.message}`);
+  }
+}
+
 export function validateRepository() {
   const packageJson = readJson("package.json");
   const workspace = readFileSync(
     path.join(ROOT, "pnpm-workspace.yaml"),
     "utf8",
   );
-  if (!/packages:\s*\[\]/.test(workspace))
-    fail("workspace packages must remain empty");
   const files = repositoryFiles();
-  validateNeutralPaths(files, packageJson);
+  validateApplicationSurface({
+    files,
+    packageJson,
+    workspace,
+    webPackageJson: files.includes("apps/web/package.json")
+      ? readJson("apps/web/package.json")
+      : null,
+    npmrc: readOptionalText(".npmrc"),
+  });
   validateCiWorkflow(
     readFileSync(path.join(ROOT, ".github/workflows/p0-controls.yml"), "utf8"),
   );
@@ -7076,7 +8355,7 @@ export function validateRepository() {
   return {
     status: "passed",
     checks: [
-      "controlled package, authorized paths, and empty application workspace",
+      "controlled package, authorized paths, and bounded application workspace",
       "locked authority references",
       "relational decision and work-item registers",
       "environment isolation",
