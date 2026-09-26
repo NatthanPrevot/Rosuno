@@ -1043,7 +1043,7 @@
         "Browser/localStorage authority for canonical business state, fake/demo/fallback business records, or client-controlled authoritative identity/business state",
         "Replit Agent, Replit AI, Production, OLD, branch publication, PR, review, merge, or later P2 work without separate authorization"
       ],
-      "status": "approved",
+      "status": "completed",
       "owner": "Rosuno P2-001 implementation owner",
       "reviewer": {
         "identity": "Rosuno",
@@ -1058,7 +1058,8 @@
       "decision_refs": [
         "DEC-20260924-P1-CLOSURE-P2-TRANSITION",
         "DEC-20260925-P2-001-APPLICATION-SHELL-CONTRACT",
-        "DEC-20260926-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION-CLOSURE"
+        "DEC-20260926-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION-CLOSURE",
+        "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE"
       ],
       "dependencies": [
         "WI-P1-011-COMPLIANCE-FOUNDATION",
@@ -1075,7 +1076,17 @@
         "No migration, schema, RLS, database data, Storage policy, provider integration, jurisdiction-specific rule, counsel-gated value, or fake production/business record is introduced",
         "Targeted tests cover the shell routing/error/form/session/client-trust boundaries and the complete canonical format/typecheck/build/P0/security validation passes on stable candidate bytes",
         "P1-012 remains conditional/deferred and blocked independently; jurisdiction-neutral P2-001 does not classify or activate Arizona",
-        "Any Claude invocation, local application implementation, commit, publication, PR, protected review, merge, database action, Staging, Production/OLD, P2-002, P2-003, P3, or later work requires its separately authorized gate"
+        "Any Claude invocation, local application implementation, commit, publication, PR, protected review, merge, database action, Staging, Production/OLD, P2-002, P2-003, P3, or later work requires its separately authorized gate",
+        "P2-001 candidate commit c9059140e721cbee1fd9768734e74a0aad139328 has sole parent c188c6ea06727e5527a2c0f7c451d8fc81b1a2c9 and tree 1cda77bc89bfb790266241e45efa2cf58e041161",
+        "Implementation scope was exactly 17 authorized paths: apps/web/.gitignore; apps/web/app/error.tsx; apps/web/app/global-error.tsx; apps/web/app/layout.tsx; apps/web/app/loading.tsx; apps/web/app/not-found.tsx; apps/web/app/page.tsx; apps/web/next.config.ts; apps/web/package.json; apps/web/src/application/form-operation.ts; apps/web/src/application/session.ts; apps/web/src/application/shell.ts; apps/web/tests/application-shell.test.mjs; apps/web/tsconfig.json; package.json; pnpm-lock.yaml; pnpm-workspace.yaml",
+        "GitHub PR #45 received designated Rosuno approval review 5327082661 (PRR_kwDOUHT1sc8AAAABPYTUpQ) at 2026-09-26T19:21:22Z on exact candidate head c9059140e721cbee1fd9768734e74a0aad139328",
+        "P0 control foundation run #90 (36265251942) succeeded on exact candidate head c9059140e721cbee1fd9768734e74a0aad139328",
+        "PR #45 merged through merge commit eb3da61ce8192e5c0b475caca4063176f1309075 at 2026-09-26T19:24:59Z",
+        "Merge eb3da61ce8192e5c0b475caca4063176f1309075 has ordered parents c188c6ea06727e5527a2c0f7c451d8fc81b1a2c9 then c9059140e721cbee1fd9768734e74a0aad139328 and tree 1cda77bc89bfb790266241e45efa2cf58e041161",
+        "Post-merge P0 control foundation run #91 (36265974561) succeeded on canonical main eb3da61ce8192e5c0b475caca4063176f1309075",
+        "Gate 5 is N/A because P2-001 contains no migration or database candidate",
+        "Gate 6 is N/A because P2-001 contains no persistent Staging application",
+        "P1-012 remains conditional/deferred and blocked; F-01/F-02/F-03 and P2-002/P2-003/P3 remain separate and outside this closure"
       ],
       "validation_commands": [
         "pnpm run p2:application-shell:test",
@@ -1091,9 +1102,9 @@
       "environment": "development",
       "release_refs": [],
       "migration_refs": [],
-      "rollback_reference": "Repository-only application work. Before protected acceptance the local candidate may be discarded. After protected acceptance corrections are forward-only. No database rollback applies.",
+      "rollback_reference": "Repository-only application lifecycle closure. Before protected acceptance, the Gate 7 closure candidate may be discarded without altering the already-merged P2-001 implementation. After protected acceptance, any correction is forward-only and must not rewrite protected history. No database rollback applies.",
       "created_at": "2026-09-25T03:23:31Z",
-      "updated_at": "2026-09-26T04:10:56Z"
+      "updated_at": "2026-09-26T19:49:50Z"
     }
   ]
 }
