@@ -952,6 +952,72 @@
       "updated_at": "2026-09-25T01:43:29Z"
     },
     {
+      "work_item_id": "WI-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION",
+      "title": "P0 application-surface control extension prerequisite",
+      "objective": "Durably record the completed repository-only P0 control extension that preserves the neutral pre-application repository state while permitting exactly one tightly bounded future P2 web application state at apps/web, without implementing P2-001.",
+      "in_scope": [
+        "The protected P0 control implementation merged through GitHub PR #43",
+        "Exact four-file implementation scope: tools/p0/lib/controls.mjs, tools/p0/lib/fast-control.mjs, tools/p0/tests/p0-controls.test.mjs, and tools/p0/tests/fast-control.test.mjs",
+        "Exact PR #43 protected review, pre-merge CI, merge topology, and post-merge CI lifecycle evidence",
+        "Formal Gate 5 N/A determination for repository-only work with no migration or database candidate",
+        "Formal Gate 6 N/A determination because no persistent Staging application exists",
+        "Durable dependency linkage preventing P2-001 from bypassing this completed prerequisite"
+      ],
+      "out_of_scope": [
+        "Any further P0 control implementation or weakening of the accepted application-surface controls",
+        "P2-001 application implementation, Claude implementation, apps/web creation, package/workspace/lockfile changes, or .replit changes",
+        "P2-002, P2-003, P3, F-01, F-02, F-03, or any later roadmap work",
+        "Any Supabase migration, database connection, schema/RLS/ACL/Storage mutation, Staging application, Production/OLD activity, provider integration, or jurisdiction-specific legal/regulatory decision",
+        "Replit Agent or Replit AI"
+      ],
+      "status": "completed",
+      "owner": "Rosuno P0 control owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "priority": "P0",
+      "authority_refs": [
+        "P0-001-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20260926-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION-CLOSURE"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "PR #43 approved exact head 0893ba05b8817b0dc0832746e7d14ddb18182e47 against base 766d7a8c1b230c62b4e4f58e7107c2267fce14ab",
+        "Rosuno protected review approved the exact PR #43 head before merge",
+        "P0 control foundation CI succeeded on the exact approved PR #43 head",
+        "PR #43 merged through merge commit ecf5f500105e74f646108815db65c6844a29bc04 with the old canonical base and approved head as its two ordered parents",
+        "The merge tree equals the approved candidate tree and no fifth implementation file entered the merge",
+        "Post-merge P0 control foundation CI succeeded on canonical main ecf5f500105e74f646108815db65c6844a29bc04",
+        "Gate 5 is N/A because this work item contains no migration or database candidate",
+        "Gate 6 is N/A because this work item has no persistent Staging application",
+        "P2-001 remains approved but unimplemented and explicitly depends on this completed P0 prerequisite",
+        "F-01, F-02, and F-03 remain separate and are not pulled into this closure"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p2-001-registration-contract.test.mjs",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository-only governance closure. Before protected acceptance the local closure candidate may be discarded. After protected acceptance corrections are forward-only. No database rollback applies.",
+      "created_at": "2026-09-26T04:10:56Z",
+      "updated_at": "2026-09-26T04:10:56Z"
+    },
+    {
       "work_item_id": "WI-P2-001-APPLICATION-SHELL",
       "title": "P2-001 Application Shell foundation",
       "objective": "Establish the smallest runnable jurisdiction-neutral Rosuno application shell under apps/web using Next.js, React, and TypeScript, with routing, shared layout, deterministic error/loading handling, form-handling patterns, a server-owned session boundary, and explicit API/service boundaries while introducing no feature-specific business workflow or database mutation.",
@@ -991,9 +1057,13 @@
       ],
       "decision_refs": [
         "DEC-20260924-P1-CLOSURE-P2-TRANSITION",
-        "DEC-20260925-P2-001-APPLICATION-SHELL-CONTRACT"
+        "DEC-20260925-P2-001-APPLICATION-SHELL-CONTRACT",
+        "DEC-20260926-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION-CLOSURE"
       ],
-      "dependencies": ["WI-P1-011-COMPLIANCE-FOUNDATION"],
+      "dependencies": [
+        "WI-P1-011-COMPLIANCE-FOUNDATION",
+        "WI-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION"
+      ],
       "acceptance_criteria": [
         "A single apps/web Next.js + React + TypeScript shell is runnable and buildable within the existing pnpm repository without introducing a competing application architecture",
         "Routing, root/shared layout, loading behavior, unknown-route handling, and error boundaries operate deterministically",
@@ -1023,7 +1093,7 @@
       "migration_refs": [],
       "rollback_reference": "Repository-only application work. Before protected acceptance the local candidate may be discarded. After protected acceptance corrections are forward-only. No database rollback applies.",
       "created_at": "2026-09-25T03:23:31Z",
-      "updated_at": "2026-09-25T03:58:33Z"
+      "updated_at": "2026-09-26T04:10:56Z"
     }
   ]
 }
