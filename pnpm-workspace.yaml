@@ -4,5 +4,6 @@ minimumReleaseAgeExclude:
   - "@replit/*"
   - stripe-replit-sync
 
-packages: []
+packages:
+  - apps/web
 autoInstallPeers: false
