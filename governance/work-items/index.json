@@ -1105,6 +1105,117 @@
       "rollback_reference": "Repository-only application lifecycle closure. Before protected acceptance, the Gate 7 closure candidate may be discarded without altering the already-merged P2-001 implementation. After protected acceptance, any correction is forward-only and must not rewrite protected history. No database rollback applies.",
       "created_at": "2026-09-25T03:23:31Z",
       "updated_at": "2026-09-26T19:49:50Z"
+    },
+    {
+      "work_item_id": "WI-P2-002-DESIGN-SYSTEM",
+      "title": "P2-002 Design System foundation",
+      "objective": "Establish the smallest jurisdiction-neutral Rosuno presentation-layer design system within the existing apps/web application using dependency-free React and ordinary CSS, faithfully implementing the human-approved P2-002 Design Direction Brief across typography, spacing, controls, forms, tables, statuses, dialogs, notifications, surfaces, density, responsive behavior, depth, motion, iconography, and media treatment without creating feature-specific business logic or a second business-state authority.",
+      "in_scope": [
+        "Dependency-free React and ordinary CSS presentation foundation within the existing apps/web application",
+        "Human-approved visual personality: premium, modern, serious, human, robust, technologically advanced, cinematic, polished, trustworthy, and restrained rather than noisy or decorative",
+        "Selective system-serif display stack for major brand/editorial headings and high-impact moments, with serif remaining selective and never reducing functional readability",
+        "Modern system-sans stack for navigation, buttons, forms, tables, metadata, labels, workspace UI, and dense operational content; no external/custom font dependency",
+        "Palette and surface strategy using Deep Cocoa, Chocolate, Cream, Warm White, Premium Gold, plus standard semantic success/warning/error/information colors",
+        "Predominantly cream/warm-white authenticated working interfaces with strategic dark surfaces for public hero moments, navigation/sidebars where appropriate, premium highlights, selected promotional/editorial modules, and carefully chosen workspace accents",
+        "Premium gold used with restraint for appropriate CTAs, selected states, highlights, borders/dividers, key numbers, icons, and premium emphasis; excessive metallic gradients, glossy bevels, skeuomorphic controls, and gold-dominated neutral structure are prohibited",
+        "Generous spacing and calm layout rhythm with system-level density variants: Public strongest cinematic/editorial expression and most generous composition; Client calm/guided/task-first/spacious/low-friction; Attorney more operationally dense and robust while polished and uncrowded; Admin densest and most structured with scanning and operational clarity prioritized",
+        "Moderate corner rounding, refined borders, subtle dimensional separation, restrained shadows, and selected dark/light layering; no heavy glassmorphism or exaggerated 3-D effects",
+        "Generic Surface / Panel presentation including surfaces, panels, elevated cards, selected cards, dark premium modules, summary blocks, and activity modules without feature-specific semantics",
+        "Required generic button hierarchy of primary, secondary, and tertiary/text with clear hover, focus, pressed, and disabled treatments",
+        "Generic form labels, inputs, selects, textareas, validation presentation, grouping, progressive-disclosure presentation, and form-state styling subordinate to the existing application-layer form-operation behavior",
+        "Generic semantic table presentation using restrained density, alignment, headers, row hierarchy, subtle dividers, and increased-but-readable density for attorney/admin contexts",
+        "Generic status indicators with caller-supplied textual meaning, approved semantic success/warning/error/information treatment, and no color-only meaning",
+        "Generic dialog presentation with clear layering, strong title, concise supporting copy, obvious primary action, and quiet dismissal path",
+        "Generic notification/toast/alert presentation for caller-supplied messages using the semantic state system without implementing Communications-domain delivery lifecycle",
+        "Responsive/mobile behavior that preserves Rosuno identity while simplifying composition, prioritizing vertical flow, touch-friendly controls, legibility, lower density, lighter dark-surface usage, and the most important action first",
+        "Subtle purposeful CSS motion for transitions, hover/focus/pressed feedback, panel emphasis, open/close transitions, and polished state changes, with no decorative constant motion and required prefers-reduced-motion handling",
+        "Small internally defined consistent outline/utility icon set implemented as bounded inline SVG using currentColor, with no icon package",
+        "Selective cinematic human/legal media treatment for public pages, attorney discovery/profile moments, onboarding or premium editorial moments, and occasional premium modules; routine client/attorney/admin working interfaces remain comparatively light and photography-sparse",
+        "Generic media treatment may define aspect/crop, overlays, framing, contrast treatment, and dark/light integration but P2-002 does not introduce real feature photography, attorney records, or sample production content",
+        "Visible keyboard focus, semantic HTML, non-color-only status meaning, touch-friendly controls, readable contrast, clear labels, responsive behavior, and reduced-motion preferences; no accessibility-certification claim",
+        "Approved visual-reference mockups remain visual-language evidence only; their names, identities, prices, practice areas, metrics, charts, navigation labels, workflow steps, statuses, dashboard data, profile details, copy, scheduling details, business logic, and feature requirements are not automatically P2-002 requirements",
+        "Later implementation surface limited to: apps/web/app/globals.css; apps/web/app/layout.tsx; apps/web/app/page.tsx; apps/web/src/presentation/design-system.tsx; apps/web/tests/design-system.test.mjs; apps/web/tests/application-shell.test.mjs only if required to preserve the original application-layer import-isolation intent while allowing the new presentation layer",
+        "Targeted design-system tests plus preservation of all existing P2-001 application-shell and canonical P0 validation"
+      ],
+      "out_of_scope": [
+        "P2-003 / 2C Security Shell including authenticated-route protection, role or principal resolution, capability checks, privileged mutation policy, or security-shell implementation",
+        "P3 identity/authentication workflows including signup, sign-in, sign-out, recovery, verification, profile lifecycle, session binding, or stronger authentication",
+        "Feature-specific client, attorney, admin, discovery, intake, referral, scheduling, consultation, payment, engagement, media, resource, messaging, review, complaint, compliance, or other business workflows",
+        "Any names, attorney/client identities, prices, practice areas, metrics, charts, navigation labels, workflow steps, status values, dashboard data, profile details, copy, scheduling details, business logic, or feature requirements merely because they appear in approved visual-reference mockups",
+        "Any generic UI component deciding canonical business state, inferring domain meaning, hard-coding domain transitions, or becoming authoritative for business outcomes",
+        "Any Supabase/database/schema/SQL/RLS/ACL/Storage mutation, database connection, seed/reference data, migration, release traceability, or schema-drift mutation",
+        "Stripe, Daily, Resend, identity, verification, webhook, email-delivery, or other provider integration",
+        "Arizona-specific or other jurisdiction-specific legal/regulatory implementation, Physical 1L implementation, or resolution of counsel/policy gates",
+        "Any custom/external font dependency, npm design dependency, UI/component framework, utility-CSS framework, icon package, motion library, Tailwind, shadcn, Radix, CSS preprocessor, package-manager state, or speculative generalized framework",
+        "Any change to root or app package.json, pnpm-lock.yaml, pnpm-workspace.yaml, root/app scripts, .replit, or CI workflow",
+        "Repository addition of the human-approved Design Direction Brief or approved visual-reference image files as part of this governance-registration candidate",
+        "Real feature photography, fake/sample attorney or client records, or mock production/business content",
+        "F-01, F-02, or F-03 remediation",
+        "Staging, Production, OLD, Replit Agent, Replit AI, or later P2/P3 implementation without separate authorization"
+      ],
+      "status": "approved",
+      "owner": "Rosuno P2-002 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20260926-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION-CLOSURE",
+        "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE",
+        "DEC-20260926-P2-002-DESIGN-SYSTEM-CONTRACT"
+      ],
+      "dependencies": [
+        "WI-P2-001-APPLICATION-SHELL",
+        "WI-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION"
+      ],
+      "acceptance_criteria": [
+        "P2-002 is registered as the bounded Implementation Master Plan 2B Design System slice only and application implementation has not started through this registration candidate",
+        "The human-approved P2-002 Design Direction Brief is durably represented as controlling visual implementation input by its fingerprint and by explicit contract requirements rather than being left as undocumented chat context",
+        "The later implementation faithfully preserves the approved dual typography system: selective system-serif major display/editorial headings and system-sans functional UI",
+        "The later implementation faithfully preserves predominantly cream/warm-white working interfaces, strategic cocoa/chocolate surfaces, and rich but restrained premium gold without glossy, beveled, or skeuomorphic treatment",
+        "Public, Client, Attorney, and Admin density distinctions are design-system variants and are not independently reinvented by future screens",
+        "The implementation provides reusable generic Surface / Panel language and restrained depth without turning the interface into repetitive card walls, heavy glassmorphism, or exaggerated 3-D styling",
+        "Buttons, forms, tables, status indicators, dialogs, and notifications follow the approved hierarchy, clarity, and semantic presentation rules while remaining caller-controlled and business-logic-free",
+        "Responsive/mobile behavior remains touch-friendly, vertically prioritized, legible, lower-density, lighter in dark-surface usage, and focused on the most important action first",
+        "Motion remains subtle and purposeful, requires prefers-reduced-motion support, and introduces no external animation/motion library",
+        "Iconography uses a bounded internally defined inline SVG currentColor approach and introduces no icon package",
+        "Photography remains selective to public/discovery/profile/onboarding/editorial/premium moments; routine client/attorney/admin working interfaces remain comparatively light and photography-sparse",
+        "Approved visual-reference mockups remain visual-language evidence only and do not authorize their sample identities, prices, metrics, navigation, charts, workflows, statuses, copy, scheduling details, business logic, or feature requirements",
+        "The implementation uses existing React plus ordinary CSS and CSS custom properties/tokens and introduces no new npm design dependency, external font, component framework, Tailwind, shadcn, Radix, icon package, motion library, or CSS preprocessor",
+        "Root/app package.json, pnpm-lock.yaml, pnpm-workspace.yaml, root/app scripts, .replit, and CI workflow remain unchanged by P2-002",
+        "Generic presentation components do not own canonical business state, infer business meaning, implement authorization, contact databases/providers, or encode jurisdiction rules",
+        "Form presentation remains subordinate to the existing P2-001 application-layer form-operation boundary rather than duplicating validation or mutation authority in UI components",
+        "Status indicators provide non-color-only meaning and interactive primitives preserve semantic HTML and visible keyboard focus behavior",
+        "The existing P2-001 routing, loading, not-found, error-redaction, server-session, presentation-to-application, and generic form-operation boundaries remain valid",
+        "Later application implementation remains inside the frozen bounded P2-002 path surface and must pass targeted design-system tests plus the complete canonical validation chain",
+        "P1-012 remains conditional/deferred and blocked; Arizona is not classified or activated by P2-002",
+        "F-01/F-02/F-03 remain separate; P2-003, P3, database/provider work, Staging, Production, and OLD remain outside this work item",
+        "A fresh bounded Builder packet is required before substantial P2-002 application implementation; Builder may generate candidate implementation/tests but may not mutate canonical Rosuno state"
+      ],
+      "validation_commands": [
+        "node --test apps/web/tests/design-system.test.mjs",
+        "pnpm run p2:application-shell:test",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "development",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository-only design-system work. Before protected acceptance, the local P2-002 candidate may be discarded without changing canonical main. After protected acceptance, any correction is forward-only and must not rewrite protected history. No database rollback applies.",
+      "created_at": "2026-09-26T21:57:37Z",
+      "updated_at": "2026-09-26T21:57:37Z"
     }
   ]
 }
