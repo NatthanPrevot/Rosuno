@@ -620,6 +620,49 @@
         "GitHub Actions P0 control foundation run #83 (36091994647) succeeded on b99c9e198bff1a3f917fbd02d884917e5e76982b"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260926-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION-CLOSURE",
+      "title": "Close P0 application-surface control prerequisite lifecycle",
+      "status": "accepted",
+      "scope": "Retrospective governance-only lifecycle closure for the already protected, reviewed, merged, and post-merge-validated P0 application-surface control prerequisite. Records completed implementation truth, Gate 5/6 N/A determinations, and the explicit prerequisite relationship to P2-001. It does not claim this local closure candidate itself has completed protected review, and it authorizes no implementation or later gate.",
+      "decision": "Record WI-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION as completed after exact PR #43 review, successful CI, merge, and successful post-merge CI. Record Gate 5 as N/A because no migration or database candidate exists and Gate 6 as N/A because no persistent Staging application exists. Make the completed P0 control prerequisite an explicit dependency of WI-P2-001-APPLICATION-SHELL without changing the substantive P2-001 Application Shell contract or beginning implementation.",
+      "rationale": "The accepted P2-001 Application Shell could not be implemented safely under the prior neutral-repository controls. The separately bounded P0 prerequisite extended the control plane to preserve the existing neutral state while allowing exactly one tightly bounded future apps/web application state. PR #43 completed that repository-only prerequisite through protected review, successful CI, merge-commit integration, and successful post-merge CI. Durable governance now needs to record that completed prerequisite before P2-001 may resume.",
+      "authority_refs": [
+        "P0-001-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": [
+        "WI-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION",
+        "WI-P2-001-APPLICATION-SHELL"
+      ],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-09-26T04:10:56Z",
+      "updated_at": "2026-09-26T04:10:56Z",
+      "supersedes": [],
+      "impact": "Durably records the completed P0 application-surface control prerequisite and adds explicit prerequisite traceability to the already-approved P2-001 work item. It does not modify the P0 implementation, start P2-001, authorize Claude implementation, alter database/schema/RLS/Storage, contact Staging, authorize Production/OLD, resolve Arizona or Physical 1L, or include F-01/F-02/F-03.",
+      "evidence": [
+        "Retrospective governance closure record for WI-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION; canonical record created after the protected implementation lifecycle completed",
+        "GitHub PR #43 reviewed exact head 0893ba05b8817b0dc0832746e7d14ddb18182e47 against base 766d7a8c1b230c62b4e4f58e7107c2267fce14ab",
+        "Rosuno review 5324240135 (PRR_kwDOUHT1sc8AAAABPVl1Bw) APPROVED at 2026-09-26T02:39:19Z on exact head 0893ba05b8817b0dc0832746e7d14ddb18182e47",
+        "GitHub Actions P0 control foundation run 36212219480 succeeded on 0893ba05b8817b0dc0832746e7d14ddb18182e47",
+        "GitHub PR #43 merged as ecf5f500105e74f646108815db65c6844a29bc04 at 2026-09-26T03:33:04Z",
+        "Merge ecf5f500105e74f646108815db65c6844a29bc04 has ordered parents 766d7a8c1b230c62b4e4f58e7107c2267fce14ab then 0893ba05b8817b0dc0832746e7d14ddb18182e47 and tree 8468166431d2cc013307cabe7ce3500552ae638a",
+        "GitHub Actions P0 control foundation run 36215153054 succeeded on ecf5f500105e74f646108815db65c6844a29bc04",
+        "Implementation scope was exactly tools/p0/lib/controls.mjs; tools/p0/lib/fast-control.mjs; tools/p0/tests/p0-controls.test.mjs; tools/p0/tests/fast-control.test.mjs",
+        "Gate 5 N/A — repository-only P0 control work; no migration or database candidate exists",
+        "Gate 6 N/A — no persistent Staging application exists for this repository-only P0 control work",
+        "Gate 7 record status: WI-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION completed; final WORK ITEM CLOSED declaration remains contingent on protected closure acceptance and final audit",
+        "P2-001 implementation remains not started; F-01/F-02/F-03 remain separate",
+        "tools/p0/tests/p2-001-registration-contract.test.mjs"
+      ],
+      "expiry": null
     }
   ]
 }

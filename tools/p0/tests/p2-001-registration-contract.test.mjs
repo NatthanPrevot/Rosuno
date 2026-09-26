@@ -62,14 +62,19 @@ test("P2-001 registration preserves the bounded Application Shell contract", () 
     status: "approved",
   });
   assert.equal(item.created_at, "2026-09-25T03:23:31Z");
-  assert.equal(item.updated_at, decision.updated_at);
+  assert.match(item.updated_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.ok(Date.parse(item.updated_at) > Date.parse(decision.updated_at));
 
   assert.deepEqual(item.decision_refs, [
     "DEC-20260924-P1-CLOSURE-P2-TRANSITION",
     "DEC-20260925-P2-001-APPLICATION-SHELL-CONTRACT",
+    "DEC-20260926-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION-CLOSURE",
   ]);
 
-  assert.deepEqual(item.dependencies, ["WI-P1-011-COMPLIANCE-FOUNDATION"]);
+  assert.deepEqual(item.dependencies, [
+    "WI-P1-011-COMPLIANCE-FOUNDATION",
+    "WI-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION",
+  ]);
 
   const contract = [
     decision.scope,
@@ -127,4 +132,84 @@ test("P2-001 registration preserves the bounded Application Shell contract", () 
     ),
     false,
   );
+});
+
+test("P0 P2 application-surface control prerequisite is durably closed", () => {
+  const decisions = readJson("governance/decision-log.json");
+  const workItems = readJson("governance/work-items/index.json");
+
+  const closureId =
+    "DEC-20260926-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION-CLOSURE";
+  const p0Id = "WI-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION";
+
+  const closureMatches = decisions.decisions.filter(
+    (entry) => entry.decision_id === closureId,
+  );
+  assert.equal(closureMatches.length, 1);
+
+  const closure = closureMatches[0];
+  assert.equal(closure.status, "accepted");
+  assert.deepEqual(closure.reviewer, {
+    identity: "Rosuno",
+    status: "approved",
+  });
+  assert.match(closure.created_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.equal(closure.updated_at, closure.created_at);
+  assert.ok(
+    Date.parse(closure.created_at) > Date.parse("2026-09-26T03:33:04Z"),
+  );
+  assert.deepEqual(closure.work_item_refs, [
+    p0Id,
+    "WI-P2-001-APPLICATION-SHELL",
+  ]);
+
+  for (const evidence of [
+    "GitHub PR #43 reviewed exact head 0893ba05b8817b0dc0832746e7d14ddb18182e47 against base 766d7a8c1b230c62b4e4f58e7107c2267fce14ab",
+    "Rosuno review 5324240135 (PRR_kwDOUHT1sc8AAAABPVl1Bw) APPROVED at 2026-09-26T02:39:19Z on exact head 0893ba05b8817b0dc0832746e7d14ddb18182e47",
+    "GitHub Actions P0 control foundation run 36212219480 succeeded on 0893ba05b8817b0dc0832746e7d14ddb18182e47",
+    "GitHub PR #43 merged as ecf5f500105e74f646108815db65c6844a29bc04 at 2026-09-26T03:33:04Z",
+    "Merge ecf5f500105e74f646108815db65c6844a29bc04 has ordered parents 766d7a8c1b230c62b4e4f58e7107c2267fce14ab then 0893ba05b8817b0dc0832746e7d14ddb18182e47 and tree 8468166431d2cc013307cabe7ce3500552ae638a",
+    "GitHub Actions P0 control foundation run 36215153054 succeeded on ecf5f500105e74f646108815db65c6844a29bc04",
+    "Gate 5 N/A — repository-only P0 control work; no migration or database candidate exists",
+    "Gate 6 N/A — no persistent Staging application exists for this repository-only P0 control work",
+    "P2-001 implementation remains not started; F-01/F-02/F-03 remain separate",
+  ]) {
+    assert.ok(
+      closure.evidence.includes(evidence),
+      "missing P0 closure evidence: " + evidence,
+    );
+  }
+
+  const p0Matches = workItems.work_items.filter(
+    (entry) => entry.work_item_id === p0Id,
+  );
+  assert.equal(p0Matches.length, 1);
+
+  const p0 = p0Matches[0];
+  assert.equal(p0.priority, "P0");
+  assert.equal(p0.status, "completed");
+  assert.equal(p0.environment, "none");
+  assert.deepEqual(p0.reviewer, {
+    identity: "Rosuno",
+    status: "approved",
+  });
+  assert.deepEqual(p0.decision_refs, [closureId]);
+  assert.deepEqual(p0.dependencies, []);
+  assert.deepEqual(p0.release_refs, []);
+  assert.deepEqual(p0.migration_refs, []);
+  assert.equal(p0.created_at, closure.created_at);
+  assert.equal(p0.updated_at, closure.updated_at);
+
+  const p2 = workItems.work_items.find(
+    (entry) => entry.work_item_id === "WI-P2-001-APPLICATION-SHELL",
+  );
+  assert.ok(p2);
+  assert.equal(p2.status, "approved");
+  assert.deepEqual(p2.decision_refs, [
+    "DEC-20260924-P1-CLOSURE-P2-TRANSITION",
+    "DEC-20260925-P2-001-APPLICATION-SHELL-CONTRACT",
+    closureId,
+  ]);
+  assert.deepEqual(p2.dependencies, ["WI-P1-011-COMPLIANCE-FOUNDATION", p0Id]);
+  assert.equal(p2.updated_at, closure.updated_at);
 });
