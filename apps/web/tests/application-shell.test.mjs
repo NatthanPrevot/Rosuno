@@ -54,6 +54,29 @@ function importsOf(source) {
   ].map((match) => match[1]);
 }
 
+// WI-P2-002 adds the design system to the shell: one global stylesheet, loaded
+// by the root layout, and one presentation module, used by the page. Both are
+// named exactly, so nothing else is admitted along with them.
+const globalStylesheet = "app/globals.css";
+const designSystem = "src/presentation/design-system.tsx";
+
+// The App Router modules: every file below app/ except the global stylesheet.
+function appModules() {
+  return filesIn("app/").filter((file) => file !== globalStylesheet);
+}
+
+// "attorney" is one of the four approved design-density names (public, client,
+// attorney, admin). It is admitted only as that presentation token, in these
+// exact forms, inside the two design-system sources. Any other use of the word
+// there, and every use of it anywhere else, still fails the vocabulary guard.
+const densityVocabulary = new Map([
+  [globalStylesheet, '[data-density="attorney"]'],
+  [
+    designSystem,
+    'export type Density = "public" | "client" | "attorney" | "admin";',
+  ],
+]);
+
 // Import or export syntax without the spacing Prettier writes, or with a
 // comment inside it, would hide its specifier from importsOf.
 const unspacedImport = /\b(?:import|export|from)(?:["'{*]|\s*\/[*/])/;
@@ -245,13 +268,15 @@ test("1. App Router shell route and boundary files exist", () => {
   assert.deepEqual(filesIn("app/"), [
     "app/error.tsx",
     "app/global-error.tsx",
+    "app/globals.css",
     "app/layout.tsx",
     "app/loading.tsx",
     "app/not-found.tsx",
     "app/page.tsx",
   ]);
-  // Application source is TypeScript only.
-  for (const file of [...filesIn("app/"), ...filesIn("src/")]) {
+  // Application source is TypeScript only, apart from the one global
+  // stylesheet listed above.
+  for (const file of [...appModules(), ...filesIn("src/")]) {
     assert.match(file, /\.tsx?$/, file);
   }
 });
@@ -905,6 +930,7 @@ test("12. presentation reaches application state only through application module
   assert.deepEqual(importsOf(page), [
     "next/server",
     "../src/application/shell.ts",
+    "../src/presentation/design-system.tsx",
   ]);
   // The page renders exactly the server-derived view it is given.
   assert.match(
@@ -912,28 +938,329 @@ test("12. presentation reaches application state only through application module
     /\nexport default async function HomePage\(\) \{\n(?: {2}\/\/ [^\n]*\n)* {2}await connection\(\);\n {2}const view = await getShellView\(\);\n {2}return \(\n[\s\S]*\n {2}\);\n\}\n$/,
   );
   assert.equal(codeOf(page).match(/\bview\b/g)?.length, 2);
+  // Its one expression is still the server-derived session state: every
+  // other tag, attribute, and text is fixed design-system presentation.
   assert.deepEqual(componentShape(page), {
     functions: 1,
     returns: 1,
     arrows: 0,
-    tags: ["h1", "p"],
-    attributes: [],
+    tags: [
+      "Page",
+      "Surface",
+      "Stack",
+      "Eyebrow",
+      "Display",
+      "Text",
+      "Rule",
+      "Status",
+      "Columns",
+      "Stack",
+      "Heading",
+      "Text",
+      "Cluster",
+      "Button",
+      "Button",
+      "Button",
+      "Button",
+      "Text",
+      "Cluster",
+      "Status",
+      "Status",
+      "Status",
+      "Status",
+      "Alert",
+      "Surface",
+      "Stack",
+      "Eyebrow",
+      "Heading",
+      "Text",
+      "Surface",
+      "Stack",
+      "Heading",
+      "FieldGroup",
+      "Columns",
+      "TextField",
+      "SelectField",
+      "option",
+      "option",
+      "TextAreaField",
+      "Choice",
+      "Disclosure",
+      "Text",
+      "Stack",
+      "Heading",
+      "Table",
+      "thead",
+      "tr",
+      "th",
+      "th",
+      "th",
+      "tbody",
+      "tr",
+      "th",
+      "td",
+      "td",
+      "tr",
+      "th",
+      "td",
+      "td",
+      "tr",
+      "th",
+      "td",
+      "td",
+      "tr",
+      "th",
+      "td",
+      "td",
+      "Columns",
+      "Stack",
+      "Heading",
+      "Dialog",
+      "DialogBody",
+      "Text",
+      "DialogActions",
+      "Button",
+      "DialogDismissal",
+      "Button",
+      "Stack",
+      "Heading",
+      "MediaFrame",
+    ],
+    attributes: [
+      "density",
+      "as",
+      "tone",
+      "emphasis",
+      "as",
+      "size",
+      "tone",
+      "tone",
+      "tone",
+      "columns",
+      "size",
+      "tone",
+      "variant",
+      "variant",
+      "variant",
+      "variant",
+      "disabled",
+      "tone",
+      "tone",
+      "tone",
+      "tone",
+      "tone",
+      "tone",
+      "title",
+      "as",
+      "tone",
+      "emphasis",
+      "gap",
+      "as",
+      "size",
+      "size",
+      "tone",
+      "emphasis",
+      "size",
+      "id",
+      "legend",
+      "hint",
+      "columns",
+      "id",
+      "label",
+      "hint",
+      "id",
+      "label",
+      "hint",
+      "id",
+      "label",
+      "errors",
+      "type",
+      "label",
+      "hint",
+      "summary",
+      "tone",
+      "size",
+      "id",
+      "caption",
+      "scope",
+      "scope",
+      "scope",
+      "scope",
+      "scope",
+      "scope",
+      "scope",
+      "columns",
+      "size",
+      "id",
+      "title",
+      "titleAs",
+      "presentation",
+      "open",
+      "tone",
+      "variant",
+      "variant",
+      "size",
+      "ratio",
+      "overlay",
+      "caption",
+    ],
     expressions: ["view.session"],
-    text: ["Rosuno", "Session: {}"],
+    text: [
+      "Interface foundation",
+      "Rosuno",
+      "One visual language for every Rosuno screen: warm surfaces, restrained gold, and clear hierarchy.",
+      "Session: {}",
+      "Actions and status",
+      "Three levels of emphasis, each with hover, focus, pressed, and disabled states.",
+      "Primary action",
+      "Secondary action",
+      "Tertiary action",
+      "Unavailable action",
+      "Status meaning is always written out; tone adds a glyph and a color beside the text.",
+      "Success",
+      "Warning",
+      "Error",
+      "Information",
+      "An alert presents a message supplied by the caller with a semantic state.",
+      "Supporting surface",
+      "Dark surfaces are used with intent",
+      "Working screens stay light. Deep cocoa and chocolate mark selected moments, and narrow screens use less of them.",
+      "Form controls",
+      "First option",
+      "Second option",
+      "Secondary detail stays one step away until it is needed.",
+      "Tables",
+      "Tone",
+      "Palette",
+      "Placement",
+      "Light",
+      "Warm White",
+      "Content panels",
+      "Cream",
+      "Cream",
+      "Canvas and summary blocks",
+      "Dark",
+      "Deep Cocoa",
+      "Premium modules",
+      "Chocolate",
+      "Chocolate",
+      "Supporting modules on wider screens",
+      "Dialog",
+      "A strong title, concise supporting content, one primary action, and a quiet dismissal path.",
+      "Primary action",
+      "Dismiss",
+      "Media frame",
+    ],
   });
+  // componentShape reads attribute names. Their values are fixed as well, in
+  // source order, so no copy or variant on the page goes unpinned.
+  assert.deepEqual(
+    [
+      ...codeOf(page)
+        .slice(codeOf(page).lastIndexOf("return"))
+        .matchAll(/\s([A-Za-z]+)="([^"]*)"/g),
+    ].map((match) => `${match[1]}=${match[2]}`),
+    [
+      "density=public",
+      "as=header",
+      "tone=dark",
+      "emphasis=raised",
+      "as=h1",
+      "size=lede",
+      "tone=muted",
+      "tone=gold",
+      "tone=neutral",
+      "columns=split",
+      "size=lg",
+      "tone=muted",
+      "variant=primary",
+      "variant=secondary",
+      "variant=tertiary",
+      "variant=secondary",
+      "tone=muted",
+      "tone=success",
+      "tone=warning",
+      "tone=error",
+      "tone=information",
+      "tone=information",
+      "title=Information",
+      "as=aside",
+      "tone=chocolate",
+      "emphasis=raised",
+      "gap=tight",
+      "as=h3",
+      "size=sm",
+      "size=small",
+      "tone=muted",
+      "emphasis=raised",
+      "size=lg",
+      "id=foundation-group",
+      "legend=Grouped fields",
+      "hint=Labels, hints, and messages are supplied by the caller.",
+      "columns=2",
+      "id=foundation-text",
+      "label=Text field",
+      "hint=Hint text guides the entry.",
+      "id=foundation-select",
+      "label=Select",
+      "hint=Options are supplied by the caller.",
+      "id=foundation-area",
+      "label=Text area",
+      "errors=Validation message supplied by the caller.",
+      "type=checkbox",
+      "label=Choice",
+      "hint=A selectable option with a supporting hint.",
+      "summary=More detail",
+      "tone=muted",
+      "size=lg",
+      "id=foundation-table",
+      "caption=Surface tones",
+      "scope=col",
+      "scope=col",
+      "scope=col",
+      "scope=row",
+      "scope=row",
+      "scope=row",
+      "scope=row",
+      "columns=split",
+      "size=lg",
+      "id=foundation-dialog",
+      "title=Dialog frame",
+      "titleAs=h3",
+      "presentation=inline",
+      "tone=muted",
+      "variant=primary",
+      "variant=tertiary",
+      "size=lg",
+      "ratio=standard",
+      "overlay=scrim",
+      "caption=Crop, overlay, and framing for media supplied by the caller.",
+    ],
+  );
   for (const file of filesIn("app/")) {
     // Each app module exports only its component (the root layout also its
     // metadata), so no route segment config (dynamic, revalidate, ...) can
-    // make Next.js prerender or cache per-request session state.
+    // make Next.js prerender or cache per-request session state. The global
+    // stylesheet exports nothing.
     assert.equal(
       codeOf(read(file)).match(/\bexport\b/g)?.length,
-      file === "app/layout.tsx" ? 2 : 1,
+      file === globalStylesheet ? undefined : file === "app/layout.tsx" ? 2 : 1,
       file,
     );
     // No server actions: each would be a public POST endpoint.
     assert.doesNotMatch(read(file), /["']use server["']/, file);
     assert.doesNotMatch(read(file), unspacedImport, file);
     for (const specifier of importsOf(read(file))) {
+      // Only the root layout loads the global stylesheet, and only the page
+      // uses the design system. Authoritative state still reaches app modules
+      // through the application layer alone.
+      if (
+        (file === "app/layout.tsx" && specifier === "./globals.css") ||
+        (file === "app/page.tsx" &&
+          specifier === "../src/presentation/design-system.tsx")
+      ) {
+        continue;
+      }
       assert.match(
         specifier,
         /^(?:react|next(?:\/[a-z]+)?|\.\.\/src\/application\/[a-z-]+\.ts)$/,
@@ -941,10 +1268,17 @@ test("12. presentation reaches application state only through application module
       );
     }
   }
-  // The application layer never depends on presentation or a UI runtime.
+  // The application layer never depends on presentation or a UI runtime, and
+  // the design system never reaches the application layer to infer state: it
+  // imports React types and nothing else. Neither is a client or server
+  // module.
   for (const file of filesIn("src/")) {
     const source = read(file);
     assert.doesNotMatch(source, /["']use (?:client|server)["']/, file);
+    if (file === designSystem) {
+      assert.deepEqual(importsOf(source), ["react"], file);
+      continue;
+    }
     for (const specifier of importsOf(source)) {
       assert.match(
         specifier,
@@ -963,7 +1297,13 @@ test("12. presentation reaches application state only through application module
 
 test("13. generic shell contains no feature-specific business logic or records", () => {
   for (const file of [...filesIn("app/"), ...filesIn("src/")]) {
-    const source = read(file);
+    // Only the exact approved density token is set aside, and only in the two
+    // design-system sources; the guards below read everything else.
+    const approved = densityVocabulary.get(file);
+    const source =
+      approved === undefined
+        ? read(file)
+        : read(file).replaceAll(approved, " ");
     assert.doesNotMatch(
       source,
       /attorney|lawyer|consultation|referral|intake|booking|payment|payout|ledger|refund|\bfee\b|stripe|\bdaily\b|\bresend\b|supabase|postgres|database|jurisdiction|california|arizona|eligib|bookab|engagement|marketplace|complaint|licen[cs]e/i,
@@ -990,7 +1330,7 @@ test("13. generic shell contains no feature-specific business logic or records",
   }
   // App modules hold no module-level code or data: before the component there
   // is only a directive, imports, a props type, and the layout's metadata.
-  for (const file of filesIn("app/")) {
+  for (const file of appModules()) {
     const code = codeOf(read(file));
     const preamble = code
       .slice(0, code.indexOf("export default"))
@@ -1077,7 +1417,9 @@ test("15. the tests and the modules they run need only Node.js built-ins", () =>
       ? /^(?:node:[a-z/]+|\.\.\/next\.config\.ts|\.\.\/src\/application\/[a-z-]+\.ts)$/
       : file === "next.config.ts"
         ? /^next$/
-        : /^\.\/[a-z-]+\.ts$/;
+        : file === designSystem
+          ? /^react$/
+          : /^\.\/[a-z-]+\.ts$/;
     for (const specifier of importsOf(source)) {
       assert.match(specifier, allowed, `${file} imports ${specifier}`);
     }
@@ -1087,5 +1429,11 @@ test("15. the tests and the modules they run need only Node.js built-ins", () =>
   assert.match(
     read("next.config.ts"),
     /^import type \{ NextConfig \} from "next";$/m,
+  );
+  // The design system's only import statement is a type import from React.
+  assert.equal(read(designSystem).match(/^import /gm)?.length, 1);
+  assert.match(
+    read(designSystem),
+    /^import type \{ [A-Za-z, ]+ \} from "react";$/m,
   );
 });

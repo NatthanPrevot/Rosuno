@@ -1,0 +1,1440 @@
+/*
+ * Rosuno design-system foundation (WI-P2-002).
+ *
+ * The single global style foundation: tokens, density variants, base
+ * elements, and the rs-* presentation classes rendered by
+ * src/presentation/design-system.tsx. Ordinary CSS and custom properties
+ * only. Selectors describe presentation and never business state.
+ */
+
+/* 1. Tokens ------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* Core palette */
+  --rs-color-deep-cocoa: #1f140e;
+  --rs-color-chocolate: #3a2519;
+  --rs-color-cream: #f6efe3;
+  --rs-color-warm-white: #fffcf7;
+  --rs-color-premium-gold: #b8893a;
+
+  /* Gold tonal steps: soft on dark surfaces, deep for text and actions. */
+  --rs-color-gold-soft: #e3c480;
+  --rs-color-gold-soft-deep: #d9b468;
+  --rs-color-gold-deep: #8a6220;
+  --rs-color-gold-deeper: #7a5418;
+  --rs-color-gold-tint: #fbf4e4;
+
+  /* Warm neutrals */
+  --rs-color-ink: #2a1d15;
+  --rs-color-ink-muted: #6b5b4e;
+  --rs-color-ink-placeholder: #7a6a5c;
+  --rs-color-line: #e4d8c5;
+  --rs-color-line-strong: #c9b798;
+  --rs-color-control-line: #8f7d66;
+  --rs-color-on-dark: #f6efe3;
+  --rs-color-on-dark-muted: #cdbfa9;
+  --rs-color-line-on-dark: #5a4330;
+  --rs-color-well-on-dark: #2e2017;
+
+  /* Semantic colors */
+  --rs-color-success: #2b6a48;
+  --rs-color-success-surface: #e9f2eb;
+  --rs-color-success-line: #b5d2c0;
+  --rs-color-success-on-dark: #93cfab;
+  --rs-color-success-surface-on-dark: #24352b;
+  --rs-color-success-line-on-dark: #3f6350;
+  --rs-color-warning: #86560a;
+  --rs-color-warning-surface: #fbf2dd;
+  --rs-color-warning-line: #e6cd96;
+  --rs-color-warning-on-dark: #ebc76e;
+  --rs-color-warning-surface-on-dark: #3a2e15;
+  --rs-color-warning-line-on-dark: #6b5524;
+  --rs-color-error: #a2322b;
+  --rs-color-error-surface: #fbebe8;
+  --rs-color-error-line: #e6bab4;
+  --rs-color-error-on-dark: #f2a59d;
+  --rs-color-error-surface-on-dark: #3d211d;
+  --rs-color-error-line-on-dark: #71403a;
+  --rs-color-information: #2b5a86;
+  --rs-color-information-surface: #e8f0f7;
+  --rs-color-information-line: #b8cee3;
+  --rs-color-information-on-dark: #a1c6e8;
+  --rs-color-information-surface-on-dark: #1f2e3c;
+  --rs-color-information-line-on-dark: #3c5670;
+
+  /* Font stacks: system fonts only. */
+  --rs-font-display:
+    ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua",
+    Georgia, "Times New Roman", serif;
+  --rs-font-ui:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+
+  /* Type scale */
+  --rs-text-xs: 0.8125rem;
+  --rs-text-sm: 0.9375rem;
+  --rs-text-base: 1rem;
+  --rs-text-md: 1.0625rem;
+  --rs-text-lg: 1.125rem;
+  --rs-text-xl: 1.375rem;
+  --rs-heading-sm: 1.375rem;
+  --rs-heading-md: 1.75rem;
+  --rs-heading-lg: clamp(2rem, 1.55rem + 1.8vw, 2.75rem);
+  --rs-display-md: clamp(2.5rem, 1.7rem + 3.4vw, 3.75rem);
+  --rs-display-lg: clamp(3rem, 1.6rem + 6vw, 5.5rem);
+  --rs-leading-tight: 1.08;
+  --rs-leading-heading: 1.2;
+  --rs-leading-body: 1.55;
+  --rs-measure: 40rem;
+
+  /* Spacing rhythm */
+  --rs-space-1: 0.25rem;
+  --rs-space-2: 0.5rem;
+  --rs-space-3: 0.75rem;
+  --rs-space-4: 1rem;
+  --rs-space-5: 1.5rem;
+  --rs-space-6: 2rem;
+  --rs-space-7: 3rem;
+  --rs-space-8: 4rem;
+  --rs-space-9: 6rem;
+
+  /* Moderate radii: no pill radius is defined. */
+  --rs-radius-sm: 0.375rem;
+  --rs-radius-md: 0.625rem;
+  --rs-radius-lg: 1rem;
+
+  /* Borders */
+  --rs-border-width: 1px;
+  --rs-border-accent-width: 3px;
+
+  /* Restrained elevation */
+  --rs-shadow-1: 0 1px 2px rgb(31 20 14 / 0.06);
+  --rs-shadow-2:
+    0 8px 20px -6px rgb(31 20 14 / 0.12), 0 2px 4px rgb(31 20 14 / 0.05);
+  --rs-shadow-3:
+    0 28px 56px -16px rgb(31 20 14 / 0.24), 0 8px 16px -8px rgb(31 20 14 / 0.1);
+
+  /* Focus treatment */
+  --rs-focus-width: 2px;
+  --rs-focus-offset: 2px;
+
+  /* Motion */
+  --rs-duration-fast: 120ms;
+  --rs-duration-base: 200ms;
+  --rs-duration-slow: 320ms;
+  --rs-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --rs-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Layout */
+  --rs-page-max: 76rem;
+  --rs-page-gutter: clamp(1rem, 4vw, 3rem);
+  --rs-layer-notification: 40;
+  --rs-layer-dialog: 50;
+
+  /* Density: the defaults match the client context. */
+  --rs-density-text: var(--rs-text-md);
+  --rs-density-gap: var(--rs-space-5);
+  --rs-density-pad: var(--rs-space-6);
+  --rs-density-section: var(--rs-space-7);
+  --rs-density-control: 3rem;
+  --rs-density-cell-block: 0.875rem;
+  --rs-density-cell-inline: 1.25rem;
+  --rs-density-display: var(--rs-display-md);
+}
+
+/* 2. Surface context ----------------------------------------------------
+ * A surface tells the primitives inside it which foreground, line, accent,
+ * and semantic colors to use. Light is the default; every light container
+ * restates it so that a light surface nested in a dark one reads correctly.
+ */
+
+:root,
+.rs-surface,
+.rs-dialog,
+.rs-table-region,
+.rs-choice,
+.rs-alert[data-presentation="toast"] {
+  --rs-ctx-fg: var(--rs-color-ink);
+  --rs-ctx-muted: var(--rs-color-ink-muted);
+  --rs-ctx-line: var(--rs-color-line);
+  --rs-ctx-accent: var(--rs-color-gold-deep);
+  --rs-ctx-rule: var(--rs-color-premium-gold);
+  --rs-ctx-focus: var(--rs-color-gold-deeper);
+  --rs-ctx-hover: var(--rs-color-gold-tint);
+  --rs-ctx-action-top: var(--rs-color-gold-deep);
+  --rs-ctx-action-bottom: var(--rs-color-gold-deeper);
+  --rs-ctx-action-fg: var(--rs-color-warm-white);
+  --rs-ctx-action-line: var(--rs-color-gold-deep);
+  --rs-ctx-quiet-bg: var(--rs-color-warm-white);
+  --rs-ctx-success: var(--rs-color-success);
+  --rs-ctx-success-surface: var(--rs-color-success-surface);
+  --rs-ctx-success-line: var(--rs-color-success-line);
+  --rs-ctx-warning: var(--rs-color-warning);
+  --rs-ctx-warning-surface: var(--rs-color-warning-surface);
+  --rs-ctx-warning-line: var(--rs-color-warning-line);
+  --rs-ctx-error: var(--rs-color-error);
+  --rs-ctx-error-surface: var(--rs-color-error-surface);
+  --rs-ctx-error-line: var(--rs-color-error-line);
+  --rs-ctx-information: var(--rs-color-information);
+  --rs-ctx-information-surface: var(--rs-color-information-surface);
+  --rs-ctx-information-line: var(--rs-color-information-line);
+  --rs-ctx-neutral: var(--rs-color-ink-muted);
+  --rs-ctx-neutral-surface: var(--rs-color-cream);
+  --rs-ctx-neutral-line: var(--rs-color-line-strong);
+}
+
+.rs-surface[data-tone="dark"],
+.rs-media {
+  --rs-ctx-fg: var(--rs-color-on-dark);
+  --rs-ctx-muted: var(--rs-color-on-dark-muted);
+  --rs-ctx-line: var(--rs-color-line-on-dark);
+  --rs-ctx-accent: var(--rs-color-gold-soft);
+  --rs-ctx-rule: var(--rs-color-premium-gold);
+  --rs-ctx-focus: var(--rs-color-gold-soft);
+  --rs-ctx-hover: var(--rs-color-well-on-dark);
+  --rs-ctx-action-top: var(--rs-color-gold-soft);
+  --rs-ctx-action-bottom: var(--rs-color-gold-soft-deep);
+  --rs-ctx-action-fg: var(--rs-color-deep-cocoa);
+  --rs-ctx-action-line: var(--rs-color-gold-soft);
+  --rs-ctx-quiet-bg: transparent;
+  --rs-ctx-success: var(--rs-color-success-on-dark);
+  --rs-ctx-success-surface: var(--rs-color-success-surface-on-dark);
+  --rs-ctx-success-line: var(--rs-color-success-line-on-dark);
+  --rs-ctx-warning: var(--rs-color-warning-on-dark);
+  --rs-ctx-warning-surface: var(--rs-color-warning-surface-on-dark);
+  --rs-ctx-warning-line: var(--rs-color-warning-line-on-dark);
+  --rs-ctx-error: var(--rs-color-error-on-dark);
+  --rs-ctx-error-surface: var(--rs-color-error-surface-on-dark);
+  --rs-ctx-error-line: var(--rs-color-error-line-on-dark);
+  --rs-ctx-information: var(--rs-color-information-on-dark);
+  --rs-ctx-information-surface: var(--rs-color-information-surface-on-dark);
+  --rs-ctx-information-line: var(--rs-color-information-line-on-dark);
+  --rs-ctx-neutral: var(--rs-color-on-dark-muted);
+  --rs-ctx-neutral-surface: var(--rs-color-well-on-dark);
+  --rs-ctx-neutral-line: var(--rs-color-line-on-dark);
+}
+
+/* 3. Density variants ---------------------------------------------------
+ * Presentation variants chosen by the caller. They set spacing and scale
+ * only, and step evenly from the most generous to the most structured.
+ */
+
+[data-density="public"] {
+  --rs-density-text: var(--rs-text-lg);
+  --rs-density-gap: var(--rs-space-6);
+  --rs-density-pad: var(--rs-space-7);
+  --rs-density-section: var(--rs-space-8);
+  --rs-density-control: 3.25rem;
+  --rs-density-cell-block: 1rem;
+  --rs-density-cell-inline: 1.5rem;
+  --rs-density-display: var(--rs-display-lg);
+}
+
+[data-density="client"] {
+  --rs-density-text: var(--rs-text-md);
+  --rs-density-gap: var(--rs-space-5);
+  --rs-density-pad: var(--rs-space-6);
+  --rs-density-section: var(--rs-space-7);
+  --rs-density-control: 3rem;
+  --rs-density-cell-block: 0.875rem;
+  --rs-density-cell-inline: 1.25rem;
+  --rs-density-display: var(--rs-display-md);
+}
+
+[data-density="attorney"] {
+  --rs-density-text: var(--rs-text-base);
+  --rs-density-gap: var(--rs-space-4);
+  --rs-density-pad: var(--rs-space-5);
+  --rs-density-section: var(--rs-space-6);
+  --rs-density-control: 2.75rem;
+  --rs-density-cell-block: 0.625rem;
+  --rs-density-cell-inline: 1rem;
+  --rs-density-display: var(--rs-display-md);
+}
+
+[data-density="admin"] {
+  --rs-density-text: var(--rs-text-sm);
+  --rs-density-gap: var(--rs-space-3);
+  --rs-density-pad: var(--rs-space-4);
+  --rs-density-section: var(--rs-space-5);
+  --rs-density-control: 2.5rem;
+  --rs-density-cell-block: 0.5rem;
+  --rs-density-cell-inline: 0.75rem;
+  --rs-density-display: var(--rs-heading-lg);
+}
+
+[data-density] {
+  font-size: var(--rs-density-text);
+}
+
+/* 4. Base elements ------------------------------------------------------ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--rs-color-cream);
+  color: var(--rs-color-ink);
+  font-family: var(--rs-font-ui);
+  font-size: 100%;
+  line-height: var(--rs-leading-body);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-block-size: 100vh;
+  margin: 0;
+  font-size: var(--rs-density-text);
+}
+
+main {
+  display: block;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-family: var(--rs-font-ui);
+  font-weight: 600;
+  line-height: var(--rs-leading-heading);
+  text-wrap: balance;
+}
+
+p,
+figure {
+  margin: 0;
+}
+
+a {
+  color: var(--rs-ctx-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition: color var(--rs-duration-fast) var(--rs-ease-standard);
+}
+
+a:hover {
+  color: var(--rs-ctx-fg);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--rs-focus-width) solid var(--rs-ctx-focus);
+  outline-offset: var(--rs-focus-offset);
+}
+
+::selection {
+  background: var(--rs-color-gold-soft);
+  color: var(--rs-color-deep-cocoa);
+}
+
+/* Content a route or boundary renders straight into the root layout, with
+ * no class of its own, still reads as Rosuno. */
+main > :where(h1, p, a, button):not([class]) {
+  display: block;
+  inline-size: fit-content;
+  max-inline-size: min(100% - 2 * var(--rs-page-gutter), var(--rs-measure));
+  margin-block: 0 var(--rs-space-4);
+  margin-inline: max(
+    var(--rs-page-gutter),
+    calc((100% - var(--rs-page-max)) / 2)
+  );
+}
+
+/* The first of them is offset from the top. A streamed fallback is preceded
+ * by a template element, so the rule looks at earlier content, not position. */
+main > :where(h1, p):not([class]):not(:where(h1, p, a, button) ~ *) {
+  margin-block-start: var(--rs-space-8);
+}
+
+main > h1:not([class]) {
+  font-family: var(--rs-font-display);
+  font-size: var(--rs-display-md);
+  line-height: var(--rs-leading-tight);
+  letter-spacing: -0.015em;
+}
+
+main > p:not([class]) {
+  color: var(--rs-ctx-muted);
+  font-size: var(--rs-text-lg);
+}
+
+/* 5. Layout and spacing ------------------------------------------------- */
+
+.rs-page {
+  display: grid;
+  gap: var(--rs-density-section);
+  inline-size: min(100% - 2 * var(--rs-page-gutter), var(--rs-page-max));
+  margin-inline: auto;
+  padding-block: var(--rs-density-section);
+}
+
+.rs-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-density-gap);
+  min-inline-size: 0;
+}
+
+.rs-stack[data-gap="tight"] {
+  gap: var(--rs-space-3);
+}
+
+.rs-stack[data-gap="loose"] {
+  gap: var(--rs-density-section);
+}
+
+.rs-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rs-space-3) var(--rs-space-4);
+}
+
+.rs-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--rs-density-gap);
+}
+
+.rs-rule {
+  inline-size: 100%;
+  block-size: var(--rs-border-width);
+  margin: 0;
+  border: 0;
+  background: var(--rs-ctx-line);
+}
+
+.rs-rule[data-tone="gold"] {
+  inline-size: var(--rs-space-8);
+  background: var(--rs-ctx-rule);
+}
+
+/* 6. Typography --------------------------------------------------------- */
+
+.rs-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--rs-space-4);
+  color: var(--rs-ctx-accent);
+  font-size: var(--rs-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  line-height: var(--rs-leading-heading);
+  text-transform: uppercase;
+}
+
+.rs-eyebrow::after {
+  flex: none;
+  inline-size: var(--rs-space-7);
+  block-size: var(--rs-border-width);
+  background: var(--rs-ctx-rule);
+  content: "";
+}
+
+.rs-display {
+  max-inline-size: 18ch;
+  font-family: var(--rs-font-display);
+  font-size: var(--rs-density-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: var(--rs-leading-tight);
+}
+
+.rs-heading {
+  font-size: var(--rs-heading-md);
+  letter-spacing: -0.01em;
+}
+
+/* The serif is kept for major headings; functional headings stay sans. */
+.rs-heading[data-size="lg"] {
+  font-family: var(--rs-font-display);
+  font-size: var(--rs-heading-lg);
+  line-height: 1.12;
+}
+
+.rs-heading[data-size="sm"] {
+  font-size: var(--rs-heading-sm);
+  letter-spacing: 0;
+}
+
+.rs-text {
+  max-inline-size: var(--rs-measure);
+  color: var(--rs-ctx-fg);
+}
+
+.rs-text[data-size="lede"] {
+  font-size: var(--rs-text-xl);
+  line-height: 1.45;
+}
+
+.rs-text[data-size="small"] {
+  font-size: var(--rs-text-sm);
+}
+
+.rs-text[data-size="meta"] {
+  font-size: var(--rs-text-xs);
+  letter-spacing: 0.02em;
+}
+
+.rs-text[data-tone="muted"] {
+  color: var(--rs-ctx-muted);
+}
+
+.rs-text[data-tone="accent"] {
+  color: var(--rs-ctx-accent);
+}
+
+/* 7. Surface / Panel ---------------------------------------------------- */
+
+.rs-surface {
+  position: relative;
+  min-inline-size: 0;
+  padding: var(--rs-density-pad);
+  border: var(--rs-border-width) solid var(--rs-ctx-line);
+  border-radius: var(--rs-radius-lg);
+  background: var(--rs-color-warm-white);
+  color: var(--rs-ctx-fg);
+  transition:
+    border-color var(--rs-duration-base) var(--rs-ease-standard),
+    box-shadow var(--rs-duration-base) var(--rs-ease-standard);
+}
+
+.rs-surface[data-tone="cream"] {
+  background: var(--rs-color-cream);
+}
+
+.rs-surface[data-tone="dark"] {
+  border-color: var(--rs-color-deep-cocoa);
+  background: linear-gradient(
+    160deg,
+    var(--rs-color-chocolate),
+    var(--rs-color-deep-cocoa)
+  );
+}
+
+/* The supporting dark tone is a light panel with a dark edge on narrow
+ * screens and becomes a dark surface from the medium breakpoint up. */
+.rs-surface[data-tone="chocolate"] {
+  border-color: var(--rs-color-line-strong);
+  border-block-start: var(--rs-border-accent-width) solid
+    var(--rs-color-chocolate);
+}
+
+.rs-surface[data-emphasis="raised"] {
+  box-shadow: var(--rs-shadow-2);
+}
+
+.rs-surface[data-emphasis="selected"] {
+  border-color: var(--rs-color-premium-gold);
+  box-shadow:
+    0 0 0 var(--rs-border-width) var(--rs-color-premium-gold),
+    var(--rs-shadow-1);
+}
+
+.rs-surface[data-emphasis="selected"]:is(
+    [data-tone="light"],
+    [data-tone="cream"]
+  ) {
+  background: var(--rs-color-gold-tint);
+}
+
+/* 8. Buttons ------------------------------------------------------------ */
+
+.rs-button,
+main > button:not([class]) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rs-space-2);
+  min-block-size: var(--rs-density-control);
+  padding: var(--rs-space-2) var(--rs-space-5);
+  border: var(--rs-border-width) solid var(--rs-ctx-action-line);
+  border-radius: var(--rs-radius-md);
+  background: var(--rs-ctx-quiet-bg);
+  color: var(--rs-ctx-fg);
+  font-family: var(--rs-font-ui);
+  font-size: var(--rs-text-base);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background-color var(--rs-duration-fast) var(--rs-ease-standard),
+    border-color var(--rs-duration-fast) var(--rs-ease-standard),
+    box-shadow var(--rs-duration-fast) var(--rs-ease-standard),
+    color var(--rs-duration-fast) var(--rs-ease-standard),
+    transform var(--rs-duration-fast) var(--rs-ease-standard);
+}
+
+main > button:not([class]) {
+  display: flex;
+}
+
+.rs-button:hover:where(:not(:disabled, [aria-disabled="true"])),
+main > button:not([class]):hover:where(:not(:disabled)) {
+  background: var(--rs-ctx-hover);
+  color: var(--rs-ctx-fg);
+  box-shadow: var(--rs-shadow-1);
+}
+
+.rs-button:active:where(:not(:disabled, [aria-disabled="true"])),
+main > button:not([class]):active:where(:not(:disabled)) {
+  box-shadow: none;
+  transform: translateY(1px);
+}
+
+.rs-button[data-variant="primary"] {
+  border-color: var(--rs-ctx-action-bottom);
+  background: linear-gradient(
+    180deg,
+    var(--rs-ctx-action-top),
+    var(--rs-ctx-action-bottom)
+  );
+  background-color: var(--rs-ctx-action-bottom);
+  color: var(--rs-ctx-action-fg);
+  box-shadow: var(--rs-shadow-1);
+}
+
+.rs-button[data-variant="primary"]:hover:where(
+    :not(:disabled, [aria-disabled="true"])
+  ) {
+  background: var(--rs-ctx-action-bottom);
+  color: var(--rs-ctx-action-fg);
+  box-shadow: var(--rs-shadow-2);
+}
+
+.rs-button[data-variant="primary"]:active:where(
+    :not(:disabled, [aria-disabled="true"])
+  ) {
+  background: var(--rs-ctx-action-bottom);
+  box-shadow: none;
+}
+
+.rs-button[data-variant="tertiary"] {
+  padding-inline: var(--rs-space-2);
+  border-color: transparent;
+  background: transparent;
+  color: var(--rs-ctx-accent);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.3em;
+}
+
+.rs-button[data-variant="tertiary"]:hover:where(
+    :not(:disabled, [aria-disabled="true"])
+  ) {
+  background: transparent;
+  color: var(--rs-ctx-fg);
+  box-shadow: none;
+  text-decoration-color: currentColor;
+}
+
+.rs-button:disabled,
+.rs-button[aria-disabled="true"],
+main > button:not([class]):disabled {
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 9. Forms -------------------------------------------------------------- */
+
+.rs-fieldset {
+  display: grid;
+  gap: var(--rs-density-gap);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.rs-fieldset__legend {
+  margin-block-end: var(--rs-space-2);
+  padding: 0;
+  color: var(--rs-ctx-fg);
+  font-size: var(--rs-heading-sm);
+  font-weight: 600;
+  line-height: var(--rs-leading-heading);
+}
+
+.rs-field {
+  display: grid;
+  gap: var(--rs-space-2);
+  min-inline-size: 0;
+}
+
+.rs-field__label {
+  color: var(--rs-ctx-fg);
+  font-size: var(--rs-text-base);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.rs-field__hint {
+  color: var(--rs-ctx-muted);
+  font-size: var(--rs-text-sm);
+}
+
+.rs-field__errors {
+  display: grid;
+  gap: var(--rs-space-1);
+  margin: 0;
+  padding: 0;
+  color: var(--rs-ctx-error);
+  font-size: var(--rs-text-sm);
+  font-weight: 600;
+  list-style: none;
+}
+
+.rs-field__errors > li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--rs-space-2);
+}
+
+.rs-control {
+  display: block;
+  inline-size: 100%;
+  min-block-size: var(--rs-density-control);
+  padding: var(--rs-space-2) var(--rs-space-4);
+  border: var(--rs-border-width) solid var(--rs-color-control-line);
+  border-radius: var(--rs-radius-md);
+  background: var(--rs-color-warm-white);
+  color: var(--rs-color-ink);
+  font-size: var(--rs-text-base);
+  line-height: 1.4;
+  transition:
+    border-color var(--rs-duration-fast) var(--rs-ease-standard),
+    box-shadow var(--rs-duration-fast) var(--rs-ease-standard);
+}
+
+.rs-control::placeholder {
+  color: var(--rs-color-ink-placeholder);
+  opacity: 1;
+}
+
+.rs-control:hover {
+  border-color: var(--rs-color-ink-muted);
+}
+
+.rs-control:focus-visible {
+  border-color: var(--rs-color-gold-deep);
+  box-shadow: 0 0 0 var(--rs-border-width) var(--rs-color-gold-deep);
+}
+
+.rs-control[aria-invalid="true"] {
+  border-color: var(--rs-color-error);
+  box-shadow: 0 0 0 var(--rs-border-width) var(--rs-color-error);
+}
+
+.rs-control:disabled {
+  border-color: var(--rs-color-control-line);
+  background: var(--rs-color-cream);
+  color: var(--rs-color-ink-muted);
+  cursor: not-allowed;
+}
+
+textarea.rs-control {
+  min-block-size: 7.5rem;
+  padding-block: var(--rs-space-3);
+  resize: vertical;
+}
+
+.rs-select {
+  position: relative;
+  display: block;
+  color: var(--rs-color-ink-muted);
+}
+
+.rs-select > select {
+  padding-inline-end: var(--rs-space-7);
+  appearance: none;
+}
+
+.rs-select > .rs-icon {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: var(--rs-space-4);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.rs-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--rs-space-3);
+  min-block-size: var(--rs-density-control);
+  padding: var(--rs-space-3) var(--rs-space-4);
+  border: var(--rs-border-width) solid var(--rs-color-line-strong);
+  border-radius: var(--rs-radius-md);
+  background: var(--rs-color-warm-white);
+  color: var(--rs-color-ink);
+  cursor: pointer;
+  transition:
+    background-color var(--rs-duration-fast) var(--rs-ease-standard),
+    border-color var(--rs-duration-fast) var(--rs-ease-standard),
+    box-shadow var(--rs-duration-fast) var(--rs-ease-standard);
+}
+
+.rs-choice:hover:where(:not(:has(:disabled))) {
+  border-color: var(--rs-color-control-line);
+}
+
+.rs-choice:has(:checked) {
+  border-color: var(--rs-color-premium-gold);
+  background: var(--rs-color-gold-tint);
+  box-shadow: 0 0 0 var(--rs-border-width) var(--rs-color-premium-gold);
+}
+
+/* The ring of a choice is drawn around the whole choice, inside its own
+ * light ground so that it stays visible on a dark surface. */
+.rs-choice:has(:focus-visible) {
+  outline: var(--rs-focus-width) solid var(--rs-ctx-focus);
+  outline-offset: calc(-1 * var(--rs-focus-width));
+}
+
+.rs-choice:has(:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.rs-choice__input {
+  flex: none;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--rs-color-gold-deep);
+}
+
+/* The native ring is removed only where the ring above can replace it. */
+@supports selector(:has(*)) {
+  .rs-choice__input:focus-visible {
+    outline: none;
+  }
+}
+
+.rs-choice__text {
+  display: grid;
+  gap: var(--rs-space-1);
+}
+
+.rs-choice__label {
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.rs-choice__hint {
+  color: var(--rs-color-ink-muted);
+  font-size: var(--rs-text-sm);
+}
+
+.rs-disclosure {
+  border-block: var(--rs-border-width) solid var(--rs-ctx-line);
+}
+
+.rs-disclosure__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rs-space-4);
+  min-block-size: var(--rs-density-control);
+  padding-block: var(--rs-space-2);
+  color: var(--rs-ctx-fg);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.rs-disclosure__summary::-webkit-details-marker {
+  display: none;
+}
+
+.rs-disclosure__summary > .rs-icon {
+  color: var(--rs-ctx-accent);
+  transition: transform var(--rs-duration-base) var(--rs-ease-standard);
+}
+
+.rs-disclosure[open] > .rs-disclosure__summary > .rs-icon {
+  transform: rotate(180deg);
+}
+
+.rs-disclosure__content {
+  display: grid;
+  gap: var(--rs-density-gap);
+  padding-block: var(--rs-space-2) var(--rs-space-5);
+}
+
+/* 10. Tables ------------------------------------------------------------ */
+
+.rs-table-region {
+  max-inline-size: 100%;
+  overflow-x: auto;
+  border: var(--rs-border-width) solid var(--rs-color-line);
+  border-radius: var(--rs-radius-lg);
+  background: var(--rs-color-warm-white);
+  color: var(--rs-color-ink);
+}
+
+.rs-table-region:focus-visible,
+.rs-dialog:focus-visible {
+  outline-offset: calc(-1 * var(--rs-focus-width));
+}
+
+.rs-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.rs-table__caption {
+  padding: var(--rs-space-4) var(--rs-density-cell-inline);
+  font-size: var(--rs-text-lg);
+  font-weight: 600;
+  line-height: var(--rs-leading-heading);
+  text-align: start;
+  caption-side: top;
+}
+
+.rs-table :where(th, td) {
+  padding: var(--rs-density-cell-block) var(--rs-density-cell-inline);
+  border-block-end: var(--rs-border-width) solid var(--rs-color-line);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.rs-table :where(thead th) {
+  border-block: var(--rs-border-width) solid var(--rs-color-line-strong);
+  background: var(--rs-color-cream);
+  color: var(--rs-color-ink-muted);
+  font-size: var(--rs-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.rs-table :where(tbody th) {
+  font-weight: 600;
+}
+
+.rs-table :where(tbody tr) {
+  transition: background-color var(--rs-duration-fast) var(--rs-ease-standard);
+}
+
+.rs-table :where(tbody tr:hover) {
+  background: var(--rs-color-gold-tint);
+}
+
+.rs-table :where(tbody tr:last-child) > :where(th, td) {
+  border-block-end: 0;
+}
+
+.rs-table :where([data-align="end"]) {
+  text-align: end;
+}
+
+/* 11. Status indicators -------------------------------------------------
+ * Tone adds color and a distinct glyph beside the caller's visible text.
+ */
+
+.rs-status,
+.rs-alert {
+  --rs-tone: var(--rs-ctx-neutral);
+  --rs-tone-surface: var(--rs-ctx-neutral-surface);
+  --rs-tone-line: var(--rs-ctx-neutral-line);
+}
+
+:is(.rs-status, .rs-alert)[data-tone="success"] {
+  --rs-tone: var(--rs-ctx-success);
+  --rs-tone-surface: var(--rs-ctx-success-surface);
+  --rs-tone-line: var(--rs-ctx-success-line);
+}
+
+:is(.rs-status, .rs-alert)[data-tone="warning"] {
+  --rs-tone: var(--rs-ctx-warning);
+  --rs-tone-surface: var(--rs-ctx-warning-surface);
+  --rs-tone-line: var(--rs-ctx-warning-line);
+}
+
+:is(.rs-status, .rs-alert)[data-tone="error"] {
+  --rs-tone: var(--rs-ctx-error);
+  --rs-tone-surface: var(--rs-ctx-error-surface);
+  --rs-tone-line: var(--rs-ctx-error-line);
+}
+
+:is(.rs-status, .rs-alert)[data-tone="information"] {
+  --rs-tone: var(--rs-ctx-information);
+  --rs-tone-surface: var(--rs-ctx-information-surface);
+  --rs-tone-line: var(--rs-ctx-information-line);
+}
+
+.rs-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rs-space-2);
+  inline-size: fit-content;
+  padding: var(--rs-space-1) var(--rs-space-3);
+  border: var(--rs-border-width) solid var(--rs-tone-line);
+  border-radius: var(--rs-radius-sm);
+  background: var(--rs-tone-surface);
+  color: var(--rs-tone);
+  font-size: var(--rs-text-sm);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.rs-status[data-emphasis="strong"] {
+  border-color: var(--rs-tone);
+  background: var(--rs-tone);
+  color: var(--rs-tone-surface);
+}
+
+/* 12. Dialog ------------------------------------------------------------ */
+
+.rs-dialog {
+  inline-size: min(100% - 2 * var(--rs-space-4), 34rem);
+  max-block-size: min(100dvh - 2 * var(--rs-space-4), 44rem);
+  padding: 0;
+  overflow: auto;
+  border: var(--rs-border-width) solid var(--rs-color-line);
+  border-radius: var(--rs-radius-lg);
+  background: var(--rs-color-warm-white);
+  color: var(--rs-color-ink);
+  box-shadow: var(--rs-shadow-3);
+  grid-template-columns: minmax(0, 1fr) auto;
+  opacity: 0;
+  transform: translateY(var(--rs-space-2));
+  transition:
+    opacity var(--rs-duration-slow) var(--rs-ease-exit),
+    transform var(--rs-duration-slow) var(--rs-ease-exit),
+    overlay var(--rs-duration-slow) allow-discrete,
+    display var(--rs-duration-slow) allow-discrete;
+}
+
+.rs-dialog[open] {
+  display: grid;
+  opacity: 1;
+  transform: none;
+  transition-timing-function: var(--rs-ease-standard);
+}
+
+@starting-style {
+  .rs-dialog[open] {
+    opacity: 0;
+    transform: translateY(var(--rs-space-2));
+  }
+}
+
+.rs-dialog::backdrop {
+  background: rgb(31 20 14 / 0.56);
+}
+
+/* Opened by its attribute alone a layered dialog is not modal, but it is
+ * still fixed above the interface. Its place does not depend on the open
+ * state, so the frame stays where it is while it leaves. */
+.rs-dialog:not([data-presentation="inline"]) {
+  position: fixed;
+  inset: 0;
+  z-index: var(--rs-layer-dialog);
+  margin: auto;
+}
+
+.rs-dialog[data-presentation="inline"] {
+  position: static;
+  inline-size: 100%;
+  max-inline-size: 34rem;
+  max-block-size: none;
+  margin: 0;
+}
+
+.rs-dialog__header,
+.rs-dialog__body {
+  grid-column: 1 / -1;
+  padding: var(--rs-space-6) var(--rs-space-6) 0;
+}
+
+.rs-dialog__body {
+  display: grid;
+  gap: var(--rs-space-4);
+  padding-block: var(--rs-space-3) var(--rs-space-6);
+  color: var(--rs-color-ink-muted);
+}
+
+.rs-dialog__title {
+  font-family: var(--rs-font-display);
+  font-size: var(--rs-heading-md);
+  line-height: 1.15;
+}
+
+.rs-dialog__actions,
+.rs-dialog__dismissal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rs-space-3);
+  padding-block: var(--rs-space-4);
+  border-block-start: var(--rs-border-width) solid var(--rs-color-line);
+  background: var(--rs-color-cream);
+}
+
+/* The primary action comes first; the quiet dismissal follows it. Together
+ * they form one footer band across the full width of the dialog. */
+.rs-dialog__actions {
+  grid-column: 1;
+  justify-content: flex-end;
+  padding-inline: var(--rs-space-6) var(--rs-space-3);
+}
+
+.rs-dialog__dismissal {
+  grid-column: 2;
+  padding-inline: 0 var(--rs-space-6);
+}
+
+.rs-dialog__actions:last-child,
+:not(.rs-dialog__actions) + .rs-dialog__dismissal {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  padding-inline: var(--rs-space-6);
+}
+
+/* 13. Notification / Alert ---------------------------------------------- */
+
+.rs-alert {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--rs-space-3);
+  padding: var(--rs-space-4) var(--rs-space-5);
+  border: var(--rs-border-width) solid var(--rs-tone-line);
+  border-inline-start: var(--rs-border-accent-width) solid var(--rs-tone);
+  border-radius: var(--rs-radius-md);
+  background: var(--rs-tone-surface);
+  color: var(--rs-ctx-fg);
+}
+
+.rs-alert > .rs-icon {
+  margin-block-start: 0.15em;
+  color: var(--rs-tone);
+}
+
+.rs-alert__content {
+  display: grid;
+  gap: var(--rs-space-1);
+}
+
+.rs-alert__title {
+  color: var(--rs-tone);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.rs-alert[data-presentation="toast"] {
+  inline-size: min(100%, 26rem);
+  background: var(--rs-color-warm-white);
+  box-shadow: var(--rs-shadow-2);
+}
+
+.rs-notification-region {
+  position: fixed;
+  inset-block-end: var(--rs-space-4);
+  inset-inline: var(--rs-space-4);
+  z-index: var(--rs-layer-notification);
+  display: grid;
+  gap: var(--rs-space-3);
+  justify-items: stretch;
+  pointer-events: none;
+}
+
+.rs-notification-region > * {
+  pointer-events: auto;
+}
+
+/* 14. Media frame -------------------------------------------------------
+ * Crop, overlay, and framing for caller-supplied media. The frame bundles
+ * no asset; without media it shows its tonal backdrop.
+ */
+
+.rs-media {
+  position: relative;
+  isolation: isolate;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: var(--rs-border-width) solid var(--rs-color-deep-cocoa);
+  border-radius: var(--rs-radius-lg);
+  background: linear-gradient(
+    135deg,
+    var(--rs-color-chocolate),
+    var(--rs-color-deep-cocoa)
+  );
+  color: var(--rs-ctx-fg);
+}
+
+.rs-media[data-ratio="wide"] {
+  aspect-ratio: 21 / 9;
+}
+
+.rs-media[data-ratio="standard"] {
+  aspect-ratio: 4 / 3;
+}
+
+.rs-media[data-ratio="portrait"] {
+  aspect-ratio: 4 / 5;
+}
+
+.rs-media[data-ratio="square"] {
+  aspect-ratio: 1;
+}
+
+.rs-media__content,
+.rs-media__content > :where(img, picture, video, canvas, svg) {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.rs-media__content > :where(img, video) {
+  object-fit: cover;
+  object-position: center;
+  filter: contrast(1.04) saturate(0.92);
+}
+
+.rs-media__content > picture > img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: contrast(1.04) saturate(0.92);
+}
+
+.rs-media::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  content: "";
+}
+
+.rs-media[data-overlay="scrim"]::after {
+  background: linear-gradient(
+    180deg,
+    rgb(31 20 14 / 0) 35%,
+    rgb(31 20 14 / 0.76) 100%
+  );
+}
+
+.rs-media[data-overlay="veil"]::after {
+  background: rgb(31 20 14 / 0.38);
+}
+
+.rs-media__caption {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  z-index: 2;
+  padding: var(--rs-space-4) var(--rs-space-5);
+  background: rgb(31 20 14 / 0.8);
+  color: var(--rs-ctx-fg);
+  font-size: var(--rs-text-sm);
+  letter-spacing: 0.02em;
+}
+
+/* 15. Icons ------------------------------------------------------------- */
+
+.rs-icon {
+  flex: none;
+  inline-size: 1.25em;
+  block-size: 1.25em;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.75;
+}
+
+/* 16. Responsive -------------------------------------------------------- */
+
+@media (min-width: 40rem) {
+  .rs-surface[data-tone="chocolate"] {
+    --rs-ctx-fg: var(--rs-color-on-dark);
+    --rs-ctx-muted: var(--rs-color-on-dark-muted);
+    --rs-ctx-line: var(--rs-color-line-on-dark);
+    --rs-ctx-accent: var(--rs-color-gold-soft);
+    --rs-ctx-rule: var(--rs-color-premium-gold);
+    --rs-ctx-focus: var(--rs-color-gold-soft);
+    --rs-ctx-hover: var(--rs-color-well-on-dark);
+    --rs-ctx-action-top: var(--rs-color-gold-soft);
+    --rs-ctx-action-bottom: var(--rs-color-gold-soft-deep);
+    --rs-ctx-action-fg: var(--rs-color-deep-cocoa);
+    --rs-ctx-action-line: var(--rs-color-gold-soft);
+    --rs-ctx-quiet-bg: transparent;
+    --rs-ctx-success: var(--rs-color-success-on-dark);
+    --rs-ctx-success-surface: var(--rs-color-success-surface-on-dark);
+    --rs-ctx-success-line: var(--rs-color-success-line-on-dark);
+    --rs-ctx-warning: var(--rs-color-warning-on-dark);
+    --rs-ctx-warning-surface: var(--rs-color-warning-surface-on-dark);
+    --rs-ctx-warning-line: var(--rs-color-warning-line-on-dark);
+    --rs-ctx-error: var(--rs-color-error-on-dark);
+    --rs-ctx-error-surface: var(--rs-color-error-surface-on-dark);
+    --rs-ctx-error-line: var(--rs-color-error-line-on-dark);
+    --rs-ctx-information: var(--rs-color-information-on-dark);
+    --rs-ctx-information-surface: var(--rs-color-information-surface-on-dark);
+    --rs-ctx-information-line: var(--rs-color-information-line-on-dark);
+    --rs-ctx-neutral: var(--rs-color-on-dark-muted);
+    --rs-ctx-neutral-surface: var(--rs-color-well-on-dark);
+    --rs-ctx-neutral-line: var(--rs-color-line-on-dark);
+    border: var(--rs-border-width) solid var(--rs-color-chocolate);
+    background: var(--rs-color-chocolate);
+  }
+
+  .rs-surface[data-tone="chocolate"][data-emphasis="selected"] {
+    border-color: var(--rs-color-premium-gold);
+  }
+
+  .rs-columns:is(
+    [data-columns="2"],
+    [data-columns="3"],
+    [data-columns="split"]
+  ) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rs-notification-region {
+    inset-inline-start: auto;
+    justify-items: end;
+  }
+}
+
+@media (min-width: 64rem) {
+  [data-density="public"] {
+    --rs-density-pad: var(--rs-space-8);
+    --rs-density-section: var(--rs-space-9);
+  }
+
+  .rs-columns[data-columns="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .rs-columns[data-columns="split"] {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+/* Narrow screens: one column, lower density, touch-sized controls, the most
+ * important action first at full width, and a compact media crop. Callers
+ * place the most important action first in the markup. */
+@media (max-width: 39.9375rem) {
+  [data-density="public"] {
+    --rs-density-gap: var(--rs-space-5);
+    --rs-density-pad: var(--rs-space-5);
+    --rs-density-section: var(--rs-space-6);
+    --rs-density-control: 3rem;
+  }
+
+  [data-density="attorney"],
+  [data-density="admin"] {
+    --rs-density-text: var(--rs-text-base);
+    --rs-density-gap: var(--rs-space-4);
+    --rs-density-pad: var(--rs-space-4);
+    --rs-density-control: 2.75rem;
+    --rs-density-cell-block: 0.75rem;
+    --rs-density-cell-inline: 1rem;
+  }
+
+  .rs-cluster:has(> .rs-button) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rs-dialog {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rs-dialog__actions,
+  .rs-dialog__dismissal,
+  .rs-dialog__actions:last-child,
+  :not(.rs-dialog__actions) + .rs-dialog__dismissal {
+    grid-column: 1;
+    flex-direction: column;
+    align-items: stretch;
+    padding-inline: var(--rs-space-5);
+  }
+
+  .rs-dialog__actions + .rs-dialog__dismissal {
+    padding-block-start: 0;
+    border-block-start: 0;
+  }
+
+  .rs-dialog__header,
+  .rs-dialog__body {
+    padding-inline: var(--rs-space-5);
+  }
+
+  /* A table keeps readable columns and scrolls inside its own region. */
+  .rs-table {
+    min-inline-size: 34rem;
+  }
+
+  .rs-media,
+  .rs-media[data-ratio="wide"] {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+@media (pointer: coarse) {
+  .rs-button,
+  .rs-control,
+  .rs-choice,
+  .rs-disclosure__summary,
+  main > button:not([class]) {
+    min-block-size: max(var(--rs-density-control), 2.75rem);
+  }
+
+  main > a:not([class]) {
+    display: flex;
+    align-items: center;
+    min-block-size: 2.75rem;
+  }
+}
+
+/* 17. Reduced motion ---------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .rs-button:active,
+  main > button:not([class]):active,
+  .rs-dialog,
+  .rs-dialog[open] {
+    transform: none;
+  }
+}
