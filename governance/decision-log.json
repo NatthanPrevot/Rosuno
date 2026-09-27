@@ -703,6 +703,51 @@
         "tools/p0/tests/p2-001-registration-contract.test.mjs"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260926-P2-002-DESIGN-SYSTEM-CONTRACT",
+      "title": "Register bounded P2-002 Design System contract and human-approved visual direction",
+      "status": "accepted",
+      "scope": "Governance registration only for Implementation Master Plan P2/2B Design System. Records the bounded dependency-free React and ordinary CSS presentation contract plus the human-approved P2-002 Design Direction Brief for typography, spacing, buttons, forms, tables, status indicators, dialogs, notifications, responsive behavior, surface/density variants, depth, interaction/motion, iconography, and selective media treatment inside the existing apps/web application. No P2-002 application implementation, feature-specific product design, dependency installation, P2-003 security-shell work, P3 identity/authentication work, business workflow, database, provider, jurisdiction-specific implementation, environment mutation, publication, review, merge, or later work is authorized by this decision.",
+      "decision": "Register WI-P2-002-DESIGN-SYSTEM as the bounded P2/2B Design System slice after completed P2-001. The human-approved P2-002 Design Direction Brief is the controlling visual implementation input. P2-002 may implement only generic presentation-layer UI using existing React, ordinary CSS, CSS custom properties/tokens, system-serif display typography, system-sans functional typography, restrained premium gold, strategic cocoa/chocolate surfaces, cream/warm-white working surfaces, approved public/client/attorney/admin density variants, generic Surface/Panel treatments, subtle purposeful motion with reduced-motion support, bounded inline SVG currentColor icons, and selective media treatment. Generic components may display caller-supplied state, collect intent, and present validation/errors, but may not own canonical business state, infer business meaning, perform authorization, implement feature-specific workflows, contact databases/providers, or encode jurisdiction rules. Approved visual-reference mockups are visual-language evidence only and do not approve their sample feature content. No new design dependency or implementation path beyond the frozen P2-002 envelope is authorized. P2-003 and P3 remain separate later work.",
+      "rationale": "The locked Implementation Master Plan orders P2 as 2A Application Shell, then 2B Design System, then 2C Security Shell. P2-001 is durably completed and provides the existing Next.js, React, TypeScript, routing, layout, error/loading, form-operation, and server-owned session shell. The human-approved P2-002 Design Direction Brief now supplies the controlling implementation-level visual direction for 2B without redefining product/domain/business workflows. Existing P0 application-surface controls already permit ordinary apps/web application paths and CSS while tightly controlling package scripts, package-manager state, workspace configuration, and dependencies. The approved visual direction can be implemented faithfully using existing React, ordinary CSS, CSS custom properties/tokens, system fonts, bounded inline SVG icons, and the existing application surface; therefore no prerequisite P0 control mutation or dependency expansion is required. The Technical Architecture keeps UI in the presentation layer and prohibits UI from becoming a second business-state authority.",
+      "authority_refs": [
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-002-DESIGN-SYSTEM"],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-09-26T21:57:37Z",
+      "updated_at": "2026-09-26T21:57:37Z",
+      "supersedes": [],
+      "impact": "If later protected and accepted, this registers only the P2-002 Design System contract and its human-approved visual implementation direction. It does not turn the visual-reference mockups into feature requirements; begin P2-002 application implementation; add photography/content records; change package dependencies, package-manager state, root/app scripts, lockfile, workspace configuration, .replit, or CI; modify database/schema/RLS/Storage; contact providers; classify or activate Arizona; alter P1-012; resolve F-01/F-02/F-03; begin P2-003 or P3; touch Staging, Production, or OLD; or authorize any later lifecycle gate.",
+      "evidence": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED — P2 section 16 orders 2A Application Shell before 2B Design System and 2C Security Shell and defines 2B as typography, spacing, buttons, forms, tables, status indicators, dialogs, notifications, and responsive behavior",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED — generic UI components must not contain feature-specific business logic",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED — presentation layer displays server state, collects intent, initiates commands, and displays validation/errors but never authoritatively decides business state",
+        "DOMAIN-MODEL-V1.4-LOCKED — jurisdiction neutrality, fail-honestly behavior, canonical Rosuno state, and AI authority limits remain governing",
+        "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE — WI-P2-001-APPLICATION-SHELL is durably completed",
+        "DEC-20260926-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION-CLOSURE — bounded apps/web application surface prerequisite is completed",
+        "Canonical protected main reconciled at c0521f3e0d70cbbf3ecafef32add97ae4e011a7c",
+        "GitHub Actions P0 control foundation run #93 (36268675243) succeeded on c0521f3e0d70cbbf3ecafef32add97ae4e011a7c",
+        "Current P0 controls permit bounded apps/web application paths and CSS while preserving exact package/dependency/workspace controls",
+        "ROSUNO_P2-002_LOCKED_DESIGN_DIRECTION_BRIEF_2026-09-26 — human-approved visual implementation direction for P2-002 — SHA-256 7f05ca3eec15532dd3cb8af36e1fcc006ed1d370c4e8e09d933b816832210d5c — 8918 bytes",
+        "Human-approved Design Direction Brief requires selective system-serif display typography and modern system-sans functional UI with no external/custom font dependency",
+        "Human-approved Design Direction Brief requires predominantly cream/warm-white authenticated working interfaces with strategic deep-cocoa/chocolate surfaces and restrained premium gold",
+        "Human-approved Design Direction Brief makes public/client/attorney/admin density distinctions part of the design system",
+        "Human-approved Design Direction Brief permits subtle purposeful motion with prefers-reduced-motion support and bounded inline SVG currentColor iconography",
+        "Human-approved Design Direction Brief makes cinematic human/legal photography selective and keeps routine working interfaces comparatively light and photography-sparse",
+        "Approved P2-002 visual-reference mockups are visual-language evidence only and do not approve their sample feature content",
+        "F-01/F-02/F-03 remain separate non-P2-002 obligations; F-02 was previously determined non-blocking for P2B/P2C",
+        "P1-012 remains conditional/deferred and blocked",
+        "No P2-002 application implementation has started under this registration candidate"
+      ],
+      "expiry": null
     }
   ]
 }
