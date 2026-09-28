@@ -10,6 +10,7 @@ function readJson(relativePath) {
 
 const WORK_ITEM_ID = "WI-P2-002-DESIGN-SYSTEM";
 const DECISION_ID = "DEC-20260926-P2-002-DESIGN-SYSTEM-CONTRACT";
+const CLOSURE_ID = "DEC-20260927-P2-002-DESIGN-SYSTEM-CLOSURE";
 
 const DESIGN_BRIEF_SHA256 =
   "7f05ca3eec15532dd3cb8af36e1fcc006ed1d370c4e8e09d933b816832210d5c";
@@ -32,7 +33,7 @@ test("P2-002 registration preserves the human-approved Design System contract", 
   const item = itemMatches[0];
 
   assert.equal(decision.status, "accepted");
-  assert.equal(item.status, "approved");
+  assert.equal(item.status, "completed");
   assert.equal(item.priority, "P2");
   assert.equal(item.environment, "development");
 
@@ -63,6 +64,7 @@ test("P2-002 registration preserves the human-approved Design System contract", 
     "DEC-20260926-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION-CLOSURE",
     "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE",
     DECISION_ID,
+    CLOSURE_ID,
   ]);
 
   assert.deepEqual(item.dependencies, [
@@ -70,7 +72,7 @@ test("P2-002 registration preserves the human-approved Design System contract", 
     "WI-P0-P2-APPLICATION-SURFACE-CONTROL-EXTENSION",
   ]);
 
-  assert.equal(item.created_at, item.updated_at);
+  assert.ok(Date.parse(item.updated_at) > Date.parse(item.created_at));
   assert.equal(decision.created_at, decision.updated_at);
   assert.equal(item.created_at, decision.created_at);
 
@@ -247,4 +249,97 @@ test("P2-002 registration preserves the human-approved Design System contract", 
       "No P2-002 application implementation has started under this registration candidate",
     ),
   );
+});
+
+test("P2-002 implementation lifecycle is durably closed", () => {
+  const decisions = readJson("governance/decision-log.json");
+  const workItems = readJson("governance/work-items/index.json");
+
+  const closureMatches = decisions.decisions.filter(
+    (entry) => entry.decision_id === CLOSURE_ID,
+  );
+  assert.equal(closureMatches.length, 1);
+
+  const closure = closureMatches[0];
+
+  assert.equal(closure.status, "accepted");
+  assert.deepEqual(closure.work_item_refs, [WORK_ITEM_ID]);
+  assert.deepEqual(closure.reviewer, {
+    identity: "Rosuno",
+    status: "approved",
+  });
+  assert.equal(closure.created_at, closure.updated_at);
+  assert.ok(
+    Date.parse(closure.created_at) > Date.parse("2026-09-27T04:30:59Z"),
+  );
+
+  for (const evidence of [
+    "P2-002 candidate commit 1d8a166ffc36e7a47a7be808dc82f5f99759b3ff has sole parent 7fcea42f501956fd25a402804ddc924e535edffb and tree 6aa22b86b0ec05ece98e9d51ea40d0609d24c43b",
+    "GitHub PR #48 reviewed exact head 1d8a166ffc36e7a47a7be808dc82f5f99759b3ff against base 7fcea42f501956fd25a402804ddc924e535edffb",
+    "Rosuno review PRR_kwDOUHT1sc8AAAABPZ8dUA APPROVED at 2026-09-27T04:25:13Z on exact head 1d8a166ffc36e7a47a7be808dc82f5f99759b3ff",
+    "GitHub Actions P0 control foundation run #96 (36294113519) succeeded on 1d8a166ffc36e7a47a7be808dc82f5f99759b3ff",
+    "GitHub PR #48 merged as ba3698467d3ef36fcf301036de0fdba39d89efa0 at 2026-09-27T04:30:10Z",
+    "Merge ba3698467d3ef36fcf301036de0fdba39d89efa0 has ordered parents 7fcea42f501956fd25a402804ddc924e535edffb then 1d8a166ffc36e7a47a7be808dc82f5f99759b3ff and tree 6aa22b86b0ec05ece98e9d51ea40d0609d24c43b",
+    "GitHub Actions P0 control foundation run #97 (36294491949) succeeded on ba3698467d3ef36fcf301036de0fdba39d89efa0",
+    "Gate 5 N/A — repository-only P2-002 Design System work; no migration or database candidate exists",
+    "Gate 6 N/A — no persistent Staging application exists for P2-002",
+  ]) {
+    assert.ok(closure.evidence.includes(evidence));
+  }
+
+  assert.ok(
+    closure.evidence.some((entry) =>
+      entry.startsWith("Implementation scope was exactly 6 authorized paths:"),
+    ),
+  );
+
+  const item = workItems.work_items.find(
+    (entry) => entry.work_item_id === WORK_ITEM_ID,
+  );
+
+  assert.ok(item);
+  assert.equal(item.status, "completed");
+  assert.equal(item.environment, "development");
+  assert.deepEqual(item.release_refs, []);
+  assert.deepEqual(item.migration_refs, []);
+  assert.equal(item.updated_at, closure.updated_at);
+  assert.ok(item.decision_refs.includes(CLOSURE_ID));
+
+  for (const phrase of [
+    "Gate 5 is N/A",
+    "Gate 6 is N/A",
+    "P1-012 remains conditional/deferred and blocked",
+  ]) {
+    assert.ok(item.acceptance_criteria.some((entry) => entry.includes(phrase)));
+  }
+
+  const p1012 = workItems.work_items.find(
+    (entry) => entry.work_item_id === "WI-P1-012-PHYSICAL-1L",
+  );
+
+  assert.ok(p1012);
+  assert.equal(p1012.status, "blocked");
+
+  const boundary = [
+    closure.scope,
+    closure.decision,
+    closure.rationale,
+    closure.impact,
+    item.rollback_reference,
+  ].join(" ");
+
+  for (const phrase of [
+    "P1-012",
+    "F-01",
+    "F-02",
+    "F-03",
+    "P2-003",
+    "P3",
+    "Staging",
+    "Production",
+    "OLD",
+    "No database rollback applies",
+  ]) {
+    assert.ok(boundary.includes(phrase));
+  }
 });
