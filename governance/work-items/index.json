@@ -1227,6 +1227,92 @@
       "rollback_reference": "Repository-only design-system lifecycle closure. Before protected acceptance, the Gate 7 closure candidate may be discarded without altering the already-merged P2-002 implementation. After protected acceptance, any correction is forward-only and must not rewrite protected history. No database rollback applies.",
       "created_at": "2026-09-26T21:57:37Z",
       "updated_at": "2026-09-27T04:38:06Z"
+    },
+    {
+      "work_item_id": "WI-P2-003-SECURITY-SHELL",
+      "title": "P2-003 Security Shell foundation",
+      "objective": "Establish the smallest jurisdiction-neutral generic server-side security shell within the existing apps/web application for authenticated-route protection, principal-context resolution, exact capability checks, server-side mutation authorization boundaries, and presentation-safe error redaction without implementing P3 identity/authentication workflows, feature-specific authorization, or database/provider integration.",
+      "in_scope": [
+        "Generic application-layer security primitives inside the existing modular-monolith apps/web application",
+        "Fail-closed authenticated-route authorization decisions derived only from trusted server-owned session state",
+        "Principal-context representation for client, attorney, and staff that does not treat browser input as authority and does not assume Client and Attorney contexts are mutually exclusive",
+        "Separation of User identity, principal context, and staff Capability Grant authorization",
+        "Exact capability requirement checks through a trusted server-side authorization source, with scope remaining explicit and no wildcard, universal admin, superuser, or everything capability",
+        "Generic server-side mutation authorization boundary that performs authorization before invoking an application mutation and never trusts a caller-supplied authorized flag",
+        "Bounded presentation-safe authorization and operation failure states that redact raw exceptions, stacks, secrets, capability internals, identifiers not required by the caller, and sensitive server details",
+        "Preservation of P2-001 server-session, routing/error/form/application boundaries and P2-002 presentation-only design-system boundaries",
+        "Later P2-003 implementation surface limited to: apps/web/src/application/security.ts; apps/web/tests/security-shell.test.mjs; apps/web/tests/application-shell.test.mjs",
+        "Targeted Security Shell tests plus preservation of all existing P2-001, P2-002, P0, format, typecheck, build, secrets, and dependency validation"
+      ],
+      "out_of_scope": [
+        "P3 account creation, sign-in, sign-out, recovery, email verification, profile lifecycle, real authentication-provider integration, session binding, RLS integration, rate limiting, abuse controls, suspicious-login handling, or stronger authentication",
+        "Supabase Auth wiring, database reads/writes, capability-grant database queries, SQL, schema, migrations, RLS, ACLs, Storage, seed/reference data, release traceability, or schema-drift mutation",
+        "Feature-specific client, attorney, staff/admin, discovery, intake, referral, scheduling, consultation, payment, engagement, media, resource, messaging, review, complaint, compliance, or regulatory authorization rules",
+        "Resource-specific ownership/relationship, Sharing Grant, business-rule, policy, jurisdiction, sensitivity, legal-hold, retention, break-glass workflow, or audit-event implementation beyond preserving a generic future authorization boundary",
+        "Any browser-controlled role, principal, capability, scope, authorization, admin, or identity assertion becoming authoritative",
+        "Any universal isAdmin, superuser, wildcard, everything capability, or role-only authorization shortcut",
+        "Any change to apps/web/src/application/session.ts, apps/web/src/application/shell.ts, apps/web/src/application/form-operation.ts, presentation/design-system implementation, app routes/pages/layout, CSS, root/app package.json, pnpm-lock.yaml, pnpm-workspace.yaml, root/app scripts, .replit, or CI workflow",
+        "Stripe, Daily, Resend, verification provider, webhook, email provider, identity provider, or any external provider integration",
+        "Arizona-specific or other jurisdiction-specific legal/regulatory implementation, Physical 1L implementation, policy-gated values, or launch activation",
+        "F-01, F-02, or F-03 remediation",
+        "Staging, Production, OLD, Replit Agent, Replit AI, P3, or later roadmap implementation without separate authorization"
+      ],
+      "status": "approved",
+      "owner": "Rosuno P2-003 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE",
+        "DEC-20260927-P2-002-DESIGN-SYSTEM-CLOSURE",
+        "DEC-20260928-P2-003-SECURITY-SHELL-CONTRACT"
+      ],
+      "dependencies": [
+        "WI-P2-001-APPLICATION-SHELL",
+        "WI-P2-002-DESIGN-SYSTEM"
+      ],
+      "acceptance_criteria": [
+        "P2-003 is registered as the bounded Implementation Master Plan 2C Security Shell slice only and no application implementation has started through this registration candidate",
+        "Later application implementation remains limited to exactly apps/web/src/application/security.ts; apps/web/tests/security-shell.test.mjs; apps/web/tests/application-shell.test.mjs",
+        "The existing P2-001 server-owned session representation remains unchanged; P2-003 may consume trusted server-derived session state but must not implement the real P3 authentication lifecycle",
+        "Protected-route decisions fail closed when required authentication or trusted principal context is absent or cannot be safely resolved",
+        "Principal resolution does not infer authority from mutable browser input and does not collapse User identity into one exclusive client/attorney/staff role",
+        "Capability authorization requires explicit trusted capability data and explicit scope where scope is required; no universal admin, superuser, wildcard, or everything bypass exists",
+        "A generic protected mutation cannot execute until the server-side security boundary authorizes the request, and caller-supplied authorization assertions have no authority",
+        "Raw thrown values, stacks, secrets, tokens, sensitive provider/database detail, internal authorization evidence, and unnecessary identifiers cannot flow to presentation through security-shell failure results",
+        "P2-003 contains no feature-specific resource authorization, domain state transition, business rule, jurisdiction policy, database/provider integration, or second source of canonical state",
+        "Root/app package manifests, pnpm-lock.yaml, pnpm-workspace.yaml, root/app scripts, .replit, CI workflow, database artifacts, and provider configuration remain unchanged",
+        "Existing P2-001 application-shell and P2-002 design-system behavior and tests remain substantively intact",
+        "P1-012 remains conditional/deferred and blocked; Arizona is not classified or activated by P2-003",
+        "F-01/F-02/F-03 remain separate; P3, database/provider work, Staging, Production, and OLD remain outside this work item",
+        "A fresh bounded Builder packet is required before substantial P2-003 application implementation; Builder may generate candidate implementation/tests but may not mutate canonical Rosuno state, publish, create a PR, review, merge, contact databases/environments, or use Replit Agent/Replit AI"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p2-003-registration-contract.test.mjs",
+        "pnpm run p2:application-shell:test",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "development",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository-only Security Shell registration. Before protected acceptance, the local registration candidate may be discarded without changing canonical main. After protected acceptance, corrections are forward-only and must not rewrite protected history. No database rollback applies.",
+      "created_at": "2026-09-29T04:03:58Z",
+      "updated_at": "2026-09-29T04:03:58Z"
     }
   ]
 }
