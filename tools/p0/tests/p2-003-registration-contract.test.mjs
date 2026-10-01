@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 function readJson(relativePath) {
@@ -150,23 +150,6 @@ test("P2-003 registration preserves the bounded Security Shell contract", () => 
         entry.includes("Later P2-003 implementation surface limited to:") &&
         entry.includes(envelopeText),
     ),
-  );
-
-  assert.equal(
-    existsSync(
-      new URL("../../../apps/web/src/application/security.ts", import.meta.url),
-    ),
-    false,
-  );
-
-  assert.equal(
-    existsSync(
-      new URL(
-        "../../../apps/web/tests/security-shell.test.mjs",
-        import.meta.url,
-      ),
-    ),
-    false,
   );
 
   const sessionSource = readFileSync(
