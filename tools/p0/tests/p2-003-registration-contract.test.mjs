@@ -62,17 +62,21 @@ test("P2-003 registration preserves the bounded Security Shell contract", () => 
     "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE",
     "DEC-20260927-P2-002-DESIGN-SYSTEM-CLOSURE",
     DECISION_ID,
+    "DEC-20261001-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT-CONTRACT",
   ]);
 
   assert.deepEqual(item.dependencies, [
     "WI-P2-001-APPLICATION-SHELL",
     "WI-P2-002-DESIGN-SYSTEM",
+    "WI-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT",
   ]);
 
   assert.deepEqual(item.release_refs, []);
   assert.deepEqual(item.migration_refs, []);
 
-  assert.equal(item.created_at, item.updated_at);
+  assert.equal(item.created_at, "2026-09-29T04:03:58Z");
+  assert.match(item.updated_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.ok(Date.parse(item.updated_at) > Date.parse(item.created_at));
   assert.equal(decision.created_at, decision.updated_at);
   assert.equal(item.created_at, decision.created_at);
   assert.match(item.created_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);

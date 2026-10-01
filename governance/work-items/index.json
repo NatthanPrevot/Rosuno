@@ -1273,11 +1273,13 @@
       "decision_refs": [
         "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE",
         "DEC-20260927-P2-002-DESIGN-SYSTEM-CLOSURE",
-        "DEC-20260928-P2-003-SECURITY-SHELL-CONTRACT"
+        "DEC-20260928-P2-003-SECURITY-SHELL-CONTRACT",
+        "DEC-20261001-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT-CONTRACT"
       ],
       "dependencies": [
         "WI-P2-001-APPLICATION-SHELL",
-        "WI-P2-002-DESIGN-SYSTEM"
+        "WI-P2-002-DESIGN-SYSTEM",
+        "WI-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT"
       ],
       "acceptance_criteria": [
         "P2-003 is registered as the bounded Implementation Master Plan 2C Security Shell slice only and no application implementation has started through this registration candidate",
@@ -1312,7 +1314,82 @@
       "migration_refs": [],
       "rollback_reference": "Repository-only Security Shell registration. Before protected acceptance, the local registration candidate may be discarded without changing canonical main. After protected acceptance, corrections are forward-only and must not rewrite protected history. No database rollback applies.",
       "created_at": "2026-09-29T04:03:58Z",
-      "updated_at": "2026-09-29T04:03:58Z"
+      "updated_at": "2026-10-01T09:31:23Z"
+    },
+    {
+      "work_item_id": "WI-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT",
+      "title": "P0 P2-003 transition-control alignment prerequisite",
+      "objective": "Establish the smallest forward-only repository-test alignment required before P2-003 Security Shell implementation so already-accepted historical controls can admit only the previously authorized P2-003 paths without widening the P2-003 application envelope or weakening generic repository controls.",
+      "in_scope": [
+        "Governance registration candidate surface limited to: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p0-p2-003-transition-control-alignment-registration-contract.test.mjs; tools/p0/tests/p2-003-registration-contract.test.mjs",
+        "Explicit prerequisite dependency linkage from WI-P2-003-SECURITY-SHELL to this work item",
+        "Later transition-control implementation surface limited to: tools/p0/tests/p2-003-registration-contract.test.mjs; apps/web/tests/design-system.test.mjs",
+        "Later P2-003 registration-test alignment may remove only the permanent rolling-filesystem absence assumption for apps/web/src/application/security.ts and apps/web/tests/security-shell.test.mjs while preserving the historical P2-003 contract",
+        "Later P2-002 design-system file-set alignment may admit only apps/web/src/application/security.ts and apps/web/tests/security-shell.test.mjs as exact optional later files while retaining all original contracted files",
+        "Preservation of historical P2-002 and P2-003 controls and generic application/presentation isolation without widening the existing P2-003 implementation envelope",
+        "Disposable transition probe proving the two exact future P2-003 paths no longer fail merely because they exist",
+        "Targeted control tests plus the complete canonical validation chain on stable implementation bytes"
+      ],
+      "out_of_scope": [
+        "Any transition-control implementation through this governance-registration candidate",
+        "Any P2-003 Security Shell application implementation or change to its exact three-path application envelope",
+        "Any broad removal or weakening of historical registration, file-set, application-layer, presentation-layer, package, dependency, workspace, or repository controls",
+        "Any change to tools/p0/lib/controls.mjs, tools/p0/lib/fast-control.mjs, CI workflow, package manifests, pnpm-lock.yaml, pnpm-workspace.yaml, .replit, or application implementation through this prerequisite registration",
+        "Any P3 identity/authentication implementation, feature-specific authorization, database/provider integration, migration, schema, SQL, RLS, ACL, Storage, or environment mutation",
+        "Arizona-specific or other jurisdiction-specific implementation, P1-012 / Physical 1L work, or launch activation",
+        "F-01, F-02, or F-03 remediation",
+        "Staging, Production, OLD, Replit Agent, or Replit AI"
+      ],
+      "status": "approved",
+      "owner": "Rosuno P0 control owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "priority": "P0",
+      "authority_refs": [
+        "P0-001-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20261001-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT-CONTRACT"
+      ],
+      "dependencies": ["WI-P2-002-DESIGN-SYSTEM"],
+      "acceptance_criteria": [
+        "The governance-registration candidate changes exactly four authorized paths and performs no transition-control implementation",
+        "WI-P2-003-SECURITY-SHELL gains exactly this prerequisite dependency and decision linkage while remaining approved",
+        "WI-P2-003-SECURITY-SHELL preserves created_at 2026-09-29T04:03:58Z and advances updated_at truthfully for the registration mutation",
+        "The existing P2-003 three-path application implementation envelope remains unchanged",
+        "The later transition-control implementation remains limited to exactly tools/p0/tests/p2-003-registration-contract.test.mjs and apps/web/tests/design-system.test.mjs",
+        "During registration, the existing P2-003 implementation-file absence assertions remain unchanged and the P2-002 design-system file-set guards remain untouched",
+        "The later P2-003 registration-test correction removes only the permanent rolling-filesystem absence assumption and preserves historical contract evidence",
+        "The later P2-002 design-system correction permits only the two exact optional later P2-003 files while retaining original contracted files and generic isolation controls",
+        "A disposable transition probe must prove that exact placeholder security.ts and security-shell.test.mjs files no longer trip the aligned controls solely because the paths exist",
+        "All targeted tests and the complete canonical format, typecheck, build, P0, secrets, dependency, and diff validation pass on stable candidate bytes",
+        "P1-012 remains conditional/deferred and blocked; F-01/F-02/F-03, P3, database/provider work, Staging, Production, and OLD remain separate"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p0-p2-003-transition-control-alignment-registration-contract.test.mjs",
+        "node --test tools/p0/tests/p2-003-registration-contract.test.mjs",
+        "node --test tools/p0/tests/p2-002-registration-contract.test.mjs",
+        "pnpm run p2:application-shell:test",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository-only transition-control prerequisite. Before protected acceptance, the local candidate may be discarded without changing canonical main. After protected acceptance, corrections are forward-only and must not rewrite protected history. No database rollback applies.",
+      "created_at": "2026-10-01T09:31:23Z",
+      "updated_at": "2026-10-01T09:31:23Z"
     }
   ]
 }
