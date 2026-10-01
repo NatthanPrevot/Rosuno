@@ -829,6 +829,46 @@
         "No P2-003 application implementation has started through this registration candidate"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261001-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT-CONTRACT",
+      "title": "Register P0 P2-003 transition-control alignment prerequisite",
+      "status": "accepted",
+      "scope": "Governance registration only for a forward-only P0 prerequisite that makes the existing P2-003 registration test and P2-002 design-system file-set guards transition-safe for the already-authorized P2-003 Security Shell paths. No control-alignment implementation, P2-003 application implementation, database/provider/environment mutation, publication, review, merge, or later work is authorized by this decision.",
+      "decision": "Register WI-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT as an explicit prerequisite of WI-P2-003-SECURITY-SHELL. The later transition-control implementation is limited to exactly tools/p0/tests/p2-003-registration-contract.test.mjs and apps/web/tests/design-system.test.mjs. It may remove only the permanent rolling-filesystem absence assumption from the P2-003 registration test while preserving its historical contract, and may admit only apps/web/src/application/security.ts and apps/web/tests/security-shell.test.mjs as exact optional later files in the P2-002 design-system file-set guards while retaining the original files and generic application/presentation isolation. The P2-003 application implementation envelope remains exactly apps/web/src/application/security.ts; apps/web/tests/security-shell.test.mjs; apps/web/tests/application-shell.test.mjs.",
+      "rationale": "The bounded P2-003 Builder correctly stopped because legitimate future P2-003 files necessarily violate two existing frozen tests regardless of implementation content. The defect is in transition-control assumptions rather than the registered Security Shell contract. A separate forward-only P0 prerequisite preserves historical evidence and existing controls without widening P2-003 itself.",
+      "authority_refs": [
+        "P0-001-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": [
+        "WI-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT",
+        "WI-P2-003-SECURITY-SHELL"
+      ],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-01T09:31:23Z",
+      "updated_at": "2026-10-01T09:31:23Z",
+      "supersedes": [],
+      "impact": "If later protected and accepted, this registers only the transition-control prerequisite and explicit dependency linkage. It does not perform the two-file control alignment; change the P2-003 three-path application envelope; implement Security Shell behavior; change packages, lockfiles, workspace configuration, .replit, CI, database/schema/RLS/Storage/providers; classify Arizona; alter P1-012; resolve F-01/F-02/F-03; touch Staging, Production, or OLD; or authorize any later lifecycle gate.",
+      "evidence": [
+        "Bounded P2-003 Builder return: STOP — RETURN NO IMPLEMENTATION because tools/p0/tests/p2-003-registration-contract.test.mjs asserts that the two future P2-003 implementation files do not exist",
+        "Bounded P2-003 Builder return: apps/web/tests/design-system.test.mjs pins the exact tests/ and src/application/ file sets and therefore rejects the same two authorized P2-003 paths",
+        "Bounded P2-003 Builder return verified a pristine scratch clone at the exact canonical base/tree with push disabled and no canonical mutation",
+        "Canonical blocker tools/p0/tests/p2-003-registration-contract.test.mjs blob b129fb2a87400f0c2a717ef4d26bf6ebcdd581f2",
+        "Canonical blocker apps/web/tests/design-system.test.mjs blob 98b2f76f1b9bb438fc24950b88cce0eb271297a5",
+        "Canonical protected main reconciled at 9d17f6451a2bc99a404b825c64b43d8db10e7bee with tree 1346e59c809a5c4b16e43b55766b70b94e61eb29",
+        "WI-P2-003-SECURITY-SHELL remains approved and its three-path application implementation envelope remains unchanged",
+        "Registration preserves P2-003 created_at 2026-09-29T04:03:58Z and advances only its updated_at to the truthful Gate 1 registration-mutation timestamp",
+        "P1-012 remains conditional/deferred and blocked; F-01, F-02, and F-03 remain separate",
+        "No transition-control or P2-003 application implementation has started through this registration candidate"
+      ],
+      "expiry": null
     }
   ]
 }
