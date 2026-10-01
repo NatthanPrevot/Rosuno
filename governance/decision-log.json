@@ -869,6 +869,48 @@
         "No transition-control or P2-003 application implementation has started through this registration candidate"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261001-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT-CLOSURE",
+      "title": "Close P0 P2-003 transition-control alignment prerequisite lifecycle",
+      "status": "accepted",
+      "scope": "Retrospective governance-only Gate 7 closure for the already implemented, protected-reviewed, merged, and post-merge-validated P2-003 transition-control alignment prerequisite. Records exact lifecycle truth, Gate 5/6 N/A determinations, and completion state. It does not alter WI-P2-003-SECURITY-SHELL governance, begin P2-003 application implementation, or authorize any later work.",
+      "decision": "Record WI-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT as completed after exact candidate c9fd41f08cb0ff1eec718a78d41f78b63fa87f01, PR #52 designated Rosuno approval, successful exact-head CI #104, merge-commit integration 097b0b00f551e30b366407e95f181b901b44bca1, and successful post-merge CI #105. Record Gate 5 as N/A because no migration or database candidate exists and Gate 6 as N/A because no persistent Staging application exists. Preserve WI-P2-003-SECURITY-SHELL as approved and unimplemented with its existing dependencies and decision references unchanged.",
+      "rationale": "The bounded two-file transition-control alignment completed its protected repository lifecycle: disposable transition proof, stable-byte validation, exact candidate commit, publication, PR #52, designated Rosuno approval, exact-head CI, merge-commit integration, and successful post-merge CI. Canonical governance still records the prerequisite as approved rather than completed, so durable Gate 7 closure is required before the prerequisite may be declared closed.",
+      "authority_refs": [
+        "P0-001-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT"],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-01T20:25:03Z",
+      "updated_at": "2026-10-01T20:25:03Z",
+      "supersedes": [],
+      "impact": "Durably records completion of the already-merged repository-only transition-control prerequisite. It does not modify P2-003 governance or implementation, create a release or migration, contact or mutate any database, touch Staging/Production/OLD, alter P1-012, resolve F-01/F-02/F-03, begin P3, or authorize any later work.",
+      "evidence": [
+        "Retrospective governance closure record for WI-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT; canonical record created after the protected implementation lifecycle completed",
+        "P2-003 transition-control alignment candidate c9fd41f08cb0ff1eec718a78d41f78b63fa87f01 has sole parent 7630ba388ed766d0f964c7810cd0cf24df7b40d0 and tree 644f150b7358469e3afbbce6cecc5c0ed8422a7c",
+        "Implementation scope was exactly 2 authorized paths: apps/web/tests/design-system.test.mjs; tools/p0/tests/p2-003-registration-contract.test.mjs",
+        "Gate 1 disposable transition probe passed complete pnpm run p0:test with exact placeholder paths apps/web/src/application/security.ts and apps/web/tests/security-shell.test.mjs; placeholders were removed before final validation and commit",
+        "Gate 1 validated, staged, and committed SHA-256 matched exactly: 3638c0db24a918aca8b49629519222a95a8f683797fae7db77b470d9796d68c7 apps/web/tests/design-system.test.mjs; e75916ec3fdc8c4f078ee79ec1d773290515389338ecd7163f2f62c9f8ecedce tools/p0/tests/p2-003-registration-contract.test.mjs",
+        "GitHub PR #52 reviewed exact head c9fd41f08cb0ff1eec718a78d41f78b63fa87f01 against base 7630ba388ed766d0f964c7810cd0cf24df7b40d0",
+        "Rosuno review 5384906058 (PRR_kwDOUHT1sc8AAAABQPclSg) APPROVED at 2026-10-01T20:09:55Z on exact head c9fd41f08cb0ff1eec718a78d41f78b63fa87f01",
+        "GitHub Actions P0 control foundation run #104 (36915891645) succeeded on c9fd41f08cb0ff1eec718a78d41f78b63fa87f01",
+        "GitHub PR #52 merged as 097b0b00f551e30b366407e95f181b901b44bca1 at 2026-10-01T20:12:11Z",
+        "Merge 097b0b00f551e30b366407e95f181b901b44bca1 has ordered parents 7630ba388ed766d0f964c7810cd0cf24df7b40d0 then c9fd41f08cb0ff1eec718a78d41f78b63fa87f01 and tree 644f150b7358469e3afbbce6cecc5c0ed8422a7c",
+        "GitHub Actions P0 control foundation run #105 (36919848204) succeeded on 097b0b00f551e30b366407e95f181b901b44bca1",
+        "Gate 5 N/A — repository-only transition-control prerequisite; no migration or database candidate exists",
+        "Gate 6 N/A — no persistent Staging application exists for the transition-control prerequisite",
+        "WI-P2-003-SECURITY-SHELL remains approved and unimplemented; its existing dependencies and decision references are unchanged",
+        "P1-012 remains conditional/deferred and blocked; F-01/F-02/F-03, P3, database/provider work, Staging, Production, and OLD remain separate"
+      ],
+      "expiry": null
     }
   ]
 }

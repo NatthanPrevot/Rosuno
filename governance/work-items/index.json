@@ -1340,7 +1340,7 @@
         "F-01, F-02, or F-03 remediation",
         "Staging, Production, OLD, Replit Agent, or Replit AI"
       ],
-      "status": "approved",
+      "status": "completed",
       "owner": "Rosuno P0 control owner",
       "reviewer": {
         "identity": "Rosuno",
@@ -1354,7 +1354,8 @@
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
       ],
       "decision_refs": [
-        "DEC-20261001-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT-CONTRACT"
+        "DEC-20261001-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT-CONTRACT",
+        "DEC-20261001-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT-CLOSURE"
       ],
       "dependencies": ["WI-P2-002-DESIGN-SYSTEM"],
       "acceptance_criteria": [
@@ -1368,7 +1369,17 @@
         "The later P2-002 design-system correction permits only the two exact optional later P2-003 files while retaining original contracted files and generic isolation controls",
         "A disposable transition probe must prove that exact placeholder security.ts and security-shell.test.mjs files no longer trip the aligned controls solely because the paths exist",
         "All targeted tests and the complete canonical format, typecheck, build, P0, secrets, dependency, and diff validation pass on stable candidate bytes",
-        "P1-012 remains conditional/deferred and blocked; F-01/F-02/F-03, P3, database/provider work, Staging, Production, and OLD remain separate"
+        "P1-012 remains conditional/deferred and blocked; F-01/F-02/F-03, P3, database/provider work, Staging, Production, and OLD remain separate",
+        "P2-003 transition-control alignment candidate c9fd41f08cb0ff1eec718a78d41f78b63fa87f01 has sole parent 7630ba388ed766d0f964c7810cd0cf24df7b40d0 and tree 644f150b7358469e3afbbce6cecc5c0ed8422a7c",
+        "Implementation scope was exactly apps/web/tests/design-system.test.mjs and tools/p0/tests/p2-003-registration-contract.test.mjs",
+        "PR #52 received designated Rosuno approval PRR_kwDOUHT1sc8AAAABQPclSg at 2026-10-01T20:09:55Z on exact candidate head c9fd41f08cb0ff1eec718a78d41f78b63fa87f01",
+        "P0 control foundation run #104 (36915891645) succeeded on exact candidate head c9fd41f08cb0ff1eec718a78d41f78b63fa87f01",
+        "PR #52 merged through merge commit 097b0b00f551e30b366407e95f181b901b44bca1 at 2026-10-01T20:12:11Z",
+        "Merge 097b0b00f551e30b366407e95f181b901b44bca1 has ordered parents 7630ba388ed766d0f964c7810cd0cf24df7b40d0 then c9fd41f08cb0ff1eec718a78d41f78b63fa87f01 and tree 644f150b7358469e3afbbce6cecc5c0ed8422a7c",
+        "Post-merge P0 control foundation run #105 (36919848204) succeeded on canonical main 097b0b00f551e30b366407e95f181b901b44bca1",
+        "Gate 5 is N/A because this repository-only prerequisite contains no migration or database candidate",
+        "Gate 6 is N/A because this prerequisite contains no persistent Staging application",
+        "WI-P2-003-SECURITY-SHELL remains approved and unimplemented with its existing dependencies and decision references unchanged"
       ],
       "validation_commands": [
         "node --test tools/p0/tests/p0-p2-003-transition-control-alignment-registration-contract.test.mjs",
@@ -1387,9 +1398,9 @@
       "environment": "none",
       "release_refs": [],
       "migration_refs": [],
-      "rollback_reference": "Repository-only transition-control prerequisite. Before protected acceptance, the local candidate may be discarded without changing canonical main. After protected acceptance, corrections are forward-only and must not rewrite protected history. No database rollback applies.",
+      "rollback_reference": "Repository-only Gate 7 lifecycle closure. Before protected acceptance, the local closure candidate may be discarded without altering the already-merged transition-control implementation. After protected acceptance, any correction is forward-only and must not rewrite protected history. No database rollback applies.",
       "created_at": "2026-10-01T09:31:23Z",
-      "updated_at": "2026-10-01T09:31:23Z"
+      "updated_at": "2026-10-01T20:25:03Z"
     }
   ]
 }
