@@ -788,6 +788,47 @@
         "tools/p0/tests/p2-002-registration-contract.test.mjs"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20260928-P2-003-SECURITY-SHELL-CONTRACT",
+      "title": "Register bounded P2-003 Security Shell contract",
+      "status": "accepted",
+      "scope": "Governance registration only for Implementation Master Plan P2/2C Security Shell. Records the smallest generic server-side application security contract for authenticated-route protection, principal-context resolution, capability checks, server-side mutation authorization boundaries, and error redaction inside the existing apps/web application. No P2-003 application implementation, P3 identity/authentication workflow, database/RLS/provider integration, feature-specific authorization, jurisdiction-specific implementation, environment mutation, publication, review, merge, or later work is authorized by this decision.",
+      "decision": "Register WI-P2-003-SECURITY-SHELL as the bounded P2/2C Security Shell slice after completed P2-001 and P2-002. P2-003 may later implement only generic server-side security primitives: fail-closed protected-route decisions based on trusted server-derived session state; principal contexts for client, attorney, and staff without treating them as one mutable browser-supplied role; exact capability and scope requirements evaluated through trusted server-side authorization inputs; a mutation guard that authorizes before invoking a server-side mutation; and presentation-safe redacted failure results. Browser input may never authoritatively assert identity, principal context, role, capability, scope, or authorization. No universal admin, superuser, wildcard, or everything capability is permitted. Resource-specific ownership, relationship, business-rule, policy, and jurisdiction authorization remains the responsibility of later owning workflows and must not be invented inside this generic shell. P3 remains responsible for actual account creation, sign-in, sign-out, recovery, verification, profile lifecycle, real identity-provider integration, session binding, RLS integration, rate limiting, abuse controls, suspicious-login handling, and stronger authentication.",
+      "rationale": "The locked Implementation Master Plan orders P2 as 2A Application Shell, 2B Design System, then 2C Security Shell. P2-001 already provides a server-owned anonymous/authenticated session representation and explicit presentation-to-application boundary; P2-002 provides presentation primitives without authorization behavior. Locked Technical Architecture requires layered server-side authorization rather than role-only access and treats the browser as untrusted for business authority. Locked relational authority separates User identity from Client/Attorney roles and separates staff identity from Capability Grant authorization, so P2-003 must not collapse principal resolution into a mutable single-role flag. Existing P0 web-application controls already permit bounded apps/web paths while protecting package, dependency, workspace, and repository control state, so no additional P0 control extension or dependency is required.",
+      "authority_refs": [
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-003-SECURITY-SHELL"],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-09-29T04:03:58Z",
+      "updated_at": "2026-09-29T04:03:58Z",
+      "supersedes": [],
+      "impact": "If later protected and accepted, this registers only the P2-003 Security Shell contract. It does not begin P2-003 application implementation; create authentication or profile workflows; connect Supabase Auth or any other identity provider; read or mutate database state; change SQL, schema, RLS, ACLs, Storage, migrations, providers, packages, lockfiles, workspace configuration, .replit, or CI; create feature-specific routes or business authorization; classify or activate Arizona; alter P1-012; resolve F-01/F-02/F-03; touch Staging, Production, or OLD; or authorize any later lifecycle gate.",
+      "evidence": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED — P2 section 16 orders 2A Application Shell before 2B Design System before 2C Security Shell and defines 2C as authenticated route protection, role/principal resolution, capability checks, server-side mutation boundaries, and error redaction",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED — P3 separately owns account creation, sign-in, sign-out, recovery, verification, User/Client/Attorney/Staff profiles, session binding, capabilities, RLS, rate limiting, abuse controls, suspicious-login handling, and stronger authentication",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED — authorization is layered through authentication, role/context, capability, scope, ownership/relationship, sensitivity, business rule, and jurisdiction/policy rather than role-only access",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED — client/browser input is untrusted for business authority and may not authoritatively claim administrative or other protected state",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED — User is identity rather than a legal-service role; one User may have Client and Attorney profiles; staff identity is separate from authorization; broad admin/superuser/everything privilege is prohibited",
+        "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE — WI-P2-001-APPLICATION-SHELL is durably completed",
+        "DEC-20260927-P2-002-DESIGN-SYSTEM-CLOSURE — WI-P2-002-DESIGN-SYSTEM is durably completed",
+        "Canonical protected main reconciled at 86d38c078e261b11be8f7a8c49afd1e3c2d342be",
+        "GitHub Actions P0 control foundation run #99 (36428961877) succeeded on canonical main 86d38c078e261b11be8f7a8c49afd1e3c2d342be",
+        "Current apps/web session boundary is server-owned, represents anonymous/authenticated state only, accepts identity only through a trusted server-side source, and explicitly defers role/capability/route protection to P2-003/P3",
+        "Current P0 application-surface controls permit bounded apps/web source/test paths while retaining exact package, dependency, workspace, lockfile, and repository-control restrictions",
+        "P1-012 remains conditional/deferred and blocked; this contract does not classify or activate Arizona",
+        "F-01, F-02, and F-03 remain separate and are not remediated by P2-003",
+        "No P2-003 application implementation has started through this registration candidate"
+      ],
+      "expiry": null
     }
   ]
 }
