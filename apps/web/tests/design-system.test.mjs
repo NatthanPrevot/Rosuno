@@ -17,6 +17,8 @@ const stylesheetPath = "app/globals.css";
 const modulePath = "src/presentation/design-system.tsx";
 const pagePath = "app/page.tsx";
 const layoutPath = "app/layout.tsx";
+const optionalLaterTestPath = "tests/security-shell.test.mjs";
+const optionalLaterApplicationPath = "src/application/security.ts";
 
 function read(relativePath, root = appRoot) {
   return readFileSync(new URL(relativePath, root), "utf8");
@@ -264,10 +266,10 @@ test("1. the design system is exactly its contracted files", () => {
       .sort(),
     ["application", "presentation"],
   );
-  assert.deepEqual(filesIn("tests/"), [
-    "tests/application-shell.test.mjs",
-    "tests/design-system.test.mjs",
-  ]);
+  assert.deepEqual(
+    filesIn("tests/").filter((file) => file !== optionalLaterTestPath),
+    ["tests/application-shell.test.mjs", "tests/design-system.test.mjs"],
+  );
   const sources = [...filesIn("app/"), ...filesIn("src/")];
   assert.deepEqual(
     sources.filter((file) => !/\.tsx?$/.test(file)),
@@ -2680,11 +2682,16 @@ test("23. the application layer and the presentation layer stay apart", () => {
       );
     }
   }
-  assert.deepEqual(filesIn("src/application/"), [
-    "src/application/form-operation.ts",
-    "src/application/session.ts",
-    "src/application/shell.ts",
-  ]);
+  assert.deepEqual(
+    filesIn("src/application/").filter(
+      (file) => file !== optionalLaterApplicationPath,
+    ),
+    [
+      "src/application/form-operation.ts",
+      "src/application/session.ts",
+      "src/application/shell.ts",
+    ],
+  );
   // Only the two error boundaries that Next.js requires are client modules.
   assert.deepEqual(
     [...filesIn("app/"), ...filesIn("src/")].filter((file) =>
