@@ -1412,6 +1412,91 @@
       "rollback_reference": "Repository-only Gate 7 lifecycle closure. Before protected acceptance, the local closure candidate may be discarded without altering the already-merged transition-control implementation. After protected acceptance, any correction is forward-only and must not rewrite protected history. No database rollback applies.",
       "created_at": "2026-10-01T09:31:23Z",
       "updated_at": "2026-10-01T20:25:03Z"
+    },
+    {
+      "work_item_id": "WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT",
+      "title": "P0/P3 Identity Control Alignment prerequisite",
+      "objective": "Establish the smallest forward-only repository/control/test alignment required after durable P2 closure so a later separately authorized P3 Identity & Authorization implementation can introduce narrowly approved identity-provider dependencies and request/session infrastructure without allowing historical P2 tests to freeze Rosuno's rolling current state, while preserving the generic P2 shell, design-system, Security Shell, dependency-source, and server-authoritative security invariants.",
+      "in_scope": [
+        "Governance registration candidate surface limited to exactly: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p0-p3-identity-control-alignment-registration-contract.test.mjs",
+        "Later control-alignment implementation surface limited to exactly: tools/p0/lib/controls.mjs; tools/p0/tests/p0-controls.test.mjs; tools/p0/tests/p2-002-registration-contract.test.mjs; tools/p0/tests/p2-003-registration-contract.test.mjs; apps/web/tests/design-system.test.mjs; apps/web/tests/application-shell.test.mjs",
+        "Later central P0 web dependency control may add exactly @supabase/supabase-js and @supabase/ssr as permitted future runtime dependency names without installing them, selecting versions, or changing apps/web/package.json or pnpm-lock.yaml through this prerequisite registration",
+        "Preservation of registry-semver-only dependency specifications, rejection of Git/file/workspace/package aliases, package-manager side-channel protections, runtime-download protections, dependency/security checks, and fail-closed handling of unknown dependencies",
+        "Later tools/p0/tests/p0-controls.test.mjs parity coverage for the narrowly expanded permitted future dependency-name envelope while retaining arbitrary-dependency negative coverage",
+        "Later transition-safe correction of P2-002 and P2-003 registration tests only where they incorrectly freeze rolling current package/session state, while preserving their accepted historical P2 contracts and closure evidence",
+        "Later ownership-scoping of apps/web/tests/design-system.test.mjs whole-repository/file/dependency assumptions while preserving provider/auth/business independence of the design-system-owned presentation surface",
+        "Later ownership-scoping of apps/web/tests/application-shell.test.mjs broad route/request/provider/environment/import assumptions while preserving the generic P2 shell-owned routing, layout, loading/error, form, browser-non-authority, application-boundary, and redaction invariants",
+        "Preservation without modification of apps/web/src/application/security.ts and apps/web/tests/security-shell.test.mjs unless a future separately reconciled exact conflict independently proves a change necessary",
+        "Governance naming reconciliation that roadmap phase P3 does not itself create a governance P3 priority; governance/work-items/schema.json remains unchanged and the first actual P3 application work-item identifier remains a later Gate 0 decision",
+        "Targeted registration-contract validation followed by the complete canonical validation chain on stable registration-candidate bytes"
+      ],
+      "out_of_scope": [
+        "Any six-file control-alignment implementation through this registration candidate",
+        "Any change to governance/work-items/schema.json, tools/p0/tests/p2-001-registration-contract.test.mjs, apps/web/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, root package configuration, Fast-Control, CI configuration, apps/web/src/application/session.ts, apps/web/src/application/security.ts, or apps/web/tests/security-shell.test.mjs through this registration candidate",
+        "Installation or version selection of @supabase/supabase-js, @supabase/ssr, or any other package",
+        "Any Supabase browser/server client, Proxy, middleware, route handler, server action, auth page, signup, sign-in, sign-out, recovery, verification, account/profile workflow, or other P3 application implementation",
+        "Credentials, secrets, environment variables, provider calls, Supabase Auth contact, Staging restoration, database queries or mutations, migrations, schema, SQL, RLS, ACL, Storage, or seed/account/profile data",
+        "Creation or registration of the first actual P3 application work item or expansion of the work-item schema to a P3 priority namespace",
+        "Arizona-specific or other jurisdiction-specific implementation, P1-012 / Physical 1L work, regulatory classification, or launch activation",
+        "G-1 through G-5 or F-01/F-02/F-03 resolution",
+        "Production, OLD, branch deletion, Replit Agent, or Replit AI",
+        "Publication, push, pull request creation, protected review, merge, persistent environment application, or any later lifecycle gate"
+      ],
+      "status": "approved",
+      "owner": "Rosuno P0 control owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "priority": "P0",
+      "authority_refs": [
+        "P0-001-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20261002-P0-P3-IDENTITY-CONTROL-ALIGNMENT-CONTRACT"
+      ],
+      "dependencies": ["WI-P2-003-SECURITY-SHELL"],
+      "acceptance_criteria": [
+        "The registration candidate changes exactly three authorized paths: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p0-p3-identity-control-alignment-registration-contract.test.mjs",
+        "The registration candidate performs no control-alignment or P3 application implementation",
+        "The later control-alignment implementation envelope is recorded as exactly six paths: tools/p0/lib/controls.mjs; tools/p0/tests/p0-controls.test.mjs; tools/p0/tests/p2-002-registration-contract.test.mjs; tools/p0/tests/p2-003-registration-contract.test.mjs; apps/web/tests/design-system.test.mjs; apps/web/tests/application-shell.test.mjs",
+        "governance/work-items/schema.json remains unchanged with P0/P1/P2 priorities only; no WI-P3-* application work item is created through registration",
+        "The future dependency-control permission is limited to exact package names @supabase/supabase-js and @supabase/ssr and does not install them or select package versions",
+        "Historical P2-001/P2-002/P2-003 closure evidence remains unchanged and all three work items remain completed",
+        "P1-012 remains conditional/deferred and blocked",
+        "The generic P2 Security Shell implementation and targeted security-shell test remain unchanged",
+        "The design system remains provider/auth/business independent and the application shell retains its generic server-owned/browser-non-authoritative boundaries",
+        "Unknown dependencies, prohibited dependency sources, package-manager side channels, runtime downloads, and dependency/security-control bypasses remain fail-closed",
+        "All targeted tests and the complete canonical format, typecheck, build, P0, secrets, dependency, and diff validation pass on stable registration-candidate bytes",
+        "Gate 5 is N/A because this registration is repository/governance-only and contains no migration or database candidate",
+        "Gate 6 is N/A because this registration creates no persistent Staging application",
+        "P3 implementation, P1-012, G-1 through G-5, F-01/F-02/F-03, database/provider work, Staging, Production, and OLD remain separate and unauthorized"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p0-p3-identity-control-alignment-registration-contract.test.mjs",
+        "node --test tools/p0/tests/p2-001-registration-contract.test.mjs",
+        "node --test tools/p0/tests/p2-002-registration-contract.test.mjs",
+        "node --test tools/p0/tests/p2-003-registration-contract.test.mjs",
+        "pnpm run p2:application-shell:test",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository/governance-only registration prerequisite. Before protected acceptance the local registration candidate may be discarded without changing canonical main. After protected acceptance corrections are forward-only and must not rewrite historical P2 evidence. No database rollback applies.",
+      "created_at": "2026-10-02T22:49:32Z",
+      "updated_at": "2026-10-02T22:49:32Z"
     }
   ]
 }

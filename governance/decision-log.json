@@ -952,6 +952,47 @@
         "tools/p0/tests/p2-003-registration-contract.test.mjs"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261002-P0-P3-IDENTITY-CONTROL-ALIGNMENT-CONTRACT",
+      "title": "Register P0/P3 Identity Control Alignment prerequisite",
+      "status": "accepted",
+      "scope": "Governance registration only for the forward-only P0/P3 Identity Control Alignment prerequisite required after durable P2 closure and before any P3 Identity & Authorization implementation. This registration records the bounded future control/test alignment contract only. It performs no control-alignment implementation, package installation, identity-provider integration, P3 application implementation, database/provider/environment mutation, publication, PR, review, merge, or later lifecycle gate.",
+      "decision": "Register WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT as the repository/control prerequisite before any separately authorized P3 Identity & Authorization application slice. The later alignment implementation is limited exactly to tools/p0/lib/controls.mjs; tools/p0/tests/p0-controls.test.mjs; tools/p0/tests/p2-002-registration-contract.test.mjs; tools/p0/tests/p2-003-registration-contract.test.mjs; apps/web/tests/design-system.test.mjs; apps/web/tests/application-shell.test.mjs. That later work may narrowly permit @supabase/supabase-js and @supabase/ssr as future allowed web runtime dependency names without installing them or selecting versions; make P2-002/P2-003 rolling current-state assertions transition-safe without rewriting historical P2 evidence; and scope whole-repository design-system/application-shell assumptions to preserve their P2-owned invariants without categorically blocking later separately authorized P3 identity/provider/request/session infrastructure. The generic P2 Security Shell remains unchanged. Roadmap phase P3 does not create a new governance P3 priority namespace; governance/work-items/schema.json remains unchanged and the first actual P3 application work-item identifier remains a later Gate 0 decision.",
+      "rationale": "Protected main shows P2-001, P2-002, and P2-003 durably completed while P1-012 remains blocked and no P3 application work item exists. Current P0 controls still allow only the P2 web runtime dependency set, while historical P2-002/P2-003 and application/design tests inspect rolling current repository state in ways that would permanently prohibit legitimate later identity-provider dependencies, request/session infrastructure, routes, and source files. UOM requires historical accepted evidence to remain historical while allowing later work to advance current state. A bounded P0 prerequisite therefore makes those controls transition-safe without implementing P3 or weakening Rosuno's generic Security Shell, dependency-source controls, design-system isolation, or server-authoritative security architecture.",
+      "authority_refs": [
+        "P0-001-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT"],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-02T22:49:32Z",
+      "updated_at": "2026-10-02T22:49:32Z",
+      "supersedes": [],
+      "impact": "If later protected and accepted, this decision registers only the P0/P3 transition-control prerequisite. It does not perform the six-file alignment; install or version @supabase/supabase-js or @supabase/ssr; change apps/web/package.json or pnpm-lock.yaml; implement Supabase clients, Proxy/middleware, Auth routes/pages/actions, account workflows, session binding, RLS integration, rate limiting, abuse controls, or stronger authentication; create credentials or secrets; contact or mutate Supabase; restore Staging; mutate any database/RLS/Storage state; alter P1-012; resolve G-1 through G-5 or F-01/F-02/F-03; create an actual P3 application work item; expand the governance priority schema; touch Production or OLD; delete branches; use Replit Agent/Replit AI; publish, create a PR, review, merge, or authorize any later gate.",
+      "evidence": [
+        "Canonical protected main reconciled at e7d454c923e25095ce32f66c409e50bd2ba25984 with tree bdbc3120e262a475b44e8fb1f8d5f7b8341f3660",
+        "Canonical governance records WI-P2-001-APPLICATION-SHELL, WI-P2-002-DESIGN-SYSTEM, and WI-P2-003-SECURITY-SHELL as completed",
+        "Canonical governance records WI-P1-012-PHYSICAL-1L as blocked / conditional / deferred",
+        "Canonical governance contains no WI-P3-* work item at registration preflight",
+        "Current governance schema permits only P0/P1/P2 priorities and does not authorize a WI-P3-* priority namespace",
+        "Current P0 web-manifest control rejects runtime dependency names outside the existing P2 dependency allowlist",
+        "P2-002 and P2-003 registration tests still inspect rolling apps/web/package.json state rather than only immutable historical P2 evidence",
+        "P2-003 registration testing still preserves the historical pre-P3 no-identity-provider condition in current source assertions",
+        "Design-system and application-shell tests retain whole-repository assumptions that must be ownership-scoped before later separately authorized P3 identity infrastructure can exist",
+        "Fresh reconciliation found no concrete conflict requiring any change to apps/web/src/application/security.ts or apps/web/tests/security-shell.test.mjs",
+        "Registration candidate surface is exactly: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p0-p3-identity-control-alignment-registration-contract.test.mjs",
+        "Later control-alignment implementation surface is exactly: tools/p0/lib/controls.mjs; tools/p0/tests/p0-controls.test.mjs; tools/p0/tests/p2-002-registration-contract.test.mjs; tools/p0/tests/p2-003-registration-contract.test.mjs; apps/web/tests/design-system.test.mjs; apps/web/tests/application-shell.test.mjs",
+        "No control-alignment implementation or P3 application implementation has started through this registration candidate"
+      ],
+      "expiry": null
     }
   ]
 }
