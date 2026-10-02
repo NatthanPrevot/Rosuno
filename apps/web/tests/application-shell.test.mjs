@@ -77,6 +77,17 @@ const densityVocabulary = new Map([
   ],
 ]);
 
+// WI-P2-003: "attorney" is also one of the three generic principal contexts
+// (client, attorney, staff). It is admitted only as that token, in this exact
+// declaration, inside the Security Shell source. Any other use of the word
+// there, and every other term the vocabulary guard lists, still fails it.
+const principalContextVocabulary = new Map([
+  [
+    "src/application/security.ts",
+    'const CONTEXTS = Object.freeze(["client", "attorney", "staff"] as const);',
+  ],
+]);
+
 // Import or export syntax without the spacing Prettier writes, or with a
 // comment inside it, would hide its specifier from importsOf.
 const unspacedImport = /\b(?:import|export|from)(?:["'{*]|\s*\/[*/])/;
@@ -1297,9 +1308,11 @@ test("12. presentation reaches application state only through application module
 
 test("13. generic shell contains no feature-specific business logic or records", () => {
   for (const file of [...filesIn("app/"), ...filesIn("src/")]) {
-    // Only the exact approved density token is set aside, and only in the two
-    // design-system sources; the guards below read everything else.
-    const approved = densityVocabulary.get(file);
+    // Only the exact approved density token, in the two design-system sources,
+    // and the exact principal-context declaration, in the Security Shell
+    // source, are set aside; the guards below read everything else.
+    const approved =
+      densityVocabulary.get(file) ?? principalContextVocabulary.get(file);
     const source =
       approved === undefined
         ? read(file)
