@@ -911,6 +911,47 @@
         "P1-012 remains conditional/deferred and blocked; F-01/F-02/F-03, P3, database/provider work, Staging, Production, and OLD remain separate"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261002-P2-003-SECURITY-SHELL-CLOSURE",
+      "title": "Close P2-003 Security Shell implementation lifecycle",
+      "status": "accepted",
+      "scope": "Retrospective governance-only lifecycle closure for the already implemented, protected-reviewed, merged, and post-merge-validated P2-003 Security Shell. Records exact implementation lifecycle truth, Gate 5/6 N/A determinations, and completion state. It does not claim this local closure candidate itself has completed protected acceptance and authorizes no P3, database, jurisdiction, environment, or later work.",
+      "decision": "Record WI-P2-003-SECURITY-SHELL as completed after exact candidate 2f2ef016975f6b5914f616e6a7bbe09c2c8f6d17, PR #54 designated Rosuno approval, successful exact-head CI, merge-commit integration 3a408b3e12e2bcd5e511eea148ea3ee447e37996, and successful post-merge CI. Record Gate 5 as N/A because no migration or database candidate exists and Gate 6 as N/A because no persistent Staging application exists. Preserve P1-012 as blocked/deferred and leave F-01/F-02/F-03, P3, database/provider work, Staging, Production, OLD, and later roadmap work outside this closure.",
+      "rationale": "The bounded P2-003 implementation has completed its protected repository lifecycle: exact local validation, candidate commit, publication, PR #54, designated Rosuno approval, exact-head CI, merge-commit integration, and successful post-merge CI. Canonical governance still records the work item as approved rather than completed. Durable closure is required to make the canonical work-item state match the completed lifecycle while preserving the independent P1-012, F-01/F-02/F-03, P3, database/provider, and environment boundaries.",
+      "authority_refs": [
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-003-SECURITY-SHELL"],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-02T20:29:58Z",
+      "updated_at": "2026-10-02T20:29:58Z",
+      "supersedes": [],
+      "impact": "Durably records completion of the already-merged P2-003 Security Shell lifecycle only. It does not modify application implementation bytes, create a release or migration, contact or mutate any database/provider/environment, touch Staging/Production/OLD, classify or activate Arizona, alter P1-012, resolve F-01/F-02/F-03, begin P3, or authorize any later work.",
+      "evidence": [
+        "Retrospective governance closure record for WI-P2-003-SECURITY-SHELL; canonical record created after the protected implementation lifecycle completed",
+        "P2-003 candidate commit 2f2ef016975f6b5914f616e6a7bbe09c2c8f6d17 has sole parent a6018bfe0e04827a98c4a0824c99a9ffdf297341 and tree 0061ef9f6030741871e91026246f98b7a49d2228",
+        "Implementation scope was exactly 3 authorized paths: apps/web/src/application/security.ts; apps/web/tests/security-shell.test.mjs; apps/web/tests/application-shell.test.mjs",
+        "GitHub PR #54 reviewed exact head 2f2ef016975f6b5914f616e6a7bbe09c2c8f6d17 against base a6018bfe0e04827a98c4a0824c99a9ffdf297341",
+        "Rosuno review 5396173281 (PRR_kwDOUHT1sc8AAAABQaMR4Q) APPROVED at 2026-10-02T19:53:59Z on exact head 2f2ef016975f6b5914f616e6a7bbe09c2c8f6d17",
+        "GitHub Actions P0 control foundation run #108 (37056535437) succeeded on 2f2ef016975f6b5914f616e6a7bbe09c2c8f6d17",
+        "GitHub PR #54 merged as 3a408b3e12e2bcd5e511eea148ea3ee447e37996 at 2026-10-02T20:01:50Z",
+        "Merge 3a408b3e12e2bcd5e511eea148ea3ee447e37996 has ordered parents a6018bfe0e04827a98c4a0824c99a9ffdf297341 then 2f2ef016975f6b5914f616e6a7bbe09c2c8f6d17 and tree 0061ef9f6030741871e91026246f98b7a49d2228",
+        "GitHub Actions P0 control foundation run #109 (37057937500) succeeded on 3a408b3e12e2bcd5e511eea148ea3ee447e37996",
+        "Gate 5 N/A — repository-only P2-003 Security Shell work; no migration or database candidate exists",
+        "Gate 6 N/A — no persistent Staging application exists for P2-003",
+        "P1-012 remains conditional/deferred and blocked; this closure does not classify or activate Arizona",
+        "F-01, F-02, F-03, P3, database/provider work, Staging, Production, OLD, and later roadmap work remain separate and are not started, resolved, or authorized by this closure",
+        "tools/p0/tests/p2-003-registration-contract.test.mjs"
+      ],
+      "expiry": null
     }
   ]
 }

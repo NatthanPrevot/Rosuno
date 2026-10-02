@@ -15,6 +15,7 @@ const CLOSURE_ID =
   "DEC-20261001-P0-P2-003-TRANSITION-CONTROL-ALIGNMENT-CLOSURE";
 const TARGET_ID = "WI-P2-003-SECURITY-SHELL";
 const TARGET_CONTRACT_ID = "DEC-20260928-P2-003-SECURITY-SHELL-CONTRACT";
+const TARGET_CLOSURE_ID = "DEC-20261002-P2-003-SECURITY-SHELL-CLOSURE";
 
 const REGISTRATION_ENVELOPE = [
   "governance/decision-log.json",
@@ -298,16 +299,39 @@ test("P0 P2-003 transition-control alignment lifecycle is durably closed", () =>
   );
 
   assert.ok(target);
-  assert.equal(target.status, "approved");
   assert.equal(target.created_at, "2026-09-29T04:03:58Z");
-  assert.equal(target.updated_at, "2026-10-01T09:31:23Z");
 
-  assert.deepEqual(target.decision_refs, [
-    "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE",
-    "DEC-20260927-P2-002-DESIGN-SYSTEM-CLOSURE",
-    TARGET_CONTRACT_ID,
-    DECISION_ID,
-  ]);
+  const targetClosureMatches = decisions.decisions.filter(
+    (entry) => entry.decision_id === TARGET_CLOSURE_ID,
+  );
+
+  if (targetClosureMatches.length === 0) {
+    assert.equal(target.status, "approved");
+    assert.equal(target.updated_at, "2026-10-01T09:31:23Z");
+
+    assert.deepEqual(target.decision_refs, [
+      "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE",
+      "DEC-20260927-P2-002-DESIGN-SYSTEM-CLOSURE",
+      TARGET_CONTRACT_ID,
+      DECISION_ID,
+    ]);
+  } else {
+    assert.equal(targetClosureMatches.length, 1);
+
+    const targetClosure = targetClosureMatches[0];
+
+    assert.equal(targetClosure.status, "accepted");
+    assert.equal(target.status, "completed");
+    assert.equal(target.updated_at, targetClosure.updated_at);
+
+    assert.deepEqual(target.decision_refs, [
+      "DEC-20260926-P2-001-APPLICATION-SHELL-CLOSURE",
+      "DEC-20260927-P2-002-DESIGN-SYSTEM-CLOSURE",
+      TARGET_CONTRACT_ID,
+      DECISION_ID,
+      TARGET_CLOSURE_ID,
+    ]);
+  }
 
   assert.deepEqual(target.dependencies, [
     "WI-P2-001-APPLICATION-SHELL",
