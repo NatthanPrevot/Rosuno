@@ -5332,6 +5332,16 @@ test("compliant @rosuno/web manifest envelopes validate", () => {
   delete subset.devDependencies["@types/node"];
   assert.doesNotThrow(() => validateWebApplicationPackageJson(subset));
 
+  // The P0/P3 alignment permits only these two future identity-provider
+  // runtime names. Synthetic semver values prove name/source validation
+  // without selecting or installing real package versions.
+  const futureIdentityRuntime = webApplicationManifest();
+  futureIdentityRuntime.dependencies["@supabase/supabase-js"] = "1.2.3";
+  futureIdentityRuntime.dependencies["@supabase/ssr"] = "1.2.3";
+  assert.doesNotThrow(() =>
+    validateWebApplicationPackageJson(futureIdentityRuntime),
+  );
+
   const metadata = webApplicationManifest();
   Object.assign(metadata, {
     description: "Rosuno web application shell",
@@ -5397,6 +5407,21 @@ test("@rosuno/web manifest rejects identity, script, dependency, and package-man
       "arbitrary runtime dependency",
       (m) => (m.dependencies.lodash = "4.17.21"),
       /dependencies name is outside the P2 control allowlist: lodash/,
+    ],
+    [
+      "unregistered identity runtime dependency",
+      (m) => (m.dependencies["@supabase/auth-js"] = "1.2.3"),
+      /dependencies name is outside the P2 control allowlist: @supabase\/auth-js/,
+    ],
+    [
+      "P3 identity runtime dependency declared as optional",
+      (m) => (m.optionalDependencies = { "@supabase/supabase-js": "1.2.3" }),
+      /optionalDependencies name is outside the P2 control allowlist: @supabase\/supabase-js/,
+    ],
+    [
+      "P3 identity runtime dependency declared as peer",
+      (m) => (m.peerDependencies = { "@supabase/ssr": "1.2.3" }),
+      /peerDependencies name is outside the P2 control allowlist: @supabase\/ssr/,
     ],
     [
       "arbitrary optional dependency",

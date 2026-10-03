@@ -6754,8 +6754,19 @@ const WEB_APPLICATION_SCRIPTS = Object.freeze({
 
 const WEB_APPLICATION_RUNTIME_DEPENDENCIES = ["next", "react", "react-dom"];
 
+// Exact future P3 identity-provider runtime names registered by
+// WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT. This is a name allowlist only; it does
+// not install packages or select versions.
+const WEB_APPLICATION_P3_RUNTIME_DEPENDENCIES = [
+  "@supabase/supabase-js",
+  "@supabase/ssr",
+];
+
 const WEB_APPLICATION_DEPENDENCY_NAMES = Object.freeze({
-  dependencies: WEB_APPLICATION_RUNTIME_DEPENDENCIES,
+  dependencies: [
+    ...WEB_APPLICATION_RUNTIME_DEPENDENCIES,
+    ...WEB_APPLICATION_P3_RUNTIME_DEPENDENCIES,
+  ],
   optionalDependencies: WEB_APPLICATION_RUNTIME_DEPENDENCIES,
   peerDependencies: WEB_APPLICATION_RUNTIME_DEPENDENCIES,
   devDependencies: [
