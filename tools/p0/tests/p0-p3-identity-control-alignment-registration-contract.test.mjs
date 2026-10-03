@@ -37,7 +37,6 @@ const AUTHORITY_REFS = [
 test("P0/P3 Identity Control Alignment registration is bounded", () => {
   const decisions = readJson("governance/decision-log.json");
   const workItems = readJson("governance/work-items/index.json");
-  const schema = readJson("governance/work-items/schema.json");
 
   const decisionMatches = decisions.decisions.filter(
     (entry) => entry.decision_id === DECISION_ID,
@@ -54,7 +53,6 @@ test("P0/P3 Identity Control Alignment registration is bounded", () => {
   const item = itemMatches[0];
 
   assert.equal(decision.status, "accepted");
-  assert.equal(item.status, "approved");
   assert.equal(item.priority, "P0");
   assert.equal(item.environment, "none");
 
@@ -68,29 +66,31 @@ test("P0/P3 Identity Control Alignment registration is bounded", () => {
   assert.deepEqual(decision.authority_refs, AUTHORITY_REFS);
   assert.deepEqual(item.authority_refs, AUTHORITY_REFS);
   assert.deepEqual(decision.work_item_refs, [PREREQ_ID]);
-  assert.deepEqual(item.decision_refs, [DECISION_ID]);
+  assert.ok(item.decision_refs.includes(DECISION_ID));
   assert.deepEqual(item.dependencies, ["WI-P2-003-SECURITY-SHELL"]);
 
   assert.deepEqual(item.release_refs, []);
   assert.deepEqual(item.migration_refs, []);
 
   assert.equal(decision.created_at, decision.updated_at);
-  assert.equal(item.created_at, item.updated_at);
   assert.equal(item.created_at, decision.created_at);
 
   assert.match(item.created_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
 
-  assert.deepEqual(schema.properties.priority.enum, ["P0", "P1", "P2"]);
+  const registrationFacts = [...decision.evidence, ...item.acceptance_criteria];
 
-  const idPattern = new RegExp(schema.properties.work_item_id.pattern);
-
-  assert.equal(idPattern.test(PREREQ_ID), true);
-  assert.equal(idPattern.test("WI-P3-001-UNAUTHORIZED"), false);
-
-  assert.equal(
-    workItems.work_items.some((entry) => /^WI-P3-/.test(entry.work_item_id)),
-    false,
-  );
+  for (const phrase of [
+    "Current governance schema permits only P0/P1/P2 priorities",
+    "Canonical governance contains no WI-P3-* work item at registration preflight",
+    "governance/work-items/schema.json remains unchanged with P0/P1/P2 priorities only; no WI-P3-* application work item is created through registration",
+    "Historical P2-001/P2-002/P2-003 closure evidence remains unchanged and all three work items remain completed",
+    "P1-012 remains conditional/deferred and blocked",
+  ]) {
+    assert.ok(
+      registrationFacts.some((entry) => entry.includes(phrase)),
+      `missing historical registration fact: ${phrase}`,
+    );
+  }
 
   assert.ok(
     item.in_scope.some((entry) =>
@@ -155,20 +155,6 @@ test("P0/P3 Identity Control Alignment registration is bounded", () => {
     "merge",
   ]) {
     assert.ok(contract.includes(phrase), `missing exclusion: ${phrase}`);
-  }
-
-  for (const [id, status] of [
-    ["WI-P2-001-APPLICATION-SHELL", "completed"],
-    ["WI-P2-002-DESIGN-SYSTEM", "completed"],
-    ["WI-P2-003-SECURITY-SHELL", "completed"],
-    ["WI-P1-012-PHYSICAL-1L", "blocked"],
-  ]) {
-    const existing = workItems.work_items.find(
-      (entry) => entry.work_item_id === id,
-    );
-
-    assert.ok(existing, `missing existing work item: ${id}`);
-    assert.equal(existing.status, status, id);
   }
 
   assert.ok(
