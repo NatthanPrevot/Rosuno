@@ -993,6 +993,47 @@
         "No control-alignment implementation or P3 application implementation has started through this registration candidate"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261003-P0-P3-IDENTITY-CONTROL-ALIGNMENT-CLOSURE",
+      "title": "Close P0/P3 Identity Control Alignment prerequisite lifecycle",
+      "status": "accepted",
+      "scope": "Retrospective governance-only Gate 7 closure for the already implemented, protected-reviewed, merged, and post-merge-validated P0/P3 Identity Control Alignment prerequisite. Records exact lifecycle truth, Gate 5/6 N/A determinations, and completion state. It does not claim this local closure candidate itself has completed protected acceptance and authorizes no P3 Identity & Authorization application implementation, package installation, credentials/secrets, database/provider/environment action, P1-012 work, G-1 through G-5, F-01/F-02/F-03 remediation, Staging, Production, OLD, or later work.",
+      "decision": "Record WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT as completed after exact candidate f04242b42683a08bad01d7e05810264fba0e113e, PR #58 designated Rosuno approval, successful exact-head CI #116, merge-commit integration f2f22d716c46733cb5f9a18d60be2bd2eb3b3407, and successful post-merge CI #117. Record Gate 5 as N/A because no migration or database candidate exists and Gate 6 as N/A because no persistent Staging application exists. Preserve the historical P1-012 registration fact without freezing its rolling current state, and leave P3 Identity & Authorization implementation and all package/credential/database/provider/environment/later work separate and unauthorized.",
+      "rationale": "The bounded six-file P0/P3 Identity Control Alignment implementation completed its protected repository lifecycle: stable-byte validation, exact candidate commit, publication, PR #58, designated Rosuno approval, exact-head CI, merge-commit integration, and successful post-merge CI. Canonical governance still records the prerequisite as approved rather than completed. Durable Gate 7 closure is therefore required to make canonical work-item state match the completed lifecycle while preserving historical P2 evidence and all later-work boundaries.",
+      "authority_refs": [
+        "P0-001-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT"],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-03T07:48:27Z",
+      "updated_at": "2026-10-03T07:48:27Z",
+      "supersedes": [],
+      "impact": "Durably records completion of the already-merged P0/P3 Identity Control Alignment prerequisite only. It does not modify implementation bytes, install packages, create credentials/secrets, contact or mutate any database/provider/environment, touch Staging/Production/OLD, alter P1-012 current state, resolve G-1 through G-5 or F-01/F-02/F-03, begin P3 Identity & Authorization application implementation, or authorize any later work.",
+      "evidence": [
+        "Retrospective governance closure record for WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT; canonical record created only after the protected implementation lifecycle completed",
+        "P0/P3 Identity Control Alignment candidate commit f04242b42683a08bad01d7e05810264fba0e113e has sole parent 50bf11103e1b5fcc0fb29d7f9a3da9361a20599a and tree 1268b59adf88a9f5d08a7dca58ccdb5a0f761b67",
+        "Implementation scope was exactly 6 authorized paths: tools/p0/lib/controls.mjs; tools/p0/tests/p0-controls.test.mjs; tools/p0/tests/p2-002-registration-contract.test.mjs; tools/p0/tests/p2-003-registration-contract.test.mjs; apps/web/tests/design-system.test.mjs; apps/web/tests/application-shell.test.mjs",
+        "GitHub PR #58 reviewed exact head f04242b42683a08bad01d7e05810264fba0e113e against base 50bf11103e1b5fcc0fb29d7f9a3da9361a20599a",
+        "Rosuno review PRR_kwDOUHT1sc8AAAABQdW4Vg APPROVED at 2026-10-03T07:11:39Z on exact head f04242b42683a08bad01d7e05810264fba0e113e",
+        "GitHub Actions P0 control foundation run #116 (37105144759) succeeded on f04242b42683a08bad01d7e05810264fba0e113e",
+        "GitHub PR #58 merged as f2f22d716c46733cb5f9a18d60be2bd2eb3b3407 at 2026-10-03T07:14:27Z",
+        "Merge f2f22d716c46733cb5f9a18d60be2bd2eb3b3407 has ordered parents 50bf11103e1b5fcc0fb29d7f9a3da9361a20599a then f04242b42683a08bad01d7e05810264fba0e113e and tree 1268b59adf88a9f5d08a7dca58ccdb5a0f761b67",
+        "GitHub Actions P0 control foundation run #117 (37105691654) succeeded on canonical main f2f22d716c46733cb5f9a18d60be2bd2eb3b3407",
+        "Gate 5 N/A — repository-only P0/P3 Identity Control Alignment prerequisite; no migration or database candidate exists",
+        "Gate 6 N/A — no persistent Staging application exists for the P0/P3 Identity Control Alignment prerequisite",
+        "P3 Identity & Authorization application implementation, package installation, credentials/secrets, P1-012, G-1 through G-5, F-01/F-02/F-03, database/provider/environment work, Staging, Production, and OLD remain separate and unauthorized by this closure",
+        "tools/p0/tests/p0-p3-identity-control-alignment-registration-contract.test.mjs"
+      ],
+      "expiry": null
     }
   ]
 }

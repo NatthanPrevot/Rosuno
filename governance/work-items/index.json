@@ -1442,7 +1442,7 @@
         "Production, OLD, branch deletion, Replit Agent, or Replit AI",
         "Publication, push, pull request creation, protected review, merge, persistent environment application, or any later lifecycle gate"
       ],
-      "status": "approved",
+      "status": "completed",
       "owner": "Rosuno P0 control owner",
       "reviewer": {
         "identity": "Rosuno",
@@ -1457,7 +1457,8 @@
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
       ],
       "decision_refs": [
-        "DEC-20261002-P0-P3-IDENTITY-CONTROL-ALIGNMENT-CONTRACT"
+        "DEC-20261002-P0-P3-IDENTITY-CONTROL-ALIGNMENT-CONTRACT",
+        "DEC-20261003-P0-P3-IDENTITY-CONTROL-ALIGNMENT-CLOSURE"
       ],
       "dependencies": ["WI-P2-003-SECURITY-SHELL"],
       "acceptance_criteria": [
@@ -1474,7 +1475,17 @@
         "All targeted tests and the complete canonical format, typecheck, build, P0, secrets, dependency, and diff validation pass on stable registration-candidate bytes",
         "Gate 5 is N/A because this registration is repository/governance-only and contains no migration or database candidate",
         "Gate 6 is N/A because this registration creates no persistent Staging application",
-        "P3 implementation, P1-012, G-1 through G-5, F-01/F-02/F-03, database/provider work, Staging, Production, and OLD remain separate and unauthorized"
+        "P3 implementation, P1-012, G-1 through G-5, F-01/F-02/F-03, database/provider work, Staging, Production, and OLD remain separate and unauthorized",
+        "P0/P3 Identity Control Alignment candidate commit f04242b42683a08bad01d7e05810264fba0e113e has sole parent 50bf11103e1b5fcc0fb29d7f9a3da9361a20599a and tree 1268b59adf88a9f5d08a7dca58ccdb5a0f761b67",
+        "Implementation scope was exactly 6 authorized paths: tools/p0/lib/controls.mjs; tools/p0/tests/p0-controls.test.mjs; tools/p0/tests/p2-002-registration-contract.test.mjs; tools/p0/tests/p2-003-registration-contract.test.mjs; apps/web/tests/design-system.test.mjs; apps/web/tests/application-shell.test.mjs",
+        "PR #58 received designated Rosuno approval PRR_kwDOUHT1sc8AAAABQdW4Vg at 2026-10-03T07:11:39Z on exact candidate head f04242b42683a08bad01d7e05810264fba0e113e",
+        "P0 control foundation run #116 (37105144759) succeeded on exact candidate head f04242b42683a08bad01d7e05810264fba0e113e",
+        "PR #58 merged through merge commit f2f22d716c46733cb5f9a18d60be2bd2eb3b3407 at 2026-10-03T07:14:27Z",
+        "Merge f2f22d716c46733cb5f9a18d60be2bd2eb3b3407 has ordered parents 50bf11103e1b5fcc0fb29d7f9a3da9361a20599a then f04242b42683a08bad01d7e05810264fba0e113e and tree 1268b59adf88a9f5d08a7dca58ccdb5a0f761b67",
+        "Post-merge P0 control foundation run #117 (37105691654) succeeded on canonical main f2f22d716c46733cb5f9a18d60be2bd2eb3b3407",
+        "Gate 5 is N/A because this repository-only prerequisite contains no migration or database candidate",
+        "Gate 6 is N/A because this prerequisite contains no persistent Staging application",
+        "P3 Identity & Authorization application implementation, package installation, credentials/secrets, P1-012, G-1 through G-5, F-01/F-02/F-03, database/provider/environment work, Staging, Production, and OLD remain separate and unauthorized by this closure"
       ],
       "validation_commands": [
         "node --test tools/p0/tests/p0-p3-identity-control-alignment-registration-contract.test.mjs",
@@ -1494,9 +1505,9 @@
       "environment": "none",
       "release_refs": [],
       "migration_refs": [],
-      "rollback_reference": "Repository/governance-only registration prerequisite. Before protected acceptance the local registration candidate may be discarded without changing canonical main. After protected acceptance corrections are forward-only and must not rewrite historical P2 evidence. No database rollback applies.",
+      "rollback_reference": "Repository-only Gate 7 lifecycle closure. Before protected acceptance, the local closure candidate may be discarded without altering the already-merged P0/P3 Identity Control Alignment implementation. After protected acceptance, any correction is forward-only and must not rewrite protected history or historical P2 evidence. No database rollback applies.",
       "created_at": "2026-10-02T22:49:32Z",
-      "updated_at": "2026-10-02T22:49:32Z"
+      "updated_at": "2026-10-03T07:48:27Z"
     }
   ]
 }
