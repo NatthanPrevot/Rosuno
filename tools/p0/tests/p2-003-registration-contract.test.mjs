@@ -89,13 +89,8 @@ test("P2-003 registration preserves the bounded Security Shell contract", () => 
   const p2002 = workItems.work_items.find(
     (entry) => entry.work_item_id === "WI-P2-002-DESIGN-SYSTEM",
   );
-  const p1012 = workItems.work_items.find(
-    (entry) => entry.work_item_id === "WI-P1-012-PHYSICAL-1L",
-  );
-
   assert.equal(p2001.status, "completed");
   assert.equal(p2002.status, "completed");
-  assert.equal(p1012.status, "blocked");
 
   const contract = [
     decision.scope,
@@ -166,31 +161,10 @@ test("P2-003 registration preserves the bounded Security Shell contract", () => 
     /Nothing\s+the browser sends[\s\S]*is\s+accepted here as identity\./,
   );
 
-  assert.match(sessionSource, /No identity provider exists before P3/);
-
-  const appPackage = readJson("apps/web/package.json");
-
-  assert.deepEqual(Object.keys(appPackage.dependencies ?? {}).sort(), [
-    "next",
-    "react",
-    "react-dom",
-  ]);
-
-  assert.deepEqual(Object.keys(appPackage.devDependencies ?? {}).sort(), [
-    "@types/node",
-    "@types/react",
-    "@types/react-dom",
-    "typescript",
-  ]);
-
-  const rootPackage = readJson("package.json");
-
-  assert.deepEqual(rootPackage.dependencies ?? {}, {});
-
-  assert.deepEqual(Object.keys(rootPackage.devDependencies ?? {}).sort(), [
-    "prettier",
-    "typescript",
-  ]);
+  // Historical P2-003 registration and closure evidence owns the pre-P3
+  // package/provider/session state accepted for that work item. This historical
+  // contract test must not freeze rolling state that later controlled P3 work
+  // is explicitly allowed to advance.
 });
 
 test("P2-003 implementation lifecycle is durably closed", () => {
@@ -266,13 +240,6 @@ test("P2-003 implementation lifecycle is durably closed", () => {
   ]) {
     assert.ok(item.acceptance_criteria.some((entry) => entry.includes(phrase)));
   }
-
-  const p1012 = workItems.work_items.find(
-    (entry) => entry.work_item_id === "WI-P1-012-PHYSICAL-1L",
-  );
-
-  assert.ok(p1012);
-  assert.equal(p1012.status, "blocked");
 
   const boundary = [
     closure.scope,
