@@ -1075,6 +1075,44 @@
         "The Arizona launch strategy is draft, noncanonical, and unlocked and supplies no authority to this work item"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261003-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH-CONTRACT",
+      "title": "Register Next.js September 2026 Security Patch contract",
+      "status": "accepted",
+      "scope": "Governance registration only for a separate repository-only P0 security-maintenance prerequisite that will later raise the canonical Rosuno web application's Next.js 16.3 dependency floor from ^16.3.6 to ^16.3.8 and resolve the lockfile to Next.js 16.3.8. This registration performs no package update, package installation, application/configuration change, P2-004 correction or implementation, provider/database/environment action, publication, PR, review, merge, or later lifecycle gate.",
+      "decision": "Register WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH as a P0 work item depending on completed WI-P2-001-APPLICATION-SHELL. The later implementation is limited exactly to apps/web/package.json and pnpm-lock.yaml. Its sole direct dependency mutation is next: ^16.3.6 to next: ^16.3.8, with apps/web resolving Next.js 16.3.8. Only lockfile changes transitively required by resolving Next.js 16.3.8 are permitted. React ^19.3.0, React DOM ^19.3.0, every unrelated direct dependency, application/configuration source, Supabase package state, and all other repository state remain unchanged. This work item is separate from P2-004 and does not broaden P2-004.",
+      "rationale": "Canonical Rosuno currently declares Next.js ^16.3.6 and resolves Next.js 16.3.6. Fresh official Next.js security guidance identifies 16.3.8 as the applicable 16.3 security release. A narrowly bounded two-file framework patch should therefore be completed independently before the later P2-004 authentication/session implementation so that P2-004 does not silently absorb an unrelated framework security upgrade.",
+      "authority_refs": [
+        "P0-001-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH"],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-03T23:30:58Z",
+      "updated_at": "2026-10-03T23:30:58Z",
+      "supersedes": [],
+      "impact": "If later protected and accepted, this decision registers only the bounded Next.js 16.3.8 security-patch contract. It does not itself update packages, modify apps/web/package.json or pnpm-lock.yaml, alter React or React DOM, add Supabase packages, implement authentication/session behavior, change application/configuration source, modify P2-004, contact or mutate any provider/database/environment, touch Staging/Production/OLD, alter P1-012, resolve G-1 through G-5 or F-01/F-02/F-03, or implement any draft Arizona launch-strategy functionality.",
+      "evidence": [
+        "Canonical protected main reconciled at c3ac36033c4713ce318462ba2989ca60e2d32548 with tree a47717b4cd975265ecdaa785ce29f91ab8f568db",
+        "WI-P2-001-APPLICATION-SHELL is completed and is the work item that introduced the canonical Next.js application shell",
+        "Canonical apps/web/package.json currently declares next ^16.3.6",
+        "Canonical pnpm-lock.yaml currently resolves the apps/web Next.js dependency to 16.3.6",
+        "Canonical apps/web/package.json currently declares react ^19.3.0 and react-dom ^19.3.0",
+        "Fresh official Next.js September 2026 security reconciliation identified 16.3.8 as the required 16.3 security release",
+        "Registration candidate surface is exactly: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p0-nextjs-september-2026-security-patch-registration-contract.test.mjs",
+        "Later implementation surface is exactly: apps/web/package.json; pnpm-lock.yaml",
+        "Later direct dependency mutation is limited to next ^16.3.6 to ^16.3.8; unrelated direct dependencies remain unchanged",
+        "Later lockfile mutation is limited to Next.js 16.3.8 and entries transitively required by that exact resolution",
+        "P2-004 remains a separate work item and is not modified or broadened through this registration",
+        "The draft Arizona launch strategy remains noncanonical and supplies no authority to this work item"
+      ],
+      "expiry": null
     }
   ]
 }

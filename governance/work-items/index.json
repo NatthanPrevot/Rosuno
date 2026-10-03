@@ -1612,6 +1612,88 @@
       "rollback_reference": "Repository-only P2-004 registration contract. Before protected acceptance, the local registration candidate may be discarded without modifying canonical main or any application/provider/database/environment state. After protected acceptance, corrections are forward-only and must preserve historical accepted evidence. No database rollback applies.",
       "created_at": "2026-10-03T21:09:06Z",
       "updated_at": "2026-10-03T21:09:06Z"
+    },
+    {
+      "work_item_id": "WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH",
+      "title": "Next.js September 2026 Security Patch",
+      "objective": "Apply, through a later separately authorized repository-only implementation, the smallest bounded framework security correction from canonical Next.js 16.3.6 to official 16.3.8 without changing application behavior, React, Supabase, P2-004, unrelated dependencies, or any provider/database/environment state.",
+      "in_scope": [
+        "Governance registration candidate surface limited to exactly: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p0-nextjs-september-2026-security-patch-registration-contract.test.mjs",
+        "Later implementation surface limited to exactly: apps/web/package.json; pnpm-lock.yaml",
+        "Later sole direct dependency mutation in apps/web/package.json from next ^16.3.6 to next ^16.3.8",
+        "Later pnpm-lock.yaml resolution of the apps/web Next.js dependency to exactly 16.3.8",
+        "Later lockfile changes limited to Next.js 16.3.8 and only entries transitively required by that exact framework resolution, including corresponding Next.js-owned packages when required by pnpm resolution",
+        "Preservation of react ^19.3.0 and react-dom ^19.3.0",
+        "Preservation of every unrelated direct dependency and dev dependency",
+        "Complete canonical format, typecheck, build, application-shell, P0, secrets, dependency-security, and diff validation on stable implementation bytes",
+        "Repository-only lifecycle with Gate 5 N/A because there is no migration/database candidate and Gate 6 N/A because there is no persistent Staging application"
+      ],
+      "out_of_scope": [
+        "Any two-file Next.js implementation through this registration candidate",
+        "Any package installation or package update through this registration candidate",
+        "Any React, React DOM, TypeScript, type-package, Supabase, or unrelated dependency upgrade",
+        "Any application source, route, component, Proxy, middleware, configuration, script, workspace, CI, P0 control-code, or test change other than this registration-contract test",
+        "Any P2-004 contract correction, dependency linkage, implementation, package selection, authentication/session behavior, or Supabase integration",
+        "Any provider contact or mutation, database query or mutation, SQL, migration, schema, RLS, ACL, Storage, credentials, secrets, or environment configuration",
+        "Staging, Production, OLD, P1-012 / Physical 1L, G-1 through G-5, or F-01/F-02/F-03 work",
+        "Founding Attorney, beta, survey/form, Arizona-page, onboarding, verification, pricing, availability, Live Now, marketplace, visibility, launch, or any other draft Arizona launch-strategy functionality",
+        "Publication, push, pull request creation, protected review, merge, branch deletion, or any later lifecycle gate",
+        "Replit Agent or Replit AI"
+      ],
+      "status": "approved",
+      "owner": "Rosuno P0 control owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "priority": "P0",
+      "authority_refs": [
+        "P0-001-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20261003-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH-CONTRACT"
+      ],
+      "dependencies": ["WI-P2-001-APPLICATION-SHELL"],
+      "acceptance_criteria": [
+        "The registration candidate changes exactly three authorized paths: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p0-nextjs-september-2026-security-patch-registration-contract.test.mjs",
+        "The registration candidate performs no package installation/update and no two-file framework implementation",
+        "WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH is registered with priority P0, environment development, and dependency WI-P2-001-APPLICATION-SHELL",
+        "The later implementation envelope is exactly apps/web/package.json and pnpm-lock.yaml",
+        "The later apps/web/package.json mutation changes only next from ^16.3.6 to ^16.3.8",
+        "React remains exactly ^19.3.0 and React DOM remains exactly ^19.3.0",
+        "Every unrelated direct dependency and dev dependency remains unchanged",
+        "The later pnpm-lock.yaml resolves the apps/web Next.js dependency to exactly 16.3.8",
+        "Later lockfile changes are limited to Next.js 16.3.8 and only transitive entries required by that exact Next.js resolution; unrelated lockfile upgrades or churn are prohibited",
+        "No application source, configuration, routes, Proxy, middleware, scripts, workspace settings, CI, or P0 control-code changes occur",
+        "No Supabase dependency or P2-004 implementation/correction occurs through this work item",
+        "The later candidate passes the complete canonical format, typecheck, build, application-shell, P0, secrets, dependency-security, and diff validation chain",
+        "Gate 5 is N/A because this repository-only work item contains no migration or database candidate",
+        "Gate 6 is N/A because this repository-only work item performs no persistent Staging application",
+        "The draft Arizona launch strategy remains noncanonical and no launch functionality is implemented",
+        "Historical accepted evidence remains forward-only; the registration test must not freeze rolling work-item status or later authorized package state"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p0-nextjs-september-2026-security-patch-registration-contract.test.mjs",
+        "node --test tools/p0/tests/p2-001-registration-contract.test.mjs",
+        "node --test tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
+        "pnpm run p2:application-shell:test",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "development",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository-only security-patch contract. Before protected acceptance, the local registration candidate may be discarded without modifying canonical main or application/provider/database/environment state. After protected acceptance, corrections are forward-only and must preserve historical accepted evidence. No database rollback applies.",
+      "created_at": "2026-10-03T23:30:58Z",
+      "updated_at": "2026-10-03T23:30:58Z"
     }
   ]
 }
