@@ -1508,6 +1508,110 @@
       "rollback_reference": "Repository-only Gate 7 lifecycle closure. Before protected acceptance, the local closure candidate may be discarded without altering the already-merged P0/P3 Identity Control Alignment implementation. After protected acceptance, any correction is forward-only and must not rewrite protected history or historical P2 evidence. No database rollback applies.",
       "created_at": "2026-10-02T22:49:32Z",
       "updated_at": "2026-10-03T07:48:27Z"
+    },
+    {
+      "work_item_id": "WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION",
+      "title": "P3 Authentication Session Foundation",
+      "objective": "Establish the smallest server-only P3 authentication/session integration boundary by later binding Supabase authentication identity into Rosuno's existing trusted ServerSessionSource without implementing account workflows, application User/profile binding, authorization business state, persistent application-session lifecycle, or marketplace/launch behavior.",
+      "in_scope": [
+        "Governance registration candidate surface limited to exactly: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
+        "Later application implementation surface limited to exactly: apps/web/package.json; pnpm-lock.yaml; apps/web/src/infrastructure/identity/supabase-server.ts; apps/web/src/infrastructure/identity/server-session-source.ts; apps/web/tests/authentication-session.test.mjs",
+        "Fresh read-only reconciliation against current official provider/package API documentation immediately before Gate 1 implementation; any required additional dependency, implementation path, or architectural change is a STOP requiring fresh Gate 0 reconciliation",
+        "Later addition of exactly @supabase/supabase-js and @supabase/ssr as runtime dependencies, with actual versions selected only after the required fresh provider/package reconciliation",
+        "Later server-only Supabase identity client boundary implemented only in apps/web/src/infrastructure/identity/supabase-server.ts",
+        "Later server-session adapter implemented only in apps/web/src/infrastructure/identity/server-session-source.ts and conforming to the existing ServerSessionSource contract",
+        "Authentication result exposed to the application session boundary only as an opaque trusted subject string or anonymous null state; no access token, refresh token, provider session object, credential, or authentication secret flows through application session state",
+        "Request cookies or provider session material may be consumed only inside the later server-side identity/provider adapter and do not become authoritative merely because the browser supplied them",
+        "Fail-closed behavior for missing configuration, provider failure, malformed identity answers, or any unsafe/unusable authentication state",
+        "No cross-request mutable or global authenticated-session cache",
+        "Preservation without modification of apps/web/src/application/session.ts, apps/web/src/application/security.ts, and apps/web/tests/security-shell.test.mjs",
+        "Authentication/session state must not encode, infer, or authorize based on Founding Attorney status, regular-attorney status, private-beta status, launch cohort, public visibility, Live Now eligibility, client/attorney/staff business context, or marketplace eligibility; those remain later application/business states and cannot become provider authentication roles, browser claims, session authority, or authentication-derived authorization shortcuts",
+        "Later isolated authentication-session tests use only synthetic non-secret fixtures, perform no live provider/network calls, and verify server-only, opaque-subject, fail-closed, redaction, request isolation, and business-state-neutrality boundaries",
+        "Targeted registration-contract validation followed by the complete canonical format, typecheck, build, P0, application-shell, secrets, dependency, and diff validation chain on stable registration-candidate bytes"
+      ],
+      "out_of_scope": [
+        "Any five-file P2-004 application implementation through this registration candidate",
+        "Any package installation or package-version selection through this registration candidate",
+        "Account creation/signup, sign-in, sign-out, password recovery/reset, email verification, authentication UI, authentication forms, or authentication server actions",
+        "Supabase browser client, Proxy, middleware, route handlers, auth routes, auth pages, or client-side provider/session integration",
+        "Creation or binding of a Rosuno public.users row, auth_user_id application mapping, Client Profile, Attorney Profile, Staff Profile, or any other profile/business principal association",
+        "Capability database sources, capability grants, staff authorization implementation, resource authorization, or any client/attorney/staff business-context derivation from authentication",
+        "application_sessions database writes, persistent session-lifecycle synchronization, auth_session_reference persistence, session revocation persistence, or session-bound marketplace behavior",
+        "SQL, migrations, schema changes, RLS changes, ACL changes, Storage changes, seed data, profile/account data, or any database query/mutation",
+        "Rate limiting, abuse controls, suspicious-login handling, MFA/stronger authentication, break-glass workflow, security-event persistence, or audit implementation",
+        "Credentials, secrets, environment-variable creation/configuration, live Supabase Auth calls, Staging restoration/application, provider mutation, Production, or OLD",
+        "Founding Attorney status or functionality, regular-attorney status or onboarding, private-beta functionality, surveys/forms, Arizona hub or practice-area pages, attorney onboarding/verification, pricing, availability, Live Now functionality, marketplace eligibility, public visibility, launch activation, or any other draft Arizona launch-strategy implementation",
+        "Treating the draft Arizona launch strategy as canonical Rosuno authority or locking any of its proposed business values through P2-004",
+        "Arizona-specific regulatory classification, P1-012 / Physical 1L work, G-1 through G-5, or F-01/F-02/F-03 resolution",
+        "Any modification to governance/work-items/schema.json, apps/web/src/application/session.ts, apps/web/src/application/security.ts, apps/web/tests/security-shell.test.mjs, root package/workspace configuration, Fast-Control, or CI configuration",
+        "Publication, push, pull request creation, protected review, merge, branch deletion, persistent environment application, or any later lifecycle gate",
+        "Replit Agent or Replit AI"
+      ],
+      "status": "approved",
+      "owner": "Rosuno P2-004 implementation owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20261003-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT"
+      ],
+      "dependencies": [
+        "WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT",
+        "WI-P2-003-SECURITY-SHELL"
+      ],
+      "acceptance_criteria": [
+        "The registration candidate changes exactly three authorized paths: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
+        "The registration candidate performs no package installation, package-version selection, provider integration, application implementation, database/provider/environment mutation, or launch-strategy implementation",
+        "WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION is registered with governance priority P2, environment development, and dependencies on WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT and WI-P2-003-SECURITY-SHELL",
+        "governance/work-items/schema.json remains unchanged; this work item does not create or require a WI-P3-* governance priority namespace",
+        "The later P2-004 implementation envelope is exactly five paths: apps/web/package.json; pnpm-lock.yaml; apps/web/src/infrastructure/identity/supabase-server.ts; apps/web/src/infrastructure/identity/server-session-source.ts; apps/web/tests/authentication-session.test.mjs",
+        "The later runtime dependency expansion is limited to @supabase/supabase-js and @supabase/ssr; @supabase/auth-js and every other new package remain unauthorized",
+        "Before Gate 1 application implementation, current official provider/package API guidance must be reconciled read-only; versions and exact API usage are not guessed during registration, and any required additional dependency/path/architecture change causes STOP and fresh Gate 0 reconciliation",
+        "apps/web/src/application/session.ts, apps/web/src/application/security.ts, and apps/web/tests/security-shell.test.mjs remain unchanged by P2-004 implementation unless a separately reconciled future contract explicitly authorizes otherwise",
+        "Authentication exposes only an opaque trusted server-side subject or anonymous state through ServerSessionSource; browser-controlled identity assertions never become authoritative",
+        "Authentication alone never establishes Rosuno application User identity, Founding Attorney status, regular-attorney status, private-beta status, launch cohort, public visibility, Live Now eligibility, client/attorney/staff business context, marketplace eligibility, or capability authorization",
+        "No raw access token, refresh token, provider session object, credential, or authentication secret flows through Rosuno application session representation, application results, logs, or test output",
+        "Provider failure, missing configuration, malformed identity, or unsafe authentication state fails closed, and authenticated state is not stored in cross-request mutable/global cache",
+        "Later P2-004 tests perform no live provider/network calls and use only synthetic non-secret fixtures",
+        "No public.users/profile/application_sessions/capability data, SQL, migration, RLS, ACL, Storage, database, provider, credential, secret, or environment mutation occurs through this registration",
+        "The draft Arizona launch strategy remains noncanonical and unlocked; Founding Attorney, beta, survey/form, Arizona-page, onboarding, verification, pricing, availability, Live Now, marketplace, and launch functionality remain outside P2-004",
+        "Historical P2/P0-P3 accepted evidence remains forward-only; the P2-004 registration contract test must not freeze rolling work-item status, future decision references, global governance priority evolution, or later authorized application/package state",
+        "All targeted tests and the complete canonical format, typecheck, build, P0, application-shell, secrets, dependency, and diff validation pass on stable registration-candidate bytes",
+        "Gate 5 is N/A because this registration/application slice contains no migration or database candidate",
+        "Gate 6 is N/A because this registration/application slice performs no persistent Staging application",
+        "Signup/sign-in/sign-out/recovery/verification, application User/profile binding, persistent application-session lifecycle, capabilities, RLS integration, abuse controls, stronger authentication, and later P3 functionality remain separate work items or separately authorized slices"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
+        "node --test tools/p0/tests/p0-p3-identity-control-alignment-registration-contract.test.mjs",
+        "node --test tools/p0/tests/p2-001-registration-contract.test.mjs",
+        "node --test tools/p0/tests/p2-002-registration-contract.test.mjs",
+        "node --test tools/p0/tests/p2-003-registration-contract.test.mjs",
+        "pnpm run p2:application-shell:test",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "development",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository-only P2-004 registration contract. Before protected acceptance, the local registration candidate may be discarded without modifying canonical main or any application/provider/database/environment state. After protected acceptance, corrections are forward-only and must preserve historical accepted evidence. No database rollback applies.",
+      "created_at": "2026-10-03T21:09:06Z",
+      "updated_at": "2026-10-03T21:09:06Z"
     }
   ]
 }
