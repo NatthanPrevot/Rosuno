@@ -1034,6 +1034,47 @@
         "tools/p0/tests/p0-p3-identity-control-alignment-registration-contract.test.mjs"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261003-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT",
+      "title": "Register P3 Authentication Session Foundation contract",
+      "status": "accepted",
+      "scope": "Governance registration only for the first bounded P3 Identity & Authorization application slice: the P3 Authentication Session Foundation. This registration defines a later five-path development implementation that binds trusted server-side authentication identity into Rosuno's existing generic session boundary. It performs no package installation, package-version selection, provider integration, application implementation, account workflow, database/provider/environment mutation, publication, PR, review, merge, or later lifecycle gate.",
+      "decision": "Register WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION as a P2-priority governance work item for roadmap phase P3. The later implementation is limited exactly to apps/web/package.json; pnpm-lock.yaml; apps/web/src/infrastructure/identity/supabase-server.ts; apps/web/src/infrastructure/identity/server-session-source.ts; apps/web/tests/authentication-session.test.mjs. Before Gate 1 implementation, current official provider/package API guidance must be reconciled read-only. Only @supabase/supabase-js and @supabase/ssr may be added as runtime dependencies, and their actual versions may be selected only after that reconciliation. The later implementation may add a server-only Supabase identity client boundary and a server-session adapter implementing the existing ServerSessionSource contract. Authentication/session state remains only trusted opaque authentication subject-or-anonymous state and must not encode, infer, or authorize Founding Attorney status, regular-attorney status, private-beta status, launch cohort, public visibility, Live Now eligibility, client/attorney/staff business context, or marketplace eligibility. Those remain later Rosuno application/business states and may not become provider authentication roles, browser claims, session authority, or authentication-derived authorization shortcuts.",
+      "rationale": "The P0/P3 Identity Control Alignment prerequisite and P2-003 Security Shell are durably completed. Rosuno already has a generic trusted ServerSessionSource and fail-closed Security Shell, while locked authority separates provider authentication identity from Rosuno application User identity, principal/profile association, capability authorization, and business state. The smallest next P3 slice is therefore a server-only authentication/session adapter boundary, not signup, profiles, authorization policy, persistent application-session lifecycle, or marketplace onboarding. This preserves the existing generic security architecture while allowing a later separately authorized account/authentication workflow to build on a trusted identity source.",
+      "authority_refs": [
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION"],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-03T21:09:06Z",
+      "updated_at": "2026-10-03T21:09:06Z",
+      "supersedes": [],
+      "impact": "If later protected and accepted, this decision registers only the bounded P3 Authentication Session Foundation contract. It does not install packages, select package versions, create Supabase clients now, modify application code now, implement signup/sign-in/sign-out/recovery/verification, bind Rosuno User/profile/business state, write application_sessions, add capabilities/RLS/rate limits/MFA, create credentials or environment configuration, contact Supabase Auth, restore or mutate Staging, mutate any database, touch Production or OLD, alter P1-012, resolve G-1 through G-5 or F-01/F-02/F-03, or implement any Founding Attorney, regular-attorney, private-beta, survey, Arizona-page, onboarding, verification, pricing, availability, Live Now, marketplace-eligibility, or launch functionality. The Arizona launch strategy remains draft, noncanonical, and unlocked.",
+      "evidence": [
+        "Canonical protected main reconciled at 4eb637be072a3cd790ac018dcd9721c5774586f0 with tree 06824584a960d22a29bb17a1e3982def997b429b",
+        "WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT is completed in canonical governance",
+        "WI-P2-003-SECURITY-SHELL is completed in canonical governance",
+        "Current governance schema permits P0/P1/P2 priorities; WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION satisfies that controlled namespace without creating WI-P3-*",
+        "Current apps/web/package.json does not yet install @supabase/supabase-js or @supabase/ssr",
+        "Current P0 controls permit exactly @supabase/supabase-js and @supabase/ssr as the narrowly registered future P3 identity-provider runtime names",
+        "Current apps/web/src/application/session.ts exposes ServerSessionSource as a trusted server-side subject-or-null port and remains provider-independent",
+        "Current apps/web/src/application/security.ts consumes the generic ServerSessionSource and remains provider-independent",
+        "Registration candidate surface is exactly: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
+        "Later implementation surface is exactly: apps/web/package.json; pnpm-lock.yaml; apps/web/src/infrastructure/identity/supabase-server.ts; apps/web/src/infrastructure/identity/server-session-source.ts; apps/web/tests/authentication-session.test.mjs",
+        "Exact package versions and provider APIs are intentionally unresolved until a fresh read-only official provider/package reconciliation immediately before Gate 1 implementation",
+        "Founding Attorney, regular-attorney, private-beta, launch-cohort, visibility, Live Now, principal/business-context, and marketplace-eligibility state are explicitly excluded from authentication/session authority",
+        "The Arizona launch strategy is draft, noncanonical, and unlocked and supplies no authority to this work item"
+      ],
+      "expiry": null
     }
   ]
 }
