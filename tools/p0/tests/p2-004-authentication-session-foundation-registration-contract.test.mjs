@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
@@ -204,4 +205,161 @@ test("P2-004 Authentication Session Foundation registration remains bounded and 
   // - exact future dependency array shape beyond required prerequisites;
   // - global governance priority/schema evolution;
   // - future authorized apps/web package or source state.
+});
+
+const CORRECTION_DECISION_ID =
+  "DEC-20261004-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT-CORRECTION";
+const SECURITY_PATCH_WORK_ITEM_ID =
+  "WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH";
+const ORIGINAL_DECISION_JSON_SHA256 =
+  "91eab52b4a0728af0bd5a63a9f2b5455b230b5458ada0556129531c75d76b41e";
+
+const CORRECTED_IMPLEMENTATION_ENVELOPE = [
+  "apps/web/package.json",
+  "pnpm-lock.yaml",
+  "apps/web/proxy.ts",
+  "apps/web/src/infrastructure/identity/supabase-server.ts",
+  "apps/web/src/infrastructure/identity/server-session-source.ts",
+  "apps/web/tests/authentication-session.test.mjs",
+];
+
+test("P2-004 forward-only provider contract correction preserves history and enforces the corrected boundary", () => {
+  const decisions = readJson("governance/decision-log.json");
+  const workItems = readJson("governance/work-items/index.json");
+
+  const originalDecision = decisions.decisions.find(
+    (entry) => entry.decision_id === DECISION_ID,
+  );
+
+  const correctionMatches = decisions.decisions.filter(
+    (entry) => entry.decision_id === CORRECTION_DECISION_ID,
+  );
+
+  const item = workItems.work_items.find(
+    (entry) => entry.work_item_id === WORK_ITEM_ID,
+  );
+
+  const securityPatch = workItems.work_items.find(
+    (entry) => entry.work_item_id === SECURITY_PATCH_WORK_ITEM_ID,
+  );
+
+  assert.ok(originalDecision);
+  assert.equal(correctionMatches.length, 1);
+  assert.ok(item);
+  assert.ok(securityPatch);
+
+  const originalDecisionHash = createHash("sha256")
+    .update(JSON.stringify(originalDecision))
+    .digest("hex");
+
+  assert.equal(originalDecisionHash, ORIGINAL_DECISION_JSON_SHA256);
+  assert.equal(originalDecision.status, "accepted");
+  assert.ok(!originalDecision.decision.includes("apps/web/proxy.ts"));
+
+  const correction = correctionMatches[0];
+
+  assert.equal(correction.status, "accepted");
+  assert.deepEqual(correction.supersedes, []);
+  assert.deepEqual(correction.work_item_refs, [WORK_ITEM_ID]);
+  assert.deepEqual(correction.authority_refs, AUTHORITY_REFS);
+
+  assert.ok(item.decision_refs.includes(DECISION_ID));
+  assert.ok(item.decision_refs.includes(CORRECTION_DECISION_ID));
+  assert.ok(item.dependencies.includes(SECURITY_PATCH_WORK_ITEM_ID));
+  assert.equal(securityPatch.status, "completed");
+
+  const envelopePrefix =
+    "Corrected later application implementation surface limited to exactly: ";
+
+  const envelopeEntries = item.in_scope.filter((entry) =>
+    entry.startsWith(envelopePrefix),
+  );
+
+  assert.equal(envelopeEntries.length, 1);
+
+  assert.deepEqual(
+    envelopeEntries[0].slice(envelopePrefix.length).split("; "),
+    CORRECTED_IMPLEMENTATION_ENVELOPE,
+  );
+
+  assert.ok(
+    !item.acceptance_criteria.some((entry) =>
+      entry.includes("implementation envelope is exactly five paths"),
+    ),
+  );
+
+  const correctedContract = [
+    correction.scope,
+    correction.decision,
+    correction.rationale,
+    correction.impact,
+    ...correction.evidence,
+    item.objective,
+    ...item.in_scope,
+    ...item.out_of_scope,
+    ...item.acceptance_criteria,
+    item.rollback_reference,
+  ].join(" ");
+
+  for (const phrase of [
+    "@supabase/supabase-js ^2.117.2",
+    "@supabase/ssr ^0.12.7",
+    "createServerClient",
+    "getAll/setAll",
+    "getClaims()",
+    "claims.sub",
+    "getSession() must not establish trusted identity",
+    "request-cookie propagation",
+    "response-cookie propagation",
+    "cache-control",
+    "expires",
+    "pragma",
+    "P2-003 Security Shell remains the owner of authorization",
+    "opaque",
+    "fail",
+    "cross-request",
+    "zero-live-network",
+    "business-state",
+    "Gate 5 N/A",
+    "Gate 6 N/A",
+  ]) {
+    assert.ok(
+      correctedContract.includes(phrase),
+      "missing corrected contract phrase: " + phrase,
+    );
+  }
+
+  for (const prohibitedProxyUse of [
+    "redirects",
+    "route authorization",
+    "capability authorization",
+    "Rosuno business authorization",
+  ]) {
+    assert.ok(
+      correctedContract.includes(prohibitedProxyUse),
+      "missing Proxy prohibition: " + prohibitedProxyUse,
+    );
+  }
+
+  assert.ok(
+    item.out_of_scope.some((entry) =>
+      entry.includes("any second Proxy/helper file"),
+    ),
+  );
+
+  assert.ok(
+    item.validation_commands.includes(
+      "node --test tools/p0/tests/p0-nextjs-september-2026-security-patch-registration-contract.test.mjs",
+    ),
+  );
+
+  assert.deepEqual(item.release_refs, []);
+  assert.deepEqual(item.migration_refs, []);
+
+  // Intentionally does not freeze:
+  // - future rolling P2-004 status;
+  // - future additive decision references;
+  // - future additive prerequisites;
+  // - future package versions after separately authorized reconciliation;
+  // - future governance schema evolution.
 });
