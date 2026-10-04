@@ -1515,9 +1515,14 @@
       "objective": "Establish the smallest server-only P3 authentication/session integration boundary by later binding Supabase authentication identity into Rosuno's existing trusted ServerSessionSource without implementing account workflows, application User/profile binding, authorization business state, persistent application-session lifecycle, or marketplace/launch behavior.",
       "in_scope": [
         "Governance registration candidate surface limited to exactly: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
-        "Later application implementation surface limited to exactly: apps/web/package.json; pnpm-lock.yaml; apps/web/src/infrastructure/identity/supabase-server.ts; apps/web/src/infrastructure/identity/server-session-source.ts; apps/web/tests/authentication-session.test.mjs",
-        "Fresh read-only reconciliation against current official provider/package API documentation immediately before Gate 1 implementation; any required additional dependency, implementation path, or architectural change is a STOP requiring fresh Gate 0 reconciliation",
-        "Later addition of exactly @supabase/supabase-js and @supabase/ssr as runtime dependencies, with actual versions selected only after the required fresh provider/package reconciliation",
+        "Corrected later application implementation surface limited to exactly: apps/web/package.json; pnpm-lock.yaml; apps/web/proxy.ts; apps/web/src/infrastructure/identity/supabase-server.ts; apps/web/src/infrastructure/identity/server-session-source.ts; apps/web/tests/authentication-session.test.mjs",
+        "Forward-only correction candidate surface limited to exactly: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
+        "Later server-only Supabase identity client handling uses createServerClient from @supabase/ssr with current getAll/setAll cookie handling; no browser Supabase client is required in this slice",
+        "Later apps/web/proxy.ts is limited to Supabase authentication-session refresh via supabase.auth.getClaims(), request-cookie propagation, response-cookie propagation, and required cache-header propagation for cache-control, expires, and pragma when present; Proxy performs no redirects, route authorization, capability authorization, or Rosuno business authorization",
+        "Trusted identity is derived only from verified getClaims() claims.sub as Rosuno's opaque subject and fails closed on provider error, missing claims, missing/blank/non-string sub, or any unusable identity result; getSession() must not establish trusted identity",
+        "P2-003 Security Shell remains the owner of authorization; P2-004 authentication/session refresh and identity verification must not absorb authorization or business-state decisions",
+        "Fresh read-only official provider/package reconciliation remains required immediately before Gate 1 implementation to confirm the corrected package/API contract; any newly required dependency, path beyond the six-path envelope, or architecture change is a STOP requiring fresh Gate 0 reconciliation",
+        "Later runtime dependency targets are exactly @supabase/supabase-js ^2.117.2 and @supabase/ssr ^0.12.7; no package installation or package mutation occurs through this governance correction candidate",
         "Later server-only Supabase identity client boundary implemented only in apps/web/src/infrastructure/identity/supabase-server.ts",
         "Later server-session adapter implemented only in apps/web/src/infrastructure/identity/server-session-source.ts and conforming to the existing ServerSessionSource contract",
         "Authentication result exposed to the application session boundary only as an opaque trusted subject string or anonymous null state; no access token, refresh token, provider session object, credential, or authentication secret flows through application session state",
@@ -1530,10 +1535,10 @@
         "Targeted registration-contract validation followed by the complete canonical format, typecheck, build, P0, application-shell, secrets, dependency, and diff validation chain on stable registration-candidate bytes"
       ],
       "out_of_scope": [
-        "Any five-file P2-004 application implementation through this registration candidate",
-        "Any package installation or package-version selection through this registration candidate",
+        "Any P2-004 application implementation through this forward-only governance correction candidate",
+        "Any package installation or modification of apps/web/package.json or pnpm-lock.yaml through this governance correction candidate",
         "Account creation/signup, sign-in, sign-out, password recovery/reset, email verification, authentication UI, authentication forms, or authentication server actions",
-        "Supabase browser client, Proxy, middleware, route handlers, auth routes, auth pages, or client-side provider/session integration",
+        "Supabase browser client, any second Proxy/helper file, middleware, route handlers, auth routes, auth pages, client-side provider/session integration, login redirects, or route/business/capability authorization inside Proxy",
         "Creation or binding of a Rosuno public.users row, auth_user_id application mapping, Client Profile, Attorney Profile, Staff Profile, or any other profile/business principal association",
         "Capability database sources, capability grants, staff authorization implementation, resource authorization, or any client/attorney/staff business-context derivation from authentication",
         "application_sessions database writes, persistent session-lifecycle synchronization, auth_session_reference persistence, session revocation persistence, or session-bound marketplace behavior",
@@ -1562,20 +1567,22 @@
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
       ],
       "decision_refs": [
-        "DEC-20261003-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT"
+        "DEC-20261003-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT",
+        "DEC-20261004-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT-CORRECTION"
       ],
       "dependencies": [
         "WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT",
-        "WI-P2-003-SECURITY-SHELL"
+        "WI-P2-003-SECURITY-SHELL",
+        "WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH"
       ],
       "acceptance_criteria": [
         "The registration candidate changes exactly three authorized paths: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
         "The registration candidate performs no package installation, package-version selection, provider integration, application implementation, database/provider/environment mutation, or launch-strategy implementation",
         "WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION is registered with governance priority P2, environment development, and dependencies on WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT and WI-P2-003-SECURITY-SHELL",
         "governance/work-items/schema.json remains unchanged; this work item does not create or require a WI-P3-* governance priority namespace",
-        "The later P2-004 implementation envelope is exactly five paths: apps/web/package.json; pnpm-lock.yaml; apps/web/src/infrastructure/identity/supabase-server.ts; apps/web/src/infrastructure/identity/server-session-source.ts; apps/web/tests/authentication-session.test.mjs",
-        "The later runtime dependency expansion is limited to @supabase/supabase-js and @supabase/ssr; @supabase/auth-js and every other new package remain unauthorized",
-        "Before Gate 1 application implementation, current official provider/package API guidance must be reconciled read-only; versions and exact API usage are not guessed during registration, and any required additional dependency/path/architecture change causes STOP and fresh Gate 0 reconciliation",
+        "The corrected later P2-004 implementation envelope is exactly six paths: apps/web/package.json; pnpm-lock.yaml; apps/web/proxy.ts; apps/web/src/infrastructure/identity/supabase-server.ts; apps/web/src/infrastructure/identity/server-session-source.ts; apps/web/tests/authentication-session.test.mjs",
+        "The later runtime dependency targets are exactly @supabase/supabase-js ^2.117.2 and @supabase/ssr ^0.12.7; @supabase/auth-js and every other new package remain unauthorized",
+        "Before Gate 1 application implementation, current official provider/package guidance must be reconciled read-only again to confirm @supabase/supabase-js ^2.117.2, @supabase/ssr ^0.12.7, createServerClient getAll/setAll handling, Proxy refresh behavior, and getClaims() identity verification remain current; any required additional dependency, path beyond the six-path envelope, or architecture change causes STOP and fresh Gate 0 reconciliation",
         "apps/web/src/application/session.ts, apps/web/src/application/security.ts, and apps/web/tests/security-shell.test.mjs remain unchanged by P2-004 implementation unless a separately reconciled future contract explicitly authorizes otherwise",
         "Authentication exposes only an opaque trusted server-side subject or anonymous state through ServerSessionSource; browser-controlled identity assertions never become authoritative",
         "Authentication alone never establishes Rosuno application User identity, Founding Attorney status, regular-attorney status, private-beta status, launch cohort, public visibility, Live Now eligibility, client/attorney/staff business context, marketplace eligibility, or capability authorization",
@@ -1588,10 +1595,17 @@
         "All targeted tests and the complete canonical format, typecheck, build, P0, application-shell, secrets, dependency, and diff validation pass on stable registration-candidate bytes",
         "Gate 5 is N/A because this registration/application slice contains no migration or database candidate",
         "Gate 6 is N/A because this registration/application slice performs no persistent Staging application",
-        "Signup/sign-in/sign-out/recovery/verification, application User/profile binding, persistent application-session lifecycle, capabilities, RLS integration, abuse controls, stronger authentication, and later P3 functionality remain separate work items or separately authorized slices"
+        "Signup/sign-in/sign-out/recovery/verification, application User/profile binding, persistent application-session lifecycle, capabilities, RLS integration, abuse controls, stronger authentication, and later P3 functionality remain separate work items or separately authorized slices",
+        "The forward-only correction candidate changes exactly three authorized paths: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
+        "The original accepted DEC-20261003-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT remains byte-for-byte-equivalent at the parsed decision-object level and is preserved as historical evidence rather than rewritten",
+        "WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION remains approved, appends the correction decision reference, and includes completed dependency WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH",
+        "apps/web/proxy.ts is authorized later only for Supabase session refresh plus request-cookie, response-cookie, and required cache-header propagation; authorization remains owned by P2-003",
+        "The later server provider boundary uses createServerClient with current getAll/setAll cookie handling and trusts identity only through verified supabase.auth.getClaims() claims.sub; getSession() never establishes trusted identity",
+        "No second Supabase Proxy/helper path is introduced; the corrected implementation envelope remains exactly six paths"
       ],
       "validation_commands": [
         "node --test tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
+        "node --test tools/p0/tests/p0-nextjs-september-2026-security-patch-registration-contract.test.mjs",
         "node --test tools/p0/tests/p0-p3-identity-control-alignment-registration-contract.test.mjs",
         "node --test tools/p0/tests/p2-001-registration-contract.test.mjs",
         "node --test tools/p0/tests/p2-002-registration-contract.test.mjs",
@@ -1611,7 +1625,7 @@
       "migration_refs": [],
       "rollback_reference": "Repository-only P2-004 registration contract. Before protected acceptance, the local registration candidate may be discarded without modifying canonical main or any application/provider/database/environment state. After protected acceptance, corrections are forward-only and must preserve historical accepted evidence. No database rollback applies.",
       "created_at": "2026-10-03T21:09:06Z",
-      "updated_at": "2026-10-03T21:09:06Z"
+      "updated_at": "2026-10-04T05:49:46Z"
     },
     {
       "work_item_id": "WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH",

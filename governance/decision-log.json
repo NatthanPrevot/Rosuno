@@ -1160,6 +1160,47 @@
         "P2-004 remains separate and unchanged; this closure does not authorize P2-004 correction or implementation, additional dependency changes, application/configuration changes, provider/database/environment work, Staging, Production, OLD, P1-012, G-1 through G-5, F-01/F-02/F-03, or draft Arizona launch-strategy functionality"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261004-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT-CORRECTION",
+      "title": "Correct P2-004 Authentication Session Foundation provider contract",
+      "status": "accepted",
+      "scope": "Forward-only governance correction only for the already accepted P2-004 Authentication Session Foundation contract after the contract's mandatory current-provider reconciliation identified a required Next.js Proxy path and current Supabase SSR identity/session requirements. This correction changes only the rolling P2-004 governance contract and its existing registration-contract test. It performs no package installation, application implementation, publication, PR, review, merge, provider/database/environment action, or later lifecycle gate.",
+      "decision": "Preserve DEC-20261003-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT unchanged as historical accepted evidence. Correct the rolling WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION contract by adding completed prerequisite WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH and changing the later implementation envelope from five paths to exactly six paths by adding apps/web/proxy.ts. The later runtime dependency targets are @supabase/supabase-js ^2.117.2 and @supabase/ssr ^0.12.7. The later Supabase server boundary must use createServerClient with current getAll/setAll cookie handling. Proxy is limited to authentication-session refresh through supabase.auth.getClaims(), request-cookie propagation, response-cookie propagation, and required cache-header propagation; it must not perform redirects, route authorization, capability authorization, or Rosuno business authorization. Trusted Rosuno authentication identity is only verified claims.sub exposed as an opaque subject and fails closed on provider error, absent/unusable claims, or absent/unusable sub. getSession() must not establish trusted identity. P2-003 remains the owner of authorization. Preserve the existing opaque-subject, fail-closed, no-token-leak, no-cross-request-global-cache, synthetic zero-live-network-test, business-state-neutrality, Gate 5 N/A, and Gate 6 N/A boundaries.",
+      "rationale": "The original P2-004 decision intentionally required STOP and fresh Gate 0 reconciliation if current provider guidance required an additional dependency, path, or architectural change. After the separate Next.js 16.3.8 security prerequisite completed, fresh official Supabase SSR guidance confirmed that Next.js Server Components cannot write refreshed Auth cookies and requires a Next.js Proxy for session refresh. Current guidance uses getClaims() for trusted identity/session refresh, requires request and response cookie propagation, requires refreshed cache headers to survive response replacement, and warns against trusting getSession() as server-side identity verification. The smallest authority-consistent correction is therefore a forward-only six-path contract without adding a second provider helper path or moving authorization into Proxy.",
+      "authority_refs": [
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION"],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-04T05:49:46Z",
+      "updated_at": "2026-10-04T05:49:46Z",
+      "supersedes": [],
+      "impact": "If later protected and accepted, this correction governs only the future bounded P2-004 application implementation contract. It does not itself install @supabase packages, modify apps/web/package.json or pnpm-lock.yaml, create apps/web/proxy.ts or any application source/test file, implement authentication UI or account workflows, alter P2-003 authorization ownership, create credentials/secrets, contact or mutate Supabase Auth or any database/environment, touch Staging/Production/OLD, alter P1-012, resolve G-1 through G-5 or F-01/F-02/F-03, or implement Founding Attorney, beta, survey, Arizona-page, onboarding, verification, pricing, availability, Live Now, marketplace, visibility, launch, or other draft Arizona launch-strategy functionality.",
+      "evidence": [
+        "Canonical protected main reconciled immediately before correction recovery authorization at cdf79f7e5e59aeef890b66122663e0c26443ef7e with tree cffd14a964cbd1569323e3d4c6c407472fc20f89",
+        "WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH is completed in canonical governance and apps/web currently targets Next.js ^16.3.8",
+        "WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION remains approved and the original DEC-20261003-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT remains accepted",
+        "Recovery reuses the existing local p2-004-authentication-session-foundation-contract-correction branch only after proving it is still at the authorized base with zero commits ahead and zero staged changes; the failed uncommitted three-file attempt is restored to exact base bytes before rebuilding",
+        "The correction branch remains absent remotely and no publication is authorized through this candidate",
+        "Current official Supabase SSR guidance requires Proxy for Next.js Server Components because refreshed Auth cookies cannot be written there directly",
+        "Current official Supabase SSR guidance requires supabase.auth.getClaims() for Proxy session refresh and trusted server identity rather than trusting getSession()",
+        "Current official Supabase SSR guidance requires refreshed request cookies, response cookies, and cache-control/expires/pragma headers to be preserved when a replacement response is returned",
+        "Current Supabase getClaims documentation distinguishes cached JWKS verification for asymmetric signing keys from Auth-server validation for symmetric-key projects, so production getClaims() is not characterized as universally network-free",
+        "Current stable package targets reconciled as @supabase/supabase-js ^2.117.2 and @supabase/ssr ^0.12.7",
+        "Rosuno apps/web uses a root-level app directory, making apps/web/proxy.ts the bounded Next.js Proxy entrypoint for this corrected implementation envelope",
+        "Correction candidate surface is exactly governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
+        "No browser Supabase client or second Proxy/helper file is required by this bounded P2-004 slice"
+      ],
+      "expiry": null
     }
   ]
 }
