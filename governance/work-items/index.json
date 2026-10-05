@@ -1552,7 +1552,7 @@
         "Publication, push, pull request creation, protected review, merge, branch deletion, persistent environment application, or any later lifecycle gate",
         "Replit Agent or Replit AI"
       ],
-      "status": "approved",
+      "status": "completed",
       "owner": "Rosuno P2-004 implementation owner",
       "reviewer": {
         "identity": "Rosuno",
@@ -1568,7 +1568,8 @@
       ],
       "decision_refs": [
         "DEC-20261003-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT",
-        "DEC-20261004-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT-CORRECTION"
+        "DEC-20261004-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT-CORRECTION",
+        "DEC-20261005-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CLOSURE"
       ],
       "dependencies": [
         "WI-P0-P3-IDENTITY-CONTROL-ALIGNMENT",
@@ -1601,7 +1602,19 @@
         "WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION remains approved, appends the correction decision reference, and includes completed dependency WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH",
         "apps/web/proxy.ts is authorized later only for Supabase session refresh plus request-cookie, response-cookie, and required cache-header propagation; authorization remains owned by P2-003",
         "The later server provider boundary uses createServerClient with current getAll/setAll cookie handling and trusts identity only through verified supabase.auth.getClaims() claims.sub; getSession() never establishes trusted identity",
-        "No second Supabase Proxy/helper path is introduced; the corrected implementation envelope remains exactly six paths"
+        "No second Supabase Proxy/helper path is introduced; the corrected implementation envelope remains exactly six paths",
+        "P2-004 implementation candidate 3501144892bdbae966f2651cfeedcd8301ce848b has sole parent 6da8d5ef5d8a3527e97c2819dda56279b481f80f and tree 3d972965945a378948344bf5273769460f17e79d",
+        "Implementation scope was exactly 6 authorized paths: apps/web/package.json; pnpm-lock.yaml; apps/web/proxy.ts; apps/web/src/infrastructure/identity/supabase-server.ts; apps/web/src/infrastructure/identity/server-session-source.ts; apps/web/tests/authentication-session.test.mjs",
+        "GitHub PR #65 received designated Rosuno approval review 5410215796 (PRR_kwDOUHT1sc8AAAABQnlXdA) at 2026-10-05T05:12:30Z on exact candidate head 3501144892bdbae966f2651cfeedcd8301ce848b",
+        "P0 control foundation run #130 (37266082114) succeeded on exact candidate head 3501144892bdbae966f2651cfeedcd8301ce848b",
+        "PR #65 merged through merge commit 54e03938d15e14f3b4c45f46d874d9fd12c21ef0 at 2026-10-05T05:44:29Z",
+        "Merge 54e03938d15e14f3b4c45f46d874d9fd12c21ef0 has ordered parents 6da8d5ef5d8a3527e97c2819dda56279b481f80f then 3501144892bdbae966f2651cfeedcd8301ce848b and tree 3d972965945a378948344bf5273769460f17e79d",
+        "Post-merge P0 control foundation run #131 (37269121649) succeeded on canonical main 54e03938d15e14f3b4c45f46d874d9fd12c21ef0",
+        "Gate 5 is N/A because P2-004 contains no migration or database candidate",
+        "Gate 6 is N/A because P2-004 contains no persistent Staging application",
+        "Gate 7 closure candidate surface is exactly 3 authorized paths: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
+        "DEC-20261003-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT and DEC-20261004-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT-CORRECTION remain accepted and preserved as historical evidence",
+        "No application/package/provider/database/environment/Arizona-launch mutation occurs through this Gate 7 closure; later authentication/account/profile/capability/business-state work remains separate"
       ],
       "validation_commands": [
         "node --test tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
@@ -1623,9 +1636,9 @@
       "environment": "development",
       "release_refs": [],
       "migration_refs": [],
-      "rollback_reference": "Repository-only P2-004 registration contract. Before protected acceptance, the local registration candidate may be discarded without modifying canonical main or any application/provider/database/environment state. After protected acceptance, corrections are forward-only and must preserve historical accepted evidence. No database rollback applies.",
+      "rollback_reference": "Repository-only P2-004 Authentication Session Foundation lifecycle closure. Before protected acceptance, the Gate 7 closure candidate may be discarded without altering the already-merged P2-004 implementation. After protected acceptance, any correction is forward-only and must preserve the original contract, forward-only correction, implementation, and closure history. No database rollback applies.",
       "created_at": "2026-10-03T21:09:06Z",
-      "updated_at": "2026-10-04T05:49:46Z"
+      "updated_at": "2026-10-05T13:37:55Z"
     },
     {
       "work_item_id": "WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH",

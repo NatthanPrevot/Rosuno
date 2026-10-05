@@ -1201,6 +1201,49 @@
         "No browser Supabase client or second Proxy/helper file is required by this bounded P2-004 slice"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261005-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CLOSURE",
+      "title": "Close P2-004 Authentication Session Foundation implementation lifecycle",
+      "status": "accepted",
+      "scope": "Retrospective governance-only Gate 7 lifecycle closure for the already registered, forward-only corrected, implemented, protected-reviewed, merged, and post-merge-validated P2-004 Authentication Session Foundation. Records exact implementation lifecycle truth, Gate 5/6 N/A determinations, the six-path canonical implementation scope, and completion state. Preserves the original contract and forward-only correction as historical accepted evidence. This local closure candidate must itself complete Gate 1 local validation, Gate 2A publication, Gate 2B pull request creation, Gate 3 protected review/CI, and Gate 4 merge before the closure becomes canonical. It authorizes no application/package/provider/database/environment/Arizona-launch or later authentication/business functionality.",
+      "decision": "Record WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION as completed after exact implementation candidate 3501144892bdbae966f2651cfeedcd8301ce848b, designated Rosuno approval on PR #65, successful exact-head P0 control foundation run #130, merge-commit integration 54e03938d15e14f3b4c45f46d874d9fd12c21ef0, and successful post-merge P0 control foundation run #131. Preserve the exact six-path implementation scope and preserve DEC-20261003-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT plus DEC-20261004-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT-CORRECTION unchanged as historical evidence. Record Gate 5 as N/A because no migration or database candidate exists and Gate 6 as N/A because no persistent Staging application exists. No additional authentication workflow, application User/profile binding, capability/business authorization, provider/database/environment action, Arizona-launch implementation, or later roadmap work is authorized by this closure.",
+      "rationale": "The corrected bounded P2-004 implementation has completed its protected repository lifecycle: exact local validation and hash freeze, one implementation candidate commit, publication, PR #65, designated Rosuno approval on the exact candidate head, successful exact-head CI, merge-commit integration onto protected main, and successful post-merge CI. Canonical governance still records WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION as approved rather than completed. Durable Gate 7 closure is required so canonical governance matches the completed lifecycle while retaining both prior accepted P2-004 decisions as forward-only historical evidence and preserving the boundary between authentication/session identity and later account, profile, capability, business-state, provider, database, environment, and Arizona-launch work.",
+      "authority_refs": [
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION"],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-05T13:37:55Z",
+      "updated_at": "2026-10-05T13:37:55Z",
+      "supersedes": [],
+      "impact": "Durably records completion of the already-merged P2-004 Authentication Session Foundation lifecycle only. It does not modify application or package implementation bytes, change the six-path canonical implementation, add or modify dependencies, create authentication/account/profile/capability/business functionality, create credentials or secrets, contact or mutate Supabase or any other provider, query or mutate any database, modify any environment, touch Staging/Production/OLD, alter P1-012, resolve G-1 through G-5 or F-01/F-02/F-03, classify or activate Arizona, implement any draft Arizona launch-strategy functionality, or authorize later roadmap work.",
+      "evidence": [
+        "Retrospective governance closure record for WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION; canonical closure is created only after the corrected application implementation completed its protected repository lifecycle",
+        "Original accepted DEC-20261003-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT remains preserved as historical evidence",
+        "Forward-only accepted DEC-20261004-P2-004-AUTHENTICATION-SESSION-FOUNDATION-CONTRACT-CORRECTION remains preserved as historical evidence",
+        "P2-004 implementation candidate 3501144892bdbae966f2651cfeedcd8301ce848b has sole parent 6da8d5ef5d8a3527e97c2819dda56279b481f80f and tree 3d972965945a378948344bf5273769460f17e79d",
+        "Implementation scope was exactly 6 authorized paths: apps/web/package.json; pnpm-lock.yaml; apps/web/proxy.ts; apps/web/src/infrastructure/identity/supabase-server.ts; apps/web/src/infrastructure/identity/server-session-source.ts; apps/web/tests/authentication-session.test.mjs",
+        "GitHub PR #65 reviewed exact head 3501144892bdbae966f2651cfeedcd8301ce848b against base 6da8d5ef5d8a3527e97c2819dda56279b481f80f",
+        "Rosuno review 5410215796 (PRR_kwDOUHT1sc8AAAABQnlXdA) APPROVED at 2026-10-05T05:12:30Z on exact head 3501144892bdbae966f2651cfeedcd8301ce848b",
+        "GitHub Actions P0 control foundation run #130 (37266082114) succeeded on 3501144892bdbae966f2651cfeedcd8301ce848b",
+        "GitHub PR #65 merged as 54e03938d15e14f3b4c45f46d874d9fd12c21ef0 at 2026-10-05T05:44:29Z",
+        "Merge 54e03938d15e14f3b4c45f46d874d9fd12c21ef0 has ordered parents 6da8d5ef5d8a3527e97c2819dda56279b481f80f then 3501144892bdbae966f2651cfeedcd8301ce848b and tree 3d972965945a378948344bf5273769460f17e79d",
+        "GitHub Actions P0 control foundation post-merge run #131 (37269121649) succeeded on canonical main 54e03938d15e14f3b4c45f46d874d9fd12c21ef0",
+        "Gate 5 N/A — repository-only P2-004 Authentication Session Foundation work; no migration or database candidate exists",
+        "Gate 6 N/A — no persistent Staging application exists for P2-004",
+        "Gate 7 closure candidate surface is exactly 3 authorized paths: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p2-004-authentication-session-foundation-registration-contract.test.mjs",
+        "No application/package/provider/database/environment/Arizona-launch changes are authorized by this closure; later authentication/account/profile/capability/business-state work remains separate"
+      ],
+      "expiry": null
     }
   ]
 }
