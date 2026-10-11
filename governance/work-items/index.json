@@ -1743,6 +1743,81 @@
       "rollback_reference": "Repository-only Gate 7 lifecycle closure. Before protected acceptance, the local closure candidate may be discarded without altering the already-merged Next.js 16.3.8 security-patch implementation. After protected acceptance, any correction is forward-only and must not rewrite protected history or historical security-patch evidence. No database rollback applies.",
       "created_at": "2026-10-03T23:30:58Z",
       "updated_at": "2026-10-04T03:00:14Z"
+    },
+    {
+      "work_item_id": "WI-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION",
+      "title": "Next.js transitive dependency security correction",
+      "objective": "Register, as a distinct repository-only P0 security-correction item, the smallest bounded forward-only correction of two vulnerable resolved transitive dependencies in pnpm-lock.yaml: source-map-js 1.2.1 to 1.2.2 (GHSA-68fv-2mgg-jv7q) and sharp 0.35.4 to 0.35.5 (GHSA-wq5f-xc86-pv6w), without broad framework or application changes. This item is not a repeat of completed WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH.",
+      "in_scope": [
+        "Candidate surface limited to exactly four writable repository paths: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p0-nextjs-transitive-dependency-security-correction-registration-contract.test.mjs; pnpm-lock.yaml",
+        "Forward-only governance decision DEC-20261010-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION preserving every prior decision",
+        "Registration of this work item with exact scope, dependencies, and acceptance requirements, preserving every existing work item",
+        "Bounded registration and security-contract coverage only, in the single registration-contract test path",
+        "pnpm-lock.yaml changes limited to source-map-js 1.2.2, sharp 0.35.5, and only sharp@0.35.5's independently verified dependency closure: 16 identified @img/sharp-* packages at 0.35.5 (including @img/sharp-wasm32) and 10 identified @img/sharp-libvips-* packages at 1.3.4, each conditional on authoritative version-specific dependency metadata, including only their required dependency edges, published integrity values, snapshots, and strictly required lockfile bookkeeping after independent resolver review; no other package identity or version is permitted",
+        "Reconfirmation of the actual local lockfile and transitive dependency graph on the work-item branch before any lockfile mutation",
+        "Human-only lockfile resolution by the owner after independent review and separate Shell authorization; the historically selected resolver was pnpm 10.26.1 but the exact lockfile-only operation remains unnamed until verified against the current package manager and transitive constraints",
+        "Human-only validation envelope contingent on live package.json script inspection, each command requiring exact reviewed bytes and separate authorization",
+        "Repository-only lifecycle; no database, Staging, OLD, or Production contact"
+      ],
+      "out_of_scope": [
+        "Any modification of apps/web/package.json, root or other package manifests, Next.js, PostCSS, React, UI, authentication, or business code",
+        "Any package or version change beyond source-map-js 1.2.1 to 1.2.2, sharp 0.35.4 to 0.35.5, the identified 16 @img/sharp-* packages targeting 0.35.5, and the identified 10 @img/sharp-libvips-* packages targeting 1.3.4; all coupled packages, dependency edges, integrity values and lockfile bookkeeping must be independently verified against authoritative version-specific metadata; if another package, version, repository path, or unexplained lockfile change is required, STOP and return to the Primary for a new bounded scope decision",
+        "Any version bump or dependency mutation that is guessed rather than independently verified",
+        "Any package installation that runs scripts without explicit impact review, including the historical preinstall script that removes competing lockfiles",
+        "Silent manual editing of unrelated generated lockfile metadata",
+        "Git configuration, historical migrations, database objects, .rosuno/, rosuno-authority/, credentials, secrets, or the preserved interrupted P0-P3 candidate",
+        "Any database, Staging, OLD, or Production contact, provider contact, or environment mutation",
+        "Builder execution of shell commands, tests, dependency resolution, Git operations, or any MCP, plugin, workflow, agent, or alternate command route",
+        "Resolution of G-1 through G-5 or F-01/F-02/F-03, or any later work item",
+        "Staging, publication, pull request creation, protected review, merge, or any later lifecycle gate without its own separate authorization"
+      ],
+      "status": "approved",
+      "owner": "Rosuno P0 control owner",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "priority": "P0",
+      "authority_refs": [
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20261010-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "The candidate changes exactly four authorized paths: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p0-nextjs-transitive-dependency-security-correction-registration-contract.test.mjs; pnpm-lock.yaml",
+        "WI-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION is registered with priority P0, environment development, and status approved, and is not marked completed",
+        "The decision log gains exactly one new forward-only record and every prior decision and work item remains unchanged",
+        "The local pnpm-lock.yaml and transitive graph are reconfirmed on the work-item branch before mutation",
+        "pnpm-lock.yaml resolves source-map-js to 1.2.2 and sharp to 0.35.5, replacing 1.2.1 and 0.35.4; the exact sharp@0.35.5 closure contains only the independently verified 16 @img/sharp-* packages at 0.35.5 and 10 @img/sharp-libvips-* packages at 1.3.4, together with their authoritative registry integrity values, required dependency edges, snapshots and strictly required lockfile bookkeeping changes, with no unrelated lockfile churn",
+        "apps/web/package.json, root and other manifests, Next.js, PostCSS, React, and all application, UI, authentication, and business code remain unchanged",
+        "The registration-contract test is limited to bounded registration and security-contract coverage",
+        "The exact lockfile resolution procedure is independently reviewed and executed only by the owner as a separately authorized human-only Shell step; the Builder executes no shell, test, or dependency command",
+        "The human-only validation envelope covers the targeted registration test, exact lockfile dependency proof for source-map-js 1.2.2 and sharp 0.35.5, format, typecheck, build, P0 validate and test, secrets check, dependency and security audit, git diff --check, exact four-path diff with no unexpected untracked or generated output, and Fast-Control freeze, tree, and commit proof",
+        "Gate 5 is N/A because this repository-only work item contains no migration or database candidate",
+        "Gate 6 is N/A because this repository-only work item performs no persistent Staging application",
+        "Staging, Production, OLD, provider, and database contact do not occur",
+        "Dependency resolution, validation, Git staging, commit, publication, pull request, protected review, merge, and closure each remain separately authorized, human-gated steps"
+      ],
+      "validation_commands": [
+        "node --test tools/p0/tests/p0-nextjs-transitive-dependency-security-correction-registration-contract.test.mjs",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "development",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository-only candidate. Before protected acceptance, the local candidate may be discarded without altering canonical main. After protected acceptance, any correction is forward-only and must not rewrite protected history or historical security-patch evidence. No database rollback applies.",
+      "created_at": "2026-10-10T06:24:07Z",
+      "updated_at": "2026-10-10T08:23:40Z"
     }
   ]
 }
