@@ -1771,7 +1771,7 @@
         "Resolution of G-1 through G-5 or F-01/F-02/F-03, or any later work item",
         "Staging, publication, pull request creation, protected review, merge, or any later lifecycle gate without its own separate authorization"
       ],
-      "status": "approved",
+      "status": "completed",
       "owner": "Rosuno P0 control owner",
       "reviewer": {
         "identity": "Rosuno",
@@ -1783,7 +1783,8 @@
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
       ],
       "decision_refs": [
-        "DEC-20261010-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION"
+        "DEC-20261010-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION",
+        "DEC-20261011-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION-CLOSURE"
       ],
       "dependencies": [],
       "acceptance_criteria": [
@@ -1799,7 +1800,15 @@
         "Gate 5 is N/A because this repository-only work item contains no migration or database candidate",
         "Gate 6 is N/A because this repository-only work item performs no persistent Staging application",
         "Staging, Production, OLD, provider, and database contact do not occur",
-        "Dependency resolution, validation, Git staging, commit, publication, pull request, protected review, merge, and closure each remain separately authorized, human-gated steps"
+        "Dependency resolution, validation, Git staging, commit, publication, pull request, protected review, merge, and closure each remain separately authorized, human-gated steps",
+        "Gate 7 closure applies only to governance/decision-log.json and governance/work-items/index.json; all original implementation paths and historical records remain unchanged.",
+        "R5 targeted registration-contract test and canonical Fast-Control validation passed; R6 committed exact four-path tree 53f71857fd83d85877813ddd6f79005f381e83ed at head 9fdc530772eed038d8b40973e764a8a9a0f25a95.",
+        "GitHub PR #67 reviewed the exact head 9fdc530772eed038d8b40973e764a8a9a0f25a95 against base 80f88a3d498917ce84cea67246c1af069991be27; designated Rosuno review PRR_kwDOUHT1sc8AAAABRrey_g was APPROVED at 2026-10-11T00:58:57Z.",
+        "GitHub Actions pull-request P0 control foundation run #134 (38100120071) succeeded on the approved head; the owner reported independent Backup audit PASS.",
+        "PR #67 merged at 2026-10-11T01:02:31Z into canonical main d159d5f7e7ca1baaa5fa4e7b6661e19d7d90d2f8 with ordered parents 80f88a3d498917ce84cea67246c1af069991be27 and 9fdc530772eed038d8b40973e764a8a9a0f25a95.",
+        "Merge commit d159d5f7e7ca1baaa5fa4e7b6661e19d7d90d2f8 has tree 53f71857fd83d85877813ddd6f79005f381e83ed, exactly equal to the R6 validated tree.",
+        "GitHub Actions post-merge push P0 control foundation run 38100477671 succeeded on canonical main d159d5f7e7ca1baaa5fa4e7b6661e19d7d90d2f8.",
+        "Gate 5 and Gate 6 remain N/A; closure performs no dependency resolution, package or application modification, provider/database/environment contact, Staging, Production, OLD or later work."
       ],
       "validation_commands": [
         "node --test tools/p0/tests/p0-nextjs-transitive-dependency-security-correction-registration-contract.test.mjs",
@@ -1815,9 +1824,9 @@
       "environment": "development",
       "release_refs": [],
       "migration_refs": [],
-      "rollback_reference": "Repository-only candidate. Before protected acceptance, the local candidate may be discarded without altering canonical main. After protected acceptance, any correction is forward-only and must not rewrite protected history or historical security-patch evidence. No database rollback applies.",
+      "rollback_reference": "Repository-only Gate 7 governance closure. Before protected acceptance, the local two-file closure candidate may be discarded without altering the already-merged P0 transitive dependency security correction. After protected acceptance, any further correction must be forward-only and must not rewrite protected history or prior security evidence. No database rollback applies.",
       "created_at": "2026-10-10T06:24:07Z",
-      "updated_at": "2026-10-10T08:23:40Z"
+      "updated_at": "2026-10-11T01:12:36Z"
     }
   ]
 }

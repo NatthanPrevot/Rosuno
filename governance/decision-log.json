@@ -1277,6 +1277,44 @@
         "Gate 6 N/A — no persistent Staging application exists for this work item"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261011-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION-CLOSURE",
+      "title": "Close Next.js transitive dependency security correction lifecycle",
+      "status": "accepted",
+      "scope": "Retrospective repository-only Gate 7 governance closure for the already validated, protected-reviewed, merged and post-merge-verified WI-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION. The closure candidate is limited to governance/decision-log.json and governance/work-items/index.json; no package, application, migration, database, provider or environment mutation is authorized.",
+      "decision": "Record WI-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION as completed following successful R5 validation, R6 exact-tree commit, GitHub PR #67 CI, designated Rosuno approval, merge-commit integration and successful post-merge CI. Preserve all prior decisions and work items. Gate 5 is N/A because no migration or database candidate exists; Gate 6 is N/A because no persistent Staging application exists.",
+      "rationale": "The transitive security correction is present on canonical GitHub main following PR #67, with the approved four-path scope, exact validated tree, two-parent merge and successful post-merge GitHub Actions run. Canonical governance still records the work item as approved. A forward-only Gate 7 record is needed to align the durable work-item status with the completed repository lifecycle without altering implementation evidence.",
+      "authority_refs": [
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": [
+        "WI-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION"
+      ],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-11T01:12:36Z",
+      "updated_at": "2026-10-11T01:12:36Z",
+      "supersedes": [],
+      "impact": "Records completion of this repository-only P0 transitive dependency security correction. The already-merged implementation and all historical governance, Next.js September 2026 security-patch evidence, application/manifests, migrations, locked authorities and Builder controls remain unchanged. No Staging, Production, OLD, Supabase, provider or database contact; no branch deletion or later work is authorized by this closure.",
+      "evidence": [
+        "R5 human-only targeted registration test and canonical Fast-Control validation passed on the exact four-file candidate; prior execution and STOP evidence remain preserved.",
+        "R6 local implementation commit 9fdc530772eed038d8b40973e764a8a9a0f25a95 has sole parent 80f88a3d498917ce84cea67246c1af069991be27 and VALIDATED_TREE 53f71857fd83d85877813ddd6f79005f381e83ed.",
+        "Implementation scope was exactly four paths: governance/decision-log.json; governance/work-items/index.json; pnpm-lock.yaml; tools/p0/tests/p0-nextjs-transitive-dependency-security-correction-registration-contract.test.mjs",
+        "GitHub PR #67 reviewed exact head 9fdc530772eed038d8b40973e764a8a9a0f25a95 against base 80f88a3d498917ce84cea67246c1af069991be27; the owner reported independent Backup review PASS.",
+        "Rosuno review PRR_kwDOUHT1sc8AAAABRrey_g APPROVED at 2026-10-11T00:58:57Z on PR #67's unchanged head.",
+        "GitHub Actions P0 control foundation pull-request run #134 (38100120071) succeeded on exact implementation head 9fdc530772eed038d8b40973e764a8a9a0f25a95.",
+        "GitHub PR #67 merged at 2026-10-11T01:02:31Z through merge commit d159d5f7e7ca1baaa5fa4e7b6661e19d7d90d2f8.",
+        "Merge d159d5f7e7ca1baaa5fa4e7b6661e19d7d90d2f8 has ordered parents 80f88a3d498917ce84cea67246c1af069991be27 and 9fdc530772eed038d8b40973e764a8a9a0f25a95; its tree equals validated tree 53f71857fd83d85877813ddd6f79005f381e83ed.",
+        "GitHub Actions P0 control foundation post-merge push run 38100477671 succeeded on canonical main d159d5f7e7ca1baaa5fa4e7b6661e19d7d90d2f8.",
+        "Canonical pnpm-lock.yaml resolves source-map-js 1.2.2 and sharp 0.35.5 with the approved Sharp platform closure: 16 @img/sharp-* at 0.35.5 and 10 @img/sharp-libvips-* at 1.3.4; manifests and application files were not modified by PR #67.",
+        "Gate 5 N/A: no migration or database candidate. Gate 6 N/A: no persistent Staging application."
+      ],
+      "expiry": null
     }
   ]
 }
