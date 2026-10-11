@@ -1244,6 +1244,39 @@
         "No application/package/provider/database/environment/Arizona-launch changes are authorized by this closure; later authentication/account/profile/capability/business-state work remains separate"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261010-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION",
+      "title": "Correct vulnerable Next.js transitive dependency resolutions",
+      "status": "accepted",
+      "scope": "Controlled P0 repository-only work item. Bounded to registering the transitive dependency security issue and correcting the two identified vulnerable resolved versions in pnpm-lock.yaml. No broad framework or application changes.",
+      "decision": "Register WI-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION as a distinct P0 item, not a repeat of completed WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH. Correct the resolved transitive dependencies source-map-js 1.2.1 to 1.2.2 and sharp 0.35.4 to 0.35.5 through the smallest forward-only change. The implementation envelope is exactly four paths: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p0-nextjs-transitive-dependency-security-correction-registration-contract.test.mjs; pnpm-lock.yaml. Preserve every prior decision unchanged.",
+      "rationale": "Public primary advisories GHSA-68fv-2mgg-jv7q (source-map-js below 1.2.2) and GHSA-wq5f-xc86-pv6w (sharp below 0.35.5) list 1.2.2 and 0.35.5 as the patched versions, and the verified canonical pnpm-lock.yaml historically resolved the older versions. This supports the version targets only; it is not a package-registry or integrity check. The local lockfile and transitive graph must be reconfirmed on the work-item branch before any lockfile mutation.",
+      "authority_refs": [
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "work_item_refs": [
+        "WI-P0-NEXTJS-TRANSITIVE-DEPENDENCY-SECURITY-CORRECTION"
+      ],
+      "owner": "Rosuno Primary Thinker",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-10T06:24:07Z",
+      "updated_at": "2026-10-10T06:24:07Z",
+      "supersedes": [],
+      "impact": "Registers the bounded P0 repository candidate only. Dependency resolution, validation, Git staging/commit/publication, protected review/merge, and closure remain separately authorized, human-gated steps. It does not itself modify pnpm-lock.yaml, apps/web/package.json, any manifest, Next.js, PostCSS, React, UI/auth/business code, migrations, database objects, credentials, or the environment. It does not touch Staging, Production, or OLD, does not resolve G-1 through G-5 or F-01/F-02/F-03, and authorizes no later work.",
+      "evidence": [
+        "Canonical GitHub main last verified read-only on 2026-10-10 UTC at 80f88a3d498917ce84cea67246c1af069991be27 after P2-004 Gate 7 PR #66",
+        "Distinct from completed WI-P0-NEXTJS-SEPTEMBER-2026-SECURITY-PATCH, which remains unchanged",
+        "Public advisories corroborate the version targets: GHSA-68fv-2mgg-jv7q (source-map-js 1.2.2) and GHSA-wq5f-xc86-pv6w (sharp 0.35.5)",
+        "Candidate surface is exactly 4 authorized paths: governance/decision-log.json; governance/work-items/index.json; tools/p0/tests/p0-nextjs-transitive-dependency-security-correction-registration-contract.test.mjs; pnpm-lock.yaml",
+        "Gate 5 N/A — repository-only work item; no migration or database candidate exists",
+        "Gate 6 N/A — no persistent Staging application exists for this work item"
+      ],
+      "expiry": null
     }
   ]
 }
