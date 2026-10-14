@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(/docs/work-items/**)", "Edit(/rosuno-authority/**)", "Edit(/.github/**)", "Edit(/.claude/**)",
+      "Edit(/CLAUDE.md)", "Edit(/docs/process/**)", "Edit(/.gitmodules)",
+      "Edit(/supabase/config.toml)", "Edit(/supabase/seed.sql)", "Edit(/supabase/seeds/**)",
+      "Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)",
+      "Bash(git push --force*)", "Bash(git push -f*)", "Bash(git push --delete*)", "Bash(git commit --amend*)",
+      "Bash(git rebase *)", "Bash(git reset --hard*)", "Bash(git filter-*)", "Bash(git submodule *)",
+      "Bash(supabase login*)", "Bash(supabase link*)", "Bash(supabase db push*)", "Bash(supabase secrets*)",
+      "Bash(supabase projects*)", "Bash(supabase functions deploy*)",
+      "Bash(npx supabase login*)", "Bash(npx supabase link*)", "Bash(npx supabase db push*)",
+      "Bash(npx supabase secrets*)", "Bash(npx supabase projects*)", "Bash(npx supabase functions deploy*)",
+      "Bash(gh *)", "Bash(git merge *)", "Bash(git pull *)"
+    ]
+  },
+  "enableAllProjectMcpServers": false,
+  "allowedMcpServers": []
+}

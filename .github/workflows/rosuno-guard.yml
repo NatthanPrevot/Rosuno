@@ -1,0 +1,86 @@
+name: rosuno-guard
+# Trusted merge-boundary check (cloud rev 2, derived from the UOM v1.8 rev 5 draft).
+# - pull_request_target: GitHub runs THIS file from the owner repository's DEFAULT branch, with the owner repository's
+#   token. The PR head (from the Builder fork) is fetched as git data only and is never checked out or executed.
+#   actions/checkout is used only for the default branch; `allow-unsafe-pr-checkout` must never be set.
+# - GitHub workflow execution protections (GA 17 Sep 2026): public repositories without an applicable event policy get
+#   a default rule that blocks pull_request_target, enforced from 2 Nov 2026. This workflow runs only if the owner
+#   separately decides to allow pull_request_target for THIS workflow file (package §2, decision PD-1).
+#   If it does not run, no rosuno-guard status is posted and merging stays blocked (fail closed).
+# - Trust binding: owner repository, base `main`, PR created by the owner, head from the owner repository or the
+#   authorized Builder fork only, and exactly one open PR carrying the head SHA. Edit the four values below ONLY via
+#   a TYPE: PROCESS work item (they differ in the disposable trial repositories).
+# The result is posted as commit status "rosuno-guard" on the exact PR head SHA; the main ruleset requires it, bound
+# to the GitHub Actions app.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+concurrency:
+  group: rosuno-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  trusted-runner:
+    runs-on: ubuntu-latest
+    env:
+      EXPECTED_REPO: NatthanPrevot/Rosuno
+      EXPECTED_BASE: main
+      BUILDER_FORK: RosunoBackup/Rosuno
+      OWNER_LOGIN: NatthanPrevot
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Mark pending on the exact PR head
+        run: |
+          gh api "repos/$REPO/statuses/$HEAD_SHA" -f state=pending -f context=rosuno-guard -f description="running: PR #$PR_NUMBER" -f target_url="$RUN_URL"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Trust binding (repository, base, author, head source, single PR per head SHA)
+        id: trust
+        run: |
+          gh api --paginate "repos/$REPO/pulls?state=open&per_page=100" --jq '.[] | "\(.number) \(.head.sha)"' > "$RUNNER_TEMP/open-prs.txt"
+          bash .github/scripts/rosuno-guard-trust.sh "$GITHUB_EVENT_PATH" "$RUNNER_TEMP/open-prs.txt" | tee "$RUNNER_TEMP/trust.txt"
+          grep -E '^MODE=(builder|owner)$' "$RUNNER_TEMP/trust.txt" >> "$GITHUB_OUTPUT"
+      - name: Validate the head branch name before using it
+        if: steps.trust.outputs.MODE == 'builder'
+        run: |
+          [[ "$HEAD_REF" =~ ^wi/[A-Z][A-Z0-9]*-[0-9]{3}(-[a-z0-9-]+)?$ ]] || { echo "::error::head branch is not wi/<ID>[-slug]"; exit 1; }
+      - name: Fetch PR head and the owner-approved Packet branch as data
+        if: steps.trust.outputs.MODE == 'builder'
+        run: |
+          git fetch --no-tags https://github.com/"$REPO".git "+refs/pull/${PR_NUMBER}/head:refs/rosuno/pr-head"
+          test "$(git rev-parse refs/rosuno/pr-head)" = "$HEAD_SHA"
+          git fetch --no-tags https://github.com/"$REPO".git "+refs/heads/${HEAD_REF}:refs/rosuno/approved" \
+            || { echo "::error::owner repository has no branch $HEAD_REF (Packet not published by the owner)"; exit 1; }
+          git cat-file -e "$BASE_SHA^{commit}"
+      - name: rosuno-guard (script from the default branch)
+        id: guard
+        if: steps.trust.outputs.MODE == 'builder'
+        run: bash .github/scripts/rosuno-guard.sh "$BASE_SHA" "$HEAD_SHA" "$HEAD_REF" refs/rosuno/approved
+      - name: Report the result on the exact PR head
+        if: always()
+        env:
+          MODE: ${{ steps.trust.outputs.MODE }}
+          TRUST: ${{ steps.trust.outcome }}
+          OUTCOME: ${{ steps.guard.outcome }}
+        run: |
+          B="${BASE_SHA:0:12}"
+          if [ "$TRUST" = success ] && [ "$MODE" = builder ] && [ "$OUTCOME" = success ]; then
+            S=success; D="PASS builder PR #$PR_NUMBER base $B"
+          elif [ "$TRUST" = success ] && [ "$MODE" = owner ]; then
+            S=success; D="owner-repo PR #$PR_NUMBER: not a Builder PR (UOM v1.7 controls)"
+          else
+            S=failure; D="FAIL PR #$PR_NUMBER (trust: $TRUST, guard: ${OUTCOME:-not run})"
+          fi
+          gh api "repos/$REPO/statuses/$HEAD_SHA" -f state="$S" -f context=rosuno-guard -f description="$D" -f target_url="$RUN_URL"
