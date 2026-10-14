@@ -2181,6 +2181,40 @@ test("product source and deployment paths outside conventional roots are rejecte
   }
 });
 
+test("P2-900 exact Cloud Builder paths reject near-misses", () => {
+  const allowed = [
+    ".github/scripts/rosuno-guard.sh",
+    ".github/scripts/rosuno-guard-trust.sh",
+    ".github/workflows/rosuno-guard.yml",
+    "CLAUDE.md",
+    ".claude/settings.json",
+  ];
+  const rejected = [
+    ".github/scripts/unreviewed.sh",
+    ".github/scripts/rosuno-guard.sh.bak",
+    ".github/workflows/deploy.yml",
+    ".github/workflows/rosuno-guard-copy.yml",
+    ".claude/extra.json",
+    ".claude/settings.local.json",
+    "CLAUDE.bak.md",
+    "claude.md",
+    "apps/api/index.ts",
+    "infra/main.tf",
+  ];
+  for (const [state, packageJson] of rootPackageFixtures()) {
+    assert.doesNotThrow(() =>
+      validateNeutralPaths(allowed, packageJson, state),
+    );
+    for (const file of rejected) {
+      assert.throws(
+        () => validateNeutralPaths([...allowed, file], packageJson, state),
+        /product implementation paths/,
+        `${state}: ${file}`,
+      );
+    }
+  }
+});
+
 test("P1-009 migration path is allowed by the neutral repository control", () => {
   for (const [state, packageJson] of rootPackageFixtures()) {
     assert.doesNotThrow(() =>

@@ -1315,6 +1315,68 @@
         "Gate 5 N/A: no migration or database candidate. Gate 6 N/A: no persistent Staging application."
       ],
       "expiry": null
+    },
+
+    {
+      "decision_id": "DEC-20261012-P2-900-CLOUD-BUILDER-KIT-REV5-1-INSTALL",
+      "title": "Authorize bounded Cloud Builder revision 5.1 PROCESS installation",
+      "status": "accepted",
+      "scope": "Only five reviewed kit file paths and additive entries in governance/work-items/index.json and governance/decision-log.json; no P2-005, policy, fork, Claude, product or database changes.",
+      "decision": "Propose the one-time P2-900 installation by owner-operated exact-byte ZIP transfer, authorized governance registration, existing Fast-Control, protected GitHub PR, independent Backup head audit, designated Rosuno approval and separately owner-authorized merge, pursuant to the adopted single-use exception. No implementation is authorized by this record alone.",
+      "rationale": "One-time bootstrap is required before the real fork may receive reviewed cloud settings. Independently audited v1.7 exception authorizes the method for P2-900 only; it does not adopt Amendment C1.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-900-CLOUD-BUILDER-KIT-REV5-1-INSTALL"],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-10-13T04:21:28Z",
+      "updated_at": "2026-10-13T06:20:08Z",
+      "supersedes": [],
+      "impact": "Proposed process-only installation; no declaration of approval, validation, merge, runtime readiness, security warranty or later-phase authority.",
+      "evidence": [
+        "Reviewed private Cloud Builder revision 5.1 ZIP SHA-256 e3d6026dc4127adeb85620b4845c91f663efafd2800e0c55eca8d9576f44abe5 (reference only; not published).",
+        "Adopted single-use P2-900 procedural exception SHA-256 b73ed406683258f2561a44c785b9c9569c3ee2bfd51dc0c030dab6ecd27a9e02 (reference only; not published).",
+        "Five fixed installation artifact SHA-256 digests are bound in the separately audited P2-900 Gate 0 Packet (reference only; not published)."
+      ],
+      "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261013-P2-901-P2900-CONTROLS-COMPATIBILITY",
+      "title": "Propose prospective combined P2-900/P2-901 validator recovery",
+      "status": "proposed",
+      "scope": "Exactly five unchanged reviewed Cloud Builder paths, two forward-only governance registration additions, and two precise P0 validator/test compatibility edits, delivered together only under a separately adopted nine-path, one-time exception and independently PASSed Gate 0 Packet.",
+      "decision": "Propose to correct the exact-five-file P0 path allowlist and add focused tests under new P2-901 while preserving the original approved P2-900 records and installed file bytes. Permit one common branch, full Fast-Control and protected PR only after a new prospective exception is independently PASSed and owner adopted and the separate nine-path Packet passes Backup review. This proposed record is not present authorization to implement or publish.",
+      "rationale": "Mandatory P2-900 Fast-Control STOP occurred because neutral-path P0 validator rejects the five fixed reviewed PROCESS paths. The live P0 test and required quality CI depend on the same validator. Independent Backup PASSED a one-combined-PR recovery strategy only; the original seven-path single-use exception is treated as expired following STOP.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "work_item_refs": [
+        "WI-P2-900-CLOUD-BUILDER-KIT-REV5-1-INSTALL",
+        "WI-P2-901-P2900-CONTROLS-COMPATIBILITY"
+      ],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-10-13T08:04:39Z",
+      "updated_at": "2026-10-13T08:04:39Z",
+      "supersedes": [],
+      "impact": "Prospective PROCESS validation compatibility and shared protected PR delivery only. Earlier P2-900 registration values and historical STOP/PASS evidence remain unchanged. No claim of approved implementation, successful rerun, CI, review, merge, fork readiness, database change or Production authority.",
+      "evidence": [
+        "P2-900 full Fast-Control STOP: pnpm run p0:validate failed because five reviewed Cloud Builder PROCESS files were classified as forbidden product implementation paths; formatting, typecheck and build passed before STOP.",
+        "Prior P2-900 Prettier STOP and subsequent four-edit separately authorized formatting correction/verification PASS are preserved as historical evidence.",
+        "P2-900 corrected original seven-path Gate 0 Packet SHA-256 6897fc251abef017e151d872d93dbfd50b036b98aeaea034ec931ed99704008a (reference only; no republication).",
+        "Consolidated read-only compatibility assessment SHA-256 314b3d6c16fee393751b3df13cb973dac0ca6f6be34aa2cc51e9072239cc4170; independent Backup strategy-only PASS, not execution permission.",
+        "Prior single-use exception SHA-256 b73ed406683258f2561a44c785b9c9569c3ee2bfd51dc0c030dab6ecd27a9e02, treated as expired for future implementation."
+      ],
+      "expiry": null
     }
   ]
 }

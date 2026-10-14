@@ -1827,6 +1827,118 @@
       "rollback_reference": "Repository-only Gate 7 governance closure. Before protected acceptance, the local two-file closure candidate may be discarded without altering the already-merged P0 transitive dependency security correction. After protected acceptance, any further correction must be forward-only and must not rewrite protected history or prior security evidence. No database rollback applies.",
       "created_at": "2026-10-10T06:24:07Z",
       "updated_at": "2026-10-11T01:12:36Z"
+    },
+
+    {
+      "work_item_id": "WI-P2-900-CLOUD-BUILDER-KIT-REV5-1-INSTALL",
+      "title": "Install reviewed Cloud Builder revision 5.1 PROCESS controls",
+      "objective": "Install exactly five fixed-hash, independently reviewed process files, with two additive registry records, using the adopted P2-900-only bootstrap exception and existing protected GitHub workflow.",
+      "in_scope": [
+        "Install only five reviewed files at exact paths and SHA-256 values identified in the audited P2-900 Packet.",
+        "Add one truthful record to governance/work-items/index.json and one to governance/decision-log.json; preserve existing entries.",
+        "Run existing human-authorized validation, Fast-Control, tree-bound commit, protected PR, independent Backup PR audit, Rosuno reviewer approval and owner merge."
+      ],
+      "out_of_scope": [
+        "Product/application code, P0 reopening, P2-005, C1 adoption, new required checks, policy/permissions changes or trial repetition.",
+        "Supabase, OLD, Production, migration/history/authority changes, real-fork synchronization and any Claude Code session.",
+        "Any repository path outside the five reviewed files and two existing governance registries."
+      ],
+      "status": "approved",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "decision_refs": ["DEC-20261012-P2-900-CLOUD-BUILDER-KIT-REV5-1-INSTALL"],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Five tracked installation files match their fixed SHA-256 digests and safe regular-file modes.",
+        "Exactly the two additive registry records exist; no earlier entry or unrelated path changes.",
+        "Existing full Fast-Control, protected required CI and clean staged/tree binding pass without weakening checks.",
+        "Exact-head independent Backup PR PASS and designated Rosuno reviewer approval precede separately owner-authorized merge-commit.",
+        "No database, product, authority, policy, fork or Claude session mutation is performed by this work item."
+      ],
+      "validation_commands": [
+        "bash -n .github/scripts/rosuno-guard.sh .github/scripts/rosuno-guard-trust.sh",
+        "python3 -m json.tool .claude/settings.json",
+        "node tools/p0/fast-control.mjs preflight (audited base/head/branch and seven allowed paths)",
+        "node tools/p0/fast-control.mjs check (audited base/head/branch and seven allowed paths)",
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "governance/rollback-recovery.md",
+      "created_at": "2026-10-13T04:21:28Z",
+      "updated_at": "2026-10-13T06:20:08Z"
+    },
+    {
+      "work_item_id": "WI-P2-901-P2900-CONTROLS-COMPATIBILITY",
+      "title": "Correct P2-900 PROCESS installation validator compatibility",
+      "objective": "Permit exactly five already reviewed P2-900 Cloud Builder PROCESS file paths through existing P0 neutral-path validation, with narrowly bounded regression tests, and deliver this corrective work alongside the separately governed P2-900 installation through one freshly excepted protected PR.",
+      "in_scope": [
+        "Update only the five exact permitted Cloud Builder file strings in tools/p0/lib/controls.mjs validateNeutralPaths; no wildcard/prefix permissions and no other validator behavior change.",
+        "Add positive and negative exact-path regression coverage only in tools/p0/tests/p0-controls.test.mjs; preserve all existing tests including the live validateRepository assertion.",
+        "Append exactly one P2-901 corrective work-item record and one corresponding new decision to existing governance registries, without altering any earlier record or value.",
+        "Under the separately audited and adopted one-time combined recovery exception, validate the complete nine-path candidate with the independently governed P2-900 installation and protected GitHub review."
+      ],
+      "out_of_scope": [
+        "Changing the five reviewed kit files, either approved original P2-900 registration, any historical decision/work-item, authority documents, P0 closure history or STOP receipts.",
+        "General .github/ or .claude/ exemptions, security exclusions, CI/protection/PD-1 alterations, package/lock changes, application/product code or migration/history changes.",
+        "P2-005, C1, Claude/local Builder or cloud sessions, fork synchronization, Supabase/OLD/Production changes or unapproved later-phase capabilities.",
+        "Any repository path outside tools/p0/lib/controls.mjs, tools/p0/tests/p0-controls.test.mjs and the two shared additive governance registries for this corrective work item."
+      ],
+      "status": "proposed",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "decision_refs": ["DEC-20261013-P2-901-P2900-CONTROLS-COMPATIBILITY"],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Existing neutral-path validation recognizes precisely the five fixed reviewed PROCESS file names and continues rejecting all neighboring names and unrelated source/deployment files.",
+        "Exact positive and negative regression tests pass in both pre-application and web-application surface states without disabling the live validateRepository test.",
+        "Both original P2-900 registrations and 24 earlier work items plus 35 earlier decisions retain exactly their approved values, identities, and ordering; only two new P2-901 records are appended.",
+        "The single final nine-path candidate retains all five reviewed kit SHA-256s/modes, passes complete Fast-Control on unstaged bytes, preserves three existing required CI checks, and passes exact-head Backup PR audit and designated human review before separately authorized merge.",
+        "No new migration, policy, database, application, fork, remote Cloud execution, unrelated file, or unapproved Git change occurs."
+      ],
+      "validation_commands": [
+        "node --test --test-name-pattern='^(?:P2-900 exact Cloud Builder paths reject near-misses|neutral P0 control foundation validates successfully)$' tools/p0/tests/p0-controls.test.mjs (separately authorized targeted two-test check; full P0 suite only through Fast-Control)",
+        "node tools/p0/fast-control.mjs preflight (pinned base/head/branch and exactly nine allowed paths)",
+        "node tools/p0/fast-control.mjs check (pinned base/head/branch and exactly nine allowed paths; one separately authorized full run)",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "git diff --check"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "governance/rollback-recovery.md",
+      "created_at": "2026-10-13T08:04:39Z",
+      "updated_at": "2026-10-13T08:04:39Z"
     }
   ]
 }

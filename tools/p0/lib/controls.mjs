@@ -7905,6 +7905,13 @@ export function validateNeutralPaths(
     ".github/pull_request_template.md",
     ".github/workflows/p0-controls.yml",
   ]);
+  const allowedCloudBuilderProcessPaths = new Set([
+    ".github/scripts/rosuno-guard.sh",
+    ".github/scripts/rosuno-guard-trust.sh",
+    ".github/workflows/rosuno-guard.yml",
+    "CLAUDE.md",
+    ".claude/settings.json",
+  ]);
   const allowedP1Files = new Set([
     "supabase/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.sql",
     "supabase/migrations/20260829000015_p1_platform_foundation.sql",
@@ -7916,6 +7923,7 @@ export function validateNeutralPaths(
     (file) =>
       !allowedRootFiles.has(file) &&
       !allowedGithubFiles.has(file) &&
+      !allowedCloudBuilderProcessPaths.has(file) &&
       !allowedP1Files.has(file) &&
       !/^supabase\/migrations\/[0-9]{14}_p1_attorney_verification_eligibility_foundation\.sql$/.test(
         file,
