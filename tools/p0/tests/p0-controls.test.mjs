@@ -4093,7 +4093,10 @@ test("pre-application surface validates unchanged in the pre-application state",
   assert.equal(validateApplicationSurface(surface), PRE_APPLICATION_STATE);
   assert.doesNotThrow(() => validatePnpmWorkspace(preApplicationWorkspace()));
   assert.doesNotThrow(() =>
-    validateNeutralPaths(neutralRepositoryFiles(), preApplicationPackage()),
+    validateNeutralPaths(
+      preApplicationRepositoryFiles(),
+      preApplicationPackage(),
+    ),
   );
   assert.doesNotThrow(() => validatePackageJson(preApplicationPackage()));
 });
@@ -4280,7 +4283,7 @@ test("comments and adjacent paths are not application-enablement signals", () =>
     "apps/api/index.ts",
   ]) {
     const surface = preApplicationSurface({
-      files: [...neutralRepositoryFiles(), file],
+      files: [...preApplicationRepositoryFiles(), file],
     });
 
     assert.equal(detectApplicationState(surface), PRE_APPLICATION_STATE, file);
@@ -4413,6 +4416,242 @@ test("web-application state permits apps/web as the only new product root", () =
       ),
     /product implementation paths/,
   );
+});
+
+test("C1 work-item Packet paths are admitted only in the web-application state", () => {
+  const packets = [
+    "docs/work-items/P2-005/PACKET.md",
+    "docs/work-items/P2-902/PACKET.md",
+  ];
+
+  assert.doesNotThrow(() =>
+    validateNeutralPaths(
+      [...webApplicationFiles(), ...packets],
+      webApplicationPackage(),
+      WEB_APPLICATION_STATE,
+    ),
+  );
+  assert.equal(
+    validateApplicationSurface(
+      webApplicationSurface({ files: [...webApplicationFiles(), ...packets] }),
+    ),
+    WEB_APPLICATION_STATE,
+  );
+
+  for (const packet of packets) {
+    assert.throws(
+      () => validateNeutralPaths([packet], preApplicationPackage()),
+      /product implementation paths/,
+      packet,
+    );
+    assert.throws(
+      () =>
+        validateNeutralPaths(
+          [...preApplicationRepositoryFiles(), packet],
+          preApplicationPackage(),
+          PRE_APPLICATION_STATE,
+        ),
+      /product implementation paths/,
+      packet,
+    );
+    const surface = preApplicationSurface({
+      files: [...preApplicationRepositoryFiles(), packet],
+    });
+    assert.equal(detectApplicationState(surface), PRE_APPLICATION_STATE);
+    assert.throws(
+      () => validateApplicationSurface(surface),
+      /product implementation paths/,
+      packet,
+    );
+  }
+});
+
+test("C1 work-item Packet admission rejects near-misses and other docs content", () => {
+  const packets = [
+    "docs/work-items/P2-005/PACKET.md",
+    "docs/work-items/P2-902/PACKET.md",
+  ];
+  const rejected = [
+    // Wrong case.
+    "docs/work-items/P2-005/packet.md",
+    "docs/work-items/P2-005/Packet.md",
+    "docs/work-items/P2-005/PACKET.MD",
+    "Docs/work-items/P2-005/PACKET.md",
+    "DOCS/work-items/P2-005/PACKET.md",
+    "docs/Work-items/P2-005/PACKET.md",
+    // Misspelled segments.
+    "doc/work-items/P2-005/PACKET.md",
+    "docs/work-item/P2-005/PACKET.md",
+    "docs/workitems/P2-005/PACKET.md",
+    "docs/work_items/P2-005/PACKET.md",
+    "docs/work-items/P2-005/PACKETS.md",
+    "docs/work-items/P2-005/PAKCET.md",
+    // Invalid work-item identifiers.
+    "docs/work-items/p2-005/PACKET.md",
+    "docs/work-items/P2-05/PACKET.md",
+    "docs/work-items/P2-0005/PACKET.md",
+    "docs/work-items/2P-005/PACKET.md",
+    "docs/work-items/P2_005/PACKET.md",
+    "docs/work-items/P2005/PACKET.md",
+    "docs/work-items/P-2-005/PACKET.md",
+    "docs/work-items/-005/PACKET.md",
+    "docs/work-items/P2-ABC/PACKET.md",
+    "docs/work-items/P2-005-slug/PACKET.md",
+    "docs/work-items/P2-005 /PACKET.md",
+    "docs/work-items/Ρ2-005/PACKET.md",
+    "docs/work-items/./PACKET.md",
+    "docs/work-items/../PACKET.md",
+    // Trailing slashes, empty and traversal segments.
+    "docs/work-items/P2-005/PACKET.md/",
+    "docs/work-items/P2-005/",
+    "docs/work-items/P2-005",
+    "docs/work-items/",
+    "docs/work-items/P2-005//PACKET.md",
+    "docs//work-items/P2-005/PACKET.md",
+    "docs/work-items/P2-005/./PACKET.md",
+    "docs/work-items/P2-005/../P2-902/PACKET.md",
+    "./docs/work-items/P2-005/PACKET.md",
+    "/docs/work-items/P2-005/PACKET.md",
+    "docs\\work-items\\P2-005\\PACKET.md",
+    " docs/work-items/P2-005/PACKET.md",
+    "docs/work-items/P2-005/PACKET.md ",
+    "docs/work-items/P2-005/PACKET.md\n",
+    // Additional nested files.
+    "docs/work-items/P2-005/NOTES.md",
+    "docs/work-items/P2-005/README.md",
+    "docs/work-items/P2-005/evidence.json",
+    "docs/work-items/P2-005/sub/PACKET.md",
+    "docs/work-items/P2-005/P2-005/PACKET.md",
+    "docs/work-items/P2-005/PACKET.md/extra",
+    "docs/work-items/P2-005/PACKET.md/PACKET.md",
+    // Sibling and prefixed paths.
+    "docs/other/P2-005/PACKET.md",
+    "docs/process/P2-005/PACKET.md",
+    "docs/work-items-old/P2-005/PACKET.md",
+    "docs/work-items/PACKET.md",
+    "docs/PACKET.md",
+    "PACKET.md",
+    "work-items/P2-005/PACKET.md",
+    "x/docs/work-items/P2-005/PACKET.md",
+    "apps/web/../../docs/work-items/P2-005/NOTES.md",
+    // Duplicate or alternative extensions.
+    "docs/work-items/P2-005/PACKET.md.bak",
+    "docs/work-items/P2-005/PACKET.md.orig",
+    "docs/work-items/P2-005/PACKET.md~",
+    "docs/work-items/P2-005/PACKET.mdx",
+    "docs/work-items/P2-005/PACKET.markdown",
+    "docs/work-items/P2-005/PACKET.txt",
+    "docs/work-items/P2-005/PACKET",
+    "docs/work-items/P2-005/.PACKET.md",
+    // Unrelated docs content.
+    "docs",
+    "docs/README.md",
+    "docs/index.md",
+    "docs/process/C1.md",
+    "docs/authority/locked.md",
+    "docs/work-items/README.md",
+    "docs/work-items/index.json",
+  ];
+
+  for (const [state, packageJson] of rootPackageFixtures()) {
+    for (const file of rejected) {
+      const files =
+        state === WEB_APPLICATION_STATE
+          ? [...webApplicationFiles(), ...packets, file]
+          : [...preApplicationRepositoryFiles(), file];
+      assert.throws(
+        () => validateNeutralPaths(files, packageJson, state),
+        {
+          message: `product implementation paths are present: ${file}`,
+        },
+        `${state}: ${JSON.stringify(file)}`,
+      );
+    }
+  }
+});
+
+test("C1 Packet admission keeps every other web-application path restriction", () => {
+  const packets = [
+    "docs/work-items/P2-005/PACKET.md",
+    "docs/work-items/P2-902/PACKET.md",
+  ];
+  const files = [...webApplicationFiles(), ...packets];
+
+  for (const file of [
+    "main.ts",
+    "index.mjs",
+    "src/index.ts",
+    "app/page.tsx",
+    "infra/main.tf",
+    "deployment/k8s.yaml",
+    "Dockerfile",
+    "vercel.json",
+    ".github/workflows/deploy.yml",
+    ".github/scripts/unreviewed.sh",
+    ".claude/settings.local.json",
+    ".claude/agents/builder.md",
+    "apps/api/index.ts",
+    "apps/web-admin/page.tsx",
+    "packages/ui/index.ts",
+    "supabase/migrations/20990101000000_p2_unreviewed.sql",
+    "supabase/seed.sql",
+    "yarn.lock",
+    "package-lock.json",
+    "bun.lockb",
+  ]) {
+    assert.throws(
+      () =>
+        validateNeutralPaths(
+          [...files, file],
+          webApplicationPackage(),
+          WEB_APPLICATION_STATE,
+        ),
+      { message: `product implementation paths are present: ${file}` },
+      file,
+    );
+  }
+
+  for (const file of [
+    "apps/web/yarn.lock",
+    "apps/web/package-lock.json",
+    "apps/web/pnpm-workspace.yaml",
+    "apps/web/node_modules/next/index.js",
+  ]) {
+    assert.throws(
+      () =>
+        validateNeutralPaths(
+          [...files, file],
+          webApplicationPackage(),
+          WEB_APPLICATION_STATE,
+        ),
+      { message: `alternative package-manager state is present: ${file}` },
+      file,
+    );
+  }
+});
+
+test("an unauthorized docs file fails a controlled web-application fixture", () => {
+  const packet = "docs/work-items/P2-902/PACKET.md";
+  const fixture = [...webApplicationFiles(), packet];
+
+  assert.equal(
+    validateApplicationSurface(webApplicationSurface({ files: fixture })),
+    WEB_APPLICATION_STATE,
+  );
+  for (const file of [
+    "docs/work-items/P2-902/NOTES.md",
+    "docs/other/P2-902/PACKET.md",
+    "docs/README.md",
+  ]) {
+    assert.throws(
+      () =>
+        validateApplicationSurface(
+          webApplicationSurface({ files: [...fixture, file] }),
+        ),
+      { message: `product implementation paths are present: ${file}` },
+      file,
+    );
+  }
 });
 
 test("workspace formatting variants validate in their application state", () => {
@@ -5993,6 +6232,15 @@ function neutralRepositoryFiles() {
   return liveRepositoryFiles().filter((file) => !file.startsWith("apps/web/"));
 }
 
+// A pre-application repository carries no C1 work-item Packet; that state
+// keeps rejecting Packet paths, so they are excluded from its fixture.
+function preApplicationRepositoryFiles() {
+  return neutralRepositoryFiles().filter(
+    (file) =>
+      !/^docs\/work-items\/[A-Z][A-Z0-9]*-[0-9]{3}\/PACKET\.md$/.test(file),
+  );
+}
+
 function webApplicationFiles() {
   return [
     ...neutralRepositoryFiles(),
@@ -6006,7 +6254,7 @@ function webApplicationFiles() {
 
 function preApplicationSurface(overrides = {}) {
   return {
-    files: neutralRepositoryFiles(),
+    files: preApplicationRepositoryFiles(),
     packageJson: preApplicationPackage(),
     workspace: preApplicationWorkspace(),
     npmrc: canonicalNpmrc(),

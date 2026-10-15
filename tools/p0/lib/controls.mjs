@@ -7951,7 +7951,12 @@ export function validateNeutralPaths(
       ) &&
       !file.startsWith("governance/") &&
       !file.startsWith("tools/p0/") &&
-      !(webApplication && isWebApplicationPath(file)),
+      !(webApplication && isWebApplicationPath(file)) &&
+      // C1 work-item Packet; the identifier grammar matches rosuno-guard.
+      !(
+        webApplication &&
+        /^docs\/work-items\/[A-Z][A-Z0-9]*-[0-9]{3}\/PACKET\.md$/.test(file)
+      ),
   );
   if (forbidden.length > 0) {
     fail(`product implementation paths are present: ${forbidden.join(", ")}`);
