@@ -3,11 +3,11 @@
 // Provider-neutral and injectable: each request hands in its own provider
 // port, built by the server action that owns the framework, provider, and
 // cookie lifecycle. This module checks the submitted input, asks the provider,
-// verifies the outcome through the trusted server session boundary, and
-// reports a fixed result code. It keeps no credential beyond the call, holds
-// no module-level mutable state, and never decides a profile, role,
-// capability, or any business question: an authenticated session is only
-// that.
+// verifies the outcome against a fresh read of the request's stored session
+// state and the trusted server session boundary over it, and reports a fixed
+// result code. It keeps no credential beyond the call, holds no module-level
+// mutable state, and never decides a profile, role, capability, or any
+// business question: an authenticated session is only that.
 
 import {
   readFormFields,
@@ -27,20 +27,38 @@ export type SignInCredentials = {
 // could not answer and started no session.
 export type PasswordSignInOutcome = "accepted" | "rejected" | "unavailable";
 
+// One verified read of a provider session. "none": the read succeeded and
+// found no session. "session": it found one, named by the provider's opaque
+// session id. "unreadable": the read failed. Any other answer, or a thrown
+// read, is taken as unreadable: it proves nothing either way.
+export type SessionRead =
+  | { readonly kind: "none" }
+  | { readonly kind: "session"; readonly id: string }
+  | { readonly kind: "unreadable" };
+
 // Request-scoped provider port. signOut resolves true only when the provider
-// reports that it ended the current session. session reads the request's
-// verified identity through the trusted server boundary, which reports a
-// failed read as no identity: enough to deny, never enough to prove that a
-// session ended. confirmNoSession resolves true only when a successful read
-// of the request's provider session finds none; a failed or unreadable read
-// is never a confirmation.
+// reports that it ended the current session.
+//
+// issuedSession reads what the request's own provider holds after its calls.
+// That provider keeps its own changes in memory, so this shows which session
+// it issued, never that the session was stored for the browser.
+//
+// storedSession and session read the request's stored session state afresh,
+// through a provider that holds nothing of its own, so they see only what the
+// request will hand back to the browser, including this request's updates.
+// session is the trusted server boundary over that state, the one the next
+// request reads; it reports a failed read as no identity, which is enough to
+// deny and never enough to prove that a session ended. Neither proves that
+// the response carrying those updates reached the browser: the next request
+// shows what it did receive.
 export type AuthenticationProvider = {
   readonly signInWithPassword: (
     submitted: SignInCredentials,
   ) => Promise<PasswordSignInOutcome>;
   readonly signOut: () => Promise<boolean>;
+  readonly issuedSession: () => Promise<SessionRead>;
+  readonly storedSession: () => Promise<SessionRead>;
   readonly session: ServerSessionSource;
-  readonly confirmNoSession: () => Promise<boolean>;
 };
 
 // Builds the provider for the current request, or reports null when the
@@ -48,6 +66,10 @@ export type AuthenticationProvider = {
 export type AuthenticationProviderSource =
   () => Promise<AuthenticationProvider | null>;
 
+// "signed-in" and "signed-out" mean the request's stored session state was
+// verified, read afresh, to hold exactly the issued session or none at all.
+// They do not mean the browser received the response; the next request reads
+// whatever it did receive through the trusted boundary.
 export type SignInState =
   | { readonly status: "idle" }
   | { readonly status: "invalid"; readonly fieldErrors: FieldErrors }
@@ -144,19 +166,68 @@ async function isAuthenticated(
   }
 }
 
-// Whether the request is confirmed to hold no session: a successful provider
-// read finds none and the trusted boundary agrees. A read that fails, throws,
-// or reports anything other than true is not a confirmation.
+// What one session read proves: the id of the session it found, null when it
+// found none, or undefined when it failed, threw, or answered anything other
+// than a well-formed read, so it is never taken as either answer.
+async function sessionIdOf(
+  read: () => Promise<SessionRead>,
+): Promise<string | null | undefined> {
+  let kind: unknown;
+  let id: unknown;
+  try {
+    const result: unknown = await read();
+    if (result === null || typeof result !== "object") {
+      return undefined;
+    }
+    ({ kind, id } = result as {
+      readonly kind?: unknown;
+      readonly id?: unknown;
+    });
+  } catch {
+    return undefined;
+  }
+  if (kind === "none" && id === undefined) {
+    return null;
+  }
+  if (kind === "session" && typeof id === "string" && id.trim() !== "") {
+    return id;
+  }
+  return undefined;
+}
+
+// Whether the request's stored state is confirmed to hold no session: a
+// fresh read succeeds and finds none, and the trusted boundary over that
+// state agrees. A read that fails, throws, or finds any session is not a
+// confirmation, so a session left behind always shows. What the request's
+// own provider now holds is never consulted: it may have dropped a session
+// that is still stored.
 async function isConfirmedAnonymous(
   provider: AuthenticationProvider,
 ): Promise<boolean> {
-  let confirmed: unknown;
-  try {
-    confirmed = await provider.confirmNoSession();
-  } catch {
+  return (
+    (await sessionIdOf(() => provider.storedSession())) === null &&
+    (await isAuthenticated(provider)) === false
+  );
+}
+
+// Whether the request's stored state is confirmed to hold the very session
+// this sign-in issued: the provider names the session it issued, a fresh
+// read of the stored state finds that same session, and the trusted boundary
+// over that state reports an authenticated request. A session that was
+// stored before, or any other session, is a different session and never
+// confirms a new sign-in. The provider's own copy of its session is never
+// taken as proof that it was stored.
+async function isConfirmedSignIn(
+  provider: AuthenticationProvider,
+): Promise<boolean> {
+  const issued = await sessionIdOf(() => provider.issuedSession());
+  if (typeof issued !== "string") {
     return false;
   }
-  return confirmed === true && (await isAuthenticated(provider)) === false;
+  return (
+    (await sessionIdOf(() => provider.storedSession())) === issued &&
+    (await isAuthenticated(provider)) === true
+  );
 }
 
 // "cleared": the provider ended the session and its absence is confirmed.
@@ -219,8 +290,9 @@ export async function signInExistingAccount(
   if (outcome === "unavailable") {
     return UNAVAILABLE;
   }
-  // Acceptance is reported only once the trusted boundary verifies it.
-  if (outcome === "accepted" && (await isAuthenticated(provider)) === true) {
+  // Acceptance is reported only once the stored state is verified to hold
+  // the session the provider issued.
+  if (outcome === "accepted" && (await isConfirmedSignIn(provider))) {
     return SIGNED_IN;
   }
   return failAfterPossibleSession(provider);
@@ -242,7 +314,8 @@ export async function signOutCurrentSession(
   if (ended !== true) {
     return SIGN_OUT_FAILED;
   }
-  // Success is reported only when the session is confirmed gone; a read that
-  // fails is not proof of sign-out.
+  // Success is reported only when the stored state is confirmed to hold no
+  // session; the provider's word, its own emptied copy, or a read that fails
+  // is not proof of sign-out.
   return (await isConfirmedAnonymous(provider)) ? SIGNED_OUT : SIGN_OUT_FAILED;
 }
