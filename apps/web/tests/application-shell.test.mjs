@@ -112,6 +112,21 @@ const principalContextVocabulary = new Map([
   ],
 ]);
 
+// P2-005: the page reads the session through the existing trusted server
+// source and offers one session entry: a sign-in link when the request is
+// anonymous, and a sign-out POST form otherwise. These exact lines are the
+// only additions admitted to the historical page contract; every other check
+// below still reads the rest of the page.
+const trustedSessionImport =
+  'import { SUPABASE_SERVER_SESSION_SOURCE } from "../src/infrastructure/identity/server-session-source.ts";';
+const trustedShellView = "getShellView(SUPABASE_SERVER_SESSION_SOURCE)";
+const sessionEntryImport = 'import { signOut } from "./sign-in/actions.ts";';
+const sessionEntry =
+  'view.session === "anonymous" ? ( <ButtonLink variant="primary" href="/sign-in"> Sign in </ButtonLink> ) : ( <form action={signOut}> <Button variant="secondary" type="submit"> Sign out </Button> </form> )';
+const trustedSourceVocabulary = new Map([
+  ["app/page.tsx", [trustedSessionImport, trustedShellView]],
+]);
+
 // Import or export syntax without the spacing Prettier writes, or with a
 // comment inside it, would hide its specifier from importsOf.
 const unspacedImport = /\b(?:import|export|from)(?:["'{*]|\s*\/[*/])/;
@@ -953,15 +968,23 @@ test("12. presentation reaches application state only through application module
   ]) {
     assert.ok(pageImports.includes(specifier), specifier);
   }
-  // The page renders a server-derived view. Later P3 work may construct and
-  // pass a trusted request/session source before calling the shell service.
+  // The page renders a server-derived view. P2-005 passes the existing
+  // trusted server-owned session source, and nothing else, to the service.
   assert.match(page, /\nexport default async function HomePage\(\)/);
   assert.match(page, /await connection\(\);/);
   assert.match(page, /const view = await getShellView\(/);
-  assert.equal(codeOf(page).match(/\bview\b/g)?.length, 2);
-  // Its one expression is still the server-derived session state: every
-  // other tag, attribute, and text is fixed design-system presentation.
-  assert.deepEqual(componentShape(page), {
+  assert.equal(page.split(`const view = await ${trustedShellView};`).length, 2);
+  assert.equal(page.split(`\n${trustedSessionImport}\n`).length, 2);
+  assert.equal(page.split(`\n${sessionEntryImport}\n`).length, 2);
+  assert.equal(codeOf(page).match(/\bview\b/g)?.length, 3);
+  // Its expressions are the server-derived session state and the one session
+  // entry chosen by that state: every other tag, attribute, and text is fixed
+  // design-system presentation.
+  const shape = componentShape(page);
+  shape.expressions = shape.expressions.map((expression) =>
+    expression.replace(/\s+/g, " "),
+  );
+  assert.deepEqual(shape, {
     functions: 1,
     returns: 1,
     arrows: 0,
@@ -1125,12 +1148,13 @@ test("12. presentation reaches application state only through application module
       "overlay",
       "caption",
     ],
-    expressions: ["view.session"],
+    expressions: ["view.session", sessionEntry],
     text: [
       "Interface foundation",
       "Rosuno",
       "One visual language for every Rosuno screen: warm surfaces, restrained gold, and clear hierarchy.",
       "Session: {}",
+      "{}",
       "Actions and status",
       "Three levels of emphasis, each with hover, focus, pressed, and disabled states.",
       "Primary action",
@@ -1191,6 +1215,10 @@ test("12. presentation reaches application state only through application module
       "tone=muted",
       "tone=gold",
       "tone=neutral",
+      "variant=primary",
+      "href=/sign-in",
+      "variant=secondary",
+      "type=submit",
       "columns=split",
       "size=lg",
       "tone=muted",
@@ -1274,11 +1302,16 @@ test("12. presentation reaches application state only through application module
     for (const specifier of importsOf(read(file))) {
       // Only the root layout loads the global stylesheet, and only the page
       // uses the design system. Authoritative state still reaches app modules
-      // through the application layer alone.
+      // through the application layer, except that the page also takes the
+      // trusted server session source and the sign-out server action (P2-005).
       if (
         (file === "app/layout.tsx" && specifier === "./globals.css") ||
         (file === "app/page.tsx" &&
-          specifier === "../src/presentation/design-system.tsx")
+          [
+            "../src/presentation/design-system.tsx",
+            "../src/infrastructure/identity/server-session-source.ts",
+            "./sign-in/actions.ts",
+          ].includes(specifier))
       ) {
         continue;
       }
@@ -1323,14 +1356,20 @@ test("13. generic shell contains no feature-specific business logic or records",
     designSystem,
   ]) {
     // Only the exact approved density token, in the two design-system sources,
-    // and the exact principal-context declaration, in the Security Shell
-    // source, are set aside; the guards below read everything else.
-    const approved =
-      densityVocabulary.get(file) ?? principalContextVocabulary.get(file);
-    const source =
-      approved === undefined
-        ? read(file)
-        : read(file).replaceAll(approved, " ");
+    // the exact principal-context declaration, in the Security Shell source,
+    // and the exact trusted session source lines, on the page, are set aside;
+    // each appears exactly once, and the guards below read everything else.
+    const approved = [
+      densityVocabulary.get(file) ?? principalContextVocabulary.get(file),
+      ...(trustedSourceVocabulary.get(file) ?? []),
+    ].filter((entry) => entry !== undefined);
+    let source = read(file);
+    for (const entry of approved) {
+      if (trustedSourceVocabulary.has(file)) {
+        assert.equal(source.split(entry).length, 2, `${file}: ${entry}`);
+      }
+      source = source.replaceAll(entry, " ");
+    }
     assert.doesNotMatch(
       source,
       /attorney|lawyer|consultation|referral|intake|booking|payment|payout|ledger|refund|\bfee\b|stripe|\bdaily\b|\bresend\b|supabase|postgres|database|jurisdiction|california|arizona|eligib|bookab|engagement|marketplace|complaint|licen[cs]e/i,
