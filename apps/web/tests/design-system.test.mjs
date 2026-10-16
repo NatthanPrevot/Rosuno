@@ -212,6 +212,43 @@ function milliseconds(value) {
 const featureVocabulary =
   /lawyer|consultation|referral|intake|booking|payment|payout|ledger|refund|invoice|retainer|\bfee\b|\bprice|pricing|stripe|\bdaily\b|\bresend\b|supabase|postgres|database|\bsql\b|jurisdiction|california|arizona|eligib|bookab|engagement|marketplace|complaint|licen[cs]e|practice area|\bmatters?\b|appointment|calendar|schedul|\bcourt|lawsuit|\blegal\b|\bbar number|dashboard|\binbox\b|sign.?in|sign.?up|password|\bauth/i;
 
+// P2-005: the page reads the session through the existing trusted server
+// source and offers one session entry, chosen by that server state: a sign-in
+// link when anonymous, and a sign-out POST form otherwise. These exact source
+// lines are the only additions to the historical page contract; each appears
+// once, and every check below still reads the rest of the page.
+const trustedSessionImport =
+  'import { SUPABASE_SERVER_SESSION_SOURCE } from "../src/infrastructure/identity/server-session-source.ts";';
+const trustedShellView = "getShellView(SUPABASE_SERVER_SESSION_SOURCE)";
+const sessionEntryImport = 'import { signOut } from "./sign-in/actions.ts";';
+const sessionEntry = `{view.session === "anonymous" ? (
+            <ButtonLink variant="primary" href="/sign-in">
+              Sign in
+            </ButtonLink>
+          ) : (
+            <form action={signOut}>
+              <Button variant="secondary" type="submit">
+                Sign out
+              </Button>
+            </form>
+          )}`;
+const pageSessionLines = [
+  trustedSessionImport,
+  trustedShellView,
+  sessionEntryImport,
+  sessionEntry,
+];
+
+// The page without its approved session lines.
+function withoutSessionLines(source) {
+  let rest = source;
+  for (const line of pageSessionLines) {
+    assert.equal(rest.split(line).length, 2, line);
+    rest = rest.replace(line, " ");
+  }
+  return rest;
+}
+
 const densities = ["public", "client", "attorney", "admin"];
 const tones = ["success", "warning", "error", "information", "neutral"];
 
@@ -2467,7 +2504,7 @@ test("21. the design system holds no feature record, workflow, or business rule"
   for (const [file, source] of [
     [modulePath, moduleText],
     [stylesheetPath, styleText],
-    [pagePath, pageSource],
+    [pagePath, withoutSessionLines(pageSource)],
     [layoutPath, layoutSource],
   ]) {
     assert.doesNotMatch(source, /attorney/i, file);
@@ -2536,22 +2573,27 @@ test("22. the page shows the foundation through the design system and the server
   assert.match(pageCode, /export default async function HomePage\(\)/);
   assert.match(pageCode, /await connection\(\);/);
   assert.match(pageCode, /const view = await getShellView\(/);
+  assert.ok(pageCode.includes(`const view = await ${trustedShellView};`));
   assert.equal(pageCode.match(/getShellView/g).length, 2);
   assert.equal(pageCode.match(/\bconnection\b/g).length, 2);
   assert.ok((pageCode.match(/\bawait\b/g)?.length ?? 0) >= 2);
-  // The one expression in the markup is the session state, shown as text
-  // inside a status whose tone is fixed, not derived from that state.
+  // Apart from the one approved session entry, the one expression in the
+  // markup is the session state, shown as text inside a status whose tone is
+  // fixed, not derived from that state.
   const markup = pageCode.slice(pageCode.indexOf("return ("));
+  assert.equal(markup.split(sessionEntry).length, 2);
+  const foundation = markup.replace(sessionEntry, " ");
   assert.deepEqual(
-    [...markup.matchAll(/\{([^{}]*)\}/g)].map((match) => match[1]),
+    [...foundation.matchAll(/\{([^{}]*)\}/g)].map((match) => match[1]),
     ["view.session"],
   );
   assert.match(
     markup,
-    /<Status tone="neutral">Session: \{view\.session\}<\/Status>/,
+    /<Status tone="neutral">Session: \{view\.session\}<\/Status>\n {10}\{view\.session === "anonymous" \? \(/,
   );
+  // The session entry is the page's only conditional and its only behavior.
   assert.doesNotMatch(
-    pageCode,
+    withoutSessionLines(pageCode),
     /\?|&&|\|\||===|!==|\bif\b|\bswitch\b|\.map\(|=>/,
   );
   // Every component on the page comes from the design system, and every
@@ -2572,17 +2614,29 @@ test("22. the page shows the foundation through the design system and the server
     assert.ok(exportedComponents.includes(name), name);
   }
   // Native elements on the page are the option and table elements that the
-  // select and table primitives take as children.
+  // select and table primitives take as children, and the session entry's
+  // sign-out form.
   assert.deepEqual(
     [
-      ...new Set([...markup.matchAll(/<([a-z]\w*)/g)].map((match) => match[1])),
+      ...new Set(
+        [...foundation.matchAll(/<([a-z]\w*)/g)].map((match) => match[1]),
+      ),
     ].sort(),
     ["option", "tbody", "td", "th", "thead", "tr"],
   );
-  // The page styles nothing itself and wires no behavior.
+  assert.deepEqual(
+    [...sessionEntry.matchAll(/<([a-z]\w*)/g)].map((match) => match[1]),
+    ["form"],
+  );
+  // Outside the session entry, the page styles nothing itself and wires no
+  // behavior. The entry styles nothing either.
   assert.doesNotMatch(
-    markup,
+    foundation,
     /className|\bstyle=|\bdata-|\bon[A-Z]\w*=|\bhref=|\baction=|<form\b|\bname=|\bvalue=|\brole=/,
+  );
+  assert.doesNotMatch(
+    sessionEntry,
+    /className|\bstyle=|\bdata-|\bon[A-Z]\w*=|\bname=|\bvalue=|\brole=|\bmethod=/,
   );
   // Every attribute value is one the design system defines or plain copy.
   const attribute = (name) =>
@@ -2622,7 +2676,7 @@ test("22. the page shows the foundation through the design system and the server
   assert.equal(surfaces.filter((props) => /tone="dark"/.test(props)).length, 1);
   // The copy describes the interface foundation itself. It holds no digit,
   // so no price, count, metric, date, or time can appear.
-  const copy = markup
+  const copy = foundation
     .replace(/\{[^{}]*\}/g, " ")
     .replace(/<[^<>]*>/g, "\n")
     .split("\n")

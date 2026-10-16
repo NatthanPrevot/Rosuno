@@ -1,8 +1,10 @@
 import { connection } from "next/server";
 import { getShellView } from "../src/application/shell.ts";
+import { SUPABASE_SERVER_SESSION_SOURCE } from "../src/infrastructure/identity/server-session-source.ts";
 import {
   Alert,
   Button,
+  ButtonLink,
   Choice,
   Cluster,
   Columns,
@@ -27,11 +29,12 @@ import {
   TextAreaField,
   TextField,
 } from "../src/presentation/design-system.tsx";
+import { signOut } from "./sign-in/actions.ts";
 
 export default async function HomePage() {
   // Session state belongs to each request on the server; never prerender it.
   await connection();
-  const view = await getShellView();
+  const view = await getShellView(SUPABASE_SERVER_SESSION_SOURCE);
   return (
     <Page density="public">
       <Surface as="header" tone="dark" emphasis="raised">
@@ -44,6 +47,17 @@ export default async function HomePage() {
           </Text>
           <Rule tone="gold" />
           <Status tone="neutral">Session: {view.session}</Status>
+          {view.session === "anonymous" ? (
+            <ButtonLink variant="primary" href="/sign-in">
+              Sign in
+            </ButtonLink>
+          ) : (
+            <form action={signOut}>
+              <Button variant="secondary" type="submit">
+                Sign out
+              </Button>
+            </form>
+          )}
         </Stack>
       </Surface>
       <Columns columns="split">
