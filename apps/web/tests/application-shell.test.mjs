@@ -126,6 +126,11 @@ const sessionEntry =
 const trustedSourceVocabulary = new Map([
   ["app/page.tsx", [trustedSessionImport, trustedShellView]],
 ]);
+// P2-006: the page also offers fixed registration and confirmation-resume
+// navigation, two plain links shown whatever the session. This exact markup
+// is the only further addition admitted to the historical page contract.
+const registrationEntry =
+  '<Cluster> <ButtonLink variant="secondary" href="/sign-up"> Create an account </ButtonLink> <ButtonLink variant="tertiary" href="/auth/confirm"> Finish account confirmation </ButtonLink> </Cluster>';
 
 // Import or export syntax without the spacing Prettier writes, or with a
 // comment inside it, would hide its specifier from importsOf.
@@ -977,6 +982,19 @@ test("12. presentation reaches application state only through application module
   assert.equal(page.split(`\n${trustedSessionImport}\n`).length, 2);
   assert.equal(page.split(`\n${sessionEntryImport}\n`).length, 2);
   assert.equal(codeOf(page).match(/\bview\b/g)?.length, 3);
+  // The registration navigation appears once, right after the session entry,
+  // and is fixed links only: no condition, expression, or form of its own.
+  assert.equal(
+    codeOf(page).replace(/\s+/g, " ").split(registrationEntry).length,
+    2,
+  );
+  assert.ok(
+    codeOf(page)
+      .replace(/\s+/g, " ")
+      .includes(
+        ` </form> )} ${registrationEntry} </Stack> </Surface> <Columns columns="split">`,
+      ),
+  );
   // Its expressions are the server-derived session state and the one session
   // entry chosen by that state: every other tag, attribute, and text is fixed
   // design-system presentation.
@@ -997,6 +1015,9 @@ test("12. presentation reaches application state only through application module
       "Text",
       "Rule",
       "Status",
+      "Cluster",
+      "ButtonLink",
+      "ButtonLink",
       "Columns",
       "Stack",
       "Heading",
@@ -1080,6 +1101,10 @@ test("12. presentation reaches application state only through application module
       "tone",
       "tone",
       "tone",
+      "variant",
+      "href",
+      "variant",
+      "href",
       "columns",
       "size",
       "tone",
@@ -1155,6 +1180,8 @@ test("12. presentation reaches application state only through application module
       "One visual language for every Rosuno screen: warm surfaces, restrained gold, and clear hierarchy.",
       "Session: {}",
       "{}",
+      "Create an account",
+      "Finish account confirmation",
       "Actions and status",
       "Three levels of emphasis, each with hover, focus, pressed, and disabled states.",
       "Primary action",
@@ -1219,6 +1246,10 @@ test("12. presentation reaches application state only through application module
       "href=/sign-in",
       "variant=secondary",
       "type=submit",
+      "variant=secondary",
+      "href=/sign-up",
+      "variant=tertiary",
+      "href=/auth/confirm",
       "columns=split",
       "size=lg",
       "tone=muted",

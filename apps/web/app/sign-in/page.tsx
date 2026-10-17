@@ -92,6 +92,9 @@ export default function SignInPage() {
                 <Button variant="primary" type="submit" disabled={pending}>
                   Sign in
                 </Button>
+                <ButtonLink variant="secondary" href="/sign-up">
+                  Create an account
+                </ButtonLink>
                 <ButtonLink variant="tertiary" href="/">
                   Return to the home page
                 </ButtonLink>

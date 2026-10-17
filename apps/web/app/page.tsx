@@ -58,6 +58,14 @@ export default async function HomePage() {
               </Button>
             </form>
           )}
+          <Cluster>
+            <ButtonLink variant="secondary" href="/sign-up">
+              Create an account
+            </ButtonLink>
+            <ButtonLink variant="tertiary" href="/auth/confirm">
+              Finish account confirmation
+            </ButtonLink>
+          </Cluster>
         </Stack>
       </Surface>
       <Columns columns="split">

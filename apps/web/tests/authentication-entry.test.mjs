@@ -1065,12 +1065,42 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
     code.replace(sessionRead, " "),
     /\bconsole\b|\bprocess\b|getSession|getUser|access_?token|refresh_?token|error\.message|\bdata\b|\.session\b(?!:)|session_id/,
   );
-  // GET cannot sign out: there is no route handler, and the sign-out form is
-  // a POST server action on the home page.
+  // GET cannot sign out. The only route handler is the P2-006 email
+  // confirmation handler, admitted by its exact path and nothing broader, and
+  // the sign-out form is a POST server action on the home page.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
-    [],
+    ["app/auth/confirm/route.ts"],
   );
+  // That handler has no sign-out capability: it takes nothing from the
+  // sign-in actions and never ends a session. Its GET renders only: no token
+  // verification or consumption, provider client, cookie, or provisioning.
+  const confirmation = codeOf(read("app/auth/confirm/route.ts"));
+  assert.doesNotMatch(
+    confirmation,
+    /sign-in\/actions|signOut|sign-?out|\.auth\.signOut\b/i,
+  );
+  assert.deepEqual(
+    [...confirmation.matchAll(/^export (?:async )?function (\w+)/gm)].map(
+      (match) => match[1],
+    ),
+    ["GET", "POST"],
+  );
+  const confirmationGet = confirmation.slice(
+    confirmation.indexOf("export function GET("),
+    confirmation.indexOf("export async function POST("),
+  );
+  assert.ok(
+    confirmationGet.startsWith("export function GET(request: Request)"),
+  );
+  assert.doesNotMatch(
+    confirmationGet,
+    /verifyOtp|verifyEmailToken|confirmRegistrationEmail|resumeRegistration|CONFIRMATION_SOURCES|requestConfirmationProvider|createSupabaseServerClient|createRegistrationProvisioning|cookies|await\b|\bimport\s*\(/,
+  );
+  // The existing sign-out stays a POST server action, reached only through
+  // the home page's one form.
+  assert.match(source, /^"use server";\n/);
+  assert.match(code, /export async function signOut\(\): Promise<void> \{/);
   assert.deepEqual(filesIn("app/sign-in/"), [
     "app/sign-in/actions.ts",
     "app/sign-in/page.tsx",
