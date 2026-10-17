@@ -232,11 +232,23 @@ const sessionEntry = `{view.session === "anonymous" ? (
               </Button>
             </form>
           )}`;
+// P2-006: fixed registration and confirmation-resume navigation, two plain
+// links shown whatever the session, directly after the session entry. This
+// exact markup is the only further addition to the historical page contract.
+const registrationEntry = `<Cluster>
+            <ButtonLink variant="secondary" href="/sign-up">
+              Create an account
+            </ButtonLink>
+            <ButtonLink variant="tertiary" href="/auth/confirm">
+              Finish account confirmation
+            </ButtonLink>
+          </Cluster>`;
 const pageSessionLines = [
   trustedSessionImport,
   trustedShellView,
   sessionEntryImport,
   sessionEntry,
+  registrationEntry,
 ];
 
 // The page without its approved session lines.
@@ -2582,7 +2594,11 @@ test("22. the page shows the foundation through the design system and the server
   // fixed, not derived from that state.
   const markup = pageCode.slice(pageCode.indexOf("return ("));
   assert.equal(markup.split(sessionEntry).length, 2);
-  const foundation = markup.replace(sessionEntry, " ");
+  assert.equal(markup.split(registrationEntry).length, 2);
+  assert.ok(markup.includes(`${sessionEntry}\n          ${registrationEntry}`));
+  const foundation = markup
+    .replace(sessionEntry, " ")
+    .replace(registrationEntry, " ");
   assert.deepEqual(
     [...foundation.matchAll(/\{([^{}]*)\}/g)].map((match) => match[1]),
     ["view.session"],
@@ -2637,6 +2653,23 @@ test("22. the page shows the foundation through the design system and the server
   assert.doesNotMatch(
     sessionEntry,
     /className|\bstyle=|\bdata-|\bon[A-Z]\w*=|\bname=|\bvalue=|\brole=|\bmethod=/,
+  );
+  // The registration navigation is two design-system links to fixed
+  // first-party paths: no condition, expression, form, native element, style,
+  // or behavior, and copy without digits.
+  assert.deepEqual(
+    [...registrationEntry.matchAll(/<([A-Za-z]\w*)/g)].map((match) => match[1]),
+    ["Cluster", "ButtonLink", "ButtonLink"],
+  );
+  assert.deepEqual(
+    [...registrationEntry.matchAll(/\bhref="([^"]*)"/g)].map(
+      (match) => match[1],
+    ),
+    ["/sign-up", "/auth/confirm"],
+  );
+  assert.doesNotMatch(
+    registrationEntry,
+    /[{}?]|&&|\|\||className|\bstyle=|\bdata-|\bon[A-Z]\w*=|\baction=|<form\b|\bname=|\bvalue=|\brole=|\bmethod=|https?:|\d/,
   );
   // Every attribute value is one the design system defines or plain copy.
   const attribute = (name) =>
