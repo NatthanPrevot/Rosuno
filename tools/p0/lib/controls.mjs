@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -5347,6 +5347,329 @@ function readP1AttorneyCandidate(migration) {
   );
 }
 
+// P2-903: forward-only migrations appended after the accepted P0/P1 register.
+// The first thirteen records remain the historical prefix, validated only by
+// their explicit P0/P1 validators. The prefix digest was computed once from
+// canonical base cddb59e19a6cc69d1f9c4ee590698509bbadbe98 as SHA-256 over the
+// JSON of those records with object keys sorted recursively and array order
+// kept. Appended entries are checked by the generic rules below; passing them
+// is repository consistency only, never owner approval or live Staging proof.
+const HISTORICAL_MIGRATION_COUNT = 13;
+const HISTORICAL_MIGRATION_PREFIX_SHA256 =
+  "d6b2ffadbda9b5a63c5b09b7ef1b022f60c8ca607b495858e185c71f26cbe18c";
+const APPENDED_MIGRATION_PATH =
+  /^supabase\/migrations\/([0-9]{14})_([a-z][a-z0-9]*(?:_[a-z0-9]+)*)\.sql$/;
+const APPENDED_MIGRATION_NAME_LIMIT = 100;
+const APPENDED_BASELINE_ID =
+  /^rosuno-staging-[a-z0-9]+(?:-[a-z0-9]+)*-v[1-9][0-9]*$/;
+const APPENDED_BASELINE_EVIDENCE_PATH =
+  /^governance\/evidence\/[a-z0-9]+(?:-[a-z0-9]+)*\.json$/;
+
+function historicalCanonical(value) {
+  if (Array.isArray(value)) return value.map(historicalCanonical);
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, historicalCanonical(value[key])]),
+    );
+  }
+
+  return value;
+}
+
+function hasHistoricalMigrationPrefix(migrations) {
+  return (
+    Array.isArray(migrations) &&
+    migrations.length >= HISTORICAL_MIGRATION_COUNT &&
+    createHash("sha256")
+      .update(
+        JSON.stringify(
+          historicalCanonical(migrations.slice(0, HISTORICAL_MIGRATION_COUNT)),
+        ),
+      )
+      .digest("hex") === HISTORICAL_MIGRATION_PREFIX_SHA256
+  );
+}
+
+function isMigrationTimestamp(version) {
+  const parts = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(version);
+  if (!parts) return false;
+  const [year, month, day, hour, minute, second] = parts.slice(1).map(Number);
+  const time = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  return (
+    time.getUTCFullYear() === year &&
+    time.getUTCMonth() === month - 1 &&
+    time.getUTCDate() === day &&
+    time.getUTCHours() === hour &&
+    time.getUTCMinutes() === minute &&
+    time.getUTCSeconds() === second
+  );
+}
+
+// The one path predicate shared by the neutral-path gate, the register and the
+// drift baseline: supabase/migrations/<UTC timestamp>_<lowercase name>.sql
+// whose file name is exactly the migration ID.
+function isAppendedMigrationPath(artifactPath, migrationId) {
+  const match =
+    typeof artifactPath === "string"
+      ? APPENDED_MIGRATION_PATH.exec(artifactPath)
+      : null;
+  return (
+    match !== null &&
+    match[2].length <= APPENDED_MIGRATION_NAME_LIMIT &&
+    isMigrationTimestamp(match[1]) &&
+    migrationId === `${match[1]}_${match[2]}`
+  );
+}
+
+// Call only after the historical prefix has been verified.
+function aliasesHistoricalMigration(migrations, migrationId) {
+  return migrations
+    .slice(0, HISTORICAL_MIGRATION_COUNT)
+    .some(
+      (historical) =>
+        historical.migration_id.slice(15) === migrationId.slice(15),
+    );
+}
+
+function isUnappliedAppendedMigration(migration) {
+  return (
+    isPlainObject(migration) &&
+    migration.reviewed === false &&
+    migration.applied_environment === "none" &&
+    Array.isArray(migration.release_refs) &&
+    migration.release_refs.length === 0
+  );
+}
+
+function isAppliedAppendedMigration(migration) {
+  return (
+    isPlainObject(migration) &&
+    migration.reviewed === true &&
+    migration.applied_environment === "staging" &&
+    migration.non_production_validation === true &&
+    Array.isArray(migration.release_refs) &&
+    migration.release_refs.length > 0
+  );
+}
+
+// Path-only admission for the neutral-path gate: a path is admissible only when
+// the supplied register carries it exactly once after the intact historical
+// prefix. Admission is not approval; the register, artifact and drift checks
+// still decide. A missing or malformed register admits nothing.
+function registeredAppendedMigrationPaths(register) {
+  const admitted = new Set();
+  const migrations = isPlainObject(register) ? register.migrations : null;
+  if (
+    !Array.isArray(migrations) ||
+    migrations.length <= HISTORICAL_MIGRATION_COUNT ||
+    !hasHistoricalMigrationPrefix(migrations)
+  ) {
+    return admitted;
+  }
+  for (const [index, migration] of migrations.entries()) {
+    if (
+      index >= HISTORICAL_MIGRATION_COUNT &&
+      isPlainObject(migration) &&
+      migration.migration_kind === "product" &&
+      migration.sequence === index + 1 &&
+      isAppendedMigrationPath(
+        migration.artifact_path,
+        migration.migration_id,
+      ) &&
+      !aliasesHistoricalMigration(migrations, migration.migration_id) &&
+      migrations.filter(
+        (other) =>
+          isPlainObject(other) &&
+          other.artifact_path === migration.artifact_path,
+      ).length === 1
+    ) {
+      admitted.add(migration.artifact_path);
+    }
+  }
+  return admitted;
+}
+
+function validateAppendedMigration(register, index, context) {
+  const migration = register.migrations[index];
+  if (migration.migration_kind !== "product") {
+    fail(`${context}.migration_kind must be product for an appended migration`);
+  }
+  if (
+    !isAppendedMigrationPath(migration.artifact_path, migration.migration_id)
+  ) {
+    fail(
+      `${context}.artifact_path must be the canonical appended migration path for its migration_id`,
+    );
+  }
+  if (aliasesHistoricalMigration(register.migrations, migration.migration_id)) {
+    fail(`${context} aliases a historical migration name`);
+  }
+  const previous = register.migrations[index - 1].migration_id;
+  if (migration.migration_id.slice(0, 14) <= previous.slice(0, 14)) {
+    fail(`${context} version must ascend after ${previous}`);
+  }
+  const artifactPath = path.join(ROOT, migration.artifact_path);
+  let sql;
+  try {
+    if (!lstatSync(artifactPath).isFile()) throw new Error("not a file");
+    sql = new TextDecoder("utf-8", { fatal: true }).decode(
+      readFileSync(artifactPath),
+    );
+  } catch {
+    fail(`${context}.artifact_path must be a regular UTF-8 SQL file`);
+  }
+  if (sql.trim() === "") fail(`${context} SQL is empty`);
+  if (scanSecretLikeText(sql, context).length > 0) {
+    fail(`${context} SQL contains a secret-like value`);
+  }
+  if (
+    !isUnappliedAppendedMigration(migration) &&
+    !isAppliedAppendedMigration(migration)
+  ) {
+    fail(
+      `${context} must be an unapplied candidate or a reviewed persistent Staging application`,
+    );
+  }
+  if (migration.non_production_validation !== true) {
+    fail(`${context} lacks non-production rollback validation`);
+  }
+  requireBoundedString(migration.rollback_plan, `${context}.rollback_plan`);
+  if (
+    /^(?:n\/a|none|null|placeholder|tbd|todo|unknown)$/i.test(
+      migration.rollback_plan.trim(),
+    )
+  ) {
+    fail(`${context}.rollback_plan must be an actual bounded rollback plan`);
+  }
+  const earlier = new Set(
+    register.migrations.slice(0, index).map((item) => item.migration_id),
+  );
+  requireStringArray(migration.depends_on, `${context}.depends_on`, 1);
+  if (migration.depends_on.some((id) => !earlier.has(id))) {
+    fail(`${context}.depends_on must name earlier registered migrations`);
+  }
+}
+
+// An appended baseline must have been checked after the accepted P1-011
+// baseline.
+function isAppendedBaselineCheckedAt(value) {
+  return (
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(value) &&
+    !Number.isNaN(Date.parse(value)) &&
+    new Date(`${value.slice(0, 19)}Z`).toISOString().slice(0, 19) ===
+      value.slice(0, 19) &&
+    Date.parse(value) > Date.parse("2026-09-23T03:14:20Z")
+  );
+}
+
+// Appended inventory items must name canonical appended migrations in
+// sequence; their SHA-256 values are then checked against the file bytes.
+function appendedBaselineInventory(inventory) {
+  return inventory.slice(HISTORICAL_MIGRATION_COUNT).map((item, offset) => {
+    const sequence = HISTORICAL_MIGRATION_COUNT + offset + 1;
+    if (
+      !isPlainObject(item) ||
+      item.sequence !== sequence ||
+      !isAppendedMigrationPath(item.artifact_path, item.migration_id) ||
+      typeof item.sha256 !== "string" ||
+      !/^[a-f0-9]{64}$/.test(item.sha256)
+    ) {
+      fail(`schema drift appended migration inventory ${sequence} is invalid`);
+    }
+    return {
+      sequence,
+      migration_id: item.migration_id,
+      artifact_path: item.artifact_path,
+      sha256: item.sha256,
+    };
+  });
+}
+
+// An appended baseline adds at least one accepted evidence file; its SHA-256
+// is then checked against the file bytes.
+function appendedBaselineEvidence(evidence, historical) {
+  if (!Array.isArray(evidence) || evidence.length <= historical.length) {
+    fail("schema drift appended baseline requires appended accepted evidence");
+  }
+  const paths = new Set(historical.map((item) => item.path));
+  return evidence.slice(historical.length).map((item) => {
+    if (
+      !isPlainObject(item) ||
+      typeof item.path !== "string" ||
+      !APPENDED_BASELINE_EVIDENCE_PATH.test(item.path) ||
+      paths.has(item.path) ||
+      typeof item.sha256 !== "string" ||
+      !/^[a-f0-9]{64}$/.test(item.sha256)
+    ) {
+      fail("schema drift appended accepted evidence is invalid");
+    }
+    paths.add(item.path);
+    return { path: item.path, sha256: item.sha256 };
+  });
+}
+
+// An appended baseline must carry a new catalog fingerprint; the accepted
+// P1-011 fingerprint cannot be relabeled as a later state.
+function appendedBaselineCatalog(fingerprint, historical) {
+  if (
+    !isPlainObject(fingerprint) ||
+    typeof fingerprint.sha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(fingerprint.sha256) ||
+    fingerprint.sha256 === historical.sha256 ||
+    !Number.isSafeInteger(fingerprint.canonical_byte_length) ||
+    fingerprint.canonical_byte_length <= 0 ||
+    !Number.isSafeInteger(fingerprint.row_count) ||
+    fingerprint.row_count <= 0
+  ) {
+    fail("schema drift appended catalog fingerprint is invalid");
+  }
+  return {
+    sha256: fingerprint.sha256,
+    bytes: fingerprint.canonical_byte_length,
+    rows: fingerprint.row_count,
+  };
+}
+
+// Each appended migration needs owner work items that list it and decisions
+// that name one of those work items; a register row alone is not authorization.
+export function validateAppendedMigrationTraceability(
+  migrationRegister,
+  workItems,
+  decisions,
+) {
+  for (const [index, migration] of migrationRegister.migrations.entries()) {
+    if (index < HISTORICAL_MIGRATION_COUNT) continue;
+    const context = `migration ${index + 1}`;
+    const owners = workItems.work_items.filter((item) =>
+      migration.work_item_refs.includes(item.work_item_id),
+    );
+    if (
+      owners.length !== migration.work_item_refs.length ||
+      owners.some(
+        (item) => !item.migration_refs.includes(migration.migration_id),
+      )
+    ) {
+      fail(`${context} must be listed by each referenced owner work item`);
+    }
+    for (const decisionId of migration.decision_refs) {
+      const decision = decisions.decisions.find(
+        (item) => item.decision_id === decisionId,
+      );
+      if (
+        !decision?.work_item_refs.some((id) =>
+          migration.work_item_refs.includes(id),
+        )
+      ) {
+        fail(`${context} decision ${decisionId} must name an owner work item`);
+      }
+    }
+  }
+}
+
 export function validateMigrationRegister(
   register,
   references = {},
@@ -5354,6 +5677,14 @@ export function validateMigrationRegister(
 ) {
   requireArray(register.migrations, "migration register");
   uniqueIds(register.migrations, "migration_id", "migration");
+  if (
+    register.migrations.length > HISTORICAL_MIGRATION_COUNT &&
+    !hasHistoricalMigrationPrefix(register.migrations)
+  ) {
+    fail(
+      "appended migrations require the unchanged accepted thirteen-migration prefix",
+    );
+  }
   const registeredArtifacts = new Set();
   for (const [index, migration] of register.migrations.entries()) {
     const context = `migration ${index + 1}`;
@@ -5375,7 +5706,9 @@ export function validateMigrationRegister(
       fail(`${context}.artifact_path is duplicated`);
     }
     registeredArtifacts.add(migration.artifact_path);
-    if (migration.migration_kind === "security_control") {
+    if (index >= HISTORICAL_MIGRATION_COUNT) {
+      validateAppendedMigration(register, index, context);
+    } else if (migration.migration_kind === "security_control") {
       if (
         !migration.artifact_path.startsWith("governance/migrations/") ||
         migration.artifact_path ===
@@ -5670,6 +6003,24 @@ export function validateDriftReport(report, migrationRegister = null) {
   const closedP1011 =
     report.baseline_id === "rosuno-staging-p1-011-20260923-v1";
 
+  // P2-903: a later independently adopted baseline whose inventory extends the
+  // accepted P1-011 thirteen-migration inventory with appended migrations.
+  const appendedBaseline =
+    !closedP1004 &&
+    !closedP1005 &&
+    !closedP1006 &&
+    !closedP1007 &&
+    !closedP1008 &&
+    !closedP1009 &&
+    !closedP1010 &&
+    !closedP1011 &&
+    report.baseline_id !== FOUNDATION_BASELINE_ID &&
+    typeof report.baseline_id === "string" &&
+    report.baseline_id.length <= 100 &&
+    APPENDED_BASELINE_ID.test(report.baseline_id) &&
+    Array.isArray(report.migration_inventory) &&
+    report.migration_inventory.length > HISTORICAL_MIGRATION_COUNT;
+
   const expectedCheckedAt = closedP1011
     ? "2026-09-23T03:14:20Z"
     : closedP1010
@@ -5698,9 +6049,12 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1009 &&
       !closedP1010 &&
       !closedP1011 &&
+      !appendedBaseline &&
       report.baseline_id !== FOUNDATION_BASELINE_ID) ||
     report.checked_environment !== "staging" ||
-    report.checked_at !== expectedCheckedAt ||
+    (appendedBaseline
+      ? !isAppendedBaselineCheckedAt(report.checked_at)
+      : report.checked_at !== expectedCheckedAt) ||
     report.project?.name !== "Rosuno Staging" ||
     report.project?.project_ref !== "mxjlvmowmodzdtdfgqpb"
   ) {
@@ -5765,18 +6119,20 @@ export function validateDriftReport(report, migrationRegister = null) {
     sha256: P1_COMPLIANCE_FOUNDATION_MIGRATION_SHA256,
   };
 
-  const expectedInventory = closedP1011
-    ? [
-        ...FOUNDATION_BASELINE_MIGRATIONS,
-        p1004Migration,
-        p1005Migration,
-        p1006Migration,
-        p1007Migration,
-        p1008Migration,
-        p1009Migration,
-        p1010Migration,
-        p1011Migration,
-      ]
+  const p1011Inventory = [
+    ...FOUNDATION_BASELINE_MIGRATIONS,
+    p1004Migration,
+    p1005Migration,
+    p1006Migration,
+    p1007Migration,
+    p1008Migration,
+    p1009Migration,
+    p1010Migration,
+    p1011Migration,
+  ];
+
+  const historicalInventory = closedP1011
+    ? p1011Inventory
     : closedP1010
       ? [
           ...FOUNDATION_BASELINE_MIGRATIONS,
@@ -5832,6 +6188,13 @@ export function validateDriftReport(report, migrationRegister = null) {
                   ? [...FOUNDATION_BASELINE_MIGRATIONS, p1004Migration]
                   : FOUNDATION_BASELINE_MIGRATIONS;
 
+  const expectedInventory = appendedBaseline
+    ? [
+        ...p1011Inventory,
+        ...appendedBaselineInventory(report.migration_inventory),
+      ]
+    : historicalInventory;
+
   if (
     JSON.stringify(report.migration_inventory) !==
     JSON.stringify(expectedInventory)
@@ -5847,7 +6210,8 @@ export function validateDriftReport(report, migrationRegister = null) {
 
   if (
     register.product_migrations_present !== true ||
-    ![5, 6, 7, 8, 9, 10, 11, 12, 13].includes(register.migrations?.length) ||
+    (![5, 6, 7, 8, 9, 10, 11, 12, 13].includes(register.migrations?.length) &&
+      !(register.migrations?.length > HISTORICAL_MIGRATION_COUNT)) ||
     register.migrations
       .slice(0, 5)
       .some(
@@ -5901,13 +6265,61 @@ export function validateDriftReport(report, migrationRegister = null) {
       "P1-010 baseline requires twelve accepted migrations plus at most one bounded P1-011 overlay",
     );
 
-  if (closedP1011 && register.migrations.length !== 13)
+  if (closedP1011 && register.migrations.length < HISTORICAL_MIGRATION_COUNT)
     fail("P1-011 baseline requires exactly thirteen accepted migrations");
 
   if (closedP1008 && ![10, 11, 12, 13].includes(register.migrations.length))
     fail(
       "P1-008 baseline requires ten accepted migrations plus at most bounded P1-009, P1-010, and P1-011 overlays",
     );
+
+  // P2-903: appended migrations need the accepted P1-011 lineage and the
+  // unchanged register prefix. The thirteen-migration P1-011 baseline cannot
+  // prove that an appended migration was applied; only a later adopted
+  // baseline tied to reviewed Staging-applied register entries can, and that
+  // is still repository evidence, not proof of live Staging state.
+  if (
+    appendedBaseline &&
+    register.migrations.length < report.migration_inventory.length
+  )
+    fail("schema drift baseline inventory exceeds the reviewed register");
+
+  if (register.migrations.length > HISTORICAL_MIGRATION_COUNT) {
+    if (!closedP1011 && !appendedBaseline)
+      fail("appended migrations require the accepted P1-011 baseline lineage");
+
+    if (!hasHistoricalMigrationPrefix(register.migrations))
+      fail(
+        "appended migrations require the unchanged accepted thirteen-migration prefix",
+      );
+
+    const appliedCount = appendedBaseline
+      ? report.migration_inventory.length
+      : HISTORICAL_MIGRATION_COUNT;
+
+    for (const [index, migration] of register.migrations.entries()) {
+      if (index < HISTORICAL_MIGRATION_COUNT) continue;
+
+      if (index >= appliedCount) {
+        if (!isUnappliedAppendedMigration(migration))
+          fail(
+            `schema drift baseline cannot prove applied or reviewed migration ${index + 1}`,
+          );
+      } else if (
+        report.migration_inventory[index].migration_id !==
+          migration.migration_id ||
+        report.migration_inventory[index].artifact_path !==
+          migration.artifact_path ||
+        !isAppliedAppendedMigration(migration)
+      ) {
+        fail(
+          `schema drift baseline migration ${index + 1} is not tied to a reviewed Staging application`,
+        );
+      }
+    }
+
+    validateMigrationRegister(register, {}, repositoryFiles());
+  }
 
   if (
     !closedP1004 &&
@@ -6226,18 +6638,20 @@ export function validateDriftReport(report, migrationRegister = null) {
       .digest("hex"),
   };
 
-  const expectedEvidence = closedP1011
-    ? [
-        ...FOUNDATION_BASELINE_EVIDENCE,
-        p1004Evidence,
-        p1005Evidence,
-        p1006Evidence,
-        p1007Evidence,
-        p1008Evidence,
-        p1009Evidence,
-        p1010Evidence,
-        p1011Evidence,
-      ]
+  const p1011AcceptedEvidence = [
+    ...FOUNDATION_BASELINE_EVIDENCE,
+    p1004Evidence,
+    p1005Evidence,
+    p1006Evidence,
+    p1007Evidence,
+    p1008Evidence,
+    p1009Evidence,
+    p1010Evidence,
+    p1011Evidence,
+  ];
+
+  const historicalEvidence = closedP1011
+    ? p1011AcceptedEvidence
     : closedP1010
       ? [
           ...FOUNDATION_BASELINE_EVIDENCE,
@@ -6293,6 +6707,16 @@ export function validateDriftReport(report, migrationRegister = null) {
                   ? [...FOUNDATION_BASELINE_EVIDENCE, p1004Evidence]
                   : FOUNDATION_BASELINE_EVIDENCE;
 
+  const expectedEvidence = appendedBaseline
+    ? [
+        ...p1011AcceptedEvidence,
+        ...appendedBaselineEvidence(
+          report.accepted_evidence,
+          p1011AcceptedEvidence,
+        ),
+      ]
+    : historicalEvidence;
+
   if (
     JSON.stringify(report.accepted_evidence) !==
       JSON.stringify(expectedEvidence) ||
@@ -6311,13 +6735,14 @@ export function validateDriftReport(report, migrationRegister = null) {
       fail(`schema drift evidence digest is invalid for ${artifact.path}`);
   }
 
-  const expectedCatalog = closedP1011
-    ? {
-        sha256:
-          "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
-        bytes: 640365,
-        rows: 1938,
-      }
+  const p1011Catalog = {
+    sha256: "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
+    bytes: 640365,
+    rows: 1938,
+  };
+
+  const historicalCatalog = closedP1011
+    ? p1011Catalog
     : closedP1010
       ? {
           sha256:
@@ -6373,6 +6798,10 @@ export function validateDriftReport(report, migrationRegister = null) {
                       rows: P1_AUTHORIZATION_CORRECTION_CATALOG_ROWS,
                     };
 
+  const expectedCatalog = appendedBaseline
+    ? appendedBaselineCatalog(report.catalog_fingerprint, p1011Catalog)
+    : historicalCatalog;
+
   if (
     report.catalog_fingerprint?.format !== "rosuno-p1-catalog-v1" ||
     report.catalog_fingerprint?.sha256 !== expectedCatalog.sha256 ||
@@ -6406,6 +6835,7 @@ export function validateDriftReport(report, migrationRegister = null) {
       !closedP1009 &&
       !closedP1010 &&
       !closedP1011 &&
+      !appendedBaseline &&
       digest !== FOUNDATION_BASELINE_DIGEST)
   ) {
     fail("schema drift baseline identity/digest is invalid");
@@ -7762,13 +8192,14 @@ export function validateApplicationSurface({
   workspace,
   webPackageJson = null,
   npmrc = null,
+  migrationRegister = null,
 } = {}) {
   if (!Array.isArray(files) || files.some((file) => typeof file !== "string")) {
     fail("repository file list must be an array of paths");
   }
   const state = detectApplicationState({ files, packageJson, workspace });
   validatePnpmWorkspace(workspace, state);
-  validateNeutralPaths(files, packageJson, state);
+  validateNeutralPaths(files, packageJson, state, migrationRegister);
   if (state === PRE_APPLICATION_STATE) {
     if (webPackageJson !== null) {
       fail("pre-application state must not include an application manifest");
@@ -7877,6 +8308,7 @@ export function validateNeutralPaths(
   files,
   packageJson,
   state = PRE_APPLICATION_STATE,
+  migrationRegister = null,
 ) {
   validatePackageJson(packageJson, state);
   const webApplication = state === WEB_APPLICATION_STATE;
@@ -7919,6 +8351,11 @@ export function validateNeutralPaths(
     "supabase/migrations/20260830023823_p1_jurisdiction_policy_launch_foundation.sql",
     "supabase/migrations/20260901012518_p1_authorization_scope_correction.sql",
   ]);
+  // P2-903: in the web-application state only, an appended migration SQL path
+  // is admissible when the explicitly supplied register carries it.
+  const appendedMigrationPaths = webApplication
+    ? registeredAppendedMigrationPaths(migrationRegister)
+    : new Set();
   const forbidden = files.filter(
     (file) =>
       !allowedRootFiles.has(file) &&
@@ -7949,6 +8386,7 @@ export function validateNeutralPaths(
       !/^supabase\/migrations\/[0-9]{14}_p1_compliance_foundation\.sql$/.test(
         file,
       ) &&
+      !appendedMigrationPaths.has(file) &&
       !file.startsWith("governance/") &&
       !file.startsWith("tools/p0/") &&
       !(webApplication && isWebApplicationPath(file)) &&
@@ -8171,6 +8609,9 @@ export function validateRepository() {
     "utf8",
   );
   const files = repositoryFiles();
+  // P2-903: the neutral-path gate admits appended migration paths only from the
+  // controlled register, so it is read first; it is still fully validated below.
+  const migrations = readJson("governance/migrations/reviewed-migrations.json");
   validateApplicationSurface({
     files,
     packageJson,
@@ -8179,6 +8620,7 @@ export function validateRepository() {
       ? readJson("apps/web/package.json")
       : null,
     npmrc: readOptionalText(".npmrc"),
+    migrationRegister: migrations,
   });
   validateCiWorkflow(
     readFileSync(path.join(ROOT, ".github/workflows/p0-controls.yml"), "utf8"),
@@ -8187,7 +8629,6 @@ export function validateRepository() {
   const authorityData = readJson("governance/authority-references.json");
   const decisions = readJson("governance/decision-log.json");
   const workItems = readJson("governance/work-items/index.json");
-  const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const releases = readJson("governance/releases/traceability.json");
   const correctionMigrationSql = readFileSync(
     path.join(ROOT, P1_AUTHORIZATION_CORRECTION_MIGRATION_PATH),
@@ -8375,6 +8816,7 @@ export function validateRepository() {
     releases,
   );
   validateTraceabilityConsistency(migrations, releases);
+  validateAppendedMigrationTraceability(migrations, workItems, decisions);
 
   return {
     status: "passed",

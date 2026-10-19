@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   cpSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
@@ -1972,7 +1973,9 @@ test("schema drift findings are rejected", () => {
 });
 
 test("reviewed and persistently applied P1-002 cannot remain pending", () => {
-  const register = readJson("governance/migrations/reviewed-migrations.json");
+  const register = historicalMigrationRegister(
+    readJson("governance/migrations/reviewed-migrations.json"),
+  );
   const migration = register.migrations.find(
     (entry) =>
       entry.migration_id === "20260829171701_p1_authorization_foundation",
@@ -2648,7 +2651,10 @@ test("P1-004 closure rejects every independent lifecycle record mutation", async
   assert.throws(() => validateP1AttorneyClosureTraceability(...duplicate));
 });
 test("P1-004 closed baseline rejects its specific governed-value mutations", async (t) => {
-  const register = readJson("governance/migrations/reviewed-migrations.json");
+  const register = historicalMigrationRegister(
+    readJson("governance/migrations/reviewed-migrations.json"),
+  );
+  const historical = await historicalRepository(t);
 
   const baseline = {
     version: 1,
@@ -2756,7 +2762,7 @@ test("P1-004 closed baseline rejects its specific governed-value mutations", asy
   assert.equal(baseline.checked_at, "2026-09-10T22:48:00.544397Z");
   assert.equal(baseline.migration_inventory.length, 6);
   assert.equal(baseline.accepted_evidence.length, 4);
-  assert.doesNotThrow(() => validateDriftReport(baseline, register));
+  assert.doesNotThrow(() => historical.validateDriftReport(baseline, register));
 
   const mutations = [
     [
@@ -2812,7 +2818,10 @@ test("P1-004 closed baseline rejects its specific governed-value mutations", asy
     await t.test(label, () => {
       const altered = structuredClone(baseline);
       mutate(altered);
-      assert.throws(() => validateDriftReport(altered, register), label);
+      assert.throws(
+        () => historical.validateDriftReport(altered, register),
+        label,
+      );
     });
   }
 });
@@ -2890,7 +2899,7 @@ test("P1-006 accepted closure remains valid under the current P1-011 baseline", 
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-011-20260923-v1");
   assert.equal(baseline.migration_inventory.length, 13);
-  assert.equal(migrations.migrations.length, 13);
+  assertHistoricalMigrationPrefix(migrations);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
@@ -3058,7 +3067,7 @@ test("P1-007 accepted closure remains valid under the current P1-011 baseline", 
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-011-20260923-v1");
   assert.equal(baseline.migration_inventory.length, 13);
-  assert.equal(migrations.migrations.length, 13);
+  assertHistoricalMigrationPrefix(migrations);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
@@ -3191,7 +3200,7 @@ test("P1-007 accepted closure remains valid under the current P1-011 baseline", 
   );
 });
 
-test("P1-008 accepted closure remains valid under the current P1-011 baseline", () => {
+test("P1-008 accepted closure remains valid under the current P1-011 baseline", async (t) => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -3231,7 +3240,7 @@ test("P1-008 accepted closure remains valid under the current P1-011 baseline", 
 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-011-20260923-v1");
   assert.equal(baseline.migration_inventory.length, 13);
-  assert.equal(migrations.migrations.length, 13);
+  assertHistoricalMigrationPrefix(migrations);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
@@ -3291,7 +3300,7 @@ test("P1-008 accepted closure remains valid under the current P1-011 baseline", 
     "pending",
   );
 
-  const pendingMigrations = structuredClone(migrations);
+  const pendingMigrations = historicalMigrationRegister(migrations);
   pendingMigrations.migrations[
     pendingMigrations.migrations.findIndex(
       (item) => item.migration_id === migrationId,
@@ -3371,8 +3380,9 @@ test("P1-008 accepted closure remains valid under the current P1-011 baseline", 
       path !== "governance/evidence/p1-010-governance-lifecycle-closure.json" &&
       path !== "governance/evidence/p1-011-governance-lifecycle-closure.json",
   );
+  const historical = await historicalRepository(t);
   assert.doesNotThrow(() =>
-    validateDriftReport(pendingBaseline, pendingMigrations),
+    historical.validateDriftReport(pendingBaseline, pendingMigrations),
   );
 });
 
@@ -3603,7 +3613,7 @@ test("P1-010 accepted closure remains valid under the current P1-011 baseline", 
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-011-20260923-v1");
   assert.equal(baseline.checked_at, "2026-09-23T03:14:20Z");
   assert.equal(baseline.migration_inventory.length, 13);
-  assert.equal(migrations.migrations.length, 13);
+  assertHistoricalMigrationPrefix(migrations);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
@@ -3830,7 +3840,7 @@ test("P1-011 accepted Compliance closure requires exact lifecycle evidence and t
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-011-20260923-v1");
   assert.equal(baseline.checked_at, "2026-09-23T03:14:20Z");
   assert.equal(baseline.migration_inventory.length, 13);
-  assert.equal(migrations.migrations.length, 13);
+  assertHistoricalMigrationPrefix(migrations);
   assert.equal(
     baseline.catalog_fingerprint.sha256,
     "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
@@ -3930,7 +3940,7 @@ test("P1-011 accepted Compliance closure requires exact lifecycle evidence and t
   );
 });
 
-test("P1-011 historical pending representation remains valid against the accepted P1-010 baseline", () => {
+test("P1-011 historical pending representation remains valid against the accepted P1-010 baseline", async (t) => {
   const migrations = readJson("governance/migrations/reviewed-migrations.json");
   const workItems = readJson("governance/work-items/index.json");
   const decisions = readJson("governance/decision-log.json");
@@ -3961,7 +3971,7 @@ test("P1-011 historical pending representation remains valid against the accepte
     "pending",
   );
 
-  const pendingMigrations = structuredClone(migrations);
+  const pendingMigrations = historicalMigrationRegister(migrations);
   pendingMigrations.migrations[
     pendingMigrations.migrations.findIndex(
       (item) => item.migration_id === "20260921051204_p1_compliance_foundation",
@@ -4039,8 +4049,9 @@ test("P1-011 historical pending representation remains valid against the accepte
   assert.equal(pendingBaseline.accepted_evidence.length, 10);
   assert.equal(pendingBaseline.evidence.length, 10);
 
+  const historical = await historicalRepository(t);
   assert.doesNotThrow(() =>
-    validateDriftReport(pendingBaseline, pendingMigrations),
+    historical.validateDriftReport(pendingBaseline, pendingMigrations),
   );
 });
 
@@ -4121,6 +4132,11 @@ test("live repository surface validates in its detected application state", () =
       npmrc: files.includes(".npmrc")
         ? readFileSync(path.join(ROOT, ".npmrc"), "utf8")
         : null,
+      // P2-903: live validation admits appended migration SQL only with the
+      // explicitly supplied register, as validateRepository does.
+      migrationRegister: readJson(
+        "governance/migrations/reviewed-migrations.json",
+      ),
     }),
     state,
   );
@@ -6110,6 +6126,108 @@ function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function sortedKeys(value) {
+  if (Array.isArray(value)) return value.map(sortedKeys);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, sortedKeys(value[key])]),
+    );
+  }
+  return value;
+}
+
+// The accepted thirteen P0/P1 migration IDs in register order. Each has a
+// supabase/migrations/<id>.sql file (the P0 file is its CLI inventory).
+function historicalMigrationIds() {
+  return [
+    "20260828192126_p0_restrict_rls_auto_enable_execution",
+    "20260829000015_p1_platform_foundation",
+    "20260829171701_p1_authorization_foundation",
+    "20260830023823_p1_jurisdiction_policy_launch_foundation",
+    "20260901012518_p1_authorization_scope_correction",
+    "20260910075939_p1_attorney_verification_eligibility_foundation",
+    "20260911062917_p1_client_intake_ai_foundation",
+    "20260914000658_p1_marketplace_referral_foundation",
+    "20260914231532_p1_scheduling_request_booking_bookability_foundation",
+    "20260917045031_p1_consultation_engagement_media_foundation",
+    "20260918060600_p1_resources_communications_foundation",
+    "20260919000112_p1_financial_foundation",
+    "20260921051204_p1_compliance_foundation",
+  ];
+}
+
+// P2-903: the register must begin with the accepted thirteen P0/P1 records,
+// unchanged and in order; later entries are appended migrations checked by
+// validateMigrationRegister, so the total register length is not fixed here.
+// The digest was computed once from canonical base
+// cddb59e19a6cc69d1f9c4ee590698509bbadbe98 as SHA-256 over the JSON of the
+// first thirteen records with object keys sorted recursively.
+function assertHistoricalMigrationPrefix(migrations) {
+  const prefix = migrations.migrations.slice(0, 13);
+  assert.deepEqual(
+    prefix.map((migration) => [
+      migration.sequence,
+      migration.migration_id,
+      migration.artifact_path,
+    ]),
+    historicalMigrationIds().map((id, index) => [
+      index + 1,
+      id,
+      index === 0
+        ? `governance/migrations/${id}.json`
+        : `supabase/migrations/${id}.sql`,
+    ]),
+  );
+  assert.equal(
+    sha256Hex(JSON.stringify(sortedKeys(prefix))),
+    "d6b2ffadbda9b5a63c5b09b7ef1b022f60c8ca607b495858e185c71f26cbe18c",
+  );
+}
+
+// P2-903: historical replays use only the verified thirteen-record prefix, so
+// a migration appended to the live register never enters a historical state.
+function historicalMigrationRegister(migrations) {
+  assertHistoricalMigrationPrefix(migrations);
+  const register = structuredClone(migrations);
+  register.migrations = register.migrations.slice(0, 13);
+  return register;
+}
+
+// P2-903: a disposable copy holding the historical thirteen-record register and
+// exactly its thirteen SQL files, so a historical drift replay validates against
+// the historical file inventory rather than any appended live migration. The
+// copy is removed when test `t` ends.
+async function historicalRepository(t) {
+  const root = mkdtempSync(path.join(tmpdir(), "rosuno-p2-903-historical-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  for (const directory of ["governance", "tools/p0"]) {
+    cpSync(path.join(ROOT, directory), path.join(root, directory), {
+      recursive: true,
+    });
+  }
+  writeFileSync(
+    path.join(root, "governance/migrations/reviewed-migrations.json"),
+    `${JSON.stringify(
+      historicalMigrationRegister(
+        readJson("governance/migrations/reviewed-migrations.json"),
+      ),
+      null,
+      2,
+    )}\n`,
+  );
+  mkdirSync(path.join(root, "supabase/migrations"), { recursive: true });
+  for (const id of historicalMigrationIds()) {
+    cpSync(
+      path.join(ROOT, `supabase/migrations/${id}.sql`),
+      path.join(root, `supabase/migrations/${id}.sql`),
+    );
+  }
+  execFileSync("git", ["init", "-q", root]);
+  return import(pathToFileURL(path.join(root, "tools/p0/lib/controls.mjs")));
+}
+
 // Frozen copy of the canonical pre-application root package.json at base
 // 766d7a8c1b230c62b4e4f58e7107c2267fce14ab (test data only).
 function preApplicationPackage() {
@@ -6228,8 +6346,19 @@ function liveRepositoryFiles() {
     .filter(Boolean);
 }
 
+// P2-903: synthetic surface fixtures model the accepted pre-suffix repository,
+// so their migration SQL paths are fixed to the thirteen historical files. The
+// live repository, including any appended migration, is validated separately
+// with its explicit register.
 function neutralRepositoryFiles() {
-  return liveRepositoryFiles().filter((file) => !file.startsWith("apps/web/"));
+  const historicalSql = new Set(
+    historicalMigrationIds().map((id) => `supabase/migrations/${id}.sql`),
+  );
+  return liveRepositoryFiles().filter(
+    (file) =>
+      !file.startsWith("apps/web/") &&
+      (!file.startsWith("supabase/migrations/") || historicalSql.has(file)),
+  );
 }
 
 // A pre-application repository carries no C1 work-item Packet; that state
