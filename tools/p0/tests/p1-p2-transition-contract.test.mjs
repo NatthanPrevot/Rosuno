@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { validateRepository } from "../lib/controls.mjs";
+
+// P2-903: the original thirteen migration and thirteen release records.
+const HISTORICAL_MIGRATION_COUNT = 13;
+const HISTORICAL_RELEASE_COUNT = 13;
 
 function readJson(relativePath) {
   return JSON.parse(
@@ -12,6 +17,26 @@ function readJson(relativePath) {
 function sha256(relativePath) {
   return createHash("sha256")
     .update(readFileSync(new URL("../../../" + relativePath, import.meta.url)))
+    .digest("hex");
+}
+
+function sortedKeys(value) {
+  if (Array.isArray(value)) return value.map(sortedKeys);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, sortedKeys(value[key])]),
+    );
+  }
+  return value;
+}
+
+// SHA-256 over the JSON of the first `count` records with object keys sorted
+// recursively and array order kept.
+function prefixSha256(records, count) {
+  return createHash("sha256")
+    .update(JSON.stringify(sortedKeys(records.slice(0, count))))
     .digest("hex");
 }
 
@@ -125,9 +150,18 @@ test("P1 closure preserves deferred Physical 1L and the accepted database baseli
     /Arizona is not READY, LIVE, approved for launch, ABS, non-ABS, LRS, non-LRS, or otherwise legally classified/,
   );
 
-  assert.equal(migrations.migrations.length, 13);
+  // P2-903: historical-prefix proof without a fixed whole-register length. The
+  // first thirteen records must match the digest computed once from canonical
+  // base cddb59e19a6cc69d1f9c4ee590698509bbadbe98 with prefixSha256, and a
+  // separately authorized appended migration never displaces the original
+  // final historical record at index 12.
+  assert.ok(migrations.migrations.length >= HISTORICAL_MIGRATION_COUNT);
   assert.equal(
-    migrations.migrations.at(-1).migration_id,
+    prefixSha256(migrations.migrations, HISTORICAL_MIGRATION_COUNT),
+    "d6b2ffadbda9b5a63c5b09b7ef1b022f60c8ca607b495858e185c71f26cbe18c",
+  );
+  assert.equal(
+    migrations.migrations[12].migration_id,
     "20260921051204_p1_compliance_foundation",
   );
   assert.equal(baseline.baseline_id, "rosuno-staging-p1-011-20260923-v1");
@@ -145,14 +179,34 @@ test("P1 closure preserves deferred Physical 1L and the accepted database baseli
     false,
   );
 
-  assert.equal(
-    sha256("governance/migrations/reviewed-migrations.json"),
-    "fdc9733cef8c7a573c3113cd56ba0fe10fa3a8b621b45cad3a099a61d81addde",
-  );
-  assert.equal(
-    sha256("governance/releases/traceability.json"),
-    "f3707b75fb027d26172cb7cb404428fa6e4e7d9980f04db1ea7ffbd7d8fd2691",
-  );
+  // P2-903: a register with no appended suffix must still match its original
+  // whole-file SHA-256. When either register has a suffix, both historical
+  // record prefixes must match their pinned digests (the migration prefix is
+  // asserted above in every state), and the suffix is tolerated only if the
+  // full repository validation accepts it: a syntactically valid JSON append
+  // is not approval.
+  const migrationSuffix =
+    migrations.migrations.length > HISTORICAL_MIGRATION_COUNT;
+  const releaseSuffix = releases.releases.length > HISTORICAL_RELEASE_COUNT;
+  if (!migrationSuffix) {
+    assert.equal(
+      sha256("governance/migrations/reviewed-migrations.json"),
+      "fdc9733cef8c7a573c3113cd56ba0fe10fa3a8b621b45cad3a099a61d81addde",
+    );
+  }
+  if (!releaseSuffix) {
+    assert.equal(
+      sha256("governance/releases/traceability.json"),
+      "f3707b75fb027d26172cb7cb404428fa6e4e7d9980f04db1ea7ffbd7d8fd2691",
+    );
+  }
+  if (migrationSuffix || releaseSuffix) {
+    assert.equal(
+      prefixSha256(releases.releases, HISTORICAL_RELEASE_COUNT),
+      "4af80ee97c3eb5449cea03e95f3ebd9d5ddb305ffde2a89a973f929eedbc12ae",
+    );
+    assert.doesNotThrow(() => validateRepository());
+  }
   assert.equal(
     sha256("governance/schema-drift/baseline.json"),
     "196caee4de2c870652ce5b716a9b02c484c97181b1d9c59e5abbc5c2966b2d65",
