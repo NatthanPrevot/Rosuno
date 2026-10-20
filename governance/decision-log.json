@@ -1377,6 +1377,43 @@
         "Prior single-use exception SHA-256 b73ed406683258f2561a44c785b9c9569c3ee2bfd51dc0c030dab6ecd27a9e02, treated as expired for future implementation."
       ],
       "expiry": null
+    },
+
+    {
+      "decision_id": "DEC-20261019-P2-903-FORWARD-MIGRATION-FAST-CONTROL-CLOSURE",
+      "title": "Record P2-903 Forward Migration Fast-Control Governance Closure",
+      "status": "accepted",
+      "scope": "Retrospective P2-903 Gate 7 governance closure limited to governance/work-items/index.json and governance/decision-log.json.",
+      "decision": "Register the already-completed P2-903 PROCESS forward-migration Fast-Control compatibility implementation using verified protected GitHub, CI and independent audit evidence, without changing implementation or environments.",
+      "rationale": "P2-903 implementation was merged and independently verified under PR #74 on 2026-10-19 UTC; its canonical work-item and closure decision were not registered in the existing governance indices.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "work_item_refs": [
+        "WI-P2-903-FORWARD-MIGRATION-FAST-CONTROL-COMPATIBILITY"
+      ],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-20T04:29:46Z",
+      "updated_at": "2026-10-20T04:29:46Z",
+      "supersedes": [],
+      "impact": "Governance registration only; unchanged implementation, original Packet, historic migration and security baseline, Git history, and all external environments. Gates 5 and 6 N/A. No database application, deployment or later work authorized.",
+      "evidence": [
+        "Original adopted P2-903 Packet SHA-256 a9eb8cee542ec4fa4a4f16e238208f2f5b506f71b216119f9a885518591c4e77; Packet-only commit 1f04d0b9b05df3968e4452a0785a861031b35c60.",
+        "PR #74: five files total (Packet plus four implementation/test files), two commits; implementation head 9ec8198017b7a2fdc262b061c5522f29b66e0c63.",
+        "Validated implementation tree 475a0f125bc99308f101e17067ab81c42d9ae20c.",
+        "Rosuno designated human implementation approval review 5574762404 on exact PR #74 head.",
+        "ROSUNO-GUARD PASS run 39282264140 and protected implementation CI PASS run 39282265588.",
+        "Protected merge commit 64b94ccbf42d8abe78e6c786b4f5d12ab8bbc7b5, ordered parents cddb59e19a6cc69d1f9c4ee590698509bbadbe98 and 9ec8198017b7a2fdc262b061c5522f29b66e0c63.",
+        "Post-merge P0 CI PASS run 39289610893; Primary and Independent Backup implementation/post-merge PASS.",
+        "All 13 accepted historical migrations preserved; supabase/migrations subtree 52c4398f8093cd691d9db5ff3976adfe23c9a8f8.",
+        "Implementation Gates 5 and 6 N/A: no migration or persistent Staging/Supabase operation."
+      ],
+      "expiry": null
     }
   ]
 }
