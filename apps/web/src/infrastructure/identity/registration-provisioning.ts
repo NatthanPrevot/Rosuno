@@ -1,16 +1,18 @@
-// Server-only registration provisioning (P2-006).
+// Server-only registration provisioning (P2-006) and quota decision (P2-007).
 //
 // The only module that reads the privileged project credential. For each
 // request it builds a separate, cookie-free Supabase client that is used for
 // nothing but Admin creation and rereads of one unconfirmed account and the
 // bounded User and Client-profile operations of that account's registration.
-// A second client, built from the publishable key alone and never given the
-// privileged credential, only requests signup confirmation emails. Neither
-// client receives a request cookie or Authorization header, stores or
+// Another such client makes only the one fixed registration quota decision
+// call. A further client, built from the publishable key alone and never
+// given the privileged credential, only requests signup confirmation emails.
+// No client receives a request cookie or Authorization header, stores or
 // refreshes a session, or reaches presentation code, and neither the
-// credential nor a client is exported. Both are built only after the
+// credential nor a client is exported. Each is built only after the
 // environment's project binding is verified; anything missing, malformed, or
-// unbound reports null before any client exists, so nothing privileged runs.
+// unbound reports null or nothing before any client exists, so nothing
+// privileged runs.
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -273,4 +275,68 @@ export async function createConfirmationDispatch(
       return error === null;
     },
   } satisfies ConfirmationDispatch);
+}
+
+// The opaque digests and validated deployment maxima of one quota decision.
+type QuotaDigests = {
+  readonly ip: string;
+  readonly identity: string;
+  readonly global: string;
+};
+
+type QuotaMaxima = {
+  readonly ipPerHour: number;
+  readonly identityPerDay: number;
+  readonly globalPerHour: number;
+};
+
+const DIGEST = /^[0-9a-f]{64}$/;
+
+function isDigest(value: unknown): value is string {
+  return typeof value === "string" && DIGEST.test(value);
+}
+
+function isMaximum(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 1;
+}
+
+// One registration quota decision (P2-007), made by the fixed
+// registration_quota_decide database function through its own cookie-free
+// privileged client. Only the three opaque digests and three validated
+// maxima are sent, under the caller's abort signal; nothing else from the
+// request reaches the call. It resolves the function's answer exactly as
+// returned, or undefined when the binding or an argument is invalid or the
+// call fails, is refused, or is aborted. The database bounds the maxima
+// again and owns the clock and windows.
+export async function decideQuotaRpc(
+  digests: QuotaDigests,
+  maxima: QuotaMaxima,
+  signal: AbortSignal,
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<unknown> {
+  const binding = readProjectBinding(environment);
+  if (
+    binding === null ||
+    !isDigest(digests.ip) ||
+    !isDigest(digests.identity) ||
+    !isDigest(digests.global) ||
+    !isMaximum(maxima.ipPerHour) ||
+    !isMaximum(maxima.identityPerDay) ||
+    !isMaximum(maxima.globalPerHour)
+  ) {
+    return undefined;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  const { data, error } = await admin
+    .rpc("registration_quota_decide", {
+      ip_digest: digests.ip,
+      identity_digest: digests.identity,
+      global_digest: digests.global,
+      ip_max: maxima.ipPerHour,
+      identity_max: maxima.identityPerDay,
+      global_max: maxima.globalPerHour,
+    })
+    .abortSignal(signal);
+  return error === null ? data : undefined;
 }

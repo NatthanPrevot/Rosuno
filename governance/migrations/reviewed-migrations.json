@@ -329,6 +329,30 @@
       "drift_check": "Rosuno Staging rollback-only validation passed exact restoration of the accepted twelve-migration P1-010 baseline; persistent application then passed exact thirteen-version history, 60/60 RLS, zero P1-011 target rows, exact retained-query 60-table catalog fingerprint, and the accepted 30 INFO / 2 WARN security-advisor posture with zero unexplained findings.",
       "rollback_plan": "If a later independently verified defect requires Staging rollback, correct only the sequence-13 P1-011 change through a separately reviewed forward-only non-production rollback migration; never edit historical migration bytes or migration history directly, and preserve all earlier accepted controls.",
       "depends_on": ["20260919000112_p1_financial_foundation"]
+    },
+    {
+      "migration_id": "20261020070000_p2_registration_abuse_control",
+      "migration_kind": "product",
+      "sequence": 14,
+      "artifact_path": "supabase/migrations/20261020070000_p2_registration_abuse_control.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-007-REGISTRATION-ABUSE-CONTROL"],
+      "decision_refs": [
+        "DEC-20261020-P2-007-REGISTRATION-ABUSE-CONTROL-CONTRACT"
+      ],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Unapplied candidate. Before any application, correct defects only with new forward-only commits; the disposable D-05 proof applied this exact SQL inside BEGIN and ROLLBACK and restored the exact fixture catalog fingerprint. After any separately authorized Staging application, a verified defect requires a separately reviewed forward-only compensating migration that restores the previous quota catalog and grants while registration stays default-denied; never edit this file, earlier migrations, or migration history.",
+      "depends_on": ["20260921051204_p1_compliance_foundation"]
     }
   ]
 }
