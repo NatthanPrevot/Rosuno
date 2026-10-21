@@ -84,9 +84,16 @@ create index registration_quota_counters_expiry_idx
 -- or advances the single current-hour global aggregate row, whose saturating
 -- throttled_count is privacy-safe operational telemetry, never quota. Any
 -- invalid argument, effective-policy mismatch with an existing current row,
--- lock timeout, or decision past the statement deadline raises one fixed
--- message and changes nothing. No caller chooses the time, windows, marker,
--- role, or target.
+-- or decision found past the statement deadline at its end raises one fixed
+-- message and changes nothing; a lock or statement timeout raises
+-- PostgreSQL's own cancellation error and likewise changes nothing. No caller
+-- chooses the time, windows, marker, role, or target.
+--
+-- The declared statement_timeout preempts a running decision only when it is
+-- armed before the statement starts, as PostgREST does when it hoists this
+-- function's setting into the transaction: a function-level setting cannot
+-- arm the timer of the statement already running. The final elapsed-time
+-- check is defense in depth and never interrupts a running decision.
 create function public.registration_quota_decide(
   ip_digest text,
   identity_digest text,
@@ -101,6 +108,7 @@ volatile
 security invoker
 set search_path = pg_catalog
 set lock_timeout = '250ms'
+set statement_timeout = '1500ms'
 as $function$
 declare
   marker text;
@@ -317,8 +325,9 @@ begin
     limit 100
   );
 
-  -- A decision that ran past the 1,500 ms statement deadline is rolled back
-  -- rather than reported.
+  -- Defense in depth: a decision that completed past the 1,500 ms statement
+  -- deadline, for example because no caller armed statement_timeout, is
+  -- rolled back rather than reported.
   if clock_timestamp() - statement_timestamp()
      > interval '1500 milliseconds' then
     raise exception 'registration quota unavailable'

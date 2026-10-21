@@ -1040,7 +1040,7 @@ test("18. the migration is one private relation and one restricted SECURITY INVO
   );
   assert.match(
     code,
-    /\nreturns text\nlanguage plpgsql\nvolatile\nsecurity invoker\nset search_path = pg_catalog\nset lock_timeout = '250ms'\nas \$function\$\n/,
+    /\nreturns text\nlanguage plpgsql\nvolatile\nsecurity invoker\nset search_path = pg_catalog\nset lock_timeout = '250ms'\nset statement_timeout = '1500ms'\nas \$function\$\n/,
   );
   assert.match(
     code,

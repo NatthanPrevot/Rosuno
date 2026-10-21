@@ -31,6 +31,20 @@
 // real hour or day rollover is waited for, and the migration has no
 // caller-supplied clock. The JSON report goes to stdout; exit 0 means PASS,
 // 1 FAIL, 2 cleanup failure, 3 refused to start.
+//
+// Statement timeout: C2 reads the function's declared statement_timeout from
+// the catalog. The T checks arm that value with a transaction-scoped
+// set_config before the decision statement starts, which is how PostgREST
+// applies a hoisted function setting, and prove that PostgreSQL itself
+// cancels an overlong decision inside the function with SQLSTATE 57014 and
+// keeps nothing from its transaction. The delay comes from a disposable
+// trigger created inside each proof transaction, so it never outlives that
+// transaction and the candidate SQL is unchanged. The unarmed control shows
+// that the function-level setting alone does not preempt and that the final
+// elapsed-time guard refuses only after the decision completes. This models
+// PostgREST hoisting; it does not establish the hosted PostgREST version,
+// its hoisting configuration, or Staging RPC enforcement, which the report
+// lists as not tested.
 
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -76,6 +90,7 @@ const report = {
   checks: [],
   concurrency: [],
   timing: {},
+  statement_timeout: {},
   not_tested: [],
   commands: [],
   psql: { invocations: 0, expected_errors: 0 },
@@ -505,6 +520,173 @@ function clock(db) {
 }
 
 // ---------------------------------------------------------------------------
+// Statement-timeout helpers
+// ---------------------------------------------------------------------------
+
+// A disposable delay fixture, created inside each proof transaction so that
+// it disappears with that transaction. After every quota row write made by
+// the unchanged candidate function, it reports the write with the
+// statement_timeout then in effect, and sleeps. Only the wall-clock cost of
+// the function's writes grows; its SQL and logic are untouched.
+const WRITE_DELAY_MS = 2000;
+const DELAY_FIXTURE = `create function public.proof_delay_after_write()
+returns trigger language plpgsql as $proof$
+begin
+  raise notice 'PROOF_WRITE % % statement_timeout=%',
+    tg_op, new.dimension, current_setting('statement_timeout');
+  perform pg_sleep(${WRITE_DELAY_MS / 1000});
+  return null;
+end;
+$proof$;
+create trigger proof_delay_after_write
+  after insert or update on public.registration_quota_counters
+  for each row execute function public.proof_delay_after_write();`;
+
+// How PostgREST applies a hoisted function setting: a transaction-scoped
+// set_config before the RPC statement starts, with the request role.
+function hoistedArming(value) {
+  return `select 'ARMED=' || set_config('statement_timeout', '${value}', true);
+select 'ROLE=' || set_config('role', 'service_role', true);`;
+}
+
+function writesIn(stderr) {
+  return [
+    ...stderr.matchAll(
+      /NOTICE:\s+00000: PROOF_WRITE (\w+) (\w+) statement_timeout=(\S+)$/gm,
+    ),
+  ].map((match) => `${match[1]} ${match[2]} ${match[3]}`);
+}
+
+const DECISION_FUNCTION_CONTEXT =
+  "PL/pgSQL function (?:public\\.)?registration_quota_decide\\(text,text,text,integer,integer,integer\\) line \\d+";
+
+// The final error psql reported, from its ERROR line to the end: notices
+// raised earlier by the delay fixture carry their own LOCATION lines.
+function errorBlock(stderr) {
+  const start = stderr.search(/^(?:psql:<stdin>:\d+: )?ERROR:/m);
+  assert.ok(start >= 0, stderr);
+  return stderr.slice(start);
+}
+
+// PostgreSQL's own statement-timeout cancellation, raised by its interrupt
+// handler while a statement of the candidate function was executing.
+function assertTimeoutCancellation(stderr) {
+  const error = errorBlock(stderr);
+  assert.equal(sqlstateOf(error), "57014", stderr);
+  assert.match(
+    error,
+    /ERROR:\s+57014: canceling statement due to statement timeout$/m,
+  );
+  assert.match(
+    error,
+    new RegExp(`${DECISION_FUNCTION_CONTEXT} at SQL statement`),
+  );
+  assert.match(error, /^LOCATION:\s+ProcessInterrupts, postgres\.c:\d+$/m);
+  assert.ok(!stderr.includes(UNAVAILABLE_MESSAGE));
+}
+
+// The candidate's final elapsed-time guard: its own RAISE, reached only after
+// the decision ran to completion.
+function assertFinalGuardRefusal(stderr) {
+  const error = errorBlock(stderr);
+  assert.equal(sqlstateOf(error), "57014", stderr);
+  assert.match(error, /ERROR:\s+57014: registration quota unavailable$/m);
+  assert.match(error, new RegExp(`${DECISION_FUNCTION_CONTEXT} at RAISE`));
+  assert.match(error, /^LOCATION:\s+exec_stmt_raise, pl_exec\.c:\d+$/m);
+  assert.doesNotMatch(stderr, /canceling statement due to statement timeout/);
+}
+
+// The error, its candidate-function context, and its source location, for
+// the report.
+function errorOrigin(stderr) {
+  return errorBlock(stderr)
+    .split("\n")
+    .map((line) => line.replace(/^psql:<stdin>:\d+: /, "").trim())
+    .filter(
+      (line) =>
+        /^(?:ERROR|LOCATION):/.test(line) ||
+        new RegExp(DECISION_FUNCTION_CONTEXT).test(line),
+    );
+}
+
+// The server's own log time of one backend's error, in epoch milliseconds.
+function serverErrorAt(pid, message) {
+  const log = fs.readFileSync(path.join(state.tmp, "postgres.log"), "utf8");
+  const found = new RegExp(
+    `^(\\d{4}-\\d{2}-\\d{2}) (\\d{2}:\\d{2}:\\d{2}\\.\\d{3}) UTC \\[${pid}\\] ERROR:  ${message}$`,
+    "m",
+  ).exec(log);
+  assert.ok(found, `no server log line for backend ${pid}: ${message}`);
+  return Date.parse(`${found[1]}T${found[2]}Z`);
+}
+
+// The candidate function's decision lock in pg_locks, for a row alias.
+const decisionLockOf = (alias) =>
+  `${alias}.locktype = 'advisory'
+     and ${alias}.database = (select oid from pg_database where datname = current_database())
+     and ${alias}.classid = ${Number(DECISION_LOCK >> 32n)}
+     and ${alias}.objid = ${Number(DECISION_LOCK & 0xffffffffn)}
+     and ${alias}.objsubid = 1`;
+
+// Runs one proof transaction in its own psql session and, while its decision
+// statement is still sleeping inside a write, observes it from another
+// session: its statement start and whether it holds the decision lock, which
+// only the candidate function takes. Returns once that backend has ended.
+async function observedDecision(db, script, label) {
+  const session = spawnPsql(db, script);
+  let exited = false;
+  session.done.then(() => {
+    exited = true;
+  });
+  let seen = null;
+  await waitFor(() => {
+    if (exited) {
+      return true;
+    }
+    const value = sqlValue(
+      db,
+      `select coalesce((select json_build_object(
+         'pid', a.pid,
+         'query_start_ms', round(extract(epoch from a.query_start) * 1000, 3),
+         'observed_ms', round(extract(epoch from clock_timestamp()) * 1000, 3),
+         'state', a.state,
+         'wait_event', a.wait_event,
+         'holds_decision_lock', exists (select 1 from pg_locks l
+           where l.pid = a.pid and l.granted and ${decisionLockOf("l")}))::text
+       from pg_stat_activity a
+       where a.datname = current_database() and a.pid <> pg_backend_pid()
+         and a.state = 'active' and a.wait_event = 'PgSleep'
+         and a.query like '%${label}%'), '');`,
+    );
+    if (value !== "") {
+      seen = JSON.parse(value);
+      return true;
+    }
+    return false;
+  }, `${label} decision in progress`);
+  const result = await session.done;
+  if (seen !== null) {
+    await waitFor(
+      () =>
+        sqlValue(
+          db,
+          `select count(*) from pg_stat_activity where pid = ${seen.pid};`,
+        ) === "0",
+      "proof backend exit",
+    );
+  }
+  return { result, seen };
+}
+
+const decisionLockHolders = (db) =>
+  Number(
+    sqlValue(
+      db,
+      `select count(*) from pg_locks k where ${decisionLockOf("k")};`,
+    ),
+  );
+
+// ---------------------------------------------------------------------------
 // Checks
 // ---------------------------------------------------------------------------
 
@@ -881,7 +1063,7 @@ async function runProbes() {
     "public.registration_quota_decide(text,text,text,integer,integer,integer)";
 
   await check(
-    "C2 RLS, ownership, exact ACLs, SECURITY INVOKER, search path, and lock timeout",
+    "C2 RLS, ownership, exact ACLs, SECURITY INVOKER, search path, lock timeout, and declared statement timeout",
     () => {
       const facts = JSON.parse(
         sqlValue(
@@ -921,6 +1103,7 @@ async function runProbes() {
       assert.deepEqual(facts.config, [
         "search_path=pg_catalog",
         "lock_timeout=250ms",
+        "statement_timeout=1500ms",
       ]);
       assert.equal(
         facts.proacl,
@@ -1522,7 +1705,7 @@ async function runProbes() {
   );
 
   await check(
-    "C15 a decision past the 1,500 ms statement deadline is rolled back and refused",
+    "C15 final elapsed-time guard (defense in depth, not preemption): with no armed statement timeout, a decision completing past 1,500 ms is refused and rolled back",
     () => {
       const late = {
         ip: digest("s13-ip"),
@@ -1532,12 +1715,14 @@ async function runProbes() {
       const started = Date.now();
       const result = psql(
         db,
-        `set role service_role;\nwith s as materialized (select pg_sleep(1.6))\nselect 'DECISION=' || ${callOf(late)} from s;\n`,
+        `set role service_role;\nselect 'ARMED=' || current_setting('statement_timeout');\nwith s as materialized (select pg_sleep(1.6))\nselect 'DECISION=' || ${callOf(late)} from s;\n`,
       );
       const elapsedMs = Date.now() - started;
       assert.equal(result.status, 3);
       report.psql.expected_errors += 1;
-      assert.equal(sqlstateOf(result.stderr), "57014");
+      assert.match(result.stdout, /^ARMED=0$/m);
+      assertFinalGuardRefusal(result.stderr);
+      assert.ok(elapsedMs >= 1600, `${elapsedMs}`);
       assert.deepEqual(rowsFor(db, [late.ip, late.identity, late.global]), []);
       const prompt = {
         ip: digest("s13-ip-b"),
@@ -1550,7 +1735,7 @@ async function runProbes() {
       );
       assert.deepEqual(decisionsIn(ok), ["allow"]);
       report.timing.deadline_refusal_elapsed_ms = elapsedMs;
-      return { refused_after_ms: elapsedMs };
+      return { refused_after_ms: elapsedMs, error: errorOrigin(result.stderr) };
     },
   );
 
@@ -1596,6 +1781,274 @@ async function runProbes() {
       assert.equal(decideOne(db, blocked), "allow");
       report.timing.lock_timeout_refusal_elapsed_ms = elapsedMs;
       return { outcome, elapsed_ms_including_psql_start: elapsedMs };
+    },
+  );
+
+  // The value PostgREST would hoist: the function's own declared setting.
+  const hoisted = sqlValue(
+    db,
+    `select option_value from pg_options_to_table(
+       (select proconfig from pg_proc where oid = '${fn}'::regprocedure))
+     where option_name = 'statement_timeout';`,
+  );
+  report.statement_timeout.declared = hoisted;
+  report.statement_timeout.local_model =
+    "BEGIN; set_config('statement_timeout', <declared value>, true) and set_config('role', 'service_role', true) as separate statements; then the RPC statement. A local model of PostgREST hoisting, not PostgREST itself.";
+
+  await check(
+    "T1 armed before the statement as PostgREST hoists it, the declared 1,500 ms statement_timeout cancels an overlong allow decision inside the function (57014) and nothing persists",
+    async () => {
+      assert.equal(hoisted, "1500ms");
+      const call = {
+        ip: digest("t1-ip"),
+        identity: digest("t1-identity"),
+        global: digest("t1-global"),
+      };
+      const catalogBefore = catalogLines(db);
+      const tableBefore = tableHash(db);
+      const { result, seen } = await observedDecision(
+        db,
+        [
+          "-- P2-007 T1 statement-timeout preemption proof",
+          "begin;",
+          DELAY_FIXTURE,
+          hoistedArming(hoisted),
+          decisionStatement(call),
+          "commit;",
+          "",
+        ].join("\n"),
+        call.ip,
+      );
+      assert.equal(result.status, 3, result.stderr);
+      report.psql.expected_errors += 1;
+      assert.match(result.stdout, /^ARMED=1500ms$/m);
+      assert.match(result.stdout, /^ROLE=service_role$/m);
+      assert.deepEqual(decisionsIn(result.stdout), []);
+      assertTimeoutCancellation(result.stderr);
+      // Interrupted inside the function after its first reservation write,
+      // so a normal completion would need at least three write delays.
+      assert.deepEqual(writesIn(result.stderr), ["INSERT ip 1500ms"]);
+      assert.ok(seen, "the decision was not observed while executing");
+      assert.equal(seen.holds_decision_lock, true);
+      const elapsedMs =
+        serverErrorAt(
+          seen.pid,
+          "canceling statement due to statement timeout",
+        ) - seen.query_start_ms;
+      assert.ok(
+        elapsedMs >= 1499 && elapsedMs < WRITE_DELAY_MS,
+        `${elapsedMs}`,
+      );
+      // The aborted transaction kept nothing: no reservation, no fixture.
+      assert.deepEqual(rowsFor(db, [call.ip, call.identity, call.global]), []);
+      assert.equal(tableHash(db), tableBefore);
+      assert.deepEqual(catalogLines(db), catalogBefore);
+      assert.equal(decisionLockHolders(db), 0);
+      const detail = {
+        sqlstate: "57014",
+        message: "canceling statement due to statement timeout",
+        origin:
+          "ProcessInterrupts (postgres.c), inside registration_quota_decide",
+        error: errorOrigin(result.stderr),
+        writes_before_cancel: writesIn(result.stderr),
+        observed_inside_function_holding_decision_lock:
+          seen.holds_decision_lock,
+        server_elapsed_ms_from_statement_start: Number(elapsedMs.toFixed(3)),
+        normal_completion_needs_at_least_ms: 3 * WRITE_DELAY_MS,
+        rows_after: 0,
+        table_unchanged: true,
+        catalog_unchanged: true,
+      };
+      report.statement_timeout.preempted_allow_decision = detail;
+      return detail;
+    },
+  );
+
+  await check(
+    "T2 the armed statement_timeout cancels an overlong throttle decision after its aggregate write; the global tally and every reservation stay unchanged",
+    async () => {
+      const identity = digest("t2-identity");
+      const global = digest("t2-global");
+      const ip = digest("t2-ip");
+      seed(db, [
+        { dimension: "identity", digest: identity, start: day, accepted: 10 },
+        {
+          dimension: "global",
+          digest: global,
+          start: hour,
+          accepted: 3,
+          throttled: 5,
+        },
+      ]);
+      const rowsBefore = rowsFor(db, [ip, identity, global]);
+      const catalogBefore = catalogLines(db);
+      const tableBefore = tableHash(db);
+      const { result, seen } = await observedDecision(
+        db,
+        [
+          "-- P2-007 T2 statement-timeout preemption proof",
+          "begin;",
+          DELAY_FIXTURE,
+          hoistedArming(hoisted),
+          decisionStatement({ ip, identity, global }),
+          "commit;",
+          "",
+        ].join("\n"),
+        ip,
+      );
+      assert.equal(result.status, 3, result.stderr);
+      report.psql.expected_errors += 1;
+      assert.match(result.stdout, /^ARMED=1500ms$/m);
+      assert.deepEqual(decisionsIn(result.stdout), []);
+      assertTimeoutCancellation(result.stderr);
+      assert.deepEqual(writesIn(result.stderr), ["UPDATE global 1500ms"]);
+      assert.ok(seen, "the decision was not observed while executing");
+      assert.equal(seen.holds_decision_lock, true);
+      const elapsedMs =
+        serverErrorAt(
+          seen.pid,
+          "canceling statement due to statement timeout",
+        ) - seen.query_start_ms;
+      assert.ok(
+        elapsedMs >= 1499 && elapsedMs < WRITE_DELAY_MS,
+        `${elapsedMs}`,
+      );
+      const rows = rowsFor(db, [ip, identity, global]);
+      assert.deepEqual(rows, rowsBefore);
+      assert.equal(row(rows, "global", global, hour).accepted, 3);
+      assert.equal(row(rows, "global", global, hour).throttled, 5);
+      assert.equal(row(rows, "identity", identity, day).accepted, 10);
+      assert.equal(row(rows, "ip", ip), undefined);
+      assert.equal(tableHash(db), tableBefore);
+      assert.deepEqual(catalogLines(db), catalogBefore);
+      assert.equal(decisionLockHolders(db), 0);
+      const detail = {
+        sqlstate: "57014",
+        message: "canceling statement due to statement timeout",
+        error: errorOrigin(result.stderr),
+        writes_before_cancel: writesIn(result.stderr),
+        server_elapsed_ms_from_statement_start: Number(elapsedMs.toFixed(3)),
+        normal_completion_needs_at_least_ms: WRITE_DELAY_MS,
+        global_row_after: { accepted: 3, throttled: 5 },
+        table_unchanged: true,
+        catalog_unchanged: true,
+      };
+      report.statement_timeout.preempted_throttle_decision = detail;
+      return detail;
+    },
+  );
+
+  await check(
+    "T3 control: without an armed timeout the function-level setting alone does not preempt; the same overlong decision runs to completion and only the final elapsed-time guard refuses it",
+    async () => {
+      const call = {
+        ip: digest("t3-ip"),
+        identity: digest("t3-identity"),
+        global: digest("t3-global"),
+      };
+      const catalogBefore = catalogLines(db);
+      const tableBefore = tableHash(db);
+      const { result, seen } = await observedDecision(
+        db,
+        [
+          "-- P2-007 T3 unarmed control",
+          "begin;",
+          DELAY_FIXTURE,
+          "select 'ARMED=' || current_setting('statement_timeout');",
+          "select 'ROLE=' || set_config('role', 'service_role', true);",
+          decisionStatement(call),
+          "commit;",
+          "",
+        ].join("\n"),
+        call.ip,
+      );
+      assert.equal(result.status, 3, result.stderr);
+      report.psql.expected_errors += 1;
+      assert.match(result.stdout, /^ARMED=0$/m);
+      assert.deepEqual(decisionsIn(result.stdout), []);
+      assertFinalGuardRefusal(result.stderr);
+      // The function's own 1500ms setting was in effect at every write, yet
+      // nothing interrupted the statement: all three writes completed.
+      assert.deepEqual(writesIn(result.stderr), [
+        "INSERT ip 1500ms",
+        "INSERT identity 1500ms",
+        "INSERT global 1500ms",
+      ]);
+      assert.ok(seen, "the decision was not observed while executing");
+      assert.equal(seen.holds_decision_lock, true);
+      const elapsedMs =
+        serverErrorAt(seen.pid, UNAVAILABLE_MESSAGE) - seen.query_start_ms;
+      assert.ok(elapsedMs >= 3 * WRITE_DELAY_MS, `${elapsedMs}`);
+      assert.deepEqual(rowsFor(db, [call.ip, call.identity, call.global]), []);
+      assert.equal(tableHash(db), tableBefore);
+      assert.deepEqual(catalogLines(db), catalogBefore);
+      assert.equal(decisionLockHolders(db), 0);
+      const detail = {
+        sqlstate: "57014",
+        message: UNAVAILABLE_MESSAGE,
+        origin: "exec_stmt_raise (pl_exec.c): the final guard's RAISE",
+        error: errorOrigin(result.stderr),
+        session_statement_timeout: "0",
+        writes_completed: writesIn(result.stderr),
+        server_elapsed_ms_from_statement_start: Number(elapsedMs.toFixed(3)),
+        rows_after: 0,
+        table_unchanged: true,
+        catalog_unchanged: true,
+      };
+      report.statement_timeout.unarmed_control = detail;
+      return detail;
+    },
+  );
+
+  await check(
+    "T4 ordinary decisions under the armed 1,500 ms statement_timeout complete, commit, and reserve normally",
+    () => {
+      const plain = {
+        ip: digest("t4-ip-a"),
+        identity: digest("t4-identity-a"),
+        global: digest("t4-global-a"),
+      };
+      const slower = {
+        ip: digest("t4-ip-b"),
+        identity: digest("t4-identity-b"),
+        global: digest("t4-global-b"),
+      };
+      const started = Date.now();
+      const out = sql(
+        db,
+        [
+          "begin;",
+          hoistedArming(hoisted),
+          "select 'IN_EFFECT=' || current_setting('statement_timeout');",
+          decisionStatement(plain),
+          "with s as materialized (select pg_sleep(0.5))",
+          `select 'DECISION=' || ${callOf(slower)} from s;`,
+          "commit;",
+          "select 'AFTER=' || current_setting('statement_timeout');",
+          "",
+        ].join("\n"),
+      );
+      const elapsedMs = Date.now() - started;
+      assert.match(out, /^ARMED=1500ms$/m);
+      assert.match(out, /^IN_EFFECT=1500ms$/m);
+      assert.deepEqual(decisionsIn(out), ["allow", "allow"]);
+      assert.match(out, /^AFTER=0$/m);
+      for (const call of [plain, slower]) {
+        const rows = rowsFor(db, [call.ip, call.identity, call.global]);
+        assert.equal(rows.length, 3);
+        for (const item of rows) {
+          assert.equal(item.accepted, 1);
+          assert.equal(item.throttled, 0);
+          assert.equal(item.marker, M);
+        }
+      }
+      const detail = {
+        decisions: ["allow", "allow"],
+        committed_rows: 6,
+        elapsed_ms_including_psql_start: elapsedMs,
+      };
+      report.statement_timeout.ordinary_armed_decisions = detail;
+      return detail;
     },
   );
 
@@ -2211,9 +2664,18 @@ async function runProbes() {
   report.not_tested.push(
     "A real wall-clock rollover across an hour or UTC-day boundary: windows were proven with seeded prior-window rows from the database clock, deterministic SQL over synthetic timestamps, and arithmetic only.",
     "Idle retention: with no traffic, expired rows remain indefinitely; no deletion deadline exists or is claimed.",
-    "Remote Supabase/PostgREST roles, grants, statement_timeout, and the deployed service_role topology: the roles here are synthetic fixtures.",
-    "A server-preemptive statement_timeout for the RPC: PostgreSQL cannot arm one from inside the running statement; the function enforces lock_timeout and refuses (rolls back) any decision past 1,500 ms from statement start.",
+    "Remote Supabase roles, grants, role-level timeouts, and the deployed service_role topology: the roles here are synthetic fixtures.",
+    "Actual hosted PostgREST version: NOT TESTED — DEFERRED TO AUTHORIZED STAGING VERIFICATION.",
+    "Actual hoisted-settings configuration (that hosted PostgREST hoists this function's statement_timeout into the RPC transaction before the RPC statement starts): NOT TESTED — DEFERRED TO AUTHORIZED STAGING VERIFICATION.",
+    "Actual Staging RPC enforcement of the 1,500 ms statement_timeout: NOT TESTED — DEFERRED TO AUTHORIZED STAGING VERIFICATION. T1 and T2 prove local PostgreSQL preemption only when the setting is armed before the statement; the function-level setting, the final elapsed-time guard, and the client abort each do not provide that guarantee on their own.",
   );
+  report.statement_timeout.postgrest = {
+    hosted_version: "NOT TESTED — DEFERRED TO AUTHORIZED STAGING VERIFICATION",
+    hoisted_settings_configuration:
+      "NOT TESTED — DEFERRED TO AUTHORIZED STAGING VERIFICATION",
+    staging_rpc_enforcement:
+      "NOT TESTED — DEFERRED TO AUTHORIZED STAGING VERIFICATION",
+  };
   report.math = {
     statement:
       "With fixed aligned windows of width W and maximum N, any interval shorter than W meets at most two windows, so at most 2N reservations can fall in it, and 2N is attainable arbitrarily close to a boundary.",
