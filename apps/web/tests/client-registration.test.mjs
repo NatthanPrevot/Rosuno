@@ -2326,27 +2326,141 @@ test("34. the route handler is web-standard, fixed-destination, and verifies a t
   );
 });
 
-test("35. the sign-up server action is POST-only, default-deny, and hands the form to the application boundary unread", () => {
-  const source = read("app/sign-up/actions.ts");
+// P2-007 (Revision 5): the action imports exactly the original registration
+// boundary, the server-only abuse-control adapter, and the privileged module
+// for its unchanged port builders and narrow quota capability. No request
+// transport such as next/headers is imported: no ingress contract is
+// verified, so nothing is read from the request as a client address.
+function assertRegistrationActionContract(source) {
   const code = codeOf(source);
   assert.match(source, /^"use server";\n/);
   assert.deepEqual(importsOf(source), [
     "../../src/application/client-registration.ts",
+    "../../src/infrastructure/identity/registration-abuse-control.ts",
     "../../src/infrastructure/identity/registration-provisioning.ts",
   ]);
+  assert.match(
+    code,
+    /^import \{\n {2}registerClientAccount,\n {2}type RegistrationState,\n\} from "\.\.\/\.\.\/src\/application\/client-registration\.ts";\nimport \{\n {2}NO_TRUSTED_CLIENT_ADDRESS,\n {2}createRegistrationAbuseControl,\n\} from "\.\.\/\.\.\/src\/infrastructure\/identity\/registration-abuse-control\.ts";\nimport \{\n {2}createConfirmationDispatch,\n {2}createRegistrationProvisioning,\n {2}decideQuotaRpc,\n\} from "\.\.\/\.\.\/src\/infrastructure\/identity\/registration-provisioning\.ts";$/m,
+  );
   assert.deepEqual(
     [...code.matchAll(/\bexport\b[^\n]*/g)].map((match) => match[0]),
     ["export async function register("],
   );
+  // A new abuse control is built inside each call, with no trusted client
+  // address and only the narrow quota capability; the other ports and the
+  // form pass through unchanged.
   assert.match(
     code,
-    /return registerClientAccount\(\n {4}\{\n {6}abuseControl: NO_TRUSTED_ABUSE_CONTROL,\n {6}provisioning: \(\) => createRegistrationProvisioning\(\),\n {6}dispatch: \(\) => createConfirmationDispatch\(\),\n {4}\},\n {4}formData,\n {2}\);/,
+    /\nexport async function register\(\n {2}_previous: RegistrationState,\n {2}formData: FormData,\n\): Promise<RegistrationState> \{\n {2}return registerClientAccount\(\n {4}\{\n {6}abuseControl: createRegistrationAbuseControl\(\{\n {8}trustedClientAddress: NO_TRUSTED_CLIENT_ADDRESS,\n {8}decideQuota: decideQuotaRpc,\n {6}\}\),\n {6}provisioning: \(\) => createRegistrationProvisioning\(\),\n {6}dispatch: \(\) => createConfirmationDispatch\(\),\n {4}\},\n {4}formData,\n {2}\);\n\}\n$/,
   );
+  assert.equal(code.match(/\bcreateRegistrationAbuseControl\(/g).length, 1);
   assert.equal(code.match(/\b_previous\b/g).length, 1);
+  assert.equal(code.match(/\bformData\b/g).length, 2);
   assert.doesNotMatch(
     code,
     /formData\.get|redirect|revalidate|cookies|headers|searchParams|process\.env|\bconsole\b|signUp|allow"/,
   );
+  // No client address, forwarding header, socket, or literal address is a
+  // source of trust here.
+  assert.doesNotMatch(
+    code,
+    /forwarded|x-real-ip|connecting-ip|client-ip|remoteAddress|socket|\brequest\b|\bip\b|\d+\.\d+\.\d+\.\d+|::/i,
+  );
+}
+
+test("35. the sign-up server action is POST-only, default-deny, and hands the form to the application boundary unread", async () => {
+  const source = read("app/sign-up/actions.ts");
+  assertRegistrationActionContract(source);
+  // Representative forbidden variants fail the same contract.
+  const wiring =
+    "abuseControl: createRegistrationAbuseControl({\n        trustedClientAddress: NO_TRUSTED_CLIENT_ADDRESS,\n        decideQuota: decideQuotaRpc,\n      }),";
+  assert.ok(source.includes(wiring));
+  const forbidden = {
+    "allow fallback": source.replace(
+      wiring,
+      'abuseControl: { decide: async () => "allow" },',
+    ),
+    "previous default-deny wiring": source.replace(
+      wiring,
+      "abuseControl: NO_TRUSTED_ABUSE_CONTROL,",
+    ),
+    "forwarded header as address": source
+      .replace(
+        '"use server";\n',
+        '"use server";\nimport { headers } from "next/headers";\n',
+      )
+      .replace(
+        "trustedClientAddress: NO_TRUSTED_CLIENT_ADDRESS,",
+        'trustedClientAddress: (await headers()).get("x-forwarded-for"),',
+      ),
+    "literal address": source.replace(
+      "trustedClientAddress: NO_TRUSTED_CLIENT_ADDRESS,",
+      'trustedClientAddress: "192.0.2.10",',
+    ),
+    "shared module-level control": source
+      .replace(
+        "// The previous state",
+        "const shared = createRegistrationAbuseControl({\n  trustedClientAddress: NO_TRUSTED_CLIENT_ADDRESS,\n  decideQuota: decideQuotaRpc,\n});\n\n// The previous state",
+      )
+      .replace(wiring, "abuseControl: shared,"),
+    "form field read": source.replace(
+      "    formData,\n  );",
+      '    formData,\n  ).then((state) => (formData.get("email"), state));',
+    ),
+    "second export": `${source}\nexport async function registerDirect() {}\n`,
+    "missing directive": source.replace('"use server";\n', ""),
+    "deployment input": source.replace(
+      "decideQuota: decideQuotaRpc,",
+      "decideQuota: decideQuotaRpc,\n        override: process.env.REGISTRATION_OVERRIDE,",
+    ),
+  };
+  for (const [name, variant] of Object.entries(forbidden)) {
+    assert.notEqual(variant, source, name);
+    assert.throws(
+      () => assertRegistrationActionContract(variant),
+      assert.AssertionError,
+      name,
+    );
+  }
+  // With every runtime input bound and the quota configured, the action still
+  // refuses a valid form before any quota, Admin, or database request: no
+  // client address is trusted. All values are synthetic and restored.
+  const key = Buffer.alloc(32, 0x5a).toString("base64");
+  const configured = {
+    ...boundEnvironment(),
+    REGISTRATION_QUOTA_IP_MAX_PER_HOUR: "10",
+    REGISTRATION_QUOTA_IDENTITY_MAX_PER_DAY: "10",
+    REGISTRATION_QUOTA_GLOBAL_MAX_PER_HOUR: "120",
+    REGISTRATION_QUOTA_HMAC_SECRET: key,
+  };
+  const previous = Object.fromEntries(
+    Object.keys(configured).map((name) => [name, process.env[name]]),
+  );
+  const previousFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (...args) => {
+    requests.push(args);
+    return new Response("{}", { status: 500 });
+  };
+  try {
+    Object.assign(process.env, configured);
+    const { register } = await import("../app/sign-up/actions.ts");
+    assertExactly(
+      await register(INITIAL_REGISTRATION_STATE, validForm()),
+      UNAVAILABLE,
+    );
+    assert.deepEqual(requests, []);
+  } finally {
+    globalThis.fetch = previousFetch;
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+  }
 });
 
 test("36. the sign-up page is an accessible design-system form with show and hide controls and fixed messages only", () => {
@@ -2464,6 +2578,103 @@ test("36. the sign-up page is an accessible design-system form with show and hid
   );
 });
 
+// P2-007 (Revision 5): the one permitted RPC in app/ and src/. It is a direct
+// call of the fixed quota function on the privileged client that the narrow
+// capability builds for itself, after the project binding and every opaque
+// digest and maximum are validated, under the caller's abort signal; it
+// returns only the function's answer. Any other mention of rpc, including a
+// computed or destructured access, a dynamic target, or a call elsewhere,
+// fails.
+const QUOTA_DECISION_RPC = `export async function decideQuotaRpc(
+  digests: QuotaDigests,
+  maxima: QuotaMaxima,
+  signal: AbortSignal,
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<unknown> {
+  const binding = readProjectBinding(environment);
+  if (
+    binding === null ||
+    !isDigest(digests.ip) ||
+    !isDigest(digests.identity) ||
+    !isDigest(digests.global) ||
+    !isMaximum(maxima.ipPerHour) ||
+    !isMaximum(maxima.identityPerDay) ||
+    !isMaximum(maxima.globalPerHour)
+  ) {
+    return undefined;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  const { data, error } = await admin
+    .rpc("registration_quota_decide", {
+      ip_digest: digests.ip,
+      identity_digest: digests.identity,
+      global_digest: digests.global,
+      ip_max: maxima.ipPerHour,
+      identity_max: maxima.identityPerDay,
+      global_max: maxima.globalPerHour,
+    })
+    .abortSignal(signal);
+  return error === null ? data : undefined;
+}
+`;
+
+const PRIVILEGED_MODULE =
+  "src/infrastructure/identity/registration-provisioning.ts";
+
+// codes: app/ and src/ source paths mapped to their comment-free code.
+function assertQuotaRpcContract(codes) {
+  for (const [file, code] of codes) {
+    assert.equal(
+      code.match(/\brpc\b/gi)?.length ?? 0,
+      file === PRIVILEGED_MODULE ? 1 : 0,
+      file,
+    );
+    assert.equal(
+      code.match(/registration_quota_decide/g)?.length ?? 0,
+      file === PRIVILEGED_MODULE ? 1 : 0,
+      file,
+    );
+  }
+  const provisioning = codes.get(PRIVILEGED_MODULE);
+  assert.ok(provisioning.endsWith(`\n${QUOTA_DECISION_RPC}`));
+  assert.match(
+    provisioning,
+    /\nconst DIGEST = \/\^\[0-9a-f\]\{64\}\$\/;\n\nfunction isDigest\(value: unknown\): value is string \{\n {2}return typeof value === "string" && DIGEST\.test\(value\);\n\}\n\nfunction isMaximum\(value: unknown\): value is number \{\n {2}return Number\.isSafeInteger\(value\) && \(value as number\) >= 1;\n\}\n/,
+  );
+  // Two privileged clients (Admin provisioning and the quota decision) and
+  // one publishable client (the confirmation request), each built only from
+  // the verified binding.
+  assert.equal(
+    provisioning.match(
+      /\bcreate\(binding\.url, binding\.adminKey, clientOptions\(\)\)/g,
+    ).length,
+    2,
+  );
+  assert.equal(provisioning.match(/\bcreate\(/g).length, 3);
+  assert.equal(provisioning.match(/\bbinding\.publishableKey\b/g).length, 1);
+  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 2);
+}
+
+// The exact export list: the original three plus the one narrow quota
+// capability, and no re-export, default export, or wildcard.
+function assertPrivilegedExports(provisioning) {
+  assert.deepEqual(
+    [
+      ...provisioning.matchAll(
+        /^export (?:async function|function|const|type) (\w+)/gm,
+      ),
+    ].map((match) => match[1]),
+    [
+      "RegistrationEnvironment",
+      "createRegistrationProvisioning",
+      "createConfirmationDispatch",
+      "decideQuotaRpc",
+    ],
+  );
+  assert.equal(provisioning.match(/\bexport\b/g).length, 4);
+}
+
 test("37. the privileged module stays server-only, and no public signUp or enrollment path exists", () => {
   const scope = [
     "app/sign-up/page.tsx",
@@ -2479,12 +2690,14 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
   for (const file of scope) {
     assert.ok(sources.includes(file), file);
   }
+  const codes = new Map(sources.map((file) => [file, codeOf(read(file))]));
   for (const file of sources) {
-    const code = codeOf(read(file));
-    // No public signUp, magic-link, OTP-creation, or code-exchange path.
+    const code = codes.get(file);
+    // No public signUp, magic-link, OTP-creation, or code-exchange path. The
+    // only RPC is the quota decision checked below.
     assert.doesNotMatch(
       code,
-      /\.signUp\(|signInWithOtp|exchangeCodeForSession|generateLink|inviteUserByEmail|listUsers|updateUserById|deleteUser|\.upsert\(|\.delete\(|\.rpc\(/,
+      /\.signUp\(|signInWithOtp|exchangeCodeForSession|generateLink|inviteUserByEmail|listUsers|updateUserById|deleteUser|\.upsert\(|\.delete\(/,
       file,
     );
     // The privileged inputs are named only in the server-only module, and no
@@ -2514,6 +2727,14 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
         file,
       );
     }
+    // Only the sign-up action loads the abuse-control adapter.
+    if (
+      imports.some((specifier) =>
+        specifier.endsWith("registration-abuse-control.ts"),
+      )
+    ) {
+      assert.equal(file, "app/sign-up/actions.ts");
+    }
     if (/["']use client["']/.test(read(file))) {
       assert.ok(
         imports.every((specifier) => !/infrastructure/.test(specifier)),
@@ -2528,18 +2749,84 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
     importsOf(read("src/infrastructure/identity/registration-provisioning.ts")),
     ["@supabase/supabase-js", "../../application/client-registration.ts"],
   );
-  assert.deepEqual(
-    [
-      ...provisioning.matchAll(
-        /^export (?:async function|function|const|type) (\w+)/gm,
+  assertPrivilegedExports(provisioning);
+  assertQuotaRpcContract(codes);
+  // Representative forbidden variants fail the same RPC and export checks.
+  const adapter = "src/infrastructure/identity/registration-abuse-control.ts";
+  const action = "app/sign-up/actions.ts";
+  const call = 'await admin\n    .rpc("registration_quota_decide", {';
+  assert.ok(provisioning.includes(call));
+  const variant = (file, edit) =>
+    new Map([...codes, [file, edit(codes.get(file))]]);
+  const forbiddenRpc = {
+    "second quota call in the adapter": variant(
+      adapter,
+      (code) =>
+        `${code}\nconst again = (client) => client.rpc("registration_quota_decide", {});\n`,
+    ),
+    "quota call in the action": variant(
+      action,
+      (code) => `${code}\nawait admin.rpc("registration_quota_decide", {});\n`,
+    ),
+    "computed rpc access": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(call, 'await admin["rpc"]("registration_quota_decide", {'),
+    ),
+    "destructured rpc access": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "const { data, error } = await admin",
+        "const { rpc } = admin;\n  const { data, error } = await admin",
       ),
-    ].map((match) => match[1]),
-    [
-      "RegistrationEnvironment",
-      "createRegistrationProvisioning",
-      "createConfirmationDispatch",
-    ],
-  );
+    ),
+    "dynamic rpc target": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace('.rpc("registration_quota_decide", {', ".rpc(target, {"),
+    ),
+    "publishable key client": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "const admin = create(binding.url, binding.adminKey, clientOptions());\n  const { data",
+        "const admin = create(binding.url, binding.publishableKey, clientOptions());\n  const { data",
+      ),
+    ),
+    "unvalidated digest": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace("    !isDigest(digests.identity) ||\n", ""),
+    ),
+    "caller-supplied argument": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "      global_max: maxima.globalPerHour,\n",
+        "      global_max: maxima.globalPerHour,\n      ...maxima,\n",
+      ),
+    ),
+    "client returned": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "return error === null ? data : undefined;\n}\n",
+        "return admin;\n}\n",
+      ),
+    ),
+  };
+  for (const [name, codesVariant] of Object.entries(forbiddenRpc)) {
+    assert.notDeepEqual(codesVariant, codes, name);
+    assert.throws(
+      () => assertQuotaRpcContract(codesVariant),
+      assert.AssertionError,
+      name,
+    );
+  }
+  const forbiddenExports = {
+    "client export": `${provisioning}\nexport const quotaClient = createClient;\n`,
+    "binding re-export": `${provisioning}\nexport { readProjectBinding };\n`,
+    "default export": `${provisioning}\nexport default decideQuotaRpc;\n`,
+    "generic capability name": provisioning.replace(
+      "export async function decideQuotaRpc(",
+      "export async function rpc(",
+    ),
+  };
+  for (const [name, code] of Object.entries(forbiddenExports)) {
+    assert.notEqual(code, provisioning, name);
+    assert.throws(
+      () => assertPrivilegedExports(code),
+      assert.AssertionError,
+      name,
+    );
+  }
   assert.deepEqual(
     [...new Set(provisioning.match(/process\.env\.\w+/g))].sort(),
     [
