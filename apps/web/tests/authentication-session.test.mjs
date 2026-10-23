@@ -27,7 +27,7 @@ test("1. P2-004 package boundary contains only the two authorized runtime depend
   assert.deepEqual(manifest.dependencies, {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
-    next: "^16.3.8",
+    next: "16.4.1",
     react: "^19.3.0",
     "react-dom": "^19.3.0",
   });
