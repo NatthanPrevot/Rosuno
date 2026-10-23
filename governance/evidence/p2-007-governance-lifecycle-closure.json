@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "evidence_id": "P2-007-GATE7-GOVERNANCE-CANDIDATE-20261022",
+  "work_item_id": "WI-P2-007-REGISTRATION-ABUSE-CONTROL",
+  "lifecycle": "GATE 7 LOCAL GOVERNANCE CANDIDATE — NOT PROTECTED-MERGED OR CLOSED",
+  "candidate_recorded_at": "2026-10-23T02:53:59Z",
+  "source_authority": {
+    "locked_originals": "Eleven current LOCKED Rosuno originals remain external immutable authority; not copied or modified",
+    "adopted_uom": "UOM v1.7",
+    "adopted_cloud_builder": "C1 rev5.1; Gates 5-7 excluded",
+    "p2_packet_revision": 5
+  },
+  "repository": {
+    "owner": "NatthanPrevot/Rosuno",
+    "implementation_pr": 76,
+    "implementation_head": "7265b86fd08d8c7765fb383468048bdfe5c40663",
+    "implementation_review_by": "Rosuno",
+    "implementation_reviewed_at": "2026-10-21T18:44:58Z",
+    "implementation_merge_commit": "f0d311d7f4880d703bf45b6654ea28620e28e0bc",
+    "implementation_parent_commits": [
+      "37cb296ce6a15e4db003837bb7ef0b4469ac4313",
+      "7265b86fd08d8c7765fb383468048bdfe5c40663"
+    ],
+    "implementation_tree": "23c2375624a0346b3a30dfce2cde7d0e49862aa1",
+    "protected_main": true,
+    "gate7_branch": "wi/P2-007-gate7-governance-closure-v1",
+    "gate7_commit": null,
+    "gate7_pr": null,
+    "gate7_human_review": null,
+    "gate7_merge": null
+  },
+  "migration": {
+    "id": "20261020070000_p2_registration_abuse_control",
+    "sequence": 14,
+    "path": "supabase/migrations/20261020070000_p2_registration_abuse_control.sql",
+    "sha256": "32649648b0d75763ba1003957d24febffc2050951ca49b962687c2427a5f4db5",
+    "byte_length": 12549,
+    "reviewed_by": "Rosuno",
+    "reviewed_at": "2026-10-21T18:44:58Z",
+    "applied_environment": "staging",
+    "applied_migrations": 14,
+    "unchanged_historical_migrations": 13,
+    "forward_only_rollback_required": true
+  },
+  "staging": {
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "accepted_gate6_result": "PASS",
+    "accepted_gate6_review_packet_sha256": "b576e746c04c575abc724298074ee9c31f386bed0cb97408aa03821cdb2b610f",
+    "accepted_gate6_readonly_zip_sha256": "af607dcd74aaae832032f45e89205def2a5f03ca96c7ea3e35c4bace95f0801b",
+    "public_tables": 61,
+    "rls_enabled_tables": 61,
+    "public_functions": 28,
+    "quota_rows": 0,
+    "quota_policies": 0,
+    "anon_rpc_execute": false,
+    "authenticated_rpc_execute": false,
+    "quota_rpc_security_invoker": true,
+    "security_advisor_info": 31,
+    "security_advisor_historical_warn": 2
+  },
+  "catalog": {
+    "original_historical": {
+      "records": 1938,
+      "bytes": 640365,
+      "sha256": "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
+      "exact_subset_unchanged": true
+    },
+    "post_p2": {
+      "records": 1970,
+      "bytes": 658601,
+      "sha256": "0f823b1ce633d925183e1f1404f962f5b524744cf09b52acbadf0b1744032e9d",
+      "new_object_records": 32
+    },
+    "certificate_verified_read_only": true,
+    "original_pinned_canonicalizer": true,
+    "accepted_measurement_zip_sha256": "e26c65a937760e9bad20ef97968f99b37860d79998b8869b6bf56f2ea4caaa50",
+    "accepted_measurement_external_to_repository": true,
+    "not_rerun_in_gate7": true
+  },
+  "limitations": {
+    "end_to_end_deployed_registration": "NOT_TESTED",
+    "trusted_ingress": "UNRESOLVED_SEPARATE_GATE",
+    "hosted_postgrest_setting_hoisting": "UNRESOLVED_SEPARATE_GATE",
+    "retention_deletion": "UNRESOLVED_SEPARATE_DECISION",
+    "runtime_configuration_and_logging": "UNRESOLVED_SEPARATE_GATE",
+    "activation": "NOT_AUTHORIZED",
+    "production": "NOT_AUTHORIZED",
+    "private_mac_logs": "OWNER_RETAINED; ONLY EXPORTED RECEIPTS ACCEPTED",
+    "gate5_numeric_exit": "NOT_CAPTURED_HISTORICAL_ZSH_STATUS_COLLISION",
+    "gate7_pr": "NOT_CREATED",
+    "gate7_work_item_closure": "NOT_YET_CLOSED"
+  },
+  "change_scope": {
+    "six_governance_paths_only": true,
+    "git_commit": false,
+    "branch_publication": false,
+    "github_mutation": false,
+    "supabase_mutation": false,
+    "deployment": false
+  }
+}

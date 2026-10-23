@@ -344,14 +344,14 @@
       "decision_refs": [
         "DEC-20261020-P2-007-REGISTRATION-ABUSE-CONTROL-CONTRACT"
       ],
-      "release_refs": [],
-      "reviewed": false,
-      "reviewed_by": "pending designated human PR review",
-      "reviewed_at": null,
-      "applied_environment": "none",
+      "release_refs": ["REL-20261022-P2-007-STAGING-APPLICATION"],
+      "reviewed": true,
+      "reviewed_by": "Rosuno",
+      "reviewed_at": "2026-10-21T18:44:58Z",
+      "applied_environment": "staging",
       "non_production_validation": true,
       "drift_check": "clean",
-      "rollback_plan": "Unapplied candidate. Before any application, correct defects only with new forward-only commits; the disposable D-05 proof applied this exact SQL inside BEGIN and ROLLBACK and restored the exact fixture catalog fingerprint. After any separately authorized Staging application, a verified defect requires a separately reviewed forward-only compensating migration that restores the previous quota catalog and grants while registration stays default-denied; never edit this file, earlier migrations, or migration history.",
+      "rollback_plan": "Verified Staging defects require a separately authorized, reviewed forward-only compensating migration with default-deny registration; preserve this migration and all prior SQL/migration history bytes.",
       "depends_on": ["20260921051204_p1_compliance_foundation"]
     }
   ]
