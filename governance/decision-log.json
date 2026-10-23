@@ -1417,11 +1417,11 @@
     },
     {
       "decision_id": "DEC-20261020-P2-007-REGISTRATION-ABUSE-CONTROL-CONTRACT",
-      "title": "Propose the P2-007 registration abuse-control quota contract",
-      "status": "proposed",
+      "title": "Accept the P2-007 registration abuse-control implementation contract",
+      "status": "accepted",
       "scope": "P2-007 offline implementation under the owner-adopted Gate 0 Revision 5 Packet: one unapplied forward-only migration (private quota counters and a SECURITY INVOKER decision RPC), the server-only abuse-control adapter, the narrow decideQuotaRpc privileged capability, request-scoped default-deny action wiring, the Revision 5 test 35 and 37 corrections and reciprocal governance records. No ingress trust, activation, Staging or Production change.",
       "decision": "Propose adopting the implemented contract: initial offline quotas of 10 per trusted client address per aligned UTC hour, 10 per lower-cased email identity per aligned UTC day and 120 globally per aligned UTC hour, configured only by server-only deployment settings and bounded again in SQL to 1..100, 1..100 and 1..1200; atomic all-or-none reservations under one transaction advisory lock with a 250 ms lock_timeout, a function-declared 1,500 ms statement_timeout that preempts the RPC only when PostgREST hoists it into the transaction before the RPC statement starts (hosted hoisting not yet verified), a retained final 1,500 ms elapsed-time guard as defense in depth only, and a 2,000 ms client deadline; domain-separated HMAC-SHA-256 digests; database-built effective-policy markers that refuse mismatched settings; a saturating global aggregate throttle tally; and opportunistic pruning of at most 100 expired rows per decision. service_role bypasses RLS and holds the direct table rights the SECURITY INVOKER function needs, so no function-only boundary is claimed. Registration stays default-denied until a separately verified trusted-ingress contract (D-04) and a retention and deletion decision are authorized.",
-      "rationale": "P2-006 left AbuseControl as a default-deny seam; real signup needs shared, server-authoritative quota enforcement across instances before any activation. The owner provisionally accepted the Packet's D-01 to D-06 choices for offline implementation only; this record stays proposed until the designated review and controlled audit accept the precise security decisions.",
+      "rationale": "The designated Rosuno implementation review for PR #76 accepted the corrected offline contract; a separately authorized Gate 6 then applied the same immutable migration to Rosuno Staging and accepted the post-P2 catalog. Hosted trusted ingress, PostgREST timeout preemption, retention/deletion and activation remain outside this decision.",
       "authority_refs": [
         "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
         "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
@@ -1431,12 +1431,12 @@
       "owner": "NatthanPrevot",
       "reviewer": {
         "identity": "Rosuno",
-        "status": "pending"
+        "status": "approved"
       },
       "created_at": "2026-10-21T14:19:05Z",
-      "updated_at": "2026-10-21T17:48:59Z",
+      "updated_at": "2026-10-23T02:53:59Z",
       "supersedes": [],
-      "impact": "Adds one unapplied migration and server-only code paths. Registration behavior is unchanged: it is still refused before any quota call or account creation. No Staging or Production schema, key, deployment, ingress or activation change occurs. The 13 historical migrations, the schema-drift baseline and release traceability are unchanged. Idle quota rows may persist indefinitely until a retention decision is made.",
+      "impact": "Implementation PR #76 was merged to canonical main and migration #14 was subsequently applied to Staging only. No Production application, live registration activation, ingress acceptance, retention decision, historical migration rewrite or new quota business rows. Gate 7 governance PR and merge remain future separate steps.",
       "evidence": [
         "Owner-adopted P2-007 Gate 0 Revision 5 Packet SHA-256 da1ec75c7adf88beb05a57682cb06b216cb86e64ee1a4d1055574562ef0677b5, Git blob 53198ca4d9b0c45e4b46596df47113c4f060e811; Builder Packet-only commit b19aaad25d73ae169ae85f734963829476a87dac on base 37cb296ce6a15e4db003837bb7ef0b4469ac4313.",
         "Original implementation commit f9e09a898f389b73df552998de1bcd725e31032f: migration 20261020070000_p2_registration_abuse_control SQL SHA-256 453a93fc4dfcef1646972e1e3f4e97d399822eedafd85c196ad0c0e9898badc1, 11,947 bytes.",
@@ -1453,7 +1453,11 @@
         "Local PostgreSQL preemption (T1, T2): with the declared value read from the catalog and armed by a transaction-scoped set_config before the RPC statement, modeling PostgREST hoisting, PostgreSQL cancelled overlong decisions inside the function with SQLSTATE 57014 'canceling statement due to statement timeout' from ProcessInterrupts, about 1,500 ms after statement start by the server's clock (allow path after its first reservation write; throttle path after its aggregate write), where normal completion needed at least 6,000 ms and 2,000 ms. The delay came from a disposable trigger created inside each proof transaction. After cancellation no reservation, aggregate change, fixture or partial commit remained: the table and full catalog were unchanged and the global aggregate stayed at 3 accepted and 5 throttled. Ordinary decisions under the armed timeout (T4) still allowed and committed.",
         "Control (T3, C15): without an armed statement_timeout the function-level setting alone did not preempt. The same overlong decision completed all three writes in about 6,011 ms and only the final guard refused it, with SQLSTATE 57014 'registration quota unavailable' raised at the function's RAISE (exec_stmt_raise); nothing persisted. The final guard is defense in depth and is not counted as preemption.",
         "NOT TESTED — DEFERRED TO AUTHORIZED STAGING VERIFICATION: the hosted PostgREST version, its hoisted-settings configuration, and Staging RPC enforcement of the 1,500 ms statement_timeout. Preemption of the deployed RPC depends on PostgREST hoisting this function's statement_timeout before the RPC statement starts; the function-level setting, the final guard and the 2,000 ms client abort do not provide it on their own. No Staging, Supabase or PostgREST instance was contacted.",
-        "Corrected-tree validation: p2:application-shell:test 175 of 175 (test 18 now requires the statement_timeout header line); format:check, typecheck, build, p0:validate, p0:test (1,260 P0 tests and the 175 application tests), secrets:check and dependency:check each exit 0. The fourteenth migration remains unreviewed (reviewed false) and unapplied (applied_environment none)."
+        "Corrected-tree validation: p2:application-shell:test 175 of 175 (test 18 now requires the statement_timeout header line); format:check, typecheck, build, p0:validate, p0:test (1,260 P0 tests and the 175 application tests), secrets:check and dependency:check each exit 0. The fourteenth migration remains unreviewed (reviewed false) and unapplied (applied_environment none).",
+        "P2-007 implementation PR #76 approved by Rosuno at 2026-10-21T18:44:58Z and merged as f0d311d7f4880d703bf45b6654ea28620e28e0bc; implementation head 7265b86fd08d8c7765fb383468048bdfe5c40663.",
+        "Separately authorized Gate 6 Staging application accepted, 14 applied versions, 61/61 public RLS, 28 public functions, 0 quota rows/policies; Gate 6 review packet sha256:b576e746c04c575abc724298074ee9c31f386bed0cb97408aa03821cdb2b610f.",
+        "Accepted certificate-verified post-P2 full catalog: 1970 rows, 658601 bytes, sha256:0f823b1ce633d925183e1f1404f962f5b524744cf09b52acbadf0b1744032e9d; owner-held measurement evidence ZIP sha256:e26c65a937760e9bad20ef97968f99b37860d79998b8869b6bf56f2ea4caaa50.",
+        "Gate 7 governance candidate only; no Gate 7 PR/review/merge, end-to-end deployed signup verification or Production activation is claimed."
       ],
       "expiry": null
     }

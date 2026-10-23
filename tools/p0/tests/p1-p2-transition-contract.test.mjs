@@ -164,12 +164,77 @@ test("P1 closure preserves deferred Physical 1L and the accepted database baseli
     migrations.migrations[12].migration_id,
     "20260921051204_p1_compliance_foundation",
   );
-  assert.equal(baseline.baseline_id, "rosuno-staging-p1-011-20260923-v1");
-  assert.equal(baseline.migration_inventory.length, 13);
-  assert.equal(
-    baseline.catalog_fingerprint.sha256,
-    "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
-  );
+  // Preserve the exact historical baseline check when no appended migration
+  // exists; otherwise require the single independently accepted P2-007 suffix.
+  if (baseline.migration_inventory.length === HISTORICAL_MIGRATION_COUNT) {
+    assert.equal(baseline.baseline_id, "rosuno-staging-p1-011-20260923-v1");
+    assert.equal(
+      baseline.catalog_fingerprint.sha256,
+      "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
+    );
+    assert.equal(
+      sha256("governance/schema-drift/baseline.json"),
+      "196caee4de2c870652ce5b716a9b02c484c97181b1d9c59e5abbc5c2966b2d65",
+    );
+  } else {
+    assert.equal(baseline.baseline_id, "rosuno-staging-p2-007-20261022-v1");
+    assert.equal(baseline.migration_inventory.length, 14);
+    assert.equal(
+      sha256("governance/evidence/p1-011-governance-lifecycle-closure.json"),
+      "7a95c0350f5be2836671513431f4c9c8982d60eb362d7561c12f3bc758e8ae73",
+    );
+    const p1011 = readJson(
+      "governance/evidence/p1-011-governance-lifecycle-closure.json",
+    );
+    assert.deepEqual(
+      baseline.migration_inventory
+        .slice(0, HISTORICAL_MIGRATION_COUNT)
+        .map((item) => item.migration_id),
+      p1011.migration.history,
+    );
+    const originalManifest = {
+      baseline_id: "rosuno-staging-p1-011-20260923-v1",
+      checked_environment: "staging",
+      project: { name: "Rosuno Staging", project_ref: "mxjlvmowmodzdtdfgqpb" },
+      migration_inventory: baseline.migration_inventory.slice(
+        0,
+        HISTORICAL_MIGRATION_COUNT,
+      ),
+      accepted_evidence: baseline.accepted_evidence.slice(0, 11),
+      catalog_fingerprint: {
+        format: "rosuno-p1-catalog-v1",
+        sha256:
+          "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
+        canonical_byte_length: 640365,
+        row_count: 1938,
+      },
+    };
+    assert.equal(
+      "sha256:" +
+        createHash("sha256")
+          .update(JSON.stringify(originalManifest))
+          .digest("hex"),
+      "sha256:c7fccca383d38712c74946c7beb4cf4beb1fec8889343ba45e8d7eb97db35677",
+    );
+    assert.equal(
+      baseline.accepted_evidence[10].sha256,
+      "7a95c0350f5be2836671513431f4c9c8982d60eb362d7561c12f3bc758e8ae73",
+    );
+    assert.equal(
+      baseline.migration_inventory[13].migration_id,
+      "20261020070000_p2_registration_abuse_control",
+    );
+    assert.equal(
+      baseline.migration_inventory[13].sha256,
+      "32649648b0d75763ba1003957d24febffc2050951ca49b962687c2427a5f4db5",
+    );
+    assert.equal(
+      baseline.catalog_fingerprint.sha256,
+      "0f823b1ce633d925183e1f1404f962f5b524744cf09b52acbadf0b1744032e9d",
+    );
+    assert.equal(baseline.catalog_fingerprint.canonical_byte_length, 658601);
+    assert.equal(baseline.catalog_fingerprint.row_count, 1970);
+  }
   assert.equal(
     releases.releases.some(
       (entry) =>
@@ -207,8 +272,4 @@ test("P1 closure preserves deferred Physical 1L and the accepted database baseli
     );
     assert.doesNotThrow(() => validateRepository());
   }
-  assert.equal(
-    sha256("governance/schema-drift/baseline.json"),
-    "196caee4de2c870652ce5b716a9b02c484c97181b1d9c59e5abbc5c2966b2d65",
-  );
 });

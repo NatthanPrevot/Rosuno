@@ -325,6 +325,29 @@
       },
       "rollback_reference": "tools/p0/p1-011-rollback.mjs",
       "created_at": "2026-09-23T03:17:12Z"
+    },
+    {
+      "release_id": "REL-20261022-P2-007-STAGING-APPLICATION",
+      "commit_sha": "f0d311d7f4880d703bf45b6654ea28620e28e0bc",
+      "work_item_refs": ["WI-P2-007-REGISTRATION-ABUSE-CONTROL"],
+      "decision_refs": [
+        "DEC-20261020-P2-007-REGISTRATION-ABUSE-CONTROL-CONTRACT"
+      ],
+      "migration_refs": ["20261020070000_p2_registration_abuse_control"],
+      "validation_evidence": [
+        "governance/evidence/p2-007-governance-lifecycle-closure.json",
+        "supabase/migrations/20261020070000_p2_registration_abuse_control.sql",
+        "Gate 6 accepted review packet sha256:b576e746c04c575abc724298074ee9c31f386bed0cb97408aa03821cdb2b610f",
+        "Gate 7 accepted post-P2 read-only evidence ZIP sha256:e26c65a937760e9bad20ef97968f99b37860d79998b8869b6bf56f2ea4caaa50"
+      ],
+      "artifact_digest": "sha256:32649648b0d75763ba1003957d24febffc2050951ca49b962687c2427a5f4db5",
+      "environment": "staging",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "rollback_reference": "Verified Staging defects require a separately authorized, reviewed forward-only compensating migration with default-deny registration; preserve this migration and all prior SQL/migration history bytes.",
+      "created_at": "2026-10-23T02:53:59Z"
     }
   ]
 }

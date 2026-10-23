@@ -2010,11 +2010,11 @@
         "A retention or deletion obligation, purge jobs or schedulers, other rate-limit channels, Redis or any new infrastructure.",
         "Changes to the frozen P2-006 application boundary, historical migrations, P0 validators, CI, Packets, dependencies or the schema-drift baseline and release traceability."
       ],
-      "status": "proposed",
+      "status": "completed",
       "owner": "NatthanPrevot",
       "reviewer": {
         "identity": "Rosuno",
-        "status": "pending"
+        "status": "approved"
       },
       "priority": "P2",
       "authority_refs": [
@@ -2031,8 +2031,8 @@
         "Registration remains default-denied: the server action trusts no client address until a separately verified ingress contract is authorized.",
         "The decision RPC reserves address/hour, identity/day and global/hour quota atomically and all-or-none within SQL-enforced envelopes, refuses any effective-policy mismatch with existing current rows, and lets a conclusive throttle create or advance only the single current-hour global aggregate row.",
         "The privileged module keeps its four runtime inputs and exports only its original three names plus decideQuotaRpc; the new adapter alone reads the HMAC key and the three quota settings.",
-        "The explicit disposable PostgreSQL proof passes with exact rollback fingerprint restoration, an allowlisted catalog delta, role, ACL and RLS probes, concurrency, timeout and window checks and clean teardown; the migration stays unapplied and no Staging or Production state changes.",
-        "All 157 baseline application tests remain, with only tests 35 and 37 narrowly corrected; the 13 historical migrations, the schema-drift baseline and release traceability stay unchanged."
+        "The explicit disposable PostgreSQL proof passes with exact rollback fingerprint restoration, an allowlisted catalog delta, role, ACL and RLS probes, concurrency, timeout and window checks and clean teardown; the unchanged migration was later applied only to Rosuno Staging under independently accepted Gate 6; Production and activation remain unchanged.",
+        "All 157 baseline application tests remain, with only tests 35 and 37 narrowly corrected; the 13 historical migrations, the historical P1-011 baseline/catalog and all prior release records remain unchanged while Gate 7 appends one independently measured Staging baseline and release; Production and activation remain unchanged."
       ],
       "validation_commands": [
         "pnpm install --frozen-lockfile",
@@ -2047,12 +2047,12 @@
         "node apps/web/tests/registration-abuse-db-proof.mjs (explicitly authorized disposable D-05 proof only; never run by CI or application tests)",
         "bash .github/scripts/rosuno-guard.sh 37cb296ce6a15e4db003837bb7ef0b4469ac4313 HEAD wi/P2-007-registration-abuse-control-v2 refs/rosuno/approved"
       ],
-      "environment": "none",
-      "release_refs": [],
+      "environment": "staging",
+      "release_refs": ["REL-20261022-P2-007-STAGING-APPLICATION"],
       "migration_refs": ["20261020070000_p2_registration_abuse_control"],
-      "rollback_reference": "Repository-only until separately authorized gates: before acceptance, correct with forward-only commits while the migration stays unapplied. Any later Staging defect requires a separately reviewed forward-only compensating migration with registration kept default-denied (P2-007 Packet section 9).",
+      "rollback_reference": "Verified Staging defects require a separately authorized, reviewed forward-only compensating migration with default-deny registration; preserve this migration and all prior SQL/migration history bytes.",
       "created_at": "2026-10-21T14:19:05Z",
-      "updated_at": "2026-10-21T14:19:05Z"
+      "updated_at": "2026-10-23T02:53:59Z"
     }
   ]
 }

@@ -1,10 +1,10 @@
 {
   "version": 1,
   "product_schema_present": true,
-  "baseline_id": "rosuno-staging-p1-011-20260923-v1",
-  "baseline_digest": "sha256:c7fccca383d38712c74946c7beb4cf4beb1fec8889343ba45e8d7eb97db35677",
+  "baseline_id": "rosuno-staging-p2-007-20261022-v1",
+  "baseline_digest": "sha256:5233572ad1c0ef93ca01391bf3dd0dd6c9ea5735a33d4d547bce297ecd4877d5",
   "checked_environment": "staging",
-  "checked_at": "2026-09-23T03:14:20Z",
+  "checked_at": "2026-10-23T02:53:59Z",
   "project": {
     "name": "Rosuno Staging",
     "project_ref": "mxjlvmowmodzdtdfgqpb"
@@ -87,6 +87,12 @@
       "migration_id": "20260921051204_p1_compliance_foundation",
       "artifact_path": "supabase/migrations/20260921051204_p1_compliance_foundation.sql",
       "sha256": "d23dc72d6c36f544b8b50bbf053a96f9ecc9b2add7f02d87ce3ed4bc586880e4"
+    },
+    {
+      "sequence": 14,
+      "migration_id": "20261020070000_p2_registration_abuse_control",
+      "artifact_path": "supabase/migrations/20261020070000_p2_registration_abuse_control.sql",
+      "sha256": "32649648b0d75763ba1003957d24febffc2050951ca49b962687c2427a5f4db5"
     }
   ],
   "accepted_evidence": [
@@ -133,13 +139,17 @@
     {
       "path": "governance/evidence/p1-011-governance-lifecycle-closure.json",
       "sha256": "7a95c0350f5be2836671513431f4c9c8982d60eb362d7561c12f3bc758e8ae73"
+    },
+    {
+      "path": "governance/evidence/p2-007-governance-lifecycle-closure.json",
+      "sha256": "13604d596926ae49dfc8c544ed0e5e63a94cd27323f879ea9856c16e417d211f"
     }
   ],
   "catalog_fingerprint": {
     "format": "rosuno-p1-catalog-v1",
-    "sha256": "edffaba2b7e081c3c8c78c158ce33a444a448671bf338188356d1118f0a9960a",
-    "canonical_byte_length": 640365,
-    "row_count": 1938
+    "sha256": "0f823b1ce633d925183e1f1404f962f5b524744cf09b52acbadf0b1744032e9d",
+    "canonical_byte_length": 658601,
+    "row_count": 1970
   },
   "evidence": [
     "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json",
@@ -152,7 +162,8 @@
     "governance/evidence/p1-008-governance-lifecycle-closure.json",
     "governance/evidence/p1-009-governance-lifecycle-closure.json",
     "governance/evidence/p1-010-governance-lifecycle-closure.json",
-    "governance/evidence/p1-011-governance-lifecycle-closure.json"
+    "governance/evidence/p1-011-governance-lifecycle-closure.json",
+    "governance/evidence/p2-007-governance-lifecycle-closure.json"
   ],
   "drift_status": "clean",
   "drift_items": []
