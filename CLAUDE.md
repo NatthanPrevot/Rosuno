@@ -78,3 +78,12 @@ must print `ROSUNO-GUARD PASS`. The same script runs in the owner repository as 
   ROSUNO-GUARD SELF-CHECK: (paste the PASS line)
   REFUSALS OR LIMITATIONS:
   RISKS / UNRESOLVED QUESTIONS:
+
+
+## P2-905 Gate 0 and conditional closure-candidate role (not commissioned)
+- Before future work, perform the read-only Gate 0 compatibility check required by the owner-adopted Packet and effective tooling. Compare exact source, branch, HEAD, approved Packet blob, Git common dir/worktrees, allowed MCPs and permissions; unexplained drift is STOP, never autocorrection.
+- `CLOSURE_CANDIDATE` is a **role name, not a permission**. It is disabled by default. Only a separate exact-work-item owner grant, completed independent commissioning (trusted source/context, App or human principal, fork-only transport, nonzero negative tests, source-bound CI and Backup audit), and a specific closure Packet could enable it. P2-905 does not enable the role, auto-authorize Gate 7, or permit self-closing this work item.
+- The role, if independently commissioned later, may prepare a candidate on the authorized fork work-item branch only; it may never approve PRs, merge, mutate owner or DB state, forge a required status, or replace the human reviewer. The signed-in account, Git transport identity and target ref must be positively verified before any permitted fork publication.
+- **Effective deny rules prevail.** TYPE: PROCESS prose does not override `.claude/settings.json`. Do not access protected paths with Edit, Bash, a connector, alternate worktree or another identity. P2-905 protected paths are authored by independent ChatGPT outside Claude and imported by the separately authorized human executor. Claude may natively edit only the two expressly authorized `tools/p0` files, and only after the verified protected-file commit. No shadow delegation or fallback tool.
+- Legacy references to network policy `Trusted` mean the restricted **Limited** setting shown in the current Claude Code interface; never promote to Full to work around a task restriction.
+- Never treat `rosuno-process-guard`, owner-executor automation or bot-PR routing as active based only on committed code. Their commissioning, source binding, required-check adoption and credential-grant proof remain separate gates.

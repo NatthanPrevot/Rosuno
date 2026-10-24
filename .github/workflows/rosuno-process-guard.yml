@@ -1,0 +1,16 @@
+name: rosuno-process-guard
+# Intentionally inert until separate owner commissioning, trusted source trials,
+# protected check-context verification and GitHub policy authorization.
+# The checked-in definition MUST NOT provide a successful required status.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  commissioning-hold:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Not commissioned
+        run: exit 1
