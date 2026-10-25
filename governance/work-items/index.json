@@ -2053,6 +2053,59 @@
       "rollback_reference": "Verified Staging defects require a separately authorized, reviewed forward-only compensating migration with default-deny registration; preserve this migration and all prior SQL/migration history bytes.",
       "created_at": "2026-10-21T14:19:05Z",
       "updated_at": "2026-10-23T02:53:59Z"
+    },
+    {
+      "work_item_id": "WI-P2-905-CLAUDE-WORKFLOW-CONTROLS",
+      "title": "Claude Workflow Controls (P2-905 PROCESS implementation)",
+      "objective": "Register the completed, repository-only P2-905 PROCESS implementation of protected Claude workflow controls and its protected PR #79 lifecycle, with outcome PROCESS_IMPLEMENTATION_PASS only; every new workflow, owner-executor and Claude closure automation control remains inactive by default.",
+      "in_scope": [
+        "Original P2-905 implementation diff of exactly 14 authorized paths (PR #79, first parent to merge): .claude/settings.json, .github/scripts/rosuno-guard-trust.sh, .github/scripts/rosuno-guard.sh, .github/scripts/rosuno-owner-executor-preflight.py, .github/scripts/rosuno-process-guard.py, .github/scripts/tests/test-rosuno-owner-executor-preflight.py, .github/scripts/tests/test-rosuno-process-guard.py, .github/workflows/rosuno-guard.yml, .github/workflows/rosuno-process-guard.yml, CLAUDE.md, docs/process/p2-905-enablement-contract.md, docs/work-items/P2-905/PACKET.md, tools/p0/lib/controls.mjs and tools/p0/tests/p0-controls.test.mjs.",
+        "Original owner-adopted P2-905 Packet, three preserved linear implementation commits, designated Rosuno exact-head approval, the four required GitHub checks, independent Backup audits and the protected two-parent merge of PR #79.",
+        "P2-907 closure scope, separate from the P2-905 14-path implementation scope: governance/work-items/index.json and governance/decision-log.json, each appended with exactly one record."
+      ],
+      "out_of_scope": [
+        "Activation or commissioning of rosuno-process-guard, owner-executor automation, bot-PR routing or the Claude CLOSURE_CANDIDATE role; GitHub App, permission, policy, required-check or source-binding changes; credential creation.",
+        "Further implementation, migrations, schema or RLS changes, Supabase, Staging, Production or OLD project contact, deployment, payments, and attorney or customer data.",
+        "Changes to the P2-905 or P2-907 Packets, locked authority, historical migrations, existing governance records, tests, validators, workflows or source code."
+      ],
+      "status": "completed",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "decision_refs": ["DEC-20261025-P2-905-PROCESS-IMPLEMENTATION-CLOSURE"],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Outcome is PROCESS_IMPLEMENTATION_PASS for repository implementation only: NOT AUTOMATION_ENABLED, NOT CLOUD_GATE7_ENABLED, not owner-executor enablement and not a verified production deployment.",
+        "Accepted P2-905 Packet SHA-256 f002e19f2e31baa5ecd9fa21a7e5b3769e080a4836c03c9420a2d8f85469cfdf (Git blob 44e02c443426d8eb74a87e7a8425da918f3f3c36) and the exact 14-path implementation scope remain immutable.",
+        "PR #79 approved implementation head 10a1177157f24e63a498df1e6eace2a980c009d4 received designated Rosuno exact-head approval (GitHub review ID 5641683072), and the four required GitHub checks passed.",
+        "Protected merge 55ef2c3a9a72c2ba3bbae361195951629e54f3d0, with ordered parents 18e040a56e388b8e840c4ec5475f0451551d9fcf and 10a1177157f24e63a498df1e6eace2a980c009d4 and merge tree f31fabb17e293b66276d05d31088abe0a9238263, is recorded without reopening implementation Gates 0 to 4.",
+        "No migration, schema, RLS or database operation: all 14 registered migrations remain byte-preserved with supabase/migrations subtree 6be2d384d257eeeb43189f568640f98077f2811d; environment none.",
+        "The P2-907 closure candidate appends only one work-item and one reciprocal decision record, preserving all 28 previous work items and 39 previous decisions in original order; the P2-907 closure-PR Rosuno approval is still pending, and protected closure-PR review and merge remain separately gated."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "bash .github/scripts/rosuno-guard.sh 55ef2c3a9a72c2ba3bbae361195951629e54f3d0 HEAD wi/P2-907-p2-905-governance-closure refs/rosuno/approved"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository-only closure. Before protected acceptance, discard only the authorized unmerged closure candidate if needed; after acceptance, make forward-only corrections under a separately authorized work item. Never rewrite accepted records, Git history or migration history. No database rollback applies.",
+      "created_at": "2026-10-25T14:29:56Z",
+      "updated_at": "2026-10-25T14:29:56Z"
     }
   ]
 }
