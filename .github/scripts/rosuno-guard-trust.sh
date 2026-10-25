@@ -5,6 +5,8 @@
 #   open-prs.txt: one line per OPEN pull request in the owner repository: "<number> <head-sha>"
 # Required env: EXPECTED_REPO (owner repo, e.g. NatthanPrevot/Rosuno), EXPECTED_BASE (main),
 #               BUILDER_FORK (e.g. RosunoBackup/Rosuno), OWNER_LOGIN (e.g. NatthanPrevot)
+# P2-905: this inherited trust binder remains a conservative PR-creator/source classifier.
+# Owner-origin PROCESS/closure is separately HOLD-gated by trusted workflow and process guard; no skip-as-success.
 # Prints MODE=builder (PR from the authorized Builder fork, created by the owner: full guard must run) or
 # MODE=owner (PR from an owner-repository branch, created by the owner: governed by UOM v1.7 alone). Exit 1 otherwise.
 set -euo pipefail

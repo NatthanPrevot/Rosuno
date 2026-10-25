@@ -30,15 +30,17 @@ PKT="$(git show "$HEAD:$PK")"
 # Packet identity (UOM v1.8 §16.1): exactly one WORK_ITEM, BRANCH and BASE_SHA line each, bound to the real branch and base.
 cnt(){ grep -c "^$1:" <<<"$PKT" || true; }
 val(){ sed -n "s/^$1:[[:space:]]*//p" <<<"$PKT" | sed 's/[[:space:]]*$//'; }
-for k in WORK_ITEM BRANCH BASE_SHA; do [ "$(cnt "$k")" = 1 ] || fail "Packet must contain exactly one $k line"; done
+for k in WORK_ITEM BRANCH BASE_SHA TYPE MIGRATIONS ALLOWED_SCOPE FORBIDDEN_SCOPE; do [ "$(cnt "$k")" = 1 ] || fail "Packet must contain exactly one $k line"; done
 [ "$(val WORK_ITEM)" = "$ID" ] || fail "Packet WORK_ITEM '$(val WORK_ITEM)' does not match branch work item '$ID'"
 [ "$(val BRANCH)" = "$BRANCH" ] || fail "Packet BRANCH '$(val BRANCH)' does not match the PR head branch '$BRANCH'"
 PBASE="$(val BASE_SHA)"
 [[ "$PBASE" =~ ^[0-9a-f]{40}$ ]] || fail "Packet BASE_SHA must be a full 40-hex commit SHA"
 [ "$PBASE" = "$(git rev-parse "$FIRST^")" ] || fail "Packet BASE_SHA $PBASE is not the parent of the Packet commit"
+[ "$MB" = "$PBASE" ] || fail "merge-base $MB does not equal approved Packet BASE_SHA $PBASE"
 list(){ awk -v k="$1:" '$0==k{f=1;next} /^[A-Z_]+:/{f=0} f&&/^[[:space:]]*- /{sub(/^[[:space:]]*- /,"");print}' <<<"$PKT"; }
 ALLOWED="$(list ALLOWED_SCOPE)"; FORBIDDEN="$(list FORBIDDEN_SCOPE)"
 [ -n "$ALLOWED" ] || fail "ALLOWED_SCOPE is empty"
+[ "$(printf '%s\n' "$ALLOWED" | LC_ALL=C sort -f | uniq -i | wc -l | tr -d ' ')" = "$(printf '%s\n' "$ALLOWED" | wc -l | tr -d ' ')" ] || fail "duplicate/case-aliased allowlist entry"
 grep -q '^FORBIDDEN_SCOPE:[[:space:]]*$' <<<"$PKT" || fail "FORBIDDEN_SCOPE field missing (it may be an empty list)"
 MIGS="$(sed -n 's/^MIGRATIONS:[[:space:]]*//p' <<<"$PKT" | head -1)"; [ -n "$MIGS" ] || fail "MIGRATIONS field missing"
 TYPE="$(sed -n 's/^TYPE:[[:space:]]*//p' <<<"$PKT" | head -1)"; TYPE="${TYPE:-FEATURE}"

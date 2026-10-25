@@ -53,34 +53,61 @@ jobs:
           bash .github/scripts/rosuno-guard-trust.sh "$GITHUB_EVENT_PATH" "$RUNNER_TEMP/open-prs.txt" | tee "$RUNNER_TEMP/trust.txt"
           grep -E '^MODE=(builder|owner)$' "$RUNNER_TEMP/trust.txt" >> "$GITHUB_OUTPUT"
       - name: Validate the head branch name before using it
-        if: steps.trust.outputs.MODE == 'builder'
+        if: steps.trust.outputs.MODE == 'builder' || steps.trust.outputs.MODE == 'owner'
         run: |
           [[ "$HEAD_REF" =~ ^wi/[A-Z][A-Z0-9]*-[0-9]{3}(-[a-z0-9-]+)?$ ]] || { echo "::error::head branch is not wi/<ID>[-slug]"; exit 1; }
       - name: Fetch PR head and the owner-approved Packet branch as data
-        if: steps.trust.outputs.MODE == 'builder'
+        if: steps.trust.outputs.MODE == 'builder' || steps.trust.outputs.MODE == 'owner'
         run: |
           git fetch --no-tags https://github.com/"$REPO".git "+refs/pull/${PR_NUMBER}/head:refs/rosuno/pr-head"
           test "$(git rev-parse refs/rosuno/pr-head)" = "$HEAD_SHA"
           git fetch --no-tags https://github.com/"$REPO".git "+refs/heads/${HEAD_REF}:refs/rosuno/approved" \
             || { echo "::error::owner repository has no branch $HEAD_REF (Packet not published by the owner)"; exit 1; }
           git cat-file -e "$BASE_SHA^{commit}"
-      - name: rosuno-guard (script from the default branch)
+      - name: rosuno-guard (script from the default branch; both head sources)
         id: guard
-        if: steps.trust.outputs.MODE == 'builder'
+        if: steps.trust.outputs.MODE == 'builder' || steps.trust.outputs.MODE == 'owner'
         run: bash .github/scripts/rosuno-guard.sh "$BASE_SHA" "$HEAD_SHA" "$HEAD_REF" refs/rosuno/approved
+      - name: Validate owner-origin PROCESS classification (no skip-as-success)
+        id: owner_process
+        if: steps.trust.outputs.MODE == 'owner' && steps.guard.outcome == 'success'
+        env:
+          # Fixed OFF for P2-905. A separately authorized future commissioning
+          # must prove genuine source-bound owner grants before changing this.
+          ROSUNO_PROCESS_COMMISSIONED: "false"
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$HEAD_REF" =~ ^wi/([A-Z][A-Z0-9]*-[0-9]{3})(-[a-z0-9-]+)?$ ]] || exit 1
+          PK="docs/work-items/${BASH_REMATCH[1]}/PACKET.md"
+          git show "$HEAD_SHA:$PK" > "$RUNNER_TEMP/head-packet.txt"
+          test "$(grep -c '^TYPE:' "$RUNNER_TEMP/head-packet.txt")" = 1
+          TYPE="$(sed -n 's/^TYPE:[[:space:]]*//p' "$RUNNER_TEMP/head-packet.txt" | tr -d '\r')"
+          case "$TYPE" in
+            PROCESS|CLOSURE)
+              echo "owner-origin $TYPE check requires separate commissioning"
+              test "$ROSUNO_PROCESS_COMMISSIONED" = true || exit 1
+              # Unreachable until an independently authorized future revision.
+              # Never accept an owner PROCESS PR using the legacy owner skip.
+              exit 1 ;;
+            FEATURE|BUG|FIX|DOCS) echo "OWNER_KIND=nonprocess" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::unsupported owner Packet TYPE $TYPE"; exit 1 ;;
+          esac
       - name: Report the result on the exact PR head
         if: always()
         env:
           MODE: ${{ steps.trust.outputs.MODE }}
           TRUST: ${{ steps.trust.outcome }}
           OUTCOME: ${{ steps.guard.outcome }}
+          OWNER_OUTCOME: ${{ steps.owner_process.outcome }}
+          OWNER_KIND: ${{ steps.owner_process.outputs.OWNER_KIND }}
         run: |
           B="${BASE_SHA:0:12}"
           if [ "$TRUST" = success ] && [ "$MODE" = builder ] && [ "$OUTCOME" = success ]; then
             S=success; D="PASS builder PR #$PR_NUMBER base $B"
-          elif [ "$TRUST" = success ] && [ "$MODE" = owner ]; then
-            S=success; D="owner-repo PR #$PR_NUMBER: not a Builder PR (UOM v1.7 controls)"
+          elif [ "$TRUST" = success ] && [ "$MODE" = owner ] && [ "$OUTCOME" = success ] && [ "$OWNER_OUTCOME" = success ] && [ "$OWNER_KIND" = nonprocess ]; then
+            S=success; D="PASS owner non-PROCESS Packet/commit PR #$PR_NUMBER"
           else
-            S=failure; D="FAIL PR #$PR_NUMBER (trust: $TRUST, guard: ${OUTCOME:-not run})"
+            S=failure; D="FAIL PR #$PR_NUMBER (trust: $TRUST, guard: ${OUTCOME:-not run}, owner: ${OWNER_OUTCOME:-not run})"
           fi
           gh api "repos/$REPO/statuses/$HEAD_SHA" -f state="$S" -f context=rosuno-guard -f description="$D" -f target_url="$RUN_URL"

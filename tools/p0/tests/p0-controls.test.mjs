@@ -2326,6 +2326,793 @@ test("P2-900 exact Cloud Builder paths reject near-misses", () => {
   }
 });
 
+// P2-905 REV3 §3A: six named PROCESS files are admitted as exact paths beside
+// the five P2-900 Cloud Builder paths. The neutral-path gate compares path
+// strings only; Git object modes are enforced by rosuno-guard, exercised on
+// disposable repositories below.
+const P2_905_PROCESS_PATHS = [
+  ".github/scripts/rosuno-process-guard.py",
+  ".github/scripts/rosuno-owner-executor-preflight.py",
+  ".github/scripts/tests/test-rosuno-process-guard.py",
+  ".github/scripts/tests/test-rosuno-owner-executor-preflight.py",
+  ".github/workflows/rosuno-process-guard.yml",
+  "docs/process/p2-905-enablement-contract.md",
+];
+
+test("P2-905 exact PROCESS paths are admitted in both repository states", () => {
+  const cloudBuilderPaths = [
+    ".github/scripts/rosuno-guard.sh",
+    ".github/scripts/rosuno-guard-trust.sh",
+    ".github/workflows/rosuno-guard.yml",
+    "CLAUDE.md",
+    ".claude/settings.json",
+  ];
+  for (const [state, packageJson] of rootPackageFixtures()) {
+    for (const file of P2_905_PROCESS_PATHS) {
+      assert.doesNotThrow(
+        () => validateNeutralPaths([file], packageJson, state),
+        `${state}: ${file}`,
+      );
+    }
+    assert.doesNotThrow(() =>
+      validateNeutralPaths(
+        [...cloudBuilderPaths, ...P2_905_PROCESS_PATHS],
+        packageJson,
+        state,
+      ),
+    );
+  }
+});
+
+test("P2-905 PROCESS paths are present exactly once in the live repository", () => {
+  const files = liveRepositoryFiles();
+  for (const file of P2_905_PROCESS_PATHS) {
+    assert.deepEqual(
+      files.filter((entry) => entry.toLowerCase() === file.toLowerCase()),
+      [file],
+      file,
+    );
+  }
+});
+
+test("P2-905 exact PROCESS paths reject near-misses and repository hazards", () => {
+  const rejected = [
+    // Sibling names.
+    ".github/scripts/rosuno-process-guard2.py",
+    ".github/scripts/rosuno-process-guards.py",
+    ".github/scripts/rosuno-process-guard-v2.py",
+    ".github/scripts/rosuno-owner-executor.py",
+    ".github/scripts/rosuno-owner-executor-preflight-v2.py",
+    ".github/scripts/rosuno-owner-executor-mutate.py",
+    ".github/scripts/tests/test-rosuno-guard.py",
+    ".github/scripts/tests/test-rosuno-process-guard-extra.py",
+    ".github/scripts/tests/test_rosuno_process_guard.py",
+    ".github/workflows/rosuno-process-guard-v2.yml",
+    ".github/workflows/rosuno-process-guard-copy.yml",
+    "docs/process/p2-905-enablement-contract-v2.md",
+    "docs/process/p2-906-enablement-contract.md",
+    // Suffixes.
+    ".github/scripts/rosuno-process-guard.py.bak",
+    ".github/scripts/rosuno-process-guard.py~",
+    ".github/scripts/rosuno-process-guard.pyc",
+    ".github/scripts/rosuno-process-guard.sh",
+    ".github/scripts/tests/test-rosuno-process-guard.py.orig",
+    ".github/workflows/rosuno-process-guard.yaml",
+    ".github/workflows/rosuno-process-guard.yml.disabled",
+    "docs/process/p2-905-enablement-contract.md.bak",
+    "docs/process/p2-905-enablement-contract.txt",
+    // Case aliases.
+    ".github/scripts/Rosuno-Process-Guard.py",
+    ".github/scripts/ROSUNO-PROCESS-GUARD.PY",
+    ".github/scripts/rosuno-process-guard.PY",
+    ".GitHub/scripts/rosuno-process-guard.py",
+    ".github/Scripts/rosuno-process-guard.py",
+    ".github/scripts/Tests/test-rosuno-process-guard.py",
+    ".github/Workflows/rosuno-process-guard.yml",
+    "docs/Process/p2-905-enablement-contract.md",
+    "Docs/process/p2-905-enablement-contract.md",
+    "docs/process/P2-905-enablement-contract.md",
+    // Unauthorized directories.
+    ".github/rosuno-process-guard.py",
+    ".github/tests/test-rosuno-process-guard.py",
+    ".github/scripts/test-rosuno-process-guard.py",
+    ".github/scripts/tests/rosuno-process-guard.py",
+    ".github/scripts/tests/tests/test-rosuno-process-guard.py",
+    ".github/scripts/rosuno-process-guard/rosuno-process-guard.py",
+    ".github/workflows/tests/rosuno-process-guard.yml",
+    ".github/actions/rosuno-process-guard.yml",
+    "scripts/rosuno-process-guard.py",
+    "process/p2-905-enablement-contract.md",
+    "docs/p2-905-enablement-contract.md",
+    "docs/process/p2-905/enablement-contract.md",
+    "docs/work-items/P2-905/p2-905-enablement-contract.md",
+    // Non-canonical spellings of an admitted path.
+    "./.github/scripts/rosuno-process-guard.py",
+    "/.github/scripts/rosuno-process-guard.py",
+    ".github/scripts/../scripts/rosuno-process-guard.py",
+    ".github/scripts/./rosuno-process-guard.py",
+    ".github//scripts/rosuno-process-guard.py",
+    ".github/scripts/rosuno-process-guard.py/",
+    " .github/scripts/rosuno-process-guard.py",
+    ".github/scripts/rosuno-process-guard.py ",
+    ".github/scripts/rosuno-process-guard.py\n",
+    ".github\\scripts\\rosuno-process-guard.py",
+    "docs/process/../process/p2-905-enablement-contract.md",
+    ".github/scripts/rоsuno-process-guard.py",
+    // Other .github, .claude and docs/process content.
+    ".github/scripts/rosuno-deploy.py",
+    ".github/scripts/tests/test-anything.py",
+    ".github/scripts/tests/helpers.py",
+    ".github/workflows/rosuno-auto-merge.yml",
+    ".github/dependabot.yml",
+    ".github/settings.yml",
+    ".claude/settings.local.json",
+    ".claude/agents/closure-candidate.md",
+    ".claude/commands/gate7.md",
+    ".claude/hooks/pre-tool-use.sh",
+    "docs/process/README.md",
+    "docs/process/closure-candidate.md",
+    // Worktree, manifest, bytecode, credential and migration hazards.
+    ".git/config",
+    ".git/worktrees/p2-905/HEAD",
+    ".github/scripts/.git",
+    ".github/scripts/tests/.git/config",
+    "docs/process/.git",
+    ".gitmodules",
+    ".github/scripts/requirements.txt",
+    ".github/scripts/tests/requirements.txt",
+    ".github/scripts/pyproject.toml",
+    ".github/scripts/setup.py",
+    ".github/scripts/tests/conftest.py",
+    ".github/scripts/tests/__init__.py",
+    ".github/scripts/package.json",
+    "docs/process/package.json",
+    ".github/scripts/__pycache__/rosuno-process-guard.cpython-312.pyc",
+    ".github/scripts/tests/__pycache__/test-rosuno-process-guard.cpython-312.pyc",
+    "requirements.txt",
+    "pyproject.toml",
+    "uv.lock",
+    ".python-version",
+    ".github/scripts/.env",
+    "docs/process/.env.local",
+    ".github/scripts/tests/20261024000000_p2_905_process_guard.sql",
+    "docs/process/20261024000000_p2_905_process_guard.sql",
+    "supabase/migrations/20261024000000_p2_905_process_guard.sql",
+  ];
+  for (const [state, packageJson] of rootPackageFixtures()) {
+    for (const file of rejected) {
+      assert.throws(
+        () =>
+          validateNeutralPaths(
+            [...P2_905_PROCESS_PATHS, file],
+            packageJson,
+            state,
+          ),
+        { message: `product implementation paths are present: ${file}` },
+        `${state}: ${JSON.stringify(file)}`,
+      );
+    }
+  }
+});
+
+// Builds a disposable repository holding a TYPE: PROCESS Packet that allows the
+// six P2-905 paths, applies one commit per change with an explicit Git mode,
+// then runs the real rosuno-guard against it. Git sees no user or system
+// configuration, so the fixture neither signs nor reads host credentials.
+function runRosunoGuardFixture(changes) {
+  const sandbox = mkdtempSync(path.join(tmpdir(), "rosuno-p2-905-guard-"));
+  const repo = path.join(sandbox, "repo");
+  const branch = "wi/P9-905-guard-fixture";
+  const packetPath = "docs/work-items/P9-905/PACKET.md";
+  const env = {
+    PATH: process.env.PATH ?? "",
+    HOME: sandbox,
+    LANG: "C.UTF-8",
+    LC_ALL: "C.UTF-8",
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_AUTHOR_NAME: "Rosuno Fixture",
+    GIT_AUTHOR_EMAIL: "fixture@example.invalid",
+    GIT_AUTHOR_DATE: "2026-10-24T00:00:00Z",
+    GIT_COMMITTER_NAME: "Rosuno Fixture",
+    GIT_COMMITTER_EMAIL: "fixture@example.invalid",
+    GIT_COMMITTER_DATE: "2026-10-24T00:00:00Z",
+  };
+  const git = (args, input) =>
+    execFileSync("git", args, {
+      cwd: repo,
+      env,
+      encoding: "utf8",
+      input,
+    }).trim();
+  try {
+    mkdirSync(repo);
+    git(["init", "-q", "-b", "main"]);
+    writeFileSync(path.join(repo, "README.md"), "Disposable guard fixture.\n");
+    git(["add", "README.md"]);
+    git(["commit", "-q", "-m", "base"]);
+    const base = git(["rev-parse", "HEAD"]);
+    git(["switch", "-q", "-c", branch]);
+    mkdirSync(path.join(repo, path.dirname(packetPath)), { recursive: true });
+    writeFileSync(
+      path.join(repo, packetPath),
+      [
+        "WORK_ITEM: P9-905",
+        "TYPE: PROCESS",
+        `BRANCH: ${branch}`,
+        `BASE_SHA: ${base}`,
+        "MIGRATIONS: none",
+        "ALLOWED_SCOPE:",
+        ...P2_905_PROCESS_PATHS.map((file) => `- ${file}`),
+        "FORBIDDEN_SCOPE:",
+        "- .env",
+        "",
+      ].join("\n"),
+    );
+    git(["add", packetPath]);
+    git(["commit", "-q", "-m", "Packet"]);
+    git(["update-ref", "refs/fixture/approved", "HEAD"]);
+    for (const { file, mode, content } of changes) {
+      const blob = git(["hash-object", "-w", "--stdin"], content);
+      git(["update-index", "--add", "--cacheinfo", `${mode},${blob},${file}`]);
+      git(["commit", "-q", "-m", `${mode} ${file}`]);
+    }
+    return spawnSync(
+      "bash",
+      [
+        path.join(ROOT, ".github/scripts/rosuno-guard.sh"),
+        base,
+        "HEAD",
+        branch,
+        "refs/fixture/approved",
+      ],
+      { cwd: repo, env, encoding: "utf8", timeout: 60_000 },
+    );
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
+}
+
+test("rosuno-guard admits regular files and rejects symlinks at exact P2-905 paths", () => {
+  const regular = runRosunoGuardFixture(
+    P2_905_PROCESS_PATHS.map((file) => ({
+      file,
+      mode: "100644",
+      content: "Disposable regular file.\n",
+    })),
+  );
+  assert.equal(regular.status, 0, regular.stdout + regular.stderr);
+  assert.match(regular.stdout, /^ROSUNO-GUARD PASS work_item=P9-905 /m);
+
+  for (const file of P2_905_PROCESS_PATHS) {
+    const symlink = runRosunoGuardFixture([
+      { file, mode: "120000", content: "../../README.md" },
+    ]);
+    assert.equal(symlink.status, 1, `${file}: ${symlink.stdout}`);
+    assert.ok(
+      symlink.stdout.includes(
+        `[final diff] ${file} has git mode 120000 (symlink/submodule/special objects are not allowed)`,
+      ),
+      `${file}: ${symlink.stdout}`,
+    );
+  }
+
+  // A symlink replaced by a regular file in a later commit is still rejected:
+  // the guard checks every commit, not only the final diff.
+  const replaced = runRosunoGuardFixture([
+    { file: P2_905_PROCESS_PATHS[0], mode: "120000", content: "../README.md" },
+    { file: P2_905_PROCESS_PATHS[0], mode: "100644", content: "Regular.\n" },
+  ]);
+  assert.equal(replaced.status, 1, replaced.stdout);
+  assert.match(
+    replaced.stdout,
+    /\[commit [0-9a-f]{12}\] \.github\/scripts\/rosuno-process-guard\.py has git mode 120000/,
+  );
+  assert.doesNotMatch(replaced.stdout, /\[final diff\]/);
+});
+
+// P2-905 REV3 §6: both protected Python security suites run as direct scripts
+// inside this existing P0 test file; their hyphenated names defeat unittest
+// discovery. The expected counts are the reviewed suites' test methods.
+const P2_905_PYTHON_SUITES = new Map([
+  [".github/scripts/tests/test-rosuno-process-guard.py", 21],
+  [".github/scripts/tests/test-rosuno-owner-executor-preflight.py", 14],
+]);
+const P2_905_PYTHON_MODULES = [
+  ".github/scripts/rosuno-process-guard.py",
+  ".github/scripts/rosuno-owner-executor-preflight.py",
+];
+// The standard-library modules those sources import today. Network modules
+// and every third-party package stay outside the allowlist.
+const P2_905_PYTHON_IMPORTS = new Set([
+  "argparse",
+  "copy",
+  "datetime",
+  "importlib",
+  "json",
+  "os",
+  "pathlib",
+  "re",
+  "subprocess",
+  "sys",
+  "tempfile",
+  "unittest",
+]);
+const P2_905_PYTHON_TIMEOUT_MS = 120_000;
+// Complete unittest verbosity=2 output: one "... ok" receipt per test, then
+// the summary. Skips, expected failures, interleaved or missing output and an
+// empty run do not match.
+const P2_905_UNITTEST_OUTPUT =
+  /^((?:test\w* \([^()\n]*\) \.\.\. ok\n)+)\n-{70}\nRan ([1-9][0-9]*) tests? in [0-9]+\.[0-9]{3}s\n\nOK\n$/;
+
+function p2905PythonImports(source) {
+  const modules = [];
+  for (const line of source.split("\n")) {
+    const from = /^\s*from\s+(\S+)\s+import\b/.exec(line);
+    const plain = /^\s*import\s+(.+)$/.exec(line);
+    if (from) {
+      modules.push(from[1]);
+    } else if (plain) {
+      for (const part of plain[1].split(",")) {
+        modules.push(part.trim().split(/\s+/)[0]);
+      }
+    }
+  }
+  return modules;
+}
+
+function assertP2905PythonSource(source, label, { suite }) {
+  const disallowed = p2905PythonImports(source).filter(
+    (name) => !P2_905_PYTHON_IMPORTS.has(name.split(".")[0]),
+  );
+  if (
+    disallowed.length > 0 ||
+    /\b__import__\s*\(|\bimport_module\s*\(/.test(source)
+  ) {
+    throw new Error(
+      `${label}: non-allowlisted import: ${disallowed.join(", ") || "dynamic import"}`,
+    );
+  }
+  if (!suite) return;
+  if (!/^class \w+\(unittest\.TestCase\):$/m.test(source)) {
+    throw new Error(`${label}: no unittest.TestCase class`);
+  }
+  if (
+    !/\nif __name__ == (['"])__main__\1:\n {4}unittest\.main\(verbosity=2\)\n$/.test(
+      source,
+    )
+  ) {
+    throw new Error(
+      `${label}: must end with the unittest.main(verbosity=2) entry point`,
+    );
+  }
+}
+
+function p2905RepositoryState(root) {
+  return execFileSync(
+    "git",
+    [
+      "--no-optional-locks",
+      "status",
+      "--porcelain=v1",
+      "-z",
+      "--untracked-files=normal",
+      "--ignored=traditional",
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+}
+
+// Runs one suite as a direct script and returns its receipt, or throws when
+// the outcome is anything other than a complete, authoritative pass.
+function runP2905PythonSuite(
+  script,
+  {
+    python = "python3",
+    root = ROOT,
+    timeoutMs = P2_905_PYTHON_TIMEOUT_MS,
+  } = {},
+) {
+  const label = path.relative(root, script);
+  const declared = [
+    ...readFileSync(script, "utf8").matchAll(/^[ \t]+def (test\w*)\s*\(/gm),
+  ]
+    .map((match) => match[1])
+    .sort();
+  if (declared.length === 0) {
+    throw new Error(`${label}: declares no test methods`);
+  }
+  const sandbox = mkdtempSync(path.join(tmpdir(), "rosuno-p2-905-python-"));
+  try {
+    const before = p2905RepositoryState(root);
+    // -I ignores PYTHON* variables, the user site and the script directory;
+    // -S keeps site-packages off the path, so no third-party module loads; -B
+    // writes no bytecode. Only PATH is inherited, so no token, credential or
+    // proxy setting reaches the suite, and HOME, TMPDIR and the working
+    // directory are a disposable sandbox that must stay empty.
+    const result = spawnSync(python, ["-I", "-S", "-B", script], {
+      cwd: sandbox,
+      env: {
+        PATH: process.env.PATH ?? "",
+        HOME: sandbox,
+        TMPDIR: sandbox,
+        LANG: "C.UTF-8",
+        LC_ALL: "C.UTF-8",
+      },
+      encoding: "utf8",
+      timeout: timeoutMs,
+      killSignal: "SIGKILL",
+      maxBuffer: 1024 * 1024,
+    });
+    return p2905PythonReceipt(label, declared, result, {
+      repositoryChanged: p2905RepositoryState(root) !== before,
+      sandboxWrites: readdirSync(sandbox),
+    });
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
+}
+
+function p2905PythonReceipt(label, declared, result, observed) {
+  if (result.error) {
+    throw new Error(
+      `${label}: Python did not complete (${result.error.code ?? result.error.message})`,
+    );
+  }
+  if (result.signal !== null) {
+    throw new Error(`${label}: Python was terminated by ${result.signal}`);
+  }
+  if (result.status !== 0) {
+    throw new Error(`${label}: Python exited with status ${result.status}`);
+  }
+  if (observed.repositoryChanged) {
+    throw new Error(`${label}: the repository changed while the suite ran`);
+  }
+  if (observed.sandboxWrites.length > 0) {
+    throw new Error(
+      `${label}: the suite wrote files: ${observed.sandboxWrites.join(", ")}`,
+    );
+  }
+  if (result.stdout !== "") {
+    throw new Error(`${label}: unexpected standard output`);
+  }
+  const output = P2_905_UNITTEST_OUTPUT.exec(result.stderr);
+  if (output === null) {
+    throw new Error(
+      `${label}: no authoritative unittest "Ran N tests" and "OK" output`,
+    );
+  }
+  const passed = [...output[1].matchAll(/^(test\w*) /gm)]
+    .map((match) => match[1])
+    .sort();
+  const ran = Number(output[2]);
+  if (ran !== declared.length || passed.join() !== declared.join()) {
+    throw new Error(
+      `${label}: ran ${ran} of ${declared.length} declared tests`,
+    );
+  }
+  return { suite: label, tests: ran };
+}
+
+test("P2-905 Python sources import only allowlisted standard-library modules", () => {
+  for (const file of P2_905_PYTHON_MODULES) {
+    const source = readFileSync(path.join(ROOT, file), "utf8");
+    assert.doesNotThrow(() =>
+      assertP2905PythonSource(source, file, { suite: false }),
+    );
+  }
+  for (const file of P2_905_PYTHON_SUITES.keys()) {
+    const source = readFileSync(path.join(ROOT, file), "utf8");
+    assert.doesNotThrow(() =>
+      assertP2905PythonSource(source, file, { suite: true }),
+    );
+  }
+
+  const label = "synthetic-suite.py";
+  const valid = readFileSync(
+    path.join(
+      ROOT,
+      ".github/scripts/tests/test-rosuno-owner-executor-preflight.py",
+    ),
+    "utf8",
+  );
+  for (const [source, expected] of [
+    [
+      valid.replace("import copy\n", "import copy\nimport requests\n"),
+      /non-allowlisted import: requests$/,
+    ],
+    [
+      valid.replace("import copy\n", "from socket import socket\n"),
+      /non-allowlisted import: socket$/,
+    ],
+    [
+      valid.replace("import copy\n", "import copy, urllib.request\n"),
+      /non-allowlisted import: urllib\.request$/,
+    ],
+    [
+      valid.replace("import copy\n", "from . import helpers\n"),
+      /non-allowlisted import: \.$/,
+    ],
+    [
+      valid.replace(
+        "import copy\n",
+        "import copy\nhttp = __import__('http')\n",
+      ),
+      /non-allowlisted import: dynamic import$/,
+    ],
+    [
+      valid.replace("(unittest.TestCase)", "(object)"),
+      /no unittest\.TestCase class/,
+    ],
+    [
+      valid.replace("unittest.main(verbosity=2)", "unittest.main()"),
+      /entry point/,
+    ],
+    [
+      valid.replace(
+        "unittest.main(verbosity=2)",
+        "unittest.main(verbosity=2, exit=False)",
+      ),
+      /entry point/,
+    ],
+    [`${valid}print('after the runner')\n`, /entry point/],
+  ]) {
+    assert.notEqual(source, valid);
+    assert.throws(
+      () => assertP2905PythonSource(source, label, { suite: true }),
+      expected,
+    );
+  }
+});
+
+for (const [suite, expectedTests] of P2_905_PYTHON_SUITES) {
+  test(`P2-905 Python security suite runs directly with complete receipts: ${suite}`, (t) => {
+    const receipt = runP2905PythonSuite(path.join(ROOT, suite));
+    t.diagnostic(
+      `${receipt.suite}: exit 0, Ran ${receipt.tests} tests, ${receipt.tests} ok receipts, OK, 0 skipped`,
+    );
+    assert.deepEqual(receipt, { suite, tests: expectedTests });
+  });
+}
+
+test("P2-905 Python bridge fails closed on every non-authoritative outcome", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "rosuno-p2-905-bridge-"));
+  const suite = (name, body, header = []) => {
+    const file = path.join(root, `${name}.py`);
+    writeFileSync(
+      file,
+      [
+        "import unittest",
+        ...header,
+        "",
+        "class Synthetic(unittest.TestCase):",
+        ...body,
+        "",
+        "if __name__ == '__main__':",
+        "    unittest.main(verbosity=2)",
+        "",
+      ].join("\n"),
+    );
+    return file;
+  };
+  try {
+    execFileSync("git", ["init", "-q", root]);
+    const passing = suite("passing", [
+      "    def test_passes(self):",
+      "        self.assertTrue(True)",
+    ]);
+    assert.deepEqual(runP2905PythonSuite(passing, { root }), {
+      suite: "passing.py",
+      tests: 1,
+    });
+
+    for (const [name, file, options, expected] of [
+      [
+        "missing interpreter",
+        passing,
+        { python: path.join(root, "missing-python3") },
+        /did not complete \(ENOENT\)/,
+      ],
+      [
+        "timeout",
+        suite("timeout", [
+          "    def test_hangs(self):",
+          "        while True:",
+          "            pass",
+        ]),
+        { timeoutMs: 1_000 },
+        /did not complete \(ETIMEDOUT\)/,
+      ],
+      [
+        "signal",
+        suite(
+          "signal",
+          ["    def test_signal(self):", "        os.kill(os.getpid(), 15)"],
+          ["import os"],
+        ),
+        {},
+        /terminated by SIGTERM/,
+      ],
+      [
+        "failing test",
+        suite("failing", [
+          "    def test_fails(self):",
+          "        self.fail('synthetic failure')",
+        ]),
+        {},
+        /exited with status 1/,
+      ],
+      [
+        "skipped test",
+        suite("skipped", [
+          "    def test_skips(self):",
+          "        self.skipTest('synthetic skip')",
+        ]),
+        {},
+        /no authoritative/,
+      ],
+      [
+        "expected failure",
+        suite("expected", [
+          "    @unittest.expectedFailure",
+          "    def test_expected(self):",
+          "        self.fail('synthetic failure')",
+        ]),
+        {},
+        /no authoritative/,
+      ],
+      [
+        "no declared tests",
+        suite("empty", ["    pass"]),
+        {},
+        /declares no test methods/,
+      ],
+      [
+        "zero tests ran",
+        suite("uncollected", [
+          "    pass",
+          "",
+          "class NotATestCase:",
+          "    def test_hidden(self):",
+          "        pass",
+        ]),
+        {},
+        /exited with status 5|no authoritative/,
+      ],
+      [
+        "declared test not run",
+        suite("partial", [
+          "    def test_runs(self):",
+          "        pass",
+          "",
+          "class NotATestCase:",
+          "    def test_hidden(self):",
+          "        pass",
+        ]),
+        {},
+        /ran 1 of 2 declared tests/,
+      ],
+      [
+        "interleaved output",
+        suite(
+          "interleaved",
+          ["    def test_noise(self):", "        sys.stderr.write('noise')"],
+          ["import sys"],
+        ),
+        {},
+        /no authoritative/,
+      ],
+      [
+        "standard output",
+        suite("stdout", [
+          "    def test_prints(self):",
+          "        print('noise')",
+        ]),
+        {},
+        /unexpected standard output/,
+      ],
+      [
+        "forged summary without receipts",
+        suite(
+          "forged",
+          ["    def test_never_runs(self):", "        pass"],
+          [
+            "import os",
+            "import sys",
+            "sys.stderr.write('-' * 70 + '\\nRan 1 test in 0.000s\\n\\nOK\\n')",
+            "os._exit(0)",
+          ],
+        ),
+        {},
+        /no authoritative/,
+      ],
+      [
+        "repository write",
+        suite(
+          "writer",
+          [
+            "    def test_writes(self):",
+            "        pathlib.Path(__file__).with_name('written.txt').write_text('x')",
+          ],
+          ["import pathlib"],
+        ),
+        {},
+        /the repository changed while the suite ran/,
+      ],
+      [
+        "temporary file left behind",
+        suite(
+          "temporary",
+          ["    def test_leaves_file(self):", "        tempfile.mkstemp()"],
+          ["import tempfile"],
+        ),
+        {},
+        /the suite wrote files: tmp/,
+      ],
+    ]) {
+      assert.throws(
+        () => runP2905PythonSuite(file, { root, ...options }),
+        expected,
+        name,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("P2-905 Python bridge writes no bytecode beside dynamically loaded modules", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "rosuno-p2-905-bytecode-"));
+  try {
+    execFileSync("git", ["init", "-q", root]);
+    writeFileSync(path.join(root, "loaded-module.py"), "VALUE = 1\n");
+    const suite = path.join(root, "test-loader.py");
+    // Loads its module the way the protected suites do.
+    writeFileSync(
+      suite,
+      [
+        "import importlib.util",
+        "from pathlib import Path",
+        "import unittest",
+        "",
+        "PATH = Path(__file__).resolve().parent / 'loaded-module.py'",
+        "spec = importlib.util.spec_from_file_location('loaded_module', PATH)",
+        "loaded = importlib.util.module_from_spec(spec)",
+        "spec.loader.exec_module(loaded)",
+        "",
+        "class Loader(unittest.TestCase):",
+        "    def test_loads(self):",
+        "        self.assertEqual(loaded.VALUE, 1)",
+        "",
+        "if __name__ == '__main__':",
+        "    unittest.main(verbosity=2)",
+        "",
+      ].join("\n"),
+    );
+    assert.deepEqual(runP2905PythonSuite(suite, { root }), {
+      suite: "test-loader.py",
+      tests: 1,
+    });
+    assert.deepEqual(readdirSync(root).sort(), [
+      ".git",
+      "loaded-module.py",
+      "test-loader.py",
+    ]);
+
+    // Control: without the bridge's flags the same suite writes bytecode
+    // beside the module, which is the hazard the bridge prevents.
+    const unprotected = spawnSync("python3", [suite], {
+      cwd: root,
+      env: { PATH: process.env.PATH ?? "" },
+      encoding: "utf8",
+      timeout: P2_905_PYTHON_TIMEOUT_MS,
+    });
+    assert.equal(unprotected.status, 0, unprotected.stderr);
+    assert.ok(readdirSync(root).includes("__pycache__"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("P1-009 migration path is allowed by the neutral repository control", () => {
   for (const [state, packageJson] of rootPackageFixtures()) {
     assert.doesNotThrow(() =>
