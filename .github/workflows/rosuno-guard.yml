@@ -74,7 +74,7 @@ jobs:
         env:
           # Fixed OFF for P2-905. A separately authorized future commissioning
           # must prove genuine source-bound owner grants before changing this.
-          ROSUNO_PROCESS_COMMISSIONED: 'false'
+          ROSUNO_PROCESS_COMMISSIONED: "false"
         shell: bash
         run: |
           set -euo pipefail

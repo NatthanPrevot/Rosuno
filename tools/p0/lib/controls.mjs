@@ -8343,6 +8343,14 @@ export function validateNeutralPaths(
     ".github/workflows/rosuno-guard.yml",
     "CLAUDE.md",
     ".claude/settings.json",
+    // P2-905 REV3 §3A: exactly six named PROCESS files, each admitted as an
+    // exact path. No directory, suffix or case variant is admitted.
+    ".github/scripts/rosuno-process-guard.py",
+    ".github/scripts/rosuno-owner-executor-preflight.py",
+    ".github/scripts/tests/test-rosuno-process-guard.py",
+    ".github/scripts/tests/test-rosuno-owner-executor-preflight.py",
+    ".github/workflows/rosuno-process-guard.yml",
+    "docs/process/p2-905-enablement-contract.md",
   ]);
   const allowedP1Files = new Set([
     "supabase/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.sql",
