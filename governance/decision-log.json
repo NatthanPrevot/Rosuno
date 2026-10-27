@@ -1460,6 +1460,41 @@
         "Gate 7 governance candidate only; no Gate 7 PR/review/merge, end-to-end deployed signup verification or Production activation is claimed."
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261025-P2-905-PROCESS-IMPLEMENTATION-CLOSURE",
+      "title": "Record P2-905 Claude Workflow Controls PROCESS Implementation Closure",
+      "status": "accepted",
+      "scope": "P2-907 administrative governance closure of the already-merged P2-905 PROCESS implementation, limited to appending one work item to governance/work-items/index.json and one reciprocal decision to governance/decision-log.json. These two files are P2-907 closure scope, not part of the P2-905 14-path implementation scope.",
+      "decision": "Record the P2-905 outcome as PROCESS_IMPLEMENTATION_PASS for repository implementation only, using the protected PR #79 merge, required-check and independent audit evidence. This is governance closure, not operational enablement: it is NOT AUTOMATION_ENABLED and NOT CLOUD_GATE7_ENABLED, grants no owner-executor enablement and claims no verified production deployment.",
+      "rationale": "The P2-905 implementation was protected-merged through PR #79 on 2026-10-25 UTC, but its canonical work item and closure decision were absent from the governance indices. The merged code is inactive by default: the owner-origin PROCESS/CLOSURE route of the trusted rosuno-guard workflow fails closed while ROSUNO_PROCESS_COMMISSIONED is false, the rosuno-process-guard workflow is a manual-dispatch commissioning hold whose only job is disabled and cannot report success, and the Claude CLOSURE_CANDIDATE role is a disabled, uncommissioned role name rather than a permission. Committed code alone does not make rosuno-process-guard, owner-executor automation or bot-PR routing active.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-905-CLAUDE-WORKFLOW-CONTROLS"],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-25T14:29:56Z",
+      "updated_at": "2026-10-25T14:29:56Z",
+      "supersedes": [],
+      "impact": "Governance registration only. The P2-905 implementation, both Packets, locked authority, historical migrations, Git history and all external environments are unchanged; no migration, schema, RLS, database, Supabase, Staging, Production or OLD project operation; no workflow, App, bot-PR, owner-executor, permission, policy, required-check or credential change. Known unresolved future gates: commissioning, source binding, required-check adoption and credential-grant proof for any P2-905 control; a separately authorized read-only commissioning readiness assessment and disposable proof stages under the existing enablement contract; and separately audited owner authorization for any GitHub permission, cloud role or workflow activation. The P2-907 closure PR, its Backup exact-head audit and its Rosuno closure-PR approval are still pending, and its protected merge remains a separate gate; P2-905 is not WORK ITEM CLOSED until these records are canonical on main.",
+      "evidence": [
+        "Accepted P2-905 Packet SHA-256 f002e19f2e31baa5ecd9fa21a7e5b3769e080a4836c03c9420a2d8f85469cfdf, Git blob 44e02c443426d8eb74a87e7a8425da918f3f3c36, added by Packet-only commit a75967e7e787a09c8f00d2259298d2b078291a01.",
+        "PR #79: exactly 14 authorized paths (first parent to merge) in 3 preserved linear commits a75967e7e787a09c8f00d2259298d2b078291a01, ec5bb9103b2ff9c1440b5a2b80d24d9c9f6734a6 and 10a1177157f24e63a498df1e6eace2a980c009d4; approved implementation head 10a1177157f24e63a498df1e6eace2a980c009d4.",
+        "Completed P2-905 approval: designated Rosuno exact-head approval of PR #79, GitHub review ID 5641683072; the reviewer field records this completed P2-905 approval only.",
+        "Four required GitHub checks PASS; CI P0 run 40164329818 and trusted guard run 40164328820; live builder-mode trusted guard with exact approved Packet binding.",
+        "Test receipts: Node 175/175; Python 21/21 and 14/14, no skipped tests.",
+        "Protected merge commit 55ef2c3a9a72c2ba3bbae361195951629e54f3d0, committed 2026-10-25T05:19:27Z, with ordered parents 18e040a56e388b8e840c4ec5475f0451551d9fcf and 10a1177157f24e63a498df1e6eace2a980c009d4; merge tree f31fabb17e293b66276d05d31088abe0a9238263 equals the approved head tree.",
+        "Independent Backup Packet, exact-head PR and post-merge PASS, as independently supplied and recorded in the owner-adopted P2-907 Packet.",
+        "No migration or database operation: the P2-905 diff touches no supabase path, and all 14 registered migrations are preserved with supabase/migrations subtree 6be2d384d257eeeb43189f568640f98077f2811d.",
+        "Owner-adopted P2-907 Packet SHA-256 a701d89bb2d381cc5eaf9052e24a31da4e359a43496815fff7c027d5c1a59464, Git blob 23a3575c8afd1ade1e21156e85cfd566fa039bca, Packet-only commit f870a2e8ae1b6a90cabf081783506e2624882e5e on base 55ef2c3a9a72c2ba3bbae361195951629e54f3d0.",
+        "Forward-only recovery: any later correction is a separately authorized forward-only record; accepted records, Git history and migration history are never rewritten."
+      ],
+      "expiry": null
     }
   ]
 }
