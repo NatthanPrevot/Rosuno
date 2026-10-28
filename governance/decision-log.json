@@ -1495,6 +1495,42 @@
         "Forward-only recovery: any later correction is a separately authorized forward-only record; accepted records, Git history and migration history are never rewritten."
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261028-P2-008-REPOSITORY-IMPLEMENTATION-CLOSURE",
+      "title": "Record P2-008 Existing-Account Password Recovery Repository Implementation Closure",
+      "status": "accepted",
+      "scope": "P2-908 administrative governance closure of the already protected-merged P2-008 Revision 3 implementation, limited to appending one work item to governance/work-items/index.json and one reciprocal decision to governance/decision-log.json. These two files are P2-908 closure scope, not part of the P2-008 eight-path implementation scope; the original P2-008 Packet did not authorize governance edits.",
+      "decision": "Record the P2-008 outcome as REPOSITORY_IMPLEMENTATION_COMPLETE / WORK ITEM CLOSED FOR BOUNDED NONPRODUCTION IMPLEMENTATION ONLY, using the protected PR #81 exact-head review, required-check, independent audit and normal two-parent merge evidence. This is repository governance closure only: P2-008 is not live, not production-ready, not deployed and not proof of a production-operational password recovery system, and Milestone 2 is not declared complete. D-01, the P2-008 Packet §5(A–D) provider prerequisites, the deployment HOLD and every unresolved release decision remain open and require separate owner authorization.",
+      "rationale": "The P2-008 Revision 3 implementation was protected-merged through PR #81 on 2026-10-28 UTC, but its canonical work item and closure decision were absent from the governance indices (29 work items and 40 decisions at merge 490c82ec32e4725a9d83532a99fe73f2a93aa03c). The eight-path implementation is network-free and was validated only with in-memory and synthetic-provider fixtures; real outbound recovery depends on provider prerequisites that remain unresolved. The independent Backup PASS supplied by the owner concerns protected source, PR and merge audit, not those live external dependencies, so repository closure and any future provider activation remain separate gates.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-008-EXISTING-ACCOUNT-PASSWORD-RECOVERY"],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-10-28T13:59:26Z",
+      "updated_at": "2026-10-28T13:59:26Z",
+      "supersedes": [],
+      "impact": "Governance registration only. The P2-008 implementation, the P2-008 and P2-908 Packets, locked authority, historical migrations, Git history and all external environments are unchanged; no migration, schema, RLS, database, Supabase, Staging, Production or OLD project operation; no configuration, email template, redirect, dependency, workflow, permission or credential change; no deployment, release or registration activation. Unresolved without separate owner authorization: D-01 recovery password lifecycle; §5(A) canonical origin and allowed recovery redirect per environment; §5(B) Reset Password template, PKCE callback, upstream verification, link-prefetch and scanner behavior, expiry and same-browser verifier proof; §5(C) real authorized delivery and provider-native recovery rate limits; §5(D) proven correct-account update, no application privilege and verified recovery-session cleanup; and the deployment HOLD. The P2-908 closure PR, its independent Backup audit and its Rosuno closure-PR approval are still pending, and its protected merge remains a separate gate; P2-008 is not WORK ITEM CLOSED until these records are canonical on main.",
+      "evidence": [
+        "Owner-adopted P2-008 Revision 3 Packet SHA-256 2d77a0e52b4eb423493d4fe8ed78ae9ad5e3c81cbbf653ad5cc8715c060235f4, Git blob acd4d44504bf83e11a1b751c0c3d73dba521bcfa; owner Packet commit 7d8fc8db59c9addaf04cf8f57fe1dc1d943f0055; fork Packet-only commit 2fc3ea435f3cbb2d59731c56360e9797da7480ad on base 89ebf6a014b85c27c481ba23bcf85543b685ceb2.",
+        "PR #81, created by NatthanPrevot from RosunoBackup:wi/P2-008-account-recovery-v3 against base 89ebf6a014b85c27c481ba23bcf85543b685ceb2: one linear implementation commit 9ccc26706ff28ae320c9d89f49dbbfe96d9d353c after the Packet-only commit, changing exactly the eight authorized paths (six added, two modified) and no configuration, dependency or migration path: apps/web/app/sign-in/page.tsx, apps/web/app/forgot-password/page.tsx, apps/web/app/forgot-password/actions.ts, apps/web/app/reset-password/page.tsx, apps/web/app/reset-password/actions.ts, apps/web/src/application/account-recovery.ts, apps/web/tests/account-recovery.test.mjs and apps/web/tests/client-registration.test.mjs.",
+        "Completed P2-008 approval: designated Rosuno exact-head APPROVED review of PR #81 on 9ccc26706ff28ae320c9d89f49dbbfe96d9d353c, GitHub review ID 5677970144, 2026-10-28T04:57:49Z; the reviewer field records this completed P2-008 review only, not any P2-908 closure-PR approval.",
+        "Required CI PASS on the exact head: GitHub P0 workflow run 40634645045 and trusted guard workflow run 40634641145 completed successfully (deterministic install; formatting, typecheck, build and controls; dependency and security; trusted-runner; plus rosuno-guard success): four GitHub jobs and the guard context.",
+        "Normal two-parent merge commit 490c82ec32e4725a9d83532a99fe73f2a93aa03c, PR #81 merged 2026-10-28T05:08:56Z (merge commit timestamp 2026-10-28T05:08:55Z), with ordered parents 89ebf6a014b85c27c481ba23bcf85543b685ceb2 and 9ccc26706ff28ae320c9d89f49dbbfe96d9d353c; merge tree 1bbd50aef8f15a53f1edded206dd84bee181fe03 equals the approved implementation tree; no rebase, squash or history rewrite.",
+        "Independent Backup Gate 0, PR audit Gate 3 and post-merge PASS, as expressly supplied by the owner and recorded in the owner-adopted P2-908 Packet; not independently reconstructed from a separately retained report. This PASS covers protected source, PR and merge audit, not the live external dependencies.",
+        "Builder-reported P2-008 results, not independent re-execution: all nine Packet validation commands PASS, application shell 220/220, p0:test 1269/1269 and 45 recovery test cases and subcases, using in-memory and synthetic-provider fixtures with no real provider, email or database contact.",
+        "No migration or database operation: the P2-008 diff touches no supabase path, and all 14 registered migrations are preserved with supabase/migrations subtree 6be2d384d257eeeb43189f568640f98077f2811d at both 89ebf6a014b85c27c481ba23bcf85543b685ceb2 and 490c82ec32e4725a9d83532a99fe73f2a93aa03c.",
+        "Pre-closure canonical governance at 490c82ec32e4725a9d83532a99fe73f2a93aa03c: 29 work items (index blob da9569f95cac90949df84123d773c800e6e97b2f) and 40 decisions (decision-log blob 31ef8da6037999204d6818b0a63dc76b6ca01548), neither containing a P2-008 work item or closure decision.",
+        "Owner-adopted P2-908 Packet SHA-256 3c4aa11c06a1fe43a2ca26edc0eab44908739fd21227f9969246e6a94ef24a71, Git blob 33832472d71b817db3b7fc09ed5190e020cb6a9b, owner Packet commit 526340f4c5df464b6e08e7da6f1032de8d69f289, fork Packet-only commit 5b9ec64f18593a3e8bddd9e1bc65acc4b6b211bc on base 490c82ec32e4725a9d83532a99fe73f2a93aa03c.",
+        "Forward-only recovery: any later correction is a separately authorized forward-only record; accepted records, Git history and migration history are never rewritten."
+      ],
+      "expiry": null
     }
   ]
 }
