@@ -2693,11 +2693,12 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
   const codes = new Map(sources.map((file) => [file, codeOf(read(file))]));
   for (const file of sources) {
     const code = codes.get(file);
-    // No public signUp, magic-link, OTP-creation, or code-exchange path. The
-    // only RPC is the quota decision checked below.
+    // No public signUp, magic-link, or OTP-creation path. The only RPC is the
+    // quota decision, and the only code exchange is the P2-008 recovery
+    // exception, both checked below.
     assert.doesNotMatch(
       code,
-      /\.signUp\(|signInWithOtp|exchangeCodeForSession|generateLink|inviteUserByEmail|listUsers|updateUserById|deleteUser|\.upsert\(|\.delete\(/,
+      /\.signUp\(|signInWithOtp|generateLink|inviteUserByEmail|listUsers|updateUserById|deleteUser|\.upsert\(|\.delete\(/,
       file,
     );
     // The privileged inputs are named only in the server-only module, and no
@@ -2823,6 +2824,105 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
     assert.notEqual(code, provisioning, name);
     assert.throws(
       () => assertPrivilegedExports(code),
+      assert.AssertionError,
+      name,
+    );
+  }
+  // P2-008 recovery exception: the only Auth code exchange anywhere in app/
+  // or src/ is one direct, literal call in the server-owned recovery POST
+  // action. Every mention of the method must be that exact call, so another
+  // file, a second call, an alias, a destructured, computed, or optional
+  // call, or another receiver or argument fails. Every other prohibition
+  // above still applies to that action too.
+  const recoveryAction = "app/reset-password/actions.ts";
+  const recoveryExchange =
+    /(?<![\w$.])client\.auth\.exchangeCodeForSession\(code\)/g;
+  const assertRecoveryExchangeContract = (sourceCodes) => {
+    for (const [file, code] of sourceCodes) {
+      assert.equal(
+        code.match(/exchangeCodeForSession/g)?.length ?? 0,
+        file === recoveryAction ? 1 : 0,
+        file,
+      );
+      assert.equal(
+        code.match(recoveryExchange)?.length ?? 0,
+        file === recoveryAction ? 1 : 0,
+        file,
+      );
+    }
+    assert.match(sourceCodes.get(recoveryAction), /^"use server";\n/);
+  };
+  assertRecoveryExchangeContract(codes);
+  const exchange = "await client.auth.exchangeCodeForSession(code);";
+  assert.ok(codes.get(recoveryAction).includes(exchange));
+  const injected = (code) =>
+    `${code}\nconst again = async (client, code) => {\n  ${exchange}\n};\n`;
+  const exchangeVariant = (replacement) =>
+    variant(recoveryAction, (code) => code.replace(exchange, replacement));
+  const forbiddenExchange = {
+    "exchange in the sign-in actions": variant(
+      "app/sign-in/actions.ts",
+      injected,
+    ),
+    "exchange in the confirmation route": variant(
+      "app/auth/confirm/route.ts",
+      injected,
+    ),
+    "exchange in the recovery request action": variant(
+      "app/forgot-password/actions.ts",
+      injected,
+    ),
+    "exchange in the recovery page": variant(
+      "app/reset-password/page.tsx",
+      injected,
+    ),
+    "exchange in the recovery application module": variant(
+      "src/application/account-recovery.ts",
+      injected,
+    ),
+    "exchange in the server session source": variant(
+      "src/infrastructure/identity/server-session-source.ts",
+      injected,
+    ),
+    "second exchange in the recovery action": exchangeVariant(
+      `${exchange}\n      ${exchange}`,
+    ),
+    "second exchange elsewhere in the recovery action": variant(
+      recoveryAction,
+      injected,
+    ),
+    "computed exchange": exchangeVariant(
+      'await client.auth["exchangeCodeForSession"](code);',
+    ),
+    "aliased exchange": exchangeVariant(
+      "const exchangeCode = client.auth.exchangeCodeForSession;\n      await exchangeCode(code);",
+    ),
+    "destructured exchange": exchangeVariant(
+      "const { exchangeCodeForSession } = client.auth;\n      await exchangeCodeForSession(code);",
+    ),
+    "optional exchange call": exchangeVariant(
+      "await client.auth.exchangeCodeForSession?.(code);",
+    ),
+    "other receiver": exchangeVariant(
+      "await admin.auth.exchangeCodeForSession(code);",
+    ),
+    "qualified receiver": exchangeVariant(
+      "await this.client.auth.exchangeCodeForSession(code);",
+    ),
+    "other argument": exchangeVariant(
+      "await client.auth.exchangeCodeForSession(submitted);",
+    ),
+    "extra argument": exchangeVariant(
+      "await client.auth.exchangeCodeForSession(code, options);",
+    ),
+    "exchange outside a server action": variant(recoveryAction, (code) =>
+      code.replace('"use server";\n', ""),
+    ),
+  };
+  for (const [name, codesVariant] of Object.entries(forbiddenExchange)) {
+    assert.notDeepEqual(codesVariant, codes, name);
+    assert.throws(
+      () => assertRecoveryExchangeContract(codesVariant),
       assert.AssertionError,
       name,
     );
