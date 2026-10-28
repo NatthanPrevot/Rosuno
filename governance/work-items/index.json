@@ -2106,6 +2106,69 @@
       "rollback_reference": "Repository-only closure. Before protected acceptance, discard only the authorized unmerged closure candidate if needed; after acceptance, make forward-only corrections under a separately authorized work item. Never rewrite accepted records, Git history or migration history. No database rollback applies.",
       "created_at": "2026-10-25T14:29:56Z",
       "updated_at": "2026-10-25T14:29:56Z"
+    },
+    {
+      "work_item_id": "WI-P2-008-EXISTING-ACCOUNT-PASSWORD-RECOVERY",
+      "title": "Existing-Account Password Recovery (P2-008 Revision 3 repository implementation)",
+      "objective": "Register the completed, nonproduction P2-008 Revision 3 repository implementation of existing-account password recovery and its protected PR #81 lifecycle, with outcome REPOSITORY_IMPLEMENTATION_COMPLETE for bounded nonproduction implementation only. P2-008 is not live, not production-ready and not proof of a production-operational password recovery system; Milestone 2 of MVP Build Specification v1.0 is not declared complete, and D-01, the P2-008 Packet §5(A–D) provider prerequisites and the deployment HOLD remain unresolved.",
+      "in_scope": [
+        "Original P2-008 Revision 3 implementation diff of exactly eight authorized paths in one linear implementation commit 9ccc26706ff28ae320c9d89f49dbbfe96d9d353c (PR #81, second parent to merge): apps/web/app/sign-in/page.tsx, apps/web/app/forgot-password/page.tsx, apps/web/app/forgot-password/actions.ts, apps/web/app/reset-password/page.tsx, apps/web/app/reset-password/actions.ts, apps/web/src/application/account-recovery.ts, apps/web/tests/account-recovery.test.mjs and apps/web/tests/client-registration.test.mjs (test 37 recovery-code exchange exception only).",
+        "Implemented nonproduction design: one fixed internal sign-in link to /forgot-password; a bounded single-email request Server Action calling resetPasswordForEmail only with the fixed ROSUNO_AUTH_PUBLIC_ORIGIN plus /reset-password return and the same neutral, non-enumerating state for every attempt (unavailable when unconfigured); an inert /reset-password GET with no provider call or cookie write; and a deliberate POST completion that validates the whole form before exchanging the same-browser PKCE code, updates the password only through the session that exchange issued, signs that session out locally and reports completion only after verified session absence. Validated with in-memory and synthetic-provider fixtures only.",
+        "Original owner-adopted P2-008 Revision 3 Packet, its Packet-only commit, the one linear implementation commit, designated Rosuno exact-head approval, the required GitHub checks and rosuno-guard context, independent Backup audits as supplied by the owner and the normal two-parent merge of PR #81.",
+        "P2-908 closure scope, separate from the P2-008 eight-path implementation scope: governance/work-items/index.json and governance/decision-log.json, each appended with exactly one record."
+      ],
+      "out_of_scope": [
+        "Declaring P2-008 live, production-ready or deployed, or declaring all Milestone 2 requirements complete; neither the PR #81 merge nor this closure proves a production-operational password recovery system.",
+        "D-01: deciding whether or which adopted registration password lifecycle rules govern password changes or resets; no inferred substitute policy.",
+        "P2-008 Packet §5(A–D) provider prerequisites: (A) canonical ROSUNO_AUTH_PUBLIC_ORIGIN and the exact Supabase Auth allowed recovery redirect for each target environment; (B) the real provider Reset Password email template, compatible PKCE code callback, upstream verification-link use, link-prefetch and scanner behavior, expiry and same-browser verifier proof; (C) real authorized email delivery and provider-native recovery rate-limit and abuse behavior; (D) proven correct-account password update, no unauthorized application privilege and verified browser recovery-session cleanup.",
+        "Deployment HOLD: real provider activation, email template or redirect configuration, Staging or Production configuration change, deployment, release, live email testing or any Supabase mutation; OLD Supabase remains forensic/reference only.",
+        "Registration activation or any successor work item; migrations, schema, RLS, dependency, configuration, workflow, validator or test changes.",
+        "Changes to the P2-008 or P2-908 Packets, the eight P2-008 implementation files, locked authority, historical migrations, existing governance records or Git history."
+      ],
+      "status": "completed",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20261028-P2-008-REPOSITORY-IMPLEMENTATION-CLOSURE"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Outcome is P2-008 REPOSITORY_IMPLEMENTATION_COMPLETE / WORK ITEM CLOSED FOR BOUNDED NONPRODUCTION IMPLEMENTATION ONLY, effective only once this closure is protected-merged and its final audit passes: not live, not production-ready, not a verified deployment and not full Milestone 2 completion.",
+        "Accepted P2-008 Revision 3 Packet SHA-256 2d77a0e52b4eb423493d4fe8ed78ae9ad5e3c81cbbf653ad5cc8715c060235f4 (Git blob acd4d44504bf83e11a1b751c0c3d73dba521bcfa), owner Packet commit 7d8fc8db59c9addaf04cf8f57fe1dc1d943f0055, fork Packet-only commit 2fc3ea435f3cbb2d59731c56360e9797da7480ad and the exact eight-path implementation scope remain immutable.",
+        "PR #81 implementation head 9ccc26706ff28ae320c9d89f49dbbfe96d9d353c received designated Rosuno exact-head approval (GitHub review ID 5677970144, 2026-10-28T04:57:49Z), and GitHub P0 workflow run 40634645045 and trusted guard workflow run 40634641145 completed successfully: four GitHub jobs plus the rosuno-guard context.",
+        "Normal two-parent merge 490c82ec32e4725a9d83532a99fe73f2a93aa03c (PR #81 merged 2026-10-28T05:08:56Z), with ordered parents 89ebf6a014b85c27c481ba23bcf85543b685ceb2 and 9ccc26706ff28ae320c9d89f49dbbfe96d9d353c and merge tree 1bbd50aef8f15a53f1edded206dd84bee181fe03 equal to the approved implementation tree, is recorded without reopening implementation Gates 0 to 4; no rebase, squash or history rewrite.",
+        "No migration, schema, RLS, configuration, dependency or database operation: all 14 registered migrations remain byte-preserved with supabase/migrations subtree 6be2d384d257eeeb43189f568640f98077f2811d; Gates 5 and 6 are N/A; environment development means merged nonproduction repository code only, with no Staging or Production deployment.",
+        "D-01, the P2-008 Packet §5(A–D) provider prerequisites, the deployment HOLD and all unresolved release decisions remain open without separate owner authorization; the independent Backup PASS covers protected source, PR and merge audit, not satisfaction of those live external dependencies.",
+        "The P2-908 closure candidate appends only one work-item and one reciprocal decision record, preserving all 29 previous work items and 40 previous decisions in original order with original values; reviewer Rosuno/approved records the completed PR #81 review only, and the P2-908 closure PR, its review and its protected merge remain separately gated."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run p2:application-shell:test",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "bash .github/scripts/rosuno-guard.sh 89ebf6a014b85c27c481ba23bcf85543b685ceb2 HEAD wi/P2-008-account-recovery-v3 refs/rosuno/approved (original P2-008 implementation)",
+        "bash .github/scripts/rosuno-guard.sh 490c82ec32e4725a9d83532a99fe73f2a93aa03c HEAD wi/P2-908-p2-008-governance-closure refs/rosuno/approved (P2-908 governance closure)",
+        "git diff --check"
+      ],
+      "environment": "development",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository-only closure. Before protected acceptance, discard only the authorized unmerged P2-908 closure candidate if needed; after acceptance, make forward-only corrections under a separately authorized work item. This closure does not revert the merged P2-008 implementation. Never rewrite accepted records, Git history or migration history. No database rollback applies.",
+      "created_at": "2026-10-28T13:59:26Z",
+      "updated_at": "2026-10-28T13:59:26Z"
     }
   ]
 }
