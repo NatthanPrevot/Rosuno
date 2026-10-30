@@ -8351,6 +8351,7 @@ export function validateNeutralPaths(
     ".github/scripts/tests/test-rosuno-owner-executor-preflight.py",
     ".github/workflows/rosuno-process-guard.yml",
     "docs/process/p2-905-enablement-contract.md",
+    "docs/process/github-to-replit-sync.md",
   ]);
   const allowedP1Files = new Set([
     "supabase/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.sql",
