@@ -2642,22 +2642,24 @@ function assertQuotaRpcContract(codes) {
     provisioning,
     /\nconst DIGEST = \/\^\[0-9a-f\]\{64\}\$\/;\n\nfunction isDigest\(value: unknown\): value is string \{\n {2}return typeof value === "string" && DIGEST\.test\(value\);\n\}\n\nfunction isMaximum\(value: unknown\): value is number \{\n {2}return Number\.isSafeInteger\(value\) && \(value as number\) >= 1;\n\}\n/,
   );
-  // Two privileged clients (Admin provisioning and the quota decision) and
-  // one publishable client (the confirmation request), each built only from
-  // the verified binding.
+  // Three privileged clients (Admin provisioning, the P3-002
+  // attorney-applicant provisioning, and the quota decision) and one
+  // publishable client (the confirmation request), each built only from the
+  // verified binding.
   assert.equal(
     provisioning.match(
       /\bcreate\(binding\.url, binding\.adminKey, clientOptions\(\)\)/g,
     ).length,
-    2,
+    3,
   );
-  assert.equal(provisioning.match(/\bcreate\(/g).length, 3);
+  assert.equal(provisioning.match(/\bcreate\(/g).length, 4);
   assert.equal(provisioning.match(/\bbinding\.publishableKey\b/g).length, 1);
-  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 2);
+  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 3);
 }
 
-// The exact export list: the original three plus the one narrow quota
-// capability, and no re-export, default export, or wildcard.
+// The exact export list: the original three, the one narrow quota
+// capability, and the one narrow P3-002 attorney-applicant capability, and no
+// re-export, default export, or wildcard.
 function assertPrivilegedExports(provisioning) {
   assert.deepEqual(
     [
@@ -2669,10 +2671,11 @@ function assertPrivilegedExports(provisioning) {
       "RegistrationEnvironment",
       "createRegistrationProvisioning",
       "createConfirmationDispatch",
+      "createAttorneyApplicantProvisioning",
       "decideQuotaRpc",
     ],
   );
-  assert.equal(provisioning.match(/\bexport\b/g).length, 4);
+  assert.equal(provisioning.match(/\bexport\b/g).length, 5);
 }
 
 test("37. the privileged module stays server-only, and no public signUp or enrollment path exists", () => {
@@ -2715,8 +2718,9 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
       /NEXT_PUBLIC_ROSUNO|NEXT_PUBLIC_\w*(?:ADMIN|SECRET|SERVICE)/,
       file,
     );
-    // Only the two server entry points load the privileged module, and no
-    // client module reaches it.
+    // Only the two server entry points and the server-only P3-002 attorney
+    // application adapter load the privileged module, and no client module
+    // reaches it.
     const imports = importsOf(read(file));
     if (
       imports.some((specifier) =>
@@ -2724,7 +2728,11 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
       )
     ) {
       assert.ok(
-        ["app/sign-up/actions.ts", "app/auth/confirm/route.ts"].includes(file),
+        [
+          "app/sign-up/actions.ts",
+          "app/auth/confirm/route.ts",
+          "src/infrastructure/identity/attorney-application-provisioning.ts",
+        ].includes(file),
         file,
       );
     }
@@ -2748,7 +2756,11 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
   );
   assert.deepEqual(
     importsOf(read("src/infrastructure/identity/registration-provisioning.ts")),
-    ["@supabase/supabase-js", "../../application/client-registration.ts"],
+    [
+      "@supabase/supabase-js",
+      "../../application/attorney-application.ts",
+      "../../application/client-registration.ts",
+    ],
   );
   assertPrivilegedExports(provisioning);
   assertQuotaRpcContract(codes);
@@ -2818,6 +2830,10 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
     "generic capability name": provisioning.replace(
       "export async function decideQuotaRpc(",
       "export async function rpc(",
+    ),
+    "generic attorney capability name": provisioning.replace(
+      "export async function createAttorneyApplicantProvisioning(",
+      "export async function createAdminClient(",
     ),
   };
   for (const [name, code] of Object.entries(forbiddenExports)) {

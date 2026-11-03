@@ -10,7 +10,8 @@
 // Profile lifecycle stage, professional verification, and current eligibility
 // apart: this slice establishes no verification and determines no
 // eligibility. Refused and unavailable requests each see one fixed message and
-// no profile data.
+// no profile data; every refusal also offers the same fixed link to the
+// attorney application entry (P3-002), which decides afresh on its own.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -164,6 +165,9 @@ export default async function AttorneyWorkspacePage() {
           access the account has is unchanged.
         </Alert>
         <Cluster>
+          <ButtonLink variant="secondary" href="/attorney/apply">
+            Attorney application
+          </ButtonLink>
           <ButtonLink variant="tertiary" href="/">
             Return to the home page
           </ButtonLink>
