@@ -2169,6 +2169,68 @@
       "rollback_reference": "Repository-only closure. Before protected acceptance, discard only the authorized unmerged P2-908 closure candidate if needed; after acceptance, make forward-only corrections under a separately authorized work item. This closure does not revert the merged P2-008 implementation. Never rewrite accepted records, Git history or migration history. No database rollback applies.",
       "created_at": "2026-10-28T13:59:26Z",
       "updated_at": "2026-10-28T13:59:26Z"
+    },
+    {
+      "work_item_id": "WI-P2-912-P3-001-GOVERNANCE-CLOSURE",
+      "title": "Existing-Attorney Principal Access and Protected Workspace Foundation (P3-001 repository implementation closure under administrative P2-912)",
+      "objective": "Register the completed, nonproduction P3-001 REV3 repository implementation of existing-attorney principal resolution and a restricted, server-rendered attorney workspace, and its protected PR #84 lifecycle, with outcome P3-001 REPOSITORY_IMPLEMENTATION_COMPLETE / WORK ITEM CLOSED FOR BOUNDED NONPRODUCTION IMPLEMENTATION ONLY. P2-912 is used only as an administrative closure identifier because the live work-item schema admits only WI-P0, WI-P1 and WI-P2 identifiers and priorities P0 to P2; priority P2 is not an assertion about P3 feature priority. This closure is not operational deployment, attorney onboarding, attorney professional verification, eligibility, bookability, consultation readiness or production authorization, and no P3 milestone is declared complete.",
+      "in_scope": [
+        "Original P3-001 implementation diff of exactly four authorized mode 100644 additions in one linear implementation commit 4ebe90c53f89a160d234b3be75cc805b7db3f79b (PR #84, second parent to merge): apps/web/app/attorney/page.tsx (blob 3229b99b355623d7e8cbb36adbf0e5b5bd0319f9), apps/web/src/application/attorney-access.ts (blob 7326f99e55a8c9f10bb405c3f43029e7c6534633), apps/web/src/infrastructure/identity/attorney-principal-source.ts (blob bb0c09df61c294984687125c7d77926865556a65) and apps/web/tests/attorney-access.test.mjs (blob febddef95fd8dd1c9f544857b91a1420a4a879cc).",
+        "Implemented nonproduction design: only a pre-existing, fresh Auth-confirmed subject linked to exactly one active public.users row and exactly one linked public.attorney_profiles row in the applicant, under_review or approved profile state is admitted to a restricted server-rendered /attorney workspace; suspended and removed profiles are refused, and missing, unconfirmed or inconsistent identities and failed reads fail closed. The workspace shows professional verification as not established and current eligibility as not determined. It creates no Auth account, User, Attorney Profile, attorney application, verification record or business data, and was validated with synthetic test-only identities.",
+        "Original owner-adopted P3-001 REV3 Packet, its owner and fork Packet-only commits, the one linear implementation commit, designated Rosuno exact-head approval, the required GitHub checks and rosuno-guard context, independent Backup publication and source audits as supplied by the owner and recorded in the owner-adopted P2-912 Packet, and the normal two-parent merge of PR #84.",
+        "P2-912 closure scope, separate from the P3-001 four-path implementation scope: governance/work-items/index.json and governance/decision-log.json, each appended with exactly one record."
+      ],
+      "out_of_scope": [
+        "Declaring P3-001 deployed, live or production-ready, or declaring any P3 or P4 milestone complete; neither the PR #84 merge nor this closure proves operational deployment, a usable attorney account in any environment, end-to-end attorney onboarding, attorney professional verification, current eligibility, bookability, payments, consultation readiness or production authorization.",
+        "Attorney account provisioning or sign-up, attorney application submission, license, insurance or discipline evidence, verification or eligibility decisions, staff review, practice-area authorization and any successor P3/P4 attorney account, application or verification-entry work item.",
+        "Deployment HOLD: Supabase environment contact or persistence, Staging or Production configuration or data change, Replit synchronization, deployment, release or production data; the OLD Supabase project remains forensic/reference only.",
+        "Migrations, schema, RLS or ACL changes and dependency, configuration, workflow, validator or test changes; activation or commissioning of the Claude CLOSURE_CANDIDATE role or any automated closure role.",
+        "Changes to the P3-001 or P2-912 Packets, the four P3-001 implementation files, locked authority, historical migrations, existing governance records, paused P2-909 and P2-911 work and refs, or Git history."
+      ],
+      "status": "completed",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20261102-P3-001-REPOSITORY-IMPLEMENTATION-CLOSURE"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Outcome is P3-001 REPOSITORY_IMPLEMENTATION_COMPLETE / WORK ITEM CLOSED FOR BOUNDED NONPRODUCTION IMPLEMENTATION ONLY, effective only once this closure is protected-merged and its final audit passes: not deployed, not live, not production-ready, not attorney onboarding, attorney professional verification, eligibility, bookability or consultation readiness, and no P3 milestone completion.",
+        "Owner-adopted P3-001 REV3 Packet SHA-256 97446075e0dd86fa52172bbcf5ae6b526b4d8d61ad7d64e07c3c694619cec8af (Git blob 732abdf647d7424c5aec468f62dc84069c244e9f), owner Packet-only commit 3f76090008195fa7dfaf2cf825106804b76408a7, fork Packet-only commit a835aa0ff9cc5bb4833a2b1f629ae01660b3c1c4 and the exact four-path implementation scope remain immutable.",
+        "PR #84 implementation head 4ebe90c53f89a160d234b3be75cc805b7db3f79b received designated Rosuno exact-head approval (GitHub review ID 5738233371, 2026-11-02T14:39:54Z); the required GitHub checks (deterministic install; format, typecheck, build, controls; dependency and security checks; rosuno-guard) succeeded, and the trusted-runner CI job also succeeded.",
+        "Normal two-parent merge c6e0ec4dec8fa632e010f8c5a7162850018209b6 (PR #84 created and merged by NatthanPrevot, merged 2026-11-02T14:43:13Z), with ordered parents 756b11cf3af4e367e76197c5f1fce20701482f4b and 4ebe90c53f89a160d234b3be75cc805b7db3f79b and merge tree 896f7596b83e6288ec4e9c290559e649563822d4 equal to the approved implementation tree, is recorded without reopening implementation gates; no rebase, squash or history rewrite.",
+        "No migration, schema, RLS, ACL, configuration, dependency or database operation: all 14 registered migrations remain byte-preserved with supabase/migrations subtree 6be2d384d257eeeb43189f568640f98077f2811d; environment development means merged nonproduction repository code only, with no Staging or Production deployment.",
+        "Attorney account and application creation, the provisioning boundary, attorney professional verification, eligibility, bookability, consultation, scheduling and payment workflows, and the deployment HOLD remain open without separate owner authorization; the independent Backup PASS covers protected publication and source audit, relying on accepted earlier Builder validation, not live operation.",
+        "The P2-912 closure candidate appends only one work-item and one reciprocal decision record, preserving all 30 previous work items and 41 previous decisions in original order with original values; reviewer Rosuno/approved records the completed PR #84 exact-head review only, and the P2-912 closure PR, its review and its protected merge remain separately gated."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run p2:application-shell:test",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "bash .github/scripts/rosuno-guard.sh 756b11cf3af4e367e76197c5f1fce20701482f4b HEAD wi/P3-001-attorney-access-entry refs/rosuno/approved (original P3-001 implementation)",
+        "bash .github/scripts/rosuno-guard.sh c6e0ec4dec8fa632e010f8c5a7162850018209b6 HEAD wi/P2-912-p3-001-governance-closure refs/rosuno/approved (P2-912 governance closure)",
+        "git diff --check"
+      ],
+      "environment": "development",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository-only closure. Before protected acceptance, discard only the authorized unmerged P2-912 closure candidate if needed; after acceptance, make forward-only corrections under a separately authorized work item. This closure does not revert the merged P3-001 implementation. Never rewrite accepted records, Git history or migration history. No database rollback applies.",
+      "created_at": "2026-11-03T04:58:50Z",
+      "updated_at": "2026-11-03T04:58:50Z"
     }
   ]
 }
