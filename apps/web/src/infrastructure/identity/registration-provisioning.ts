@@ -590,24 +590,6 @@ export async function createStaffVerificationProvisioning(
     return null;
   }
   const admin = create(binding.url, binding.adminKey, clientOptions());
-  const recordsIn = async (
-    table:
-      | "licenses"
-      | "insurance_records"
-      | "discipline_records"
-      | "practice_area_authorisations",
-    columns: string,
-    attorneyId: string,
-    jurisdictionId: string,
-  ) =>
-    rowsResultOf(
-      await admin
-        .from(table)
-        .select(columns)
-        .eq("attorney_id", attorneyId)
-        .eq("jurisdiction_id", jurisdictionId)
-        .limit(MAX_IDS),
-    );
   return Object.freeze({
     jurisdictions: async () =>
       rowsResultOf(
@@ -633,28 +615,43 @@ export async function createStaffVerificationProvisioning(
           .eq("id", userId)
           .limit(2),
       ),
-    licensesIn: (attorneyId, jurisdictionId) =>
-      recordsIn("licenses", LICENSE_COLUMNS, attorneyId, jurisdictionId),
-    insuranceIn: (attorneyId, jurisdictionId) =>
-      recordsIn(
-        "insurance_records",
-        INSURANCE_COLUMNS,
-        attorneyId,
-        jurisdictionId,
+    // Each professional table is named literally; the privileged client
+    // never receives a table chosen at run time.
+    licensesIn: async (attorneyId, jurisdictionId) =>
+      rowsResultOf(
+        await admin
+          .from("licenses")
+          .select(LICENSE_COLUMNS)
+          .eq("attorney_id", attorneyId)
+          .eq("jurisdiction_id", jurisdictionId)
+          .limit(MAX_IDS),
       ),
-    disciplineIn: (attorneyId, jurisdictionId) =>
-      recordsIn(
-        "discipline_records",
-        DISCIPLINE_COLUMNS,
-        attorneyId,
-        jurisdictionId,
+    insuranceIn: async (attorneyId, jurisdictionId) =>
+      rowsResultOf(
+        await admin
+          .from("insurance_records")
+          .select(INSURANCE_COLUMNS)
+          .eq("attorney_id", attorneyId)
+          .eq("jurisdiction_id", jurisdictionId)
+          .limit(MAX_IDS),
       ),
-    authorisationsIn: (attorneyId, jurisdictionId) =>
-      recordsIn(
-        "practice_area_authorisations",
-        PRACTICE_AUTHORISATION_COLUMNS,
-        attorneyId,
-        jurisdictionId,
+    disciplineIn: async (attorneyId, jurisdictionId) =>
+      rowsResultOf(
+        await admin
+          .from("discipline_records")
+          .select(DISCIPLINE_COLUMNS)
+          .eq("attorney_id", attorneyId)
+          .eq("jurisdiction_id", jurisdictionId)
+          .limit(MAX_IDS),
+      ),
+    authorisationsIn: async (attorneyId, jurisdictionId) =>
+      rowsResultOf(
+        await admin
+          .from("practice_area_authorisations")
+          .select(PRACTICE_AUTHORISATION_COLUMNS)
+          .eq("attorney_id", attorneyId)
+          .eq("jurisdiction_id", jurisdictionId)
+          .limit(MAX_IDS),
       ),
     evidenceSubjectsOf: async (kind: SubjectKind, recordIds) => {
       const ids = idListOf(recordIds);
