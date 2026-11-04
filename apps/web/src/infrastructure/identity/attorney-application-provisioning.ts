@@ -24,7 +24,10 @@ import type {
   AttorneyApplicationRecords,
   AttorneyApplicationRows,
 } from "../../application/attorney-application.ts";
-import { createAttorneyApplicantProvisioning } from "./registration-provisioning.ts";
+import {
+  createAttorneyApplicantProvisioning,
+  hasPrivilegedProjectBinding,
+} from "./registration-provisioning.ts";
 
 type RequestReadClient = Pick<SupabaseClient, "auth" | "from">;
 
@@ -199,3 +202,8 @@ export const ATTORNEY_APPLICATION_RECORDS =
 
 export const ATTORNEY_APPLICANT_PROVISIONING =
   createBoundedApplicantProvisioning();
+
+// Whether the shared boundary would build the applicant port, answered from
+// the binding check alone: no client is built and nothing is sent (P3-003).
+export const ATTORNEY_APPLICANT_START_CONFIGURED = async (): Promise<boolean> =>
+  hasPrivilegedProjectBinding();

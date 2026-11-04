@@ -64,6 +64,10 @@ export type AttorneyApplicationEntrySources = {
   readonly session: ServerSessionSource;
   readonly account: AttorneyApplicationAccountSource;
   readonly records: () => Promise<AttorneyApplicationRecords | null>;
+  // Whether the privileged start boundary is configured, answered without
+  // building it. When given, the entry offers a start only if it answers
+  // exactly true, so no form is shown that would certainly fail (P3-003).
+  readonly startConfigured?: () => Promise<boolean>;
 };
 
 export type AttorneyApplicationStartSources = {
@@ -365,7 +369,14 @@ export async function resolveAttorneyApplicationEntry(
       return UNAVAILABLE;
     }
     const standing = await standingOf(records, identity.accountId);
-    return standing.status === "none" ? CAN_START : standing;
+    if (standing.status !== "none") {
+      return standing;
+    }
+    if (sources.startConfigured === undefined) {
+      return CAN_START;
+    }
+    const configured = await attempt(() => sources.startConfigured!());
+    return configured === true ? CAN_START : UNAVAILABLE;
   } catch {
     return UNAVAILABLE;
   }

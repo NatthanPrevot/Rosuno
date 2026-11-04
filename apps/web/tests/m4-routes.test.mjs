@@ -365,3 +365,61 @@ test("M4-R4. the staff queue and review render only within the reviewer's scope,
 function metadataIsPrivate(metadata) {
   return metadata.robots.index === false && metadata.robots.follow === false;
 }
+
+test("M4-R5. P3-002 limitation correction: a failed or unconfirmed start shows a specific, truthful message with a re-checking retry and no error detail", async () => {
+  const source = read("app/attorney/apply/error.tsx");
+  assert.match(source, /^"use client";\n/);
+  const code = source.replace(/^\s*\/\/.*\n/gm, "");
+  assert.deepEqual(
+    [
+      ...source.matchAll(
+        /^\s*import\s+(?:[^"';]*?\s+from\s+)?["']([^"']+)["']/gm,
+      ),
+    ].map((m) => m[1]),
+    ["../../../src/presentation/design-system.tsx"],
+  );
+  // Only the retry callback is taken; the thrown value is never read.
+  assert.match(
+    code,
+    /export default function AttorneyApplicationError\(\{\n {2}retry,\n\}: SegmentFallbackProps\) \{/,
+  );
+  assert.doesNotMatch(
+    code,
+    /props|arguments|digest|\.message|\.stack|console|process|useEffect|setTimeout/,
+  );
+  write(
+    "apply-error.mjs",
+    relink(transpile(source, "error.tsx"), {
+      "react/jsx-runtime": jsxRuntime,
+      "../../../src/presentation/design-system.tsx":
+        target("design-system.mjs"),
+    }),
+  );
+  const boundary = await import(target("apply-error.mjs"));
+  let retried = 0;
+  const html = renderToStaticMarkup(
+    boundary.default({
+      retry: () => (retried += 1),
+      error: new Error("synthetic secret 7f3a"),
+    }),
+  );
+  const text = html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  assert.ok(text.includes("The application could not be confirmed"));
+  assert.ok(
+    text.includes(
+      "We could not confirm whether your attorney application was started.",
+    ),
+  );
+  assert.ok(text.includes("trying again never creates a second one"));
+  assert.ok(text.includes("Check again"));
+  assert.equal(html.includes("7f3a"), false);
+  assert.equal(html.includes("<form"), false);
+  assert.deepEqual(
+    [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]),
+    ["/"],
+  );
+  assert.equal(retried, 0);
+});

@@ -7,7 +7,9 @@
 // to the server action, which decides afresh on the server. The page reads no
 // route parameter, query, header, cookie, or form field of its own. A
 // visitor who is not signed in sees informational content and the existing
-// sign-in only: no account is created here. Every refusal reason shows the
+// sign-in only: no account is created here. The start form is offered only
+// when the privileged start boundary is configured, checked without building
+// it (P3-003), so a start that would certainly fail is never offered. Every refusal reason shows the
 // same fixed message, and no state shows an identifier or record. Starting an
 // application records an applicant stage only; this page establishes no
 // professional verification, approval, or eligibility.
@@ -21,6 +23,7 @@ import {
   resolveAttorneyApplicationEntry,
 } from "../../../src/application/attorney-application.ts";
 import {
+  ATTORNEY_APPLICANT_START_CONFIGURED,
   ATTORNEY_APPLICATION_ACCOUNT,
   ATTORNEY_APPLICATION_RECORDS,
 } from "../../../src/infrastructure/identity/attorney-application-provisioning.ts";
@@ -93,6 +96,7 @@ export default async function AttorneyApplicationPage() {
     session: SUPABASE_SERVER_SESSION_SOURCE,
     account: ATTORNEY_APPLICATION_ACCOUNT,
     records: ATTORNEY_APPLICATION_RECORDS,
+    startConfigured: ATTORNEY_APPLICANT_START_CONFIGURED,
   });
   if (entry.status === "can-start") {
     return (

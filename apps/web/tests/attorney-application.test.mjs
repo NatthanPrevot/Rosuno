@@ -2097,8 +2097,15 @@ test("19. the adapter holds no credential and builds no privileged client: it de
   );
   assert.match(
     code,
-    /^import \{ createAttorneyApplicantProvisioning \} from "\.\/registration-provisioning\.ts";$/m,
+    /^import \{\n {2}createAttorneyApplicantProvisioning,\n {2}hasPrivilegedProjectBinding,\n\} from "\.\/registration-provisioning\.ts";$/m,
   );
+  // P3-003: the start-configuration probe only asks the binding check; it
+  // builds no client and sends nothing.
+  assert.match(
+    code,
+    /^export const ATTORNEY_APPLICANT_START_CONFIGURED = async \(\): Promise<boolean> =>\n {2}hasPrivilegedProjectBinding\(\);$/m,
+  );
+  assert.equal(code.match(/hasPrivilegedProjectBinding\(/g).length, 1);
   assert.match(code, /await import\("\.\/supabase-server\.ts"\)/);
   assert.equal(code.match(/\bimport\s*\(/g).length, 1);
   assert.doesNotMatch(code, PRIVILEGED_NAMES);
@@ -2127,9 +2134,10 @@ test("19. the adapter holds no credential and builds no privileged client: it de
       "ATTORNEY_APPLICATION_ACCOUNT",
       "ATTORNEY_APPLICATION_RECORDS",
       "ATTORNEY_APPLICANT_PROVISIONING",
+      "ATTORNEY_APPLICANT_START_CONFIGURED",
     ],
   );
-  assert.equal(code.match(/\bexport\b/g).length, 6);
+  assert.equal(code.match(/\bexport\b/g).length, 7);
 });
 
 test("20. the shared boundary's attorney section is narrow: exact tables, columns, keys, and one applicant insert, with no generic executor", () => {
@@ -2285,7 +2293,7 @@ test("23. the entry page is a server-rendered, parameter-free page with one expl
     /^export default async function AttorneyApplicationPage\(\) \{$/m,
   );
   const resolve =
-    "await resolveAttorneyApplicationEntry({\n    session: SUPABASE_SERVER_SESSION_SOURCE,\n    account: ATTORNEY_APPLICATION_ACCOUNT,\n    records: ATTORNEY_APPLICATION_RECORDS,\n  });";
+    "await resolveAttorneyApplicationEntry({\n    session: SUPABASE_SERVER_SESSION_SOURCE,\n    account: ATTORNEY_APPLICATION_ACCOUNT,\n    records: ATTORNEY_APPLICATION_RECORDS,\n    startConfigured: ATTORNEY_APPLICANT_START_CONFIGURED,\n  });";
   assert.equal(code.split("await connection();").length, 2);
   assert.equal(code.split(resolve).length, 2);
   assert.ok(code.indexOf("await connection();") < code.indexOf(resolve));
@@ -2350,6 +2358,7 @@ const WIRING_STUB = `export const wiring = {
   account: null,
   records: null,
   provisioning: null,
+  configured: null,
   log: [],
 };
 export const SUPABASE_SERVER_SESSION_SOURCE = Object.freeze({
@@ -2371,6 +2380,10 @@ export const ATTORNEY_APPLICATION_RECORDS = async () => {
 export const ATTORNEY_APPLICANT_PROVISIONING = async () => {
   wiring.log.push("provisioning");
   return wiring.provisioning();
+};
+export const ATTORNEY_APPLICANT_START_CONFIGURED = async () => {
+  wiring.log.push("configured");
+  return wiring.configured();
 };
 `;
 
@@ -2506,6 +2519,7 @@ function wire({
   overrides,
   records,
   provisioning,
+  configured,
 } = {}) {
   const account = accountOf(user);
   const reads = memoryProvisioning(db, overrides);
@@ -2519,6 +2533,7 @@ function wire({
       return { usersOf, attorneyProfilesOf };
     });
   harness.wiring.provisioning = provisioning ?? (async () => writes.port);
+  harness.wiring.configured = configured ?? (async () => true);
   harness.wiring.log.length = 0;
   return { db, reads, writes };
 }
@@ -2609,7 +2624,15 @@ const MEANING = "An application is not verification";
 test("25. a signed-in account that can start sees one accessible form posting only the fixed intent to the server action", async () => {
   const { html, log, db } = await renderPage();
   assertFrame(html, "Start an attorney application", "can-start");
-  assert.deepEqual(log, ["connection", "session", "account", "records"]);
+  // P3-003: only a would-be start consults whether the privileged boundary
+  // is configured, without building it.
+  assert.deepEqual(log, [
+    "connection",
+    "session",
+    "account",
+    "records",
+    "configured",
+  ]);
   assert.equal(html.match(/<form\b/g).length, 1);
   // The form posts to the page's own server action, whose reference field
   // the framework adds, and carries exactly one field of the page's own: the
@@ -2889,4 +2912,67 @@ test("29. an unavailable or unconfirmed start is never reported as success: the 
     );
   }
   assert.deepEqual(Object.keys(harness.actions), ["startApplication"]);
+});
+
+test("30. P3-003 correction: the start form is offered only when the privileged start boundary is configured, checked without building it", async () => {
+  // Unconfigured, failing, or non-boolean answers show the fixed unavailable
+  // state with no form, and nothing is built or written.
+  for (const [name, configured] of [
+    ["unconfigured", async () => false],
+    [
+      "probe throws",
+      async () => {
+        throw new Error("synthetic");
+      },
+    ],
+    ["non-boolean answer", async () => "true"],
+  ]) {
+    const { html, log, db, writes } = await renderPage({ configured });
+    assertFrame(html, "Attorney application unavailable", name);
+    assert.equal(html.includes("<form"), false, name);
+    assert.deepEqual(
+      log,
+      ["connection", "session", "account", "records", "configured"],
+      name,
+    );
+    assert.ok(
+      log.every((entry) => entry !== "provisioning"),
+      name,
+    );
+    assert.equal(writes.calls.length, 0, name);
+    assert.equal(db.attorney_profiles.length, 0, name);
+  }
+  // The boundary itself: the probe is consulted only for a would-be start,
+  // and leaving it out keeps the P3-002 behavior unchanged.
+  const probe = { calls: 0 };
+  const sources = (db, startConfigured) => ({
+    ...entryWiring(db).sources,
+    ...(startConfigured === undefined ? {} : { startConfigured }),
+  });
+  const counting = async () => {
+    probe.calls += 1;
+    return false;
+  };
+  assert.deepEqual(
+    await resolveAttorneyApplicationEntry(sources(memoryDatabase(), counting)),
+    { status: "unavailable" },
+  );
+  assert.equal(probe.calls, 1);
+  assert.deepEqual(
+    await resolveAttorneyApplicationEntry(
+      sources(memoryDatabase({ attorneys: [attorneyProfile()] }), counting),
+    ),
+    { status: "on-record" },
+  );
+  assert.equal(probe.calls, 1);
+  assert.deepEqual(
+    await resolveAttorneyApplicationEntry(sources(memoryDatabase(), undefined)),
+    { status: "can-start" },
+  );
+  assert.deepEqual(
+    await resolveAttorneyApplicationEntry(
+      sources(memoryDatabase(), async () => true),
+    ),
+    { status: "can-start" },
+  );
 });

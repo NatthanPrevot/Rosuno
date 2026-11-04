@@ -2686,8 +2686,9 @@ function assertQuotaRpcContract(codes) {
 }
 
 // The exact export list: the original three, the one narrow quota
-// capability, the one narrow P3-002 attorney-applicant capability, and the
-// two narrow P3-003 professional and staff verification capabilities, and no
+// capability, the one narrow P3-002 attorney-applicant capability, the
+// P3-003 binding check (a boolean only, building no client), and the two
+// narrow P3-003 professional and staff verification capabilities, and no
 // re-export, default export, or wildcard.
 function assertPrivilegedExports(provisioning) {
   assert.deepEqual(
@@ -2700,13 +2701,19 @@ function assertPrivilegedExports(provisioning) {
       "RegistrationEnvironment",
       "createRegistrationProvisioning",
       "createConfirmationDispatch",
+      "hasPrivilegedProjectBinding",
       "createAttorneyProfessionalProvisioning",
       "createStaffVerificationProvisioning",
       "createAttorneyApplicantProvisioning",
       "decideQuotaRpc",
     ],
   );
-  assert.equal(provisioning.match(/\bexport\b/g).length, 7);
+  assert.equal(provisioning.match(/\bexport\b/g).length, 8);
+  // The binding check returns only whether a binding exists.
+  assert.match(
+    provisioning,
+    /export function hasPrivilegedProjectBinding\(\n {2}environment: RegistrationEnvironment = runtimeEnvironment\(\),\n\): boolean \{\n {2}return readProjectBinding\(environment\) !== null;\n\}/,
+  );
 }
 
 test("37. the privileged module stays server-only, and no public signUp or enrollment path exists", () => {

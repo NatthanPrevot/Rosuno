@@ -308,6 +308,16 @@ export async function createConfirmationDispatch(
   } satisfies ConfirmationDispatch);
 }
 
+// Whether the environment holds a verified project binding, answered without
+// building any client and without returning the binding or a credential. It
+// lets a page refrain from offering an action that the privileged boundary
+// would certainly refuse (P3-003 correction of the P3-002 entry limitation).
+export function hasPrivilegedProjectBinding(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+): boolean {
+  return readProjectBinding(environment) !== null;
+}
+
 // P3-003 professional ports. Every list read is bounded, every id list is
 // checked to hold only canonical ids before it reaches a filter, and every
 // change is keyed by the verified profile and guarded by the record's
