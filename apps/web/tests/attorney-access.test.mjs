@@ -1126,11 +1126,13 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
     code,
     /searchParams|\bparams\b|headers\(|cookies\(|redirect|notFound|next\/navigation|useActionState|useState|useEffect|<form|\baction=|TextField|TextAreaField|SelectField|Choice|<Button\b|<Dialog|dangerouslySetInnerHTML|process\.env|\bconsole\b|createSupabaseServerClient|\.from\(|getUser|getClaims|\.insert\(|\.update\(|\.upsert\(|\.delete\(|localStorage|sessionStorage|window\.|document\.|\bfetch\s*\(/,
   );
-  // Fixed destinations only: the home page and the existing sign-in.
+  // Fixed destinations only: the home page, the existing sign-in, and the
+  // P3-002 attorney application entry, linked once, from the refusal state.
   assert.deepEqual(
     [...new Set([...code.matchAll(/href="([^"]*)"/g)].map((m) => m[1]))],
-    ["/", "/sign-in"],
+    ["/", "/sign-in", "/attorney/apply"],
   );
+  assert.equal(code.match(/href="\/attorney\/apply"/g).length, 1);
   assert.doesNotMatch(code, /href=\{/);
   // Design-system primitives and native table structure only.
   const lowercaseTags = new Set(
@@ -1333,7 +1335,25 @@ function assertNoAdvertisedCapability(html, name) {
   assert.doesNotMatch(html, /<form|<input|<textarea|<select|<button/, name);
 }
 
+// The one fixed link every refusal offers to the separate P3-002 attorney
+// application entry, in exactly this form. It is the only application
+// wording the workspace route admits, and only on its refusal page; every
+// other state still advertises nothing.
+const APPLICATION_ENTRY_LINK =
+  '<a class="rs-button" data-variant="secondary" href="/attorney/apply">Attorney application</a>';
+const REFUSAL_TITLE = "Attorney workspace not available";
+
 function assertFrame(html, title, name) {
+  if (title === REFUSAL_TITLE) {
+    assert.equal(html.split(APPLICATION_ENTRY_LINK).length, 2, name);
+    assertFrameOf(html.replace(APPLICATION_ENTRY_LINK, ""), title, name);
+    return;
+  }
+  assert.equal(html.includes("/attorney/apply"), false, name);
+  assertFrameOf(html, title, name);
+}
+
+function assertFrameOf(html, title, name) {
   assert.match(
     html,
     /^<div class="rs-page" data-density="attorney"><section class="rs-surface" data-tone="light" data-emphasis="raised" aria-labelledby="attorney-workspace-title">/,
@@ -1429,7 +1449,7 @@ test("15. denied, unavailable, and anonymous requests each render one fixed, non
     assert.ok(
       textOf(html).includes("Any other access the account has is unchanged."),
     );
-    assert.deepEqual(hrefsOf(html), ["/"], name);
+    assert.deepEqual(hrefsOf(html), ["/attorney/apply", "/"], name);
     deniedPages.add(html);
   }
   // Every refusal reason renders the very same page, so none can be told

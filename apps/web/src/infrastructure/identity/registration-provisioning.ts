@@ -1,21 +1,25 @@
-// Server-only registration provisioning (P2-006) and quota decision (P2-007).
+// Server-only registration provisioning (P2-006), attorney-applicant
+// provisioning (P3-002), and quota decision (P2-007).
 //
 // The only module that reads the privileged project credential. For each
 // request it builds a separate, cookie-free Supabase client that is used for
 // nothing but Admin creation and rereads of one unconfirmed account and the
 // bounded User and Client-profile operations of that account's registration.
-// Another such client makes only the one fixed registration quota decision
-// call. A further client, built from the publishable key alone and never
-// given the privileged credential, only requests signup confirmation emails.
-// No client receives a request cookie or Authorization header, stores or
-// refreshes a session, or reaches presentation code, and neither the
-// credential nor a client is exported. Each is built only after the
-// environment's project binding is verified; anything missing, malformed, or
-// unbound reports null or nothing before any client exists, so nothing
-// privileged runs.
+// Another such client is used for nothing but the bounded User and Attorney
+// Profile reads, and the one applicant-state Attorney Profile insert, of an
+// already verified account's attorney application. Another makes only the
+// one fixed registration quota decision call. A further client, built from
+// the publishable key alone and never given the privileged credential, only
+// requests signup confirmation emails. No client receives a request cookie or
+// Authorization header, stores or refreshes a session, or reaches
+// presentation code, and neither the credential nor a client is exported.
+// Each is built only after the environment's project binding is verified;
+// anything missing, malformed, or unbound reports null or nothing before any
+// client exists, so nothing privileged runs.
 
 import { createClient } from "@supabase/supabase-js";
 
+import type { AttorneyApplicantProvisioning } from "../../application/attorney-application.ts";
 import type {
   AccountCreation,
   AccountRead,
@@ -275,6 +279,54 @@ export async function createConfirmationDispatch(
       return error === null;
     },
   } satisfies ConfirmationDispatch);
+}
+
+const ATTORNEY_PROFILE_COLUMNS = "id, user_id, profile_state";
+
+// Attorney-applicant provisioning (P3-002), through its own cookie-free
+// privileged client. It reads the User of exactly one Auth account id and the
+// Attorney Profile of exactly one User id, and inserts at most one Attorney
+// Profile for exactly one User id, always in the applicant state. The
+// profile's id and timestamps are the database's own defaults, its unique
+// User link decides duplicates, and no other column, state, update, removal,
+// or Admin operation is offered. The caller derives every id from a verified
+// server-side read; nothing here takes request input.
+export async function createAttorneyApplicantProvisioning(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<AttorneyApplicantProvisioning | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    usersOf: async (accountId) =>
+      rowsResultOf(
+        await admin
+          .from("users")
+          .select(USER_COLUMNS)
+          .eq("auth_user_id", accountId)
+          .limit(2),
+      ),
+    attorneyProfilesOf: async (userId) =>
+      rowsResultOf(
+        await admin
+          .from("attorney_profiles")
+          .select(ATTORNEY_PROFILE_COLUMNS)
+          .eq("user_id", userId)
+          .limit(2),
+      ),
+    // A failed or refused insert, a duplicate included, is unreadable here;
+    // the caller decides only from a fresh read afterwards.
+    insertApplicantProfile: async (userId) =>
+      rowsResultOf(
+        await admin
+          .from("attorney_profiles")
+          .insert({ user_id: userId, profile_state: "applicant" })
+          .select(ATTORNEY_PROFILE_COLUMNS),
+      ),
+  } satisfies AttorneyApplicantProvisioning);
 }
 
 // The opaque digests and validated deployment maxima of one quota decision.
