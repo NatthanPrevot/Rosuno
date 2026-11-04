@@ -80,6 +80,8 @@ export type ProfileDetails = {
   readonly years_experience: number | null;
 };
 
+export type PresentationDetails = Omit<ProfileDetails, "years_experience">;
+
 export type LicenseClaim = {
   readonly jurisdiction_id: string;
   readonly license_number: string;
@@ -118,6 +120,13 @@ export type AttorneyProfessionalProvisioning = {
     attorneyId: string,
     userId: string,
     details: ProfileDetails,
+  ) => Promise<RowsResult>;
+  // An approved profile's presentation fields only: display name, headline,
+  // and biography. Years of experience, a reviewed claim, never changes here.
+  readonly updatePresentationDetails: (
+    attorneyId: string,
+    userId: string,
+    details: PresentationDetails,
   ) => Promise<RowsResult>;
   readonly insertLicense: (
     attorneyId: string,
@@ -246,6 +255,11 @@ export type ProfessionalSetupView =
       readonly stage: ProfileState;
       readonly editable: boolean;
       readonly canSubmit: boolean;
+      // Ordinary presentation fields stay editable once approved; years of
+      // experience is a reviewed claim and changes only before submission.
+      readonly detailsEditable: boolean;
+      readonly yearsEditable: boolean;
+      readonly hasLicenseClaim: boolean;
       readonly details: {
         readonly displayName: string;
         readonly headline: string;
@@ -651,7 +665,10 @@ export async function resolveProfessionalSetup(
       status: "ready",
       stage: profile.state,
       editable,
-      canSubmit: editable && licenses.length > 0,
+      canSubmit: editable,
+      detailsEditable: editable || profile.state === "approved",
+      yearsEditable: editable,
+      hasLicenseClaim: licenses.length > 0,
       details: Object.freeze({
         displayName: shown(profile.displayName),
         headline: shown(profile.headline),
@@ -892,10 +909,12 @@ type Writable = {
   readonly provisioning: AttorneyProfessionalProvisioning;
 };
 
-// The verified context of a change: the attorney's own profile, still in the
-// applicant stage, and both ports. Anything else refuses before any write.
+// The verified context of a change: the attorney's own profile, in one of
+// the stages the change allows (the applicant stage unless stated), and both
+// ports. Anything else refuses before any write.
 async function writableOf(
   sources: AttorneyProfessionalSources,
+  stages: readonly ProfileState[] = ["applicant"],
 ): Promise<Writable | ProfessionalActionState> {
   const reads = await portFrom(sources.reads);
   if (reads === null) {
@@ -905,7 +924,7 @@ async function writableOf(
   if (!("profile" in context)) {
     return context.status === "no-application" ? DENIED : context;
   }
-  if (context.profile.state !== "applicant") {
+  if (!stages.includes(context.profile.state)) {
     return LOCKED;
   }
   const provisioning = await portFrom(sources.provisioning);
@@ -937,8 +956,9 @@ async function activePracticeAreaIdsOf(
 
 // A fresh re-check of the attorney's authority for one change: the same
 // verified identity and active User still hold exactly the same own profile,
-// still in the applicant stage while writes remain, and any precondition of
-// the change still holds. true holds, false lapsed, null unreadable.
+// still in the stage the change started from while writes remain, and any
+// precondition of the change still holds. true holds, false lapsed, null
+// unreadable.
 function authorityOf(
   sources: AttorneyProfessionalSources,
   writable: Writable,
@@ -960,7 +980,9 @@ function authorityOf(
     ) {
       return false;
     }
-    return stageMustBeApplicant ? fresh.profile.state === "applicant" : true;
+    return stageMustBeApplicant
+      ? fresh.profile.state === writable.context.profile.state
+      : true;
   };
   return {
     forWrite: async () => {
@@ -1040,8 +1062,11 @@ function claimSnapshotOfInsurance(record: InsuranceRecord | InsuranceClaim) {
   return { ...record };
 }
 
-// Saves the attorney's own ordinary profile details. Only display name,
-// headline, biography, and years of experience can change; nothing else.
+// Saves the attorney's own ordinary profile details. In the applicant stage
+// display name, headline, biography, and years of experience can change; once
+// approved, only the presentation fields (display name, headline, biography)
+// can, and years of experience, a reviewed claim, stays as it was. Nothing
+// changes while the application is under review or after suspension.
 export async function saveProfileDetails(
   sources: AttorneyProfessionalSources,
   formData: unknown,
@@ -1076,16 +1101,31 @@ export async function saveProfileDetails(
     ) {
       return invalid(collected.errors);
     }
-    const writable = await writableOf(sources);
+    const writable = await writableOf(sources, ["applicant", "approved"]);
     if (!("context" in writable)) {
       return writable;
     }
     const { context, reads, provisioning } = writable;
+    const presentationOnly = context.profile.state === "approved";
+    const yearsSubmitted = formData.getAll("years_experience").length > 0;
+    if (
+      presentationOnly &&
+      yearsSubmitted &&
+      years !== context.profile.yearsExperience
+    ) {
+      return invalid({
+        years_experience: [
+          "Years of experience was reviewed and cannot be changed after approval.",
+        ],
+      });
+    }
     const details: ProfileDetails = Object.freeze({
       display_name: displayName,
       headline,
       bio,
-      years_experience: years,
+      years_experience: presentationOnly
+        ? context.profile.yearsExperience
+        : years,
     });
     const authority = authorityOf(sources, writable);
     return stateOf(
@@ -1105,6 +1145,7 @@ export async function saveProfileDetails(
               years_experience: context.profile.yearsExperience,
             },
             after: details,
+            reasonCode: presentationOnly ? "presentation_only" : null,
             occurredAtMs: sources.clock(),
           },
           authorizedForWrite: authority.forWrite,
@@ -1112,11 +1153,21 @@ export async function saveProfileDetails(
           steps: [
             () =>
               wroteOne(() =>
-                provisioning.updateProfileDetails(
-                  context.profile.id,
-                  context.userId,
-                  details,
-                ),
+                presentationOnly
+                  ? provisioning.updatePresentationDetails(
+                      context.profile.id,
+                      context.userId,
+                      {
+                        display_name: details.display_name,
+                        headline: details.headline,
+                        bio: details.bio,
+                      },
+                    )
+                  : provisioning.updateProfileDetails(
+                      context.profile.id,
+                      context.userId,
+                      details,
+                    ),
               ),
           ],
           verify: async () => {
@@ -1831,8 +1882,8 @@ export const SUBMIT_APPLICATION_INTENT = Object.freeze({
 } as const);
 
 // Submits the attorney's own application for review: applicant to
-// under_review, and nothing else. It needs at least one license claim, and
-// it approves, verifies, or authorises nothing.
+// under_review, and nothing else. It approves, verifies, or authorises
+// nothing.
 export async function submitApplicationForReview(
   sources: AttorneyProfessionalSources,
   formData: unknown,
@@ -1850,19 +1901,9 @@ export async function submitApplicationForReview(
       return writable;
     }
     const { context, reads, provisioning } = writable;
-    const licenses = ownedRows(
-      await attempt(() => reads.licensesOf(context.profile.id)),
-      readLicense,
-      context.profile.id,
-    );
-    if (licenses === null) {
-      return UNAVAILABLE;
-    }
-    if (licenses.length === 0) {
-      return invalid({
-        submit: ["Add at least one license claim before submitting."],
-      });
-    }
+    // No completeness rule is imposed here: an application without a license
+    // claim can be submitted, and review staff can return it for more
+    // information. Submission verifies, approves, and decides nothing.
     const authority = authorityOf(sources, writable);
     return stateOf(
       await runAuditedChange(

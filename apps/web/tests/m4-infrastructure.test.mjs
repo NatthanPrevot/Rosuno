@@ -172,6 +172,7 @@ test("M4-I1. both P3-003 privileged ports are built only for a verified project 
     "evaluationsOf",
     "informationRequestsOf",
     "updateProfileDetails",
+    "updatePresentationDetails",
     "insertLicense",
     "updateLicense",
     "insertInsurance",

@@ -547,14 +547,28 @@ test("M4-A6. practice-area requests: request, duplicate, inactive area, withdraw
   assert.equal(decided.status, "authorised");
 });
 
-test("M4-A7. submission asks for review only: it needs a license claim and the exact intent, and approves nothing", async () => {
+test("M4-A7. submission asks for review only: it needs the exact intent, imposes no completeness rule, and approves nothing", async () => {
   const s = setup();
   const sources = attorneySources(s.world, s.me.authId);
   const intent = {
     [SUBMIT_APPLICATION_INTENT.field]: SUBMIT_APPLICATION_INTENT.value,
   };
-  const empty = await submitApplicationForReview(sources, form(intent));
-  assert.deepEqual(Object.keys(empty.fieldErrors), ["submit"]);
+  // An application without any license claim may still be submitted; review
+  // staff can return it for more information. (Another attorney is used so
+  // the main flow below still starts from the applicant stage.)
+  const bare = addAttorney(s.world, 12, "applicant");
+  assert.deepEqual(
+    await submitApplicationForReview(
+      attorneySources(s.world, bare.authId),
+      form(intent),
+    ),
+    { status: "saved" },
+  );
+  assert.equal(
+    s.world.attorney_profiles.find((p) => p.id === bare.attorneyId)
+      .profile_state,
+    "under_review",
+  );
   addLicense(s.world, s.me.attorneyId, s.a);
   assert.deepEqual(
     await submitApplicationForReview(sources, form({ intent: "approve" })),
@@ -643,4 +657,90 @@ test("M4-A8. failure semantics: unreadable reads, failed writes, and a missing a
     "unavailable",
   );
   assert.equal(UNREADABLE.kind, "unreadable");
+});
+
+test("M4-A9. an approved attorney may revise presentation fields only; years of experience stays as reviewed, and nothing changes under review", async () => {
+  const s = setup("approved");
+  const profile = s.world.attorney_profiles.find(
+    (p) => p.id === s.me.attorneyId,
+  );
+  profile.years_experience = 7;
+  const sources = attorneySources(s.world, s.me.authId);
+  const view = await resolveProfessionalSetup(sources);
+  assert.deepEqual(
+    [view.editable, view.detailsEditable, view.yearsEditable, view.canSubmit],
+    [false, true, false, false],
+  );
+  assert.deepEqual(
+    await saveProfileDetails(
+      sources,
+      form({
+        display_name: "Synthetic Approved",
+        headline: "Synthetic headline",
+        bio: "Synthetic bio",
+      }),
+    ),
+    { status: "saved" },
+  );
+  assert.deepEqual(
+    [
+      profile.display_name,
+      profile.headline,
+      profile.bio,
+      profile.years_experience,
+      profile.profile_state,
+    ],
+    [
+      "Synthetic Approved",
+      "Synthetic headline",
+      "Synthetic bio",
+      7,
+      "approved",
+    ],
+  );
+  const pair = auditPair(s.world, "attorney_profile_details_revised");
+  assert.deepEqual(
+    [pair.attempt.reason_code, pair.outcome.after_snapshot.outcome],
+    ["presentation_only", "applied"],
+  );
+  // A changed years value is refused; the same value is accepted.
+  const refused = await saveProfileDetails(
+    sources,
+    form({ display_name: "X", years_experience: "9" }),
+  );
+  assert.deepEqual(Object.keys(refused.fieldErrors), ["years_experience"]);
+  assert.equal(profile.years_experience, 7);
+  assert.deepEqual(
+    await saveProfileDetails(
+      sources,
+      form({ display_name: "Y", years_experience: "7" }),
+    ),
+    { status: "saved" },
+  );
+  // Claims stay locked once approved.
+  assert.deepEqual(await saveLicenseClaim(sources, LICENSE(s.a)), {
+    status: "locked",
+  });
+  // Under review and suspended profiles change nothing.
+  profile.profile_state = "under_review";
+  assert.deepEqual(
+    await saveProfileDetails(sources, form({ display_name: "Z" })),
+    { status: "locked" },
+  );
+  profile.profile_state = "suspended";
+  assert.deepEqual(
+    await saveProfileDetails(sources, form({ display_name: "Z" })),
+    { status: "denied" },
+  );
+  assert.equal(profile.display_name, "Y");
+  // Approval ending between the check and the write stops the write.
+  profile.profile_state = "approved";
+  s.world.hooks.set("prov.insertAuditEvent", () => {
+    profile.profile_state = "suspended";
+  });
+  assert.deepEqual(
+    await saveProfileDetails(sources, form({ display_name: "Raced" })),
+    { status: "locked" },
+  );
+  assert.equal(profile.display_name, "Y");
 });

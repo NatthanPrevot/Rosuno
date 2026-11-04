@@ -570,6 +570,17 @@ export function attorneyProvisioningFor(world) {
             details,
             PROFILE_COLUMNS,
           ),
+    updatePresentationDetails: async (attorneyId, userId, details) =>
+      guardedUpdate(
+        world,
+        "attorney_profiles",
+        (p) =>
+          p.id === attorneyId &&
+          p.user_id === userId &&
+          p.profile_state === "approved",
+        details,
+        PROFILE_COLUMNS,
+      ),
     insertLicense: async (attorneyId, id, claim) => {
       if (fail(world, "prov.insertLicense")) {
         return UNREADABLE;

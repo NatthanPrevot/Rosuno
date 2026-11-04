@@ -271,13 +271,21 @@ export default async function ProfessionalSetupPage() {
       <Heading as="h2" size="md">
         Profile details
       </Heading>
-      {view.editable ? (
-        <DetailsForm
-          displayName={view.details.displayName}
-          headline={view.details.headline}
-          bio={view.details.bio}
-          yearsExperience={view.details.yearsExperience}
-        />
+      {view.detailsEditable ? (
+        <>
+          {view.yearsEditable ? null : (
+            <Text tone="muted">
+              {`Your display name, headline, and biography can be updated. Years of experience (${view.details.yearsExperience || "not provided"}) was reviewed and stays as recorded.`}
+            </Text>
+          )}
+          <DetailsForm
+            displayName={view.details.displayName}
+            headline={view.details.headline}
+            bio={view.details.bio}
+            yearsExperience={view.details.yearsExperience}
+            yearsEditable={view.yearsEditable}
+          />
+        </>
       ) : (
         <Table id="profile-details" caption="Profile details">
           <tbody>
@@ -475,14 +483,16 @@ export default async function ProfessionalSetupPage() {
                 Submitting moves your application to review. Claims cannot be
                 changed while it is under review. Submitting approves nothing.
               </Text>
+              {view.hasLicenseClaim ? null : (
+                <Alert tone="warning" title="No license claim yet">
+                  Review staff verify licenses against their sources. Without a
+                  license claim they will likely return your application for
+                  more information.
+                </Alert>
+              )}
               <SubmitApplicationForm />
             </>
-          ) : (
-            <Text tone="muted">
-              Add at least one license claim before submitting your application
-              for review.
-            </Text>
-          )}
+          ) : null}
         </>
       ) : null}
       <Cluster>

@@ -462,6 +462,22 @@ export async function createAttorneyProfessionalProvisioning(
           .eq("profile_state", "applicant")
           .select(ATTORNEY_PROFESSIONAL_PROFILE_COLUMNS),
       ),
+    // An approved profile's presentation fields only; years of experience
+    // and the lifecycle stage are never written here.
+    updatePresentationDetails: async (attorneyId, userId, details) =>
+      rowsResultOf(
+        await admin
+          .from("attorney_profiles")
+          .update({
+            display_name: details.display_name,
+            headline: details.headline,
+            bio: details.bio,
+          })
+          .eq("id", attorneyId)
+          .eq("user_id", userId)
+          .eq("profile_state", "approved")
+          .select(ATTORNEY_PROFESSIONAL_PROFILE_COLUMNS),
+      ),
     insertLicense: async (attorneyId, licenseId, claim) =>
       rowsResultOf(
         await admin

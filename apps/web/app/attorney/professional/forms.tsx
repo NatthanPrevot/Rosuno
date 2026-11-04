@@ -122,6 +122,9 @@ type DetailsProps = {
   readonly headline: string;
   readonly bio: string;
   readonly yearsExperience: string;
+  // Years of experience is a reviewed claim: editable only before
+  // submission, and shown read-only afterwards.
+  readonly yearsEditable: boolean;
 };
 
 export function DetailsForm(props: DetailsProps) {
@@ -156,14 +159,16 @@ export function DetailsForm(props: DetailsProps) {
           rows={5}
           errors={errorsOf(state, "bio")}
         />
-        <TextField
-          id="details-years"
-          name="years_experience"
-          label="Years of experience"
-          inputMode="numeric"
-          defaultValue={props.yearsExperience}
-          errors={errorsOf(state, "years_experience")}
-        />
+        {props.yearsEditable ? (
+          <TextField
+            id="details-years"
+            name="years_experience"
+            label="Years of experience"
+            inputMode="numeric"
+            defaultValue={props.yearsExperience}
+            errors={errorsOf(state, "years_experience")}
+          />
+        ) : null}
         <Cluster>
           <Button variant="primary" type="submit" disabled={pending}>
             Save profile details

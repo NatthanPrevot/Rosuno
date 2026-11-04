@@ -220,11 +220,13 @@ test("M4-R1. professional setup keeps the five readiness facts apart and offers 
   }
   assert.ok(text.includes("Each of these is a separate fact"));
   assert.ok(html.includes("<form"));
-  assert.ok(!text.includes("Submit application for review"));
-  assert.ok(text.includes("Add at least one license claim before submitting"));
+  // Submission is offered without a license claim, with an advisory only.
+  assert.ok(text.includes("Submit application for review"));
+  assert.ok(text.includes("No license claim yet"));
   addLicense(w, me.attorneyId, a);
   const withLicense = await render(attorneyPage, attorneySources(w, me.authId));
   assert.ok(withLicense.text.includes("Submit application for review"));
+  assert.ok(!withLicense.text.includes("No license claim yet"));
   assert.ok(withLicense.text.includes("Awaiting review"));
   assert.ok(metadataIsPrivate(attorneyPage.metadata));
 });
