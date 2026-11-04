@@ -2170,9 +2170,18 @@ test("20. the shared boundary's attorney section is narrow: exact tables, column
     code,
     /^const ATTORNEY_PROFILE_COLUMNS = "id, user_id, profile_state";$/m,
   );
-  // The pre-existing ports are untouched by the new section.
-  assert.equal(code.match(/profile_state/g).length, 2);
-  assert.equal(code.match(/attorney_profiles/g).length, 2);
+  // The pre-existing ports are untouched by the new section. The P3-003
+  // professional ports sit in their own bounded section before it, are
+  // checked exactly by the P3-003 tests, and are the only code set aside.
+  const professionalStart = code.indexOf("const MAX_IDS = 500;");
+  const professionalEnd = code.indexOf(
+    'const ATTORNEY_PROFILE_COLUMNS = "id, user_id, profile_state";',
+  );
+  assert.ok(professionalStart > 0 && professionalEnd > professionalStart);
+  const outside =
+    code.slice(0, professionalStart) + code.slice(professionalEnd);
+  assert.equal(outside.match(/profile_state/g).length, 2);
+  assert.equal(outside.match(/attorney_profiles/g).length, 2);
 });
 
 test("21. privileged credentials and modules never reach presentation: the page, action, and application code name none, and no client module imports infrastructure", () => {

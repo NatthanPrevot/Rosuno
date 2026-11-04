@@ -1126,12 +1126,14 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
     code,
     /searchParams|\bparams\b|headers\(|cookies\(|redirect|notFound|next\/navigation|useActionState|useState|useEffect|<form|\baction=|TextField|TextAreaField|SelectField|Choice|<Button\b|<Dialog|dangerouslySetInnerHTML|process\.env|\bconsole\b|createSupabaseServerClient|\.from\(|getUser|getClaims|\.insert\(|\.update\(|\.upsert\(|\.delete\(|localStorage|sessionStorage|window\.|document\.|\bfetch\s*\(/,
   );
-  // Fixed destinations only: the home page, the existing sign-in, and the
+  // Fixed destinations only: the P3-003 professional setup, linked once,
+  // from the granted state, the home page, the existing sign-in, and the
   // P3-002 attorney application entry, linked once, from the refusal state.
   assert.deepEqual(
     [...new Set([...code.matchAll(/href="([^"]*)"/g)].map((m) => m[1]))],
-    ["/", "/sign-in", "/attorney/apply"],
+    ["/attorney/professional", "/", "/sign-in", "/attorney/apply"],
   );
+  assert.equal(code.match(/href="\/attorney\/professional"/g).length, 1);
   assert.equal(code.match(/href="\/attorney\/apply"/g).length, 1);
   assert.doesNotMatch(code, /href=\{/);
   // Design-system primitives and native table structure only.
@@ -1386,8 +1388,8 @@ test("14. the route renders a restricted entry for each admitted stage that keep
       "Workspace access Restricted entry permitted",
       "User account Active",
       `Attorney profile lifecycle ${LABELS[stage]}`,
-      "Professional verification Not established",
-      "Current eligibility Not determined",
+      "Professional verification Shown in professional setup",
+      "Current eligibility Shown in professional setup",
     ]) {
       assert.ok(text.includes(row), `${stage}: ${row}`);
     }
@@ -1400,11 +1402,16 @@ test("14. the route renders a restricted entry for each admitted stage that keep
     for (const other of ADMITTED.filter((entry) => entry !== stage)) {
       assert.equal(text.includes(LABELS[other]), false, `${stage}/${other}`);
     }
-    // Verification and eligibility are never shown as settled, the lifecycle
-    // stage, approved included, is shown in a neutral tone as a record stage,
-    // and only workspace access and the active User account read as success.
-    assert.ok(html.includes(statusOf("warning", "Not established")), stage);
-    assert.ok(html.includes(statusOf("warning", "Not determined")), stage);
+    // Verification and eligibility are never shown as settled here: both
+    // point, in a neutral tone, to the P3-003 professional setup, which
+    // shows them separately. The lifecycle stage, approved included, is
+    // shown in a neutral tone as a record stage, and only workspace access
+    // and the active User account read as success.
+    assert.equal(
+      html.split(statusOf("neutral", "Shown in professional setup")).length,
+      3,
+      stage,
+    );
     assert.ok(html.includes(statusOf("neutral", LABELS[stage])), stage);
     assert.ok(html.includes(statusOf("success", "Active")), stage);
     assert.ok(
@@ -1413,7 +1420,7 @@ test("14. the route renders a restricted entry for each admitted stage that keep
     );
     assert.equal(html.match(/data-tone="success"/g).length, 2, stage);
     assert.ok(text.includes("Access is not verification"), stage);
-    assert.deepEqual(hrefsOf(html), ["/"], stage);
+    assert.deepEqual(hrefsOf(html), ["/attorney/professional", "/"], stage);
   }
 });
 
@@ -1498,7 +1505,7 @@ test("15. denied, unavailable, and anonymous requests each render one fixed, non
   for (const html of [...deniedPages, ...unavailablePages, signIn.html]) {
     assert.doesNotMatch(
       textOf(html),
-      /Applicant|Under review|Approved|User account|lifecycle|Not established|Not determined/,
+      /Applicant|Under review|Approved|User account|lifecycle|Not established|Not determined|professional setup/i,
     );
     assert.equal(html.includes("<table"), false);
   }

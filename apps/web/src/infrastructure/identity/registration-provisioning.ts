@@ -1,5 +1,6 @@
 // Server-only registration provisioning (P2-006), attorney-applicant
-// provisioning (P3-002), and quota decision (P2-007).
+// provisioning (P3-002), professional setup and staff verification
+// provisioning (P3-003), and quota decision (P2-007).
 //
 // The only module that reads the privileged project credential. For each
 // request it builds a separate, cookie-free Supabase client that is used for
@@ -7,8 +8,13 @@
 // bounded User and Client-profile operations of that account's registration.
 // Another such client is used for nothing but the bounded User and Attorney
 // Profile reads, and the one applicant-state Attorney Profile insert, of an
-// already verified account's attorney application. Another makes only the
-// one fixed registration quota decision call. A further client, built from
+// already verified account's attorney application. Two more serve only the
+// fixed, exact-key professional-claim operations of a verified attorney's own
+// profile and the fixed staff verification operations that run after the
+// caller's own staff authorization; neither offers a generic query, a
+// lifecycle value chosen by its caller, a removal, or an Admin operation.
+// Another makes only the one fixed registration quota decision call. A
+// further client, built from
 // the publishable key alone and never given the privileged credential, only
 // requests signup confirmation emails. No client receives a request cookie or
 // Authorization header, stores or refreshes a session, or reaches
@@ -20,6 +26,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import type { AttorneyApplicantProvisioning } from "../../application/attorney-application.ts";
+import type { AttorneyProfessionalProvisioning } from "../../application/attorney-professional.ts";
 import type {
   AccountCreation,
   AccountRead,
@@ -27,6 +34,26 @@ import type {
   RegistrationProvisioning,
   RowsResult,
 } from "../../application/client-registration.ts";
+import {
+  AUTHORITY_REFERENCE_COLUMNS,
+  ELIGIBILITY_POLICY_TYPE,
+  POLICY_VERSION_COLUMNS,
+} from "../../application/policy-selection.ts";
+import {
+  DISCIPLINE_COLUMNS,
+  EVALUATION_COLUMNS,
+  EVIDENCE_COLUMNS,
+  EVIDENCE_SUBJECT_COLUMNS,
+  INSURANCE_COLUMNS,
+  isUuid,
+  JURISDICTION_COLUMNS,
+  LICENSE_COLUMNS,
+  PRACTICE_AUTHORISATION_COLUMNS,
+  PROFILE_COLUMNS as ATTORNEY_PROFESSIONAL_PROFILE_COLUMNS,
+  subjectColumnOf,
+  type SubjectKind,
+} from "../../application/professional-records.ts";
+import type { StaffProvisioning } from "../../application/staff-verification.ts";
 
 // The four server runtime inputs this module reads, and nothing else. The URL
 // and publishable key are the ones the request-scoped session client already
@@ -279,6 +306,545 @@ export async function createConfirmationDispatch(
       return error === null;
     },
   } satisfies ConfirmationDispatch);
+}
+
+// P3-003 professional ports. Every list read is bounded, every id list is
+// checked to hold only canonical ids before it reaches a filter, and every
+// change is keyed by the verified profile and guarded by the record's
+// current state. The caller derives each id from a verified server-side
+// read; nothing here takes request input or decides authorization.
+const MAX_IDS = 500;
+
+function idListOf(ids: readonly string[]): readonly string[] | null {
+  return ids.length > 0 && ids.length <= MAX_IDS && ids.every(isUuid)
+    ? [...new Set(ids)]
+    : null;
+}
+
+const EVIDENCE_FLAG_COLUMNS = "id, discrepancy_flag, retrieved_at";
+const ATTORNEY_EVALUATION_COLUMNS =
+  "id, jurisdiction_id, context_type, context_id, result, evaluated_at";
+const EVALUATION_INSERT_KEYS = Object.freeze([
+  "attorney_id",
+  "jurisdiction_id",
+  "context_type",
+  "context_id",
+  "evaluated_at",
+  "as_of",
+  "result",
+  "factor_results",
+  "policy_references",
+  "evidence_references",
+]);
+const AUDIT_KEYS = Object.freeze([
+  "actor_user_id",
+  "actor_type",
+  "action_code",
+  "resource_type",
+  "resource_id",
+  "before_snapshot",
+  "after_snapshot",
+  "reason_code",
+  "policy_references",
+  "jurisdiction_id",
+  "occurred_at",
+]);
+
+// Whether a row to insert holds exactly the expected keys, no more.
+function hasExactKeys(
+  row: Readonly<Record<string, unknown>>,
+  keys: readonly string[],
+): boolean {
+  const own = Object.keys(row);
+  return own.length === keys.length && own.every((key) => keys.includes(key));
+}
+
+// The only staff profile transitions the staff port performs.
+const STAFF_TRANSITIONS = Object.freeze([
+  "under_review>approved",
+  "under_review>applicant",
+  "approved>suspended",
+]);
+
+export async function createAttorneyProfessionalProvisioning(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<AttorneyProfessionalProvisioning | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    jurisdictions: async () =>
+      rowsResultOf(
+        await admin
+          .from("jurisdictions")
+          .select(JURISDICTION_COLUMNS)
+          .order("code")
+          .limit(MAX_IDS),
+      ),
+    evidenceSubjectsOf: async (kind: SubjectKind, recordIds) => {
+      const ids = idListOf(recordIds);
+      if (ids === null) {
+        return UNREADABLE_ROWS;
+      }
+      const column = subjectColumnOf(kind);
+      return rowsResultOf(
+        await admin
+          .from("verification_evidence_subjects")
+          .select(`verification_evidence_id, ${column}`)
+          .in(column, ids)
+          .limit(MAX_IDS),
+      );
+    },
+    evidenceFlagsOf: async (evidenceIds) => {
+      const ids = idListOf(evidenceIds);
+      if (ids === null) {
+        return UNREADABLE_ROWS;
+      }
+      return rowsResultOf(
+        await admin
+          .from("verification_evidence")
+          .select(EVIDENCE_FLAG_COLUMNS)
+          .in("id", ids)
+          .limit(MAX_IDS),
+      );
+    },
+    evaluationsOf: async (attorneyId) =>
+      rowsResultOf(
+        await admin
+          .from("eligibility_evaluations")
+          .select(ATTORNEY_EVALUATION_COLUMNS)
+          .eq("attorney_id", attorneyId)
+          .order("evaluated_at", { ascending: false })
+          .limit(MAX_IDS),
+      ),
+    informationRequestsOf: async (attorneyId) =>
+      rowsResultOf(
+        await admin
+          .from("audit_events")
+          .select("occurred_at, after_snapshot")
+          .eq("resource_type", "attorney_profile")
+          .eq("resource_id", attorneyId)
+          .eq("action_code", "attorney_information_requested")
+          .order("occurred_at", { ascending: false })
+          .limit(20),
+      ),
+    updateProfileDetails: async (attorneyId, userId, details) =>
+      rowsResultOf(
+        await admin
+          .from("attorney_profiles")
+          .update({
+            display_name: details.display_name,
+            headline: details.headline,
+            bio: details.bio,
+            years_experience: details.years_experience,
+          })
+          .eq("id", attorneyId)
+          .eq("user_id", userId)
+          .eq("profile_state", "applicant")
+          .select(ATTORNEY_PROFESSIONAL_PROFILE_COLUMNS),
+      ),
+    insertLicense: async (attorneyId, claim) =>
+      rowsResultOf(
+        await admin
+          .from("licenses")
+          .insert({
+            attorney_id: attorneyId,
+            jurisdiction_id: claim.jurisdiction_id,
+            license_number: claim.license_number,
+            license_type: claim.license_type,
+            effective_from: claim.effective_from,
+            effective_until: claim.effective_until,
+          })
+          .select(LICENSE_COLUMNS),
+      ),
+    // Only an unobserved claim is ever revised: the source-observed status
+    // must still be empty, and the row must be exactly the one read.
+    updateLicense: async (attorneyId, licenseId, expectedUpdatedAt, claim) =>
+      rowsResultOf(
+        await admin
+          .from("licenses")
+          .update({
+            jurisdiction_id: claim.jurisdiction_id,
+            license_number: claim.license_number,
+            license_type: claim.license_type,
+            effective_from: claim.effective_from,
+            effective_until: claim.effective_until,
+          })
+          .eq("id", licenseId)
+          .eq("attorney_id", attorneyId)
+          .eq("updated_at", expectedUpdatedAt)
+          .is("reported_status", null)
+          .select(LICENSE_COLUMNS),
+      ),
+    insertInsurance: async (attorneyId, claim) =>
+      rowsResultOf(
+        await admin
+          .from("insurance_records")
+          .insert({
+            attorney_id: attorneyId,
+            jurisdiction_id: claim.jurisdiction_id,
+            carrier_name: claim.carrier_name,
+            policy_reference: claim.policy_reference,
+            coverage_type: claim.coverage_type,
+            per_occurrence_limit_minor: claim.per_occurrence_limit_minor,
+            aggregate_limit_minor: claim.aggregate_limit_minor,
+            currency_code: claim.currency_code,
+            coverage_from: claim.coverage_from,
+            coverage_until: claim.coverage_until,
+          })
+          .select(INSURANCE_COLUMNS),
+      ),
+    updateInsurance: async (attorneyId, recordId, expectedUpdatedAt, claim) =>
+      rowsResultOf(
+        await admin
+          .from("insurance_records")
+          .update({
+            jurisdiction_id: claim.jurisdiction_id,
+            carrier_name: claim.carrier_name,
+            policy_reference: claim.policy_reference,
+            coverage_type: claim.coverage_type,
+            per_occurrence_limit_minor: claim.per_occurrence_limit_minor,
+            aggregate_limit_minor: claim.aggregate_limit_minor,
+            currency_code: claim.currency_code,
+            coverage_from: claim.coverage_from,
+            coverage_until: claim.coverage_until,
+          })
+          .eq("id", recordId)
+          .eq("attorney_id", attorneyId)
+          .eq("updated_at", expectedUpdatedAt)
+          .select(INSURANCE_COLUMNS),
+      ),
+    insertAuthorisationRequest: async (
+      attorneyId,
+      jurisdictionId,
+      practiceAreaId,
+      requestedAt,
+    ) =>
+      rowsResultOf(
+        await admin
+          .from("practice_area_authorisations")
+          .insert({
+            attorney_id: attorneyId,
+            jurisdiction_id: jurisdictionId,
+            practice_area_id: practiceAreaId,
+            status: "requested",
+            requested_at: requestedAt,
+          })
+          .select(PRACTICE_AUTHORISATION_COLUMNS),
+      ),
+    // Only an undecided request changes, and only between requested and
+    // withdrawn; a staff decision is never touched.
+    updateAuthorisationRequest: async (
+      attorneyId,
+      authorisationId,
+      expectedStatus,
+      expectedUpdatedAt,
+      next,
+    ) =>
+      rowsResultOf(
+        await admin
+          .from("practice_area_authorisations")
+          .update(
+            next.status === "withdrawn"
+              ? { status: "withdrawn" }
+              : { status: "requested", requested_at: next.requestedAt },
+          )
+          .eq("id", authorisationId)
+          .eq("attorney_id", attorneyId)
+          .eq(
+            "status",
+            expectedStatus === "requested" ? "requested" : "withdrawn",
+          )
+          .eq("updated_at", expectedUpdatedAt)
+          .is("decided_at", null)
+          .select(PRACTICE_AUTHORISATION_COLUMNS),
+      ),
+    submitApplication: async (attorneyId, userId) =>
+      rowsResultOf(
+        await admin
+          .from("attorney_profiles")
+          .update({ profile_state: "under_review" })
+          .eq("id", attorneyId)
+          .eq("user_id", userId)
+          .eq("profile_state", "applicant")
+          .select(ATTORNEY_PROFESSIONAL_PROFILE_COLUMNS),
+      ),
+    insertAuditEvent: async (event) =>
+      event.actor_type !== "attorney" || !hasExactKeys(event, AUDIT_KEYS)
+        ? UNREADABLE_ROWS
+        : rowsResultOf(
+            await admin.from("audit_events").insert(event).select("id"),
+          ),
+  } satisfies AttorneyProfessionalProvisioning);
+}
+
+export async function createStaffVerificationProvisioning(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<StaffProvisioning | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  const recordsIn = async (
+    table:
+      | "licenses"
+      | "insurance_records"
+      | "discipline_records"
+      | "practice_area_authorisations",
+    columns: string,
+    attorneyId: string,
+    jurisdictionId: string,
+  ) =>
+    rowsResultOf(
+      await admin
+        .from(table)
+        .select(columns)
+        .eq("attorney_id", attorneyId)
+        .eq("jurisdiction_id", jurisdictionId)
+        .limit(MAX_IDS),
+    );
+  return Object.freeze({
+    jurisdictions: async () =>
+      rowsResultOf(
+        await admin
+          .from("jurisdictions")
+          .select(JURISDICTION_COLUMNS)
+          .order("code")
+          .limit(MAX_IDS),
+      ),
+    attorneyProfileOf: async (attorneyId) =>
+      rowsResultOf(
+        await admin
+          .from("attorney_profiles")
+          .select(ATTORNEY_PROFESSIONAL_PROFILE_COLUMNS)
+          .eq("id", attorneyId)
+          .limit(2),
+      ),
+    accountStateOf: async (userId) =>
+      rowsResultOf(
+        await admin
+          .from("users")
+          .select("id, account_state")
+          .eq("id", userId)
+          .limit(2),
+      ),
+    licensesIn: (attorneyId, jurisdictionId) =>
+      recordsIn("licenses", LICENSE_COLUMNS, attorneyId, jurisdictionId),
+    insuranceIn: (attorneyId, jurisdictionId) =>
+      recordsIn(
+        "insurance_records",
+        INSURANCE_COLUMNS,
+        attorneyId,
+        jurisdictionId,
+      ),
+    disciplineIn: (attorneyId, jurisdictionId) =>
+      recordsIn(
+        "discipline_records",
+        DISCIPLINE_COLUMNS,
+        attorneyId,
+        jurisdictionId,
+      ),
+    authorisationsIn: (attorneyId, jurisdictionId) =>
+      recordsIn(
+        "practice_area_authorisations",
+        PRACTICE_AUTHORISATION_COLUMNS,
+        attorneyId,
+        jurisdictionId,
+      ),
+    evidenceSubjectsOf: async (kind: SubjectKind, recordIds) => {
+      const ids = idListOf(recordIds);
+      if (ids === null) {
+        return UNREADABLE_ROWS;
+      }
+      return rowsResultOf(
+        await admin
+          .from("verification_evidence_subjects")
+          .select(EVIDENCE_SUBJECT_COLUMNS)
+          .in(subjectColumnOf(kind), ids)
+          .limit(MAX_IDS),
+      );
+    },
+    evidenceOf: async (evidenceIds) => {
+      const ids = idListOf(evidenceIds);
+      if (ids === null) {
+        return UNREADABLE_ROWS;
+      }
+      return rowsResultOf(
+        await admin
+          .from("verification_evidence")
+          .select(EVIDENCE_COLUMNS)
+          .in("id", ids)
+          .limit(MAX_IDS),
+      );
+    },
+    // Only the one eligibility policy type, for exactly one jurisdiction.
+    policyVersionsFor: async (policyTypeCode, jurisdictionId) =>
+      policyTypeCode !== ELIGIBILITY_POLICY_TYPE
+        ? UNREADABLE_ROWS
+        : rowsResultOf(
+            await admin
+              .from("policy_versions")
+              .select(POLICY_VERSION_COLUMNS)
+              .eq("policy_type_code", ELIGIBILITY_POLICY_TYPE)
+              .eq("jurisdiction_id", jurisdictionId)
+              .limit(50),
+          ),
+    authorityReferencesFor: async (versionIds) => {
+      const ids = idListOf(versionIds);
+      if (ids === null) {
+        return UNREADABLE_ROWS;
+      }
+      return rowsResultOf(
+        await admin
+          .from("policy_authority_references")
+          .select(AUTHORITY_REFERENCE_COLUMNS)
+          .in("policy_version_id", ids)
+          .limit(MAX_IDS),
+      );
+    },
+    insertEvidence: async (evidence) =>
+      rowsResultOf(
+        await admin
+          .from("verification_evidence")
+          .insert({
+            jurisdiction_id: evidence.jurisdiction_id,
+            source_type: evidence.source_type,
+            source_uri: evidence.source_uri,
+            source_reference: evidence.source_reference,
+            retrieved_at: evidence.retrieved_at,
+            retrieved_by_user_id: evidence.retrieved_by_user_id,
+            evidence_summary: evidence.evidence_summary,
+            evidence_digest: evidence.evidence_digest,
+            verification_method: evidence.verification_method,
+            discrepancy_flag: evidence.discrepancy_flag,
+          })
+          .select(EVIDENCE_COLUMNS),
+      ),
+    linkEvidence: async (evidenceId, kind: SubjectKind, recordId) =>
+      rowsResultOf(
+        await admin
+          .from("verification_evidence_subjects")
+          .insert({
+            verification_evidence_id: evidenceId,
+            [subjectColumnOf(kind)]: recordId,
+          })
+          .select(EVIDENCE_SUBJECT_COLUMNS),
+      ),
+    recordLicenseObservation: async (
+      attorneyId,
+      licenseId,
+      expectedUpdatedAt,
+      reportedStatus,
+    ) =>
+      rowsResultOf(
+        await admin
+          .from("licenses")
+          .update({ reported_status: reportedStatus })
+          .eq("id", licenseId)
+          .eq("attorney_id", attorneyId)
+          .eq("updated_at", expectedUpdatedAt)
+          .select(LICENSE_COLUMNS),
+      ),
+    insertDiscipline: async (attorneyId, record) =>
+      rowsResultOf(
+        await admin
+          .from("discipline_records")
+          .insert({
+            attorney_id: attorneyId,
+            jurisdiction_id: record.jurisdiction_id,
+            external_reference: record.external_reference,
+            finding_type: record.finding_type,
+            opened_at: record.opened_at,
+            resolved_at: record.resolved_at,
+            status: record.status,
+          })
+          .select(DISCIPLINE_COLUMNS),
+      ),
+    // A resolved date is only ever added, never cleared.
+    updateDisciplineStatus: async (
+      attorneyId,
+      recordId,
+      expectedUpdatedAt,
+      status,
+      resolvedAt,
+    ) =>
+      rowsResultOf(
+        await admin
+          .from("discipline_records")
+          .update(
+            resolvedAt === null
+              ? { status }
+              : { status, resolved_at: resolvedAt },
+          )
+          .eq("id", recordId)
+          .eq("attorney_id", attorneyId)
+          .eq("updated_at", expectedUpdatedAt)
+          .select(DISCIPLINE_COLUMNS),
+      ),
+    // Only a pending request is decided.
+    decideAuthorisation: async (
+      attorneyId,
+      authorisationId,
+      expectedUpdatedAt,
+      decision,
+    ) =>
+      rowsResultOf(
+        await admin
+          .from("practice_area_authorisations")
+          .update({
+            status: decision.status === "authorised" ? "authorised" : "refused",
+            decided_at: decision.decided_at,
+            effective_from: decision.effective_from,
+            effective_until: decision.effective_until,
+          })
+          .eq("id", authorisationId)
+          .eq("attorney_id", attorneyId)
+          .eq("status", "requested")
+          .eq("updated_at", expectedUpdatedAt)
+          .select(PRACTICE_AUTHORISATION_COLUMNS),
+      ),
+    transitionProfile: async (attorneyId, transition) =>
+      !STAFF_TRANSITIONS.includes(`${transition.from}>${transition.to}`)
+        ? UNREADABLE_ROWS
+        : rowsResultOf(
+            await admin
+              .from("attorney_profiles")
+              .update({ profile_state: transition.to })
+              .eq("id", attorneyId)
+              .eq("profile_state", transition.from)
+              .select(ATTORNEY_PROFESSIONAL_PROFILE_COLUMNS),
+          ),
+    insertEvaluation: async (row) =>
+      !hasExactKeys(row, EVALUATION_INSERT_KEYS)
+        ? UNREADABLE_ROWS
+        : rowsResultOf(
+            await admin
+              .from("eligibility_evaluations")
+              .insert(row)
+              .select(EVALUATION_COLUMNS),
+          ),
+    insertAuditEvent: async (event) =>
+      event.actor_type !== "staff" || !hasExactKeys(event, AUDIT_KEYS)
+        ? UNREADABLE_ROWS
+        : rowsResultOf(
+            await admin.from("audit_events").insert(event).select("id"),
+          ),
+    profileHistoryOf: async (attorneyId) =>
+      rowsResultOf(
+        await admin
+          .from("audit_events")
+          .select("occurred_at, action_code, after_snapshot")
+          .eq("resource_type", "attorney_profile")
+          .eq("resource_id", attorneyId)
+          .order("occurred_at", { ascending: false })
+          .limit(100),
+      ),
+  } satisfies StaffProvisioning);
 }
 
 const ATTORNEY_PROFILE_COLUMNS = "id, user_id, profile_state";
