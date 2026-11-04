@@ -204,6 +204,7 @@ test("M4-I1. both P3-003 privileged ports are built only for a verified project 
     "updateDisciplineStatus",
     "decideAuthorisation",
     "transitionProfile",
+    "evaluationById",
     "insertEvaluation",
     "insertAuditEvent",
     "profileHistoryOf",
@@ -232,7 +233,7 @@ test("M4-I2. the attorney port writes only keyed, guarded claims and never a lif
     "2026-11-04T12:00:00.000000+00:00",
     claim,
   );
-  await port.insertLicense(ID(3), claim);
+  await port.insertLicense(ID(3), ID(7), claim);
   await port.submitApplication(ID(3), ID(2));
   await port.updateAuthorisationRequest(
     ID(3),
@@ -259,7 +260,7 @@ test("M4-I2. the attorney port writes only keyed, guarded claims and never a lif
     ],
     [
       ["from", "licenses"],
-      ["insert", { attorney_id: ID(3), ...claim }],
+      ["insert", { id: ID(7), attorney_id: ID(3), ...claim }],
       ["select", LICENSE_COLUMNS],
     ],
     [

@@ -21,8 +21,9 @@
 // readiness apart; this page becomes the source of none of them.
 
 import {
-  auditEventOf,
   AUDIT_ACTIONS,
+  runAuditedChange,
+  type AuditedResult,
   type AuditEvent,
 } from "./professional-audit.ts";
 import {
@@ -120,6 +121,7 @@ export type AttorneyProfessionalProvisioning = {
   ) => Promise<RowsResult>;
   readonly insertLicense: (
     attorneyId: string,
+    licenseId: string,
     claim: LicenseClaim,
   ) => Promise<RowsResult>;
   readonly updateLicense: (
@@ -130,6 +132,7 @@ export type AttorneyProfessionalProvisioning = {
   ) => Promise<RowsResult>;
   readonly insertInsurance: (
     attorneyId: string,
+    recordId: string,
     claim: InsuranceClaim,
   ) => Promise<RowsResult>;
   readonly updateInsurance: (
@@ -140,6 +143,7 @@ export type AttorneyProfessionalProvisioning = {
   ) => Promise<RowsResult>;
   readonly insertAuthorisationRequest: (
     attorneyId: string,
+    authorisationId: string,
     jurisdictionId: string,
     practiceAreaId: string,
     requestedAt: string,
@@ -166,6 +170,9 @@ export type AttorneyProfessionalSources = {
   readonly reads: () => Promise<AttorneyProfessionalReads | null>;
   readonly provisioning: () => Promise<AttorneyProfessionalProvisioning | null>;
   readonly clock: () => number;
+  // A new record id generated on the server for each insert, so the audit
+  // attempt names the exact record and verification reads it by id.
+  readonly newId: () => string;
 };
 
 // ---------------------------------------------------------------------------
@@ -467,40 +474,78 @@ function eligibilityViewsOf(
   return Object.freeze([...latest.values()].map((entry) => entry.view));
 }
 
+// One own data field of a snapshot object, or undefined.
+function snapshotField(snapshot: unknown, key: string): unknown {
+  if (
+    snapshot === null ||
+    typeof snapshot !== "object" ||
+    Array.isArray(snapshot)
+  ) {
+    return undefined;
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(snapshot, key);
+  return descriptor !== undefined && "value" in descriptor
+    ? descriptor.value
+    : undefined;
+}
+
+// The staff messages asking this applicant for more information. Under the
+// write-ahead audit protocol a request is an attempt row; it is shown when
+// its outcome row confirms the return to the applicant stage. The newest
+// request is also shown, without such a confirmation, only while the profile
+// actually is in the applicant stage, the state that request produces. Only
+// the message written for the applicant is ever read.
 function informationRequestsOf(
   rows: readonly unknown[],
+  stage: ProfileState,
 ): readonly InformationRequestView[] | null {
-  const views: { at: number; view: InformationRequestView }[] = [];
+  const requests: {
+    readonly id: string;
+    readonly at: number;
+    readonly view: InformationRequestView;
+  }[] = [];
+  const outcomes = new Map<string, unknown>();
   for (const row of rows) {
-    const fields = readExact(row, ["occurred_at", "after_snapshot"]);
+    const fields = readExact(row, [
+      "id",
+      "occurred_at",
+      "action_code",
+      "after_snapshot",
+    ]);
+    const id = fields?.get("id");
     const at = fields?.get("occurred_at");
-    if (fields === null || !isTimestamp(at)) {
+    const action = fields?.get("action_code");
+    if (fields === null || !isUuid(id) || !isTimestamp(at)) {
       return null;
     }
-    // Only the message written for the applicant is ever shown; a request
-    // without one shows nothing, and no other snapshot field is read.
     const snapshot = fields.get("after_snapshot");
-    const descriptor =
-      snapshot !== null &&
-      typeof snapshot === "object" &&
-      !Array.isArray(snapshot)
-        ? Object.getOwnPropertyDescriptor(snapshot, "message_to_applicant")
-        : undefined;
-    const message =
-      descriptor !== undefined && "value" in descriptor
-        ? descriptor.value
-        : undefined;
+    if (action === AUDIT_ACTIONS.outcome) {
+      const attemptId = snapshotField(snapshot, "attempt_event_id");
+      if (isUuid(attemptId)) {
+        outcomes.set(attemptId, snapshotField(snapshot, "outcome"));
+      }
+      continue;
+    }
+    if (action !== AUDIT_ACTIONS.informationRequested) {
+      return null;
+    }
+    const message = snapshotField(snapshot, "message_to_applicant");
     if (typeof message !== "string" || message.trim() === "") {
       continue;
     }
-    views.push({
+    requests.push({
+      id,
       at: Date.parse(at),
       view: Object.freeze({ requestedAt: at, message }),
     });
   }
-  return Object.freeze(
-    views.sort((a, b) => b.at - a.at).map((entry) => entry.view),
+  requests.sort((a, b) => b.at - a.at);
+  const shown = requests.filter(
+    (request, index) =>
+      outcomes.get(request.id) === "applied" ||
+      (index === 0 && stage === "applicant" && !outcomes.has(request.id)),
   );
+  return Object.freeze(shown.map((entry) => entry.view));
 }
 
 function authorisationStatusOf(status: string): AuthorisationView["status"] {
@@ -597,7 +642,7 @@ export async function resolveProfessionalSetup(
       jurisdictionNames,
       areaNames,
     );
-    const informationRequests = informationRequestsOf(requests);
+    const informationRequests = informationRequestsOf(requests, profile.state);
     if (eligibility === null || informationRequests === null) {
       return UNAVAILABLE;
     }
@@ -890,21 +935,79 @@ async function activePracticeAreaIdsOf(
     : read.filter((area) => area.active).map((area) => area.id);
 }
 
-// Records the audit event of a change that a fresh read already showed. A
-// missing audit row is reported as unconfirmed, never as saved.
-async function audited(
-  provisioning: AttorneyProfessionalProvisioning,
-  event: AuditEvent,
-): Promise<ProfessionalActionState> {
-  const rows = rowsOf(
-    await attempt(() => provisioning.insertAuditEvent(event)),
-  );
-  return rows !== null && rows.length === 1 ? SAVED : UNCONFIRMED;
+// A fresh re-check of the attorney's authority for one change: the same
+// verified identity and active User still hold exactly the same own profile,
+// still in the applicant stage while writes remain, and any precondition of
+// the change still holds. true holds, false lapsed, null unreadable.
+function authorityOf(
+  sources: AttorneyProfessionalSources,
+  writable: Writable,
+  precondition: () => Promise<boolean | null> = async () => true,
+): {
+  readonly forWrite: () => Promise<boolean | null>;
+  readonly atCompletion: () => Promise<boolean | null>;
+} {
+  const current = async (
+    stageMustBeApplicant: boolean,
+  ): Promise<boolean | null> => {
+    const fresh = await attorneyContextOf(sources, writable.reads);
+    if (!("profile" in fresh)) {
+      return fresh === UNAVAILABLE ? null : false;
+    }
+    if (
+      fresh.userId !== writable.context.userId ||
+      fresh.profile.id !== writable.context.profile.id
+    ) {
+      return false;
+    }
+    return stageMustBeApplicant ? fresh.profile.state === "applicant" : true;
+  };
+  return {
+    forWrite: async () => {
+      const held = await current(true);
+      return held === true ? await precondition() : held;
+    },
+    atCompletion: () => current(false),
+  };
 }
 
-function rowCountOf(result: unknown): number | null {
-  const rows = rowsOf(result);
-  return rows === null ? null : rows.length;
+// The fixed state shown for one audited change. Only a change whose attempt
+// and applied outcome were both recorded, under authority that still held
+// at completion, is reported saved.
+function stateOf(result: AuditedResult): ProfessionalActionState {
+  if (result.status === "unrecorded") {
+    return UNAVAILABLE;
+  }
+  if (result.status === "stopped") {
+    if (result.outcome !== "not_applied") {
+      return UNCONFIRMED;
+    }
+    return result.authority === "lapsed" ? LOCKED : UNAVAILABLE;
+  }
+  if (result.outcome === "not_applied") {
+    return NOT_SAVED;
+  }
+  return result.outcome === "applied" &&
+    result.authorityAtCompletion === "held" &&
+    result.outcomeRecorded
+    ? SAVED
+    : UNCONFIRMED;
+}
+
+// Exactly one row reported by one write.
+async function wroteOne(call: () => Promise<RowsResult>): Promise<boolean> {
+  const rows = rowsOf(await attempt(call));
+  return rows !== null && rows.length === 1;
+}
+
+// A new record id generated on the server, or null when unusable.
+function newIdOf(sources: AttorneyProfessionalSources): string | null {
+  try {
+    const id = sources.newId();
+    return isUuid(id) ? id : null;
+  } catch {
+    return null;
+  }
 }
 
 function claimSnapshotOfLicense(record: LicenseRecord | LicenseClaim) {
@@ -984,48 +1087,54 @@ export async function saveProfileDetails(
       bio,
       years_experience: years,
     });
-    const count = rowCountOf(
-      await attempt(() =>
-        provisioning.updateProfileDetails(
-          context.profile.id,
-          context.userId,
-          details,
-        ),
-      ),
-    );
-    const fresh = await attorneyContextOf(sources, reads);
-    if (!("profile" in fresh)) {
-      return UNCONFIRMED;
-    }
-    const after = fresh.profile;
-    const matches =
-      after.displayName === details.display_name &&
-      after.headline === details.headline &&
-      after.bio === details.bio &&
-      after.yearsExperience === details.years_experience;
-    if (!matches) {
-      if (count === 0 && after.state !== "applicant") {
-        return LOCKED;
-      }
-      return count === 0 ? NOT_SAVED : UNCONFIRMED;
-    }
-    return await audited(
-      provisioning,
-      auditEventOf({
-        actorUserId: context.userId,
-        actorType: "attorney",
-        action: AUDIT_ACTIONS.profileDetailsRevised,
-        resourceType: "attorney_profile",
-        resourceId: context.profile.id,
-        before: {
-          display_name: context.profile.displayName,
-          headline: context.profile.headline,
-          bio: context.profile.bio,
-          years_experience: context.profile.yearsExperience,
+    const authority = authorityOf(sources, writable);
+    return stateOf(
+      await runAuditedChange(
+        {
+          port: provisioning,
+          attempt: {
+            actorUserId: context.userId,
+            actorType: "attorney",
+            action: AUDIT_ACTIONS.profileDetailsRevised,
+            resourceType: "attorney_profile",
+            resourceId: context.profile.id,
+            before: {
+              display_name: context.profile.displayName,
+              headline: context.profile.headline,
+              bio: context.profile.bio,
+              years_experience: context.profile.yearsExperience,
+            },
+            after: details,
+            occurredAtMs: sources.clock(),
+          },
+          authorizedForWrite: authority.forWrite,
+          authorizedAtCompletion: authority.atCompletion,
+          steps: [
+            () =>
+              wroteOne(() =>
+                provisioning.updateProfileDetails(
+                  context.profile.id,
+                  context.userId,
+                  details,
+                ),
+              ),
+          ],
+          verify: async () => {
+            const fresh = await attorneyContextOf(sources, reads);
+            if (!("profile" in fresh)) {
+              return "unknown";
+            }
+            const after = fresh.profile;
+            return after.displayName === details.display_name &&
+              after.headline === details.headline &&
+              after.bio === details.bio &&
+              after.yearsExperience === details.years_experience
+              ? "applied"
+              : "not_applied";
+          },
         },
-        after: details,
-        occurredAtMs: sources.clock(),
-      }),
+        sources.clock,
+      ),
     );
   } catch {
     return UNAVAILABLE;
@@ -1107,6 +1216,18 @@ function sameLicense(record: LicenseRecord, claim: LicenseClaim): boolean {
   );
 }
 
+// Whether a record still has no linked verification evidence, read afresh.
+function stillUnreviewed(
+  provisioning: AttorneyProfessionalProvisioning,
+  kind: SubjectKind,
+  recordId: string,
+): () => Promise<boolean | null> {
+  return async () => {
+    const flags = await evidenceStatusOf(provisioning, kind, [recordId]);
+    return flags === null ? null : flags.size === 0;
+  };
+}
+
 // Adds a license claim (record omitted) or revises one of the attorney's own
 // unreviewed license claims (record names it). The source-observed status is
 // never set here.
@@ -1138,7 +1259,6 @@ export async function saveLicenseClaim(
     }
     const attorneyId = context.profile.id;
     let before: LicenseRecord | null = null;
-    let writeId: string | null = null;
     if (recordId !== null) {
       const own = ownedRows(
         await attempt(() => reads.licensesOf(attorneyId)),
@@ -1152,68 +1272,80 @@ export async function saveLicenseClaim(
       if (before === null) {
         return DENIED;
       }
-      const flags = await evidenceStatusOf(provisioning, "license", [recordId]);
-      if (flags === null) {
+      const unreviewed = await stillUnreviewed(
+        provisioning,
+        "license",
+        recordId,
+      )();
+      if (unreviewed === null) {
         return UNAVAILABLE;
       }
-      if (flags.size > 0 || before.reportedStatus !== null) {
+      if (!unreviewed || before.reportedStatus !== null) {
         return LOCKED;
       }
-      const expectedUpdatedAt = before.updatedAt;
-      const updated = rowsOf(
-        await attempt(() =>
-          provisioning.updateLicense(
-            attorneyId,
-            recordId,
-            expectedUpdatedAt,
-            claim,
-          ),
-        ),
-      );
-      if (updated !== null && updated.length === 0) {
-        return NOT_SAVED;
-      }
-      writeId = recordId;
-    } else {
-      const inserted = rowsOf(
-        await attempt(() => provisioning.insertLicense(attorneyId, claim)),
-      );
-      // A refused insert (a duplicate number included) changes nothing;
-      // the fresh read below decides whether anything was kept.
-      const row = inserted?.length === 1 ? readLicense(inserted[0]) : null;
-      writeId = row?.id ?? null;
     }
-    const fresh = ownedRows(
-      await attempt(() => reads.licensesOf(attorneyId)),
-      readLicense,
-      attorneyId,
+    const id = recordId ?? newIdOf(sources);
+    if (id === null) {
+      return UNAVAILABLE;
+    }
+    const expectedUpdatedAt = before?.updatedAt ?? null;
+    const authority = authorityOf(
+      sources,
+      writable,
+      recordId === null
+        ? undefined
+        : stillUnreviewed(provisioning, "license", recordId),
     );
-    if (fresh === null) {
-      return UNCONFIRMED;
-    }
-    const kept =
-      writeId === null
-        ? null
-        : (fresh.find((record) => record.id === writeId) ?? null);
-    if (kept === null || !sameLicense(kept, claim)) {
-      return writeId === null && recordId === null ? NOT_SAVED : UNCONFIRMED;
-    }
-    return await audited(
-      provisioning,
-      auditEventOf({
-        actorUserId: context.userId,
-        actorType: "attorney",
-        action:
-          before === null
-            ? AUDIT_ACTIONS.claimRecorded
-            : AUDIT_ACTIONS.claimRevised,
-        resourceType: "license",
-        resourceId: kept.id,
-        before: before === null ? null : claimSnapshotOfLicense(before),
-        after: claimSnapshotOfLicense(claim),
-        jurisdictionId: claim.jurisdiction_id,
-        occurredAtMs: sources.clock(),
-      }),
+    return stateOf(
+      await runAuditedChange(
+        {
+          port: provisioning,
+          attempt: {
+            actorUserId: context.userId,
+            actorType: "attorney",
+            action:
+              before === null
+                ? AUDIT_ACTIONS.claimRecorded
+                : AUDIT_ACTIONS.claimRevised,
+            resourceType: "license",
+            resourceId: id,
+            before: before === null ? null : claimSnapshotOfLicense(before),
+            after: claimSnapshotOfLicense(claim),
+            jurisdictionId: claim.jurisdiction_id,
+            occurredAtMs: sources.clock(),
+          },
+          authorizedForWrite: authority.forWrite,
+          authorizedAtCompletion: authority.atCompletion,
+          steps: [
+            () =>
+              wroteOne(() =>
+                expectedUpdatedAt === null
+                  ? provisioning.insertLicense(attorneyId, id, claim)
+                  : provisioning.updateLicense(
+                      attorneyId,
+                      id,
+                      expectedUpdatedAt,
+                      claim,
+                    ),
+              ),
+          ],
+          verify: async () => {
+            const fresh = ownedRows(
+              await attempt(() => reads.licensesOf(attorneyId)),
+              readLicense,
+              attorneyId,
+            );
+            if (fresh === null) {
+              return "unknown";
+            }
+            const kept = fresh.find((record) => record.id === id) ?? null;
+            return kept !== null && sameLicense(kept, claim)
+              ? "applied"
+              : "not_applied";
+          },
+        },
+        sources.clock,
+      ),
     );
   } catch {
     return UNAVAILABLE;
@@ -1376,7 +1508,6 @@ export async function saveInsuranceClaim(
     }
     const attorneyId = context.profile.id;
     let before: InsuranceRecord | null = null;
-    let writeId: string | null = null;
     if (recordId !== null) {
       const own = ownedRows(
         await attempt(() => reads.insuranceOf(attorneyId)),
@@ -1390,68 +1521,80 @@ export async function saveInsuranceClaim(
       if (before === null) {
         return DENIED;
       }
-      const flags = await evidenceStatusOf(provisioning, "insurance", [
+      const unreviewed = await stillUnreviewed(
+        provisioning,
+        "insurance",
         recordId,
-      ]);
-      if (flags === null) {
+      )();
+      if (unreviewed === null) {
         return UNAVAILABLE;
       }
-      if (flags.size > 0) {
+      if (!unreviewed) {
         return LOCKED;
       }
-      const expectedUpdatedAt = before.updatedAt;
-      const updated = rowsOf(
-        await attempt(() =>
-          provisioning.updateInsurance(
-            attorneyId,
-            recordId,
-            expectedUpdatedAt,
-            claim,
-          ),
-        ),
-      );
-      if (updated !== null && updated.length === 0) {
-        return NOT_SAVED;
-      }
-      writeId = recordId;
-    } else {
-      const inserted = rowsOf(
-        await attempt(() => provisioning.insertInsurance(attorneyId, claim)),
-      );
-      const row = inserted?.length === 1 ? readInsurance(inserted[0]) : null;
-      writeId = row?.id ?? null;
     }
-    const fresh = ownedRows(
-      await attempt(() => reads.insuranceOf(attorneyId)),
-      readInsurance,
-      attorneyId,
+    const id = recordId ?? newIdOf(sources);
+    if (id === null) {
+      return UNAVAILABLE;
+    }
+    const expectedUpdatedAt = before?.updatedAt ?? null;
+    const authority = authorityOf(
+      sources,
+      writable,
+      recordId === null
+        ? undefined
+        : stillUnreviewed(provisioning, "insurance", recordId),
     );
-    if (fresh === null) {
-      return UNCONFIRMED;
-    }
-    const kept =
-      writeId === null
-        ? null
-        : (fresh.find((record) => record.id === writeId) ?? null);
-    if (kept === null || !sameInsurance(kept, claim)) {
-      return writeId === null && recordId === null ? NOT_SAVED : UNCONFIRMED;
-    }
-    return await audited(
-      provisioning,
-      auditEventOf({
-        actorUserId: context.userId,
-        actorType: "attorney",
-        action:
-          before === null
-            ? AUDIT_ACTIONS.claimRecorded
-            : AUDIT_ACTIONS.claimRevised,
-        resourceType: "insurance_record",
-        resourceId: kept.id,
-        before: before === null ? null : claimSnapshotOfInsurance(before),
-        after: claimSnapshotOfInsurance(claim),
-        jurisdictionId: claim.jurisdiction_id,
-        occurredAtMs: sources.clock(),
-      }),
+    return stateOf(
+      await runAuditedChange(
+        {
+          port: provisioning,
+          attempt: {
+            actorUserId: context.userId,
+            actorType: "attorney",
+            action:
+              before === null
+                ? AUDIT_ACTIONS.claimRecorded
+                : AUDIT_ACTIONS.claimRevised,
+            resourceType: "insurance_record",
+            resourceId: id,
+            before: before === null ? null : claimSnapshotOfInsurance(before),
+            after: claimSnapshotOfInsurance(claim),
+            jurisdictionId: claim.jurisdiction_id,
+            occurredAtMs: sources.clock(),
+          },
+          authorizedForWrite: authority.forWrite,
+          authorizedAtCompletion: authority.atCompletion,
+          steps: [
+            () =>
+              wroteOne(() =>
+                expectedUpdatedAt === null
+                  ? provisioning.insertInsurance(attorneyId, id, claim)
+                  : provisioning.updateInsurance(
+                      attorneyId,
+                      id,
+                      expectedUpdatedAt,
+                      claim,
+                    ),
+              ),
+          ],
+          verify: async () => {
+            const fresh = ownedRows(
+              await attempt(() => reads.insuranceOf(attorneyId)),
+              readInsurance,
+              attorneyId,
+            );
+            if (fresh === null) {
+              return "unknown";
+            }
+            const kept = fresh.find((record) => record.id === id) ?? null;
+            return kept !== null && sameInsurance(kept, claim)
+              ? "applied"
+              : "not_applied";
+          },
+        },
+        sources.clock,
+      ),
     );
   } catch {
     return UNAVAILABLE;
@@ -1520,51 +1663,60 @@ export async function requestPracticeArea(
         ],
       });
     }
+    const id = newIdOf(sources);
+    if (id === null) {
+      return UNAVAILABLE;
+    }
     const requestedAt = new Date(sources.clock()).toISOString();
-    const inserted = rowsOf(
-      await attempt(() =>
-        provisioning.insertAuthorisationRequest(
-          attorneyId,
-          jurisdiction,
-          area,
-          requestedAt,
-        ),
+    const authority = authorityOf(sources, writable);
+    return stateOf(
+      await runAuditedChange(
+        {
+          port: provisioning,
+          attempt: {
+            actorUserId: context.userId,
+            actorType: "attorney",
+            action: AUDIT_ACTIONS.practiceAreaRequestChanged,
+            resourceType: "practice_area_authorisation",
+            resourceId: id,
+            after: { status: "requested", practice_area_id: area },
+            jurisdictionId: jurisdiction,
+            occurredAtMs: sources.clock(),
+          },
+          authorizedForWrite: authority.forWrite,
+          authorizedAtCompletion: authority.atCompletion,
+          steps: [
+            () =>
+              wroteOne(() =>
+                provisioning.insertAuthorisationRequest(
+                  attorneyId,
+                  id,
+                  jurisdiction,
+                  area,
+                  requestedAt,
+                ),
+              ),
+          ],
+          verify: async () => {
+            const fresh = ownedRows(
+              await attempt(() => reads.authorisationsOf(attorneyId)),
+              readPracticeAuthorisation,
+              attorneyId,
+            );
+            if (fresh === null) {
+              return "unknown";
+            }
+            const kept = fresh.find((entry) => entry.id === id) ?? null;
+            return kept !== null &&
+              kept.status === "requested" &&
+              kept.jurisdictionId === jurisdiction &&
+              kept.practiceAreaId === area
+              ? "applied"
+              : "not_applied";
+          },
+        },
+        sources.clock,
       ),
-    );
-    const row =
-      inserted?.length === 1 ? readPracticeAuthorisation(inserted[0]) : null;
-    const fresh = ownedRows(
-      await attempt(() => reads.authorisationsOf(attorneyId)),
-      readPracticeAuthorisation,
-      attorneyId,
-    );
-    if (fresh === null) {
-      return UNCONFIRMED;
-    }
-    const kept =
-      row === null
-        ? null
-        : (fresh.find((entry) => entry.id === row.id) ?? null);
-    if (
-      kept === null ||
-      kept.status !== "requested" ||
-      kept.jurisdictionId !== jurisdiction ||
-      kept.practiceAreaId !== area
-    ) {
-      return row === null ? NOT_SAVED : UNCONFIRMED;
-    }
-    return await audited(
-      provisioning,
-      auditEventOf({
-        actorUserId: context.userId,
-        actorType: "attorney",
-        action: AUDIT_ACTIONS.practiceAreaRequestChanged,
-        resourceType: "practice_area_authorisation",
-        resourceId: kept.id,
-        after: { status: "requested", practice_area_id: area },
-        jurisdictionId: jurisdiction,
-        occurredAtMs: sources.clock(),
-      }),
     );
   } catch {
     return UNAVAILABLE;
@@ -1622,39 +1774,51 @@ export async function changePracticeAreaRequest(
             status: "requested",
             requestedAt: new Date(sources.clock()).toISOString(),
           } as const);
-    const count = rowCountOf(
-      await attempt(() =>
-        provisioning.updateAuthorisationRequest(
-          attorneyId,
-          recordId,
-          expected,
-          entry.updatedAt,
-          next,
-        ),
+    const authority = authorityOf(sources, writable);
+    return stateOf(
+      await runAuditedChange(
+        {
+          port: provisioning,
+          attempt: {
+            actorUserId: context.userId,
+            actorType: "attorney",
+            action: AUDIT_ACTIONS.practiceAreaRequestChanged,
+            resourceType: "practice_area_authorisation",
+            resourceId: recordId,
+            before: { status: expected },
+            after: { status: nextStatus },
+            jurisdictionId: entry.jurisdictionId,
+            occurredAtMs: sources.clock(),
+          },
+          authorizedForWrite: authority.forWrite,
+          authorizedAtCompletion: authority.atCompletion,
+          steps: [
+            () =>
+              wroteOne(() =>
+                provisioning.updateAuthorisationRequest(
+                  attorneyId,
+                  recordId,
+                  expected,
+                  entry.updatedAt,
+                  next,
+                ),
+              ),
+          ],
+          verify: async () => {
+            const fresh = ownedRows(
+              await attempt(() => reads.authorisationsOf(attorneyId)),
+              readPracticeAuthorisation,
+              attorneyId,
+            );
+            if (fresh === null) {
+              return "unknown";
+            }
+            const kept = fresh.find((record) => record.id === recordId);
+            return kept?.status === nextStatus ? "applied" : "not_applied";
+          },
+        },
+        sources.clock,
       ),
-    );
-    const fresh = ownedRows(
-      await attempt(() => reads.authorisationsOf(attorneyId)),
-      readPracticeAuthorisation,
-      attorneyId,
-    );
-    const kept = fresh?.find((record) => record.id === recordId) ?? null;
-    if (kept === null || kept.status !== nextStatus) {
-      return count === 0 ? NOT_SAVED : UNCONFIRMED;
-    }
-    return await audited(
-      provisioning,
-      auditEventOf({
-        actorUserId: context.userId,
-        actorType: "attorney",
-        action: AUDIT_ACTIONS.practiceAreaRequestChanged,
-        resourceType: "practice_area_authorisation",
-        resourceId: recordId,
-        before: { status: expected },
-        after: { status: nextStatus },
-        jurisdictionId: entry.jurisdictionId,
-        occurredAtMs: sources.clock(),
-      }),
     );
   } catch {
     return UNAVAILABLE;
@@ -1699,30 +1863,45 @@ export async function submitApplicationForReview(
         submit: ["Add at least one license claim before submitting."],
       });
     }
-    const count = rowCountOf(
-      await attempt(() =>
-        provisioning.submitApplication(context.profile.id, context.userId),
+    const authority = authorityOf(sources, writable);
+    return stateOf(
+      await runAuditedChange(
+        {
+          port: provisioning,
+          attempt: {
+            actorUserId: context.userId,
+            actorType: "attorney",
+            action: AUDIT_ACTIONS.applicationSubmitted,
+            resourceType: "attorney_profile",
+            resourceId: context.profile.id,
+            before: { profile_state: "applicant" },
+            after: { profile_state: "under_review" },
+            occurredAtMs: sources.clock(),
+          },
+          authorizedForWrite: authority.forWrite,
+          authorizedAtCompletion: authority.atCompletion,
+          steps: [
+            () =>
+              wroteOne(() =>
+                provisioning.submitApplication(
+                  context.profile.id,
+                  context.userId,
+                ),
+              ),
+          ],
+          verify: async () => {
+            const fresh = await attorneyContextOf(sources, reads);
+            if (!("profile" in fresh)) {
+              return "unknown";
+            }
+            return fresh.profile.id === context.profile.id &&
+              fresh.profile.state === "under_review"
+              ? "applied"
+              : "not_applied";
+          },
+        },
+        sources.clock,
       ),
-    );
-    const fresh = await attorneyContextOf(sources, reads);
-    if (!("profile" in fresh) || fresh.profile.id !== context.profile.id) {
-      return UNCONFIRMED;
-    }
-    if (fresh.profile.state !== "under_review") {
-      return count === 0 ? NOT_SAVED : UNCONFIRMED;
-    }
-    return await audited(
-      provisioning,
-      auditEventOf({
-        actorUserId: context.userId,
-        actorType: "attorney",
-        action: AUDIT_ACTIONS.applicationSubmitted,
-        resourceType: "attorney_profile",
-        resourceId: context.profile.id,
-        before: { profile_state: "applicant" },
-        after: { profile_state: "under_review" },
-        occurredAtMs: sources.clock(),
-      }),
     );
   } catch {
     return UNAVAILABLE;

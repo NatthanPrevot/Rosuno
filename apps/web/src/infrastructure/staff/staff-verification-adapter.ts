@@ -10,6 +10,8 @@
 // narrow staff verification port; this module never sees a credential or a
 // privileged client, and only bounds each call in time.
 
+import { randomUUID } from "node:crypto";
+
 import {
   rowsResultOf,
   USER_COLUMNS,
@@ -251,4 +253,5 @@ export const STAFF_VERIFICATION_SOURCES: StaffSources = Object.freeze({
   reads: createStaffReads(),
   provisioning: createBoundedStaffProvisioning(),
   clock: () => Date.now(),
+  newId: () => randomUUID(),
 });

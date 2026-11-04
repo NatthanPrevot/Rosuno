@@ -335,6 +335,7 @@ const EVIDENCE_FLAG_COLUMNS = "id, discrepancy_flag, retrieved_at";
 const ATTORNEY_EVALUATION_COLUMNS =
   "id, jurisdiction_id, context_type, context_id, result, evaluated_at";
 const EVALUATION_INSERT_KEYS = Object.freeze([
+  "id",
   "attorney_id",
   "jurisdiction_id",
   "context_type",
@@ -430,16 +431,21 @@ export async function createAttorneyProfessionalProvisioning(
           .order("evaluated_at", { ascending: false })
           .limit(MAX_IDS),
       ),
+    // The applicant's own information requests and the outcome rows of the
+    // write-ahead audit protocol for the same profile.
     informationRequestsOf: async (attorneyId) =>
       rowsResultOf(
         await admin
           .from("audit_events")
-          .select("occurred_at, after_snapshot")
+          .select("id, occurred_at, action_code, after_snapshot")
           .eq("resource_type", "attorney_profile")
           .eq("resource_id", attorneyId)
-          .eq("action_code", "attorney_information_requested")
+          .in("action_code", [
+            "attorney_information_requested",
+            "audited_change_outcome",
+          ])
           .order("occurred_at", { ascending: false })
-          .limit(20),
+          .limit(100),
       ),
     updateProfileDetails: async (attorneyId, userId, details) =>
       rowsResultOf(
@@ -456,11 +462,12 @@ export async function createAttorneyProfessionalProvisioning(
           .eq("profile_state", "applicant")
           .select(ATTORNEY_PROFESSIONAL_PROFILE_COLUMNS),
       ),
-    insertLicense: async (attorneyId, claim) =>
+    insertLicense: async (attorneyId, licenseId, claim) =>
       rowsResultOf(
         await admin
           .from("licenses")
           .insert({
+            id: licenseId,
             attorney_id: attorneyId,
             jurisdiction_id: claim.jurisdiction_id,
             license_number: claim.license_number,
@@ -489,11 +496,12 @@ export async function createAttorneyProfessionalProvisioning(
           .is("reported_status", null)
           .select(LICENSE_COLUMNS),
       ),
-    insertInsurance: async (attorneyId, claim) =>
+    insertInsurance: async (attorneyId, recordId, claim) =>
       rowsResultOf(
         await admin
           .from("insurance_records")
           .insert({
+            id: recordId,
             attorney_id: attorneyId,
             jurisdiction_id: claim.jurisdiction_id,
             carrier_name: claim.carrier_name,
@@ -529,6 +537,7 @@ export async function createAttorneyProfessionalProvisioning(
       ),
     insertAuthorisationRequest: async (
       attorneyId,
+      authorisationId,
       jurisdictionId,
       practiceAreaId,
       requestedAt,
@@ -537,6 +546,7 @@ export async function createAttorneyProfessionalProvisioning(
         await admin
           .from("practice_area_authorisations")
           .insert({
+            id: authorisationId,
             attorney_id: attorneyId,
             jurisdiction_id: jurisdictionId,
             practice_area_id: practiceAreaId,
@@ -719,6 +729,7 @@ export async function createStaffVerificationProvisioning(
         await admin
           .from("verification_evidence")
           .insert({
+            id: evidence.id,
             jurisdiction_id: evidence.jurisdiction_id,
             source_type: evidence.source_type,
             source_uri: evidence.source_uri,
@@ -757,11 +768,12 @@ export async function createStaffVerificationProvisioning(
           .eq("updated_at", expectedUpdatedAt)
           .select(LICENSE_COLUMNS),
       ),
-    insertDiscipline: async (attorneyId, record) =>
+    insertDiscipline: async (attorneyId, disciplineId, record) =>
       rowsResultOf(
         await admin
           .from("discipline_records")
           .insert({
+            id: disciplineId,
             attorney_id: attorneyId,
             jurisdiction_id: record.jurisdiction_id,
             external_reference: record.external_reference,
@@ -826,6 +838,14 @@ export async function createStaffVerificationProvisioning(
               .eq("profile_state", transition.from)
               .select(ATTORNEY_PROFESSIONAL_PROFILE_COLUMNS),
           ),
+    evaluationById: async (evaluationId) =>
+      rowsResultOf(
+        await admin
+          .from("eligibility_evaluations")
+          .select(EVALUATION_COLUMNS)
+          .eq("id", evaluationId)
+          .limit(2),
+      ),
     insertEvaluation: async (row) =>
       !hasExactKeys(row, EVALUATION_INSERT_KEYS)
         ? UNREADABLE_ROWS

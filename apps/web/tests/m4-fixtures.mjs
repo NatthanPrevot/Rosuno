@@ -109,6 +109,8 @@ export function createWorld() {
     policy_authority_references: [],
     calls: [],
     failures: new Set(),
+    lost: new Set(),
+    hooks: new Map(),
   };
   return world;
 }
@@ -397,6 +399,51 @@ function subjectRecordOf(world, link) {
   return null;
 }
 
+// One audit append, failing when the test says so: for every append
+// (prov.audit), or only for attempt or outcome rows.
+function auditInsert(world, event) {
+  const phase = event.after_snapshot?.audit_phase ?? "single";
+  world.calls.push(`audit:${phase}`);
+  if (
+    world.failures.has("prov.audit") ||
+    world.failures.has(`prov.audit.${phase}`)
+  ) {
+    return UNREADABLE;
+  }
+  return insert(world, "audit_events", { id: world.nextId(), ...event }, "id");
+}
+
+// Wraps every method of a port so that a test can run a hook just before a
+// named call (to revoke a grant or change a record mid-operation), make the
+// call fail without effect (failures), or apply it but lose its answer
+// (lost), exactly as an uncertain network write would.
+export function instrument(world, prefix, port) {
+  const wrapped = {};
+  for (const [name, call] of Object.entries(port)) {
+    wrapped[name] = async (...args) => {
+      const key = `${prefix}.${name}`;
+      const hook = world.hooks.get(key);
+      if (hook !== undefined) {
+        world.hooks.delete(key);
+        await hook(...args);
+      }
+      if (world.failures.has(key)) {
+        world.calls.push(`failed:${key}`);
+        return name === "holdsVerificationScope"
+          ? { kind: "unreadable" }
+          : UNREADABLE;
+      }
+      const answer = await call(...args);
+      if (world.lost.has(key)) {
+        world.calls.push(`lost:${key}`);
+        return UNREADABLE;
+      }
+      return answer;
+    };
+  }
+  return wrapped;
+}
+
 function fail(world, name) {
   world.calls.push(name);
   return world.failures.has(name);
@@ -505,9 +552,10 @@ export function attorneyProvisioningFor(world) {
             (a) =>
               a.resource_type === "attorney_profile" &&
               a.resource_id === attorneyId &&
-              a.action_code === "attorney_information_requested",
+              (a.action_code === "attorney_information_requested" ||
+                a.action_code === "audited_change_outcome"),
           )
-          .map((a) => pick(a, "occurred_at, after_snapshot")),
+          .map((a) => pick(a, "id, occurred_at, action_code, after_snapshot")),
       ),
     updateProfileDetails: async (attorneyId, userId, details) =>
       fail(world, "prov.updateProfileDetails")
@@ -522,7 +570,7 @@ export function attorneyProvisioningFor(world) {
             details,
             PROFILE_COLUMNS,
           ),
-    insertLicense: async (attorneyId, claim) => {
+    insertLicense: async (attorneyId, id, claim) => {
       if (fail(world, "prov.insertLicense")) {
         return UNREADABLE;
       }
@@ -539,7 +587,7 @@ export function attorneyProvisioningFor(world) {
         world,
         "licenses",
         {
-          id: world.nextId(),
+          id,
           attorney_id: attorneyId,
           ...claim,
           reported_status: null,
@@ -561,12 +609,12 @@ export function attorneyProvisioningFor(world) {
         claim,
         LICENSE_COLUMNS,
       ),
-    insertInsurance: async (attorneyId, claim) =>
+    insertInsurance: async (attorneyId, id, claim) =>
       insert(
         world,
         "insurance_records",
         {
-          id: world.nextId(),
+          id,
           attorney_id: attorneyId,
           ...claim,
           created_at: stamp(world.now),
@@ -587,6 +635,7 @@ export function attorneyProvisioningFor(world) {
       ),
     insertAuthorisationRequest: async (
       attorneyId,
+      id,
       jurisdictionId,
       practiceAreaId,
       requestedAt,
@@ -595,7 +644,7 @@ export function attorneyProvisioningFor(world) {
         world,
         "practice_area_authorisations",
         {
-          id: world.nextId(),
+          id,
           attorney_id: attorneyId,
           jurisdiction_id: jurisdictionId,
           practice_area_id: practiceAreaId,
@@ -642,10 +691,7 @@ export function attorneyProvisioningFor(world) {
         { profile_state: "under_review" },
         PROFILE_COLUMNS,
       ),
-    insertAuditEvent: async (event) =>
-      fail(world, "prov.audit")
-        ? UNREADABLE
-        : insert(world, "audit_events", { id: world.nextId(), ...event }, "id"),
+    insertAuditEvent: async (event) => auditInsert(world, event),
   };
 }
 
@@ -838,7 +884,6 @@ export function staffProvisioningFor(world) {
             world,
             "verification_evidence",
             {
-              id: world.nextId(),
               ...evidence,
               retention_class: null,
               created_at: stamp(world.tick()),
@@ -874,12 +919,12 @@ export function staffProvisioningFor(world) {
         { reported_status: status },
         LICENSE_COLUMNS,
       ),
-    insertDiscipline: async (attorneyId, record) =>
+    insertDiscipline: async (attorneyId, id, record) =>
       insert(
         world,
         "discipline_records",
         {
-          id: world.nextId(),
+          id,
           attorney_id: attorneyId,
           ...record,
           created_at: stamp(world.now),
@@ -931,16 +976,18 @@ export function staffProvisioningFor(world) {
             world,
             "eligibility_evaluations",
             {
-              id: world.nextId(),
               ...JSON.parse(JSON.stringify(row)),
               created_at: stamp(world.now),
             },
             EVALUATION_COLUMNS,
           ),
-    insertAuditEvent: async (event) =>
-      fail(world, "prov.audit")
-        ? UNREADABLE
-        : insert(world, "audit_events", { id: world.nextId(), ...event }, "id"),
+    insertAuditEvent: async (event) => auditInsert(world, event),
+    evaluationById: async (id) =>
+      rows(
+        world.eligibility_evaluations
+          .filter((e) => e.id === id)
+          .map((e) => pick(e, EVALUATION_COLUMNS)),
+      ),
     profileHistoryOf: async (attorneyId) =>
       rows(
         world.audit_events
@@ -977,9 +1024,12 @@ export function attorneySources(world, authId, overrides = {}) {
   return {
     session: sessionOf(authId),
     account: accountOf(world, authId),
-    reads: async () => attorneyReadsFor(world, authId),
-    provisioning: async () => attorneyProvisioningFor(world),
+    reads: async () =>
+      instrument(world, "reads", attorneyReadsFor(world, authId)),
+    provisioning: async () =>
+      instrument(world, "prov", attorneyProvisioningFor(world)),
     clock: () => world.now,
+    newId: () => world.nextId(),
     ...overrides,
   };
 }
@@ -988,9 +1038,11 @@ export function staffSources(world, authId, overrides = {}) {
   return {
     session: sessionOf(authId),
     account: accountOf(world, authId),
-    reads: async () => staffReadsFor(world, authId),
-    provisioning: async () => staffProvisioningFor(world),
+    reads: async () => instrument(world, "reads", staffReadsFor(world, authId)),
+    provisioning: async () =>
+      instrument(world, "prov", staffProvisioningFor(world)),
     clock: () => world.now,
+    newId: () => world.nextId(),
     ...overrides,
   };
 }
@@ -1003,4 +1055,25 @@ export function form(fields) {
     }
   }
   return data;
+}
+
+// The latest attempt row for an action and the outcome row that references
+// it (undefined when absent), under the write-ahead audit protocol.
+export function auditPair(world, action) {
+  const attempt = [...world.audit_events]
+    .reverse()
+    .find(
+      (event) =>
+        event.action_code === action &&
+        event.after_snapshot?.audit_phase === "attempt",
+    );
+  const outcome =
+    attempt === undefined
+      ? undefined
+      : world.audit_events.find(
+          (event) =>
+            event.action_code === "audited_change_outcome" &&
+            event.after_snapshot?.attempt_event_id === attempt.id,
+        );
+  return { attempt, outcome };
 }

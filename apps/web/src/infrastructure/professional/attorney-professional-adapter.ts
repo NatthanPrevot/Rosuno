@@ -11,6 +11,8 @@
 // each call in time. Every call answers within its deadline; anything that
 // fails, throws, or is too slow is reported as unreadable.
 
+import { randomUUID } from "node:crypto";
+
 import type {
   AttorneyProfessionalProvisioning,
   AttorneyProfessionalReads,
@@ -123,4 +125,5 @@ export const ATTORNEY_PROFESSIONAL_SOURCES: AttorneyProfessionalSources =
     reads: createAttorneyProfessionalReads(),
     provisioning: createBoundedProfessionalProvisioning(),
     clock: () => Date.now(),
+    newId: () => randomUUID(),
   });

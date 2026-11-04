@@ -32,6 +32,7 @@ import {
   addPolicy,
   addPracticeArea,
   addStaff,
+  auditPair,
   createWorld,
   form,
   idOf,
@@ -315,7 +316,24 @@ test("M4-S4. a source-grounded finding writes immutable evidence linked to exact
   assert.ok(
     Date.parse(evidence.created_at) <= Date.parse(s.licenseA.updated_at),
   );
-  const audit = s.world.audit_events.at(-1);
+  // The attempt row preceded every write; the outcome row confirms them.
+  const { attempt: audit, outcome: auditOutcome } = auditPair(
+    s.world,
+    "verification_evidence_recorded",
+  );
+  assert.deepEqual(
+    s.world.calls.filter((call) =>
+      /^audit:|^prov\.(insertEvidence|linkEvidence)$/.test(call),
+    ),
+    [
+      "audit:attempt",
+      "prov.insertEvidence",
+      "prov.linkEvidence",
+      "audit:outcome",
+    ],
+  );
+  assert.equal(auditOutcome.after_snapshot.outcome, "applied");
+  assert.equal(auditOutcome.after_snapshot.authority, "held");
   assert.deepEqual(
     [
       audit.actor_type,
@@ -388,6 +406,9 @@ test("M4-S5. an unavailable source is an audit event only, never evidence or ver
     s.world.audit_events.at(-1).action_code,
     "verification_source_unavailable",
   );
+  // A failed link stops the remaining writes: the observed status is never
+  // set without linked evidence, and the outcome row says only part of the
+  // change persisted.
   s.world.failures.add("prov.linkEvidence");
   assert.deepEqual(
     await recordVerificationFinding(
@@ -398,14 +419,21 @@ test("M4-S5. an unavailable source is an audit event only, never evidence or ver
     ),
     { status: "unconfirmed" },
   );
-  // The status never changes without linked evidence.
   assert.equal(s.licenseA.reported_status, null);
+  assert.equal(
+    auditPair(s.world, "verification_evidence_recorded").outcome.after_snapshot
+      .outcome,
+    "partially_applied",
+  );
   s.world.failures.clear();
+  // Write-ahead audit: without a recorded attempt nothing is written.
+  const evidenceBefore = s.world.verification_evidence.length;
   s.world.failures.add("prov.audit");
   assert.deepEqual(
     await recordVerificationFinding(sources, finding("license", s.licenseA.id)),
-    { status: "unconfirmed" },
+    { status: "unavailable" },
   );
+  assert.equal(s.world.verification_evidence.length, evidenceBefore);
 });
 
 test("M4-S6. discipline findings and practice-area decisions are scoped, guarded, and audited", async () => {
@@ -474,10 +502,9 @@ test("M4-S6. discipline findings and practice-area decisions are scoped, guarded
     [s.request.status, s.request.effective_from],
     ["authorised", "2026-11-04T00:00:00.000Z"],
   );
-  assert.equal(
-    s.world.audit_events.at(-1).after_snapshot.note,
-    "Synthetic basis",
-  );
+  const decided = auditPair(s.world, "practice_area_authorisation_decided");
+  assert.equal(decided.attempt.after_snapshot.note, "Synthetic basis");
+  assert.equal(decided.outcome.after_snapshot.outcome, "applied");
   // A decided request is never decided again.
   assert.deepEqual(
     await decidePracticeArea(
@@ -527,17 +554,13 @@ test("M4-S7. profile transitions: only the three supported transitions, from the
     { status: "recorded" },
   );
   assert.equal(profile.profile_state, "applicant");
-  const request = s.world.audit_events.at(-1);
-  assert.deepEqual(
-    [request.action_code, request.after_snapshot],
-    [
-      "attorney_information_requested",
-      {
-        profile_state: "applicant",
-        message_to_applicant: "Please add your synthetic insurance.",
-      },
-    ],
-  );
+  const request = auditPair(s.world, "attorney_information_requested");
+  assert.deepEqual(request.attempt.after_snapshot, {
+    profile_state: "applicant",
+    message_to_applicant: "Please add your synthetic insurance.",
+    audit_phase: "attempt",
+  });
+  assert.equal(request.outcome.after_snapshot.outcome, "applied");
   profile.profile_state = "under_review";
   assert.deepEqual(
     await changeProfileStage(
@@ -627,10 +650,9 @@ test("M4-S8. viewing computes assessments without persisting; an explicit determ
     t1.policy_references[0].policy_type_code,
     "attorney_eligibility",
   );
-  assert.equal(
-    s.world.audit_events.at(-1).action_code,
-    "eligibility_evaluation_recorded",
-  );
+  const recorded = auditPair(s.world, "eligibility_evaluation_recorded");
+  assert.equal(recorded.attempt.resource_id, t1.id);
+  assert.equal(recorded.outcome.after_snapshot.outcome, "applied");
   // Adverse fact, then T2.
   s.world.now += DAY;
   assert.deepEqual(

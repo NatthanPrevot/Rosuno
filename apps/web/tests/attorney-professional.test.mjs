@@ -29,6 +29,7 @@ import {
   addPracticeArea,
   attorneySources,
   createWorld,
+  auditPair,
   form,
   idOf,
   UNREADABLE,
@@ -239,7 +240,24 @@ test("M4-A3. license claims: added and revised only as claims, never with an obs
       .profile_state,
     "applicant",
   );
-  const audit = s.world.audit_events.at(-1);
+  // The attempt row was appended before the insert and names the exact
+  // record; its outcome row confirms the insert was applied.
+  const { attempt: audit, outcome } = auditPair(
+    s.world,
+    "attorney_claim_recorded",
+  );
+  assert.ok(
+    s.world.audit_events.indexOf(audit) < s.world.audit_events.indexOf(outcome),
+  );
+  assert.deepEqual(
+    [
+      outcome.after_snapshot.outcome,
+      outcome.after_snapshot.authority,
+      outcome.resource_id,
+      outcome.actor_user_id,
+    ],
+    ["applied", "held", row.id, s.me.userId],
+  );
   assert.deepEqual(
     [
       audit.actor_user_id,
@@ -265,14 +283,10 @@ test("M4-A3. license claims: added and revised only as claims, never with an obs
   );
   assert.deepEqual(revised, { status: "saved" });
   assert.deepEqual([row.jurisdiction_id, row.license_number], [s.b, "SYN-101"]);
-  assert.equal(
-    s.world.audit_events.at(-1).action_code,
-    "attorney_claim_revised",
-  );
-  assert.equal(
-    s.world.audit_events.at(-1).before_snapshot.license_number,
-    "SYN-100",
-  );
+  const revision = auditPair(s.world, "attorney_claim_revised");
+  assert.equal(revision.attempt.before_snapshot.license_number, "SYN-100");
+  assert.equal(revision.attempt.after_snapshot.license_number, "SYN-101");
+  assert.equal(revision.outcome.after_snapshot.outcome, "applied");
   // Validation: bad jurisdiction, empty number, impossible or inverted dates.
   const invalid = await saveLicenseClaim(
     sources,
@@ -558,10 +572,12 @@ test("M4-A7. submission asks for review only: it needs a license claim and the e
       .profile_state,
     "under_review",
   );
-  assert.equal(
-    s.world.audit_events.at(-1).action_code,
-    "attorney_application_submitted",
-  );
+  const submitted = auditPair(s.world, "attorney_application_submitted");
+  assert.deepEqual(submitted.attempt.after_snapshot, {
+    profile_state: "under_review",
+    audit_phase: "attempt",
+  });
+  assert.equal(submitted.outcome.after_snapshot.outcome, "applied");
   // A second submission changes nothing.
   assert.deepEqual(await submitApplicationForReview(sources, form(intent)), {
     status: "locked",
@@ -578,11 +594,16 @@ test("M4-A8. failure semantics: unreadable reads, failed writes, and a missing a
   const s = setup();
   addLicense(s.world, s.me.attorneyId, s.a);
   const sources = attorneySources(s.world, s.me.authId);
+  // Write-ahead audit: when the attempt row cannot be appended, nothing is
+  // written at all, so no change can persist without its audit evidence.
+  const licensesBefore = s.world.licenses.length;
   s.world.failures.add("prov.audit");
   assert.deepEqual(
     await saveLicenseClaim(sources, LICENSE(s.b, { license_number: "SYN-A8" })),
-    { status: "unconfirmed" },
+    { status: "unavailable" },
   );
+  assert.equal(s.world.licenses.length, licensesBefore);
+  assert.equal(s.world.audit_events.length, 0);
   s.world.failures.clear();
   s.world.failures.add("prov.insertLicense");
   assert.deepEqual(
