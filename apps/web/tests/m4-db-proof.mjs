@@ -941,6 +941,154 @@ function probes() {
       );
     },
   );
+
+  check(
+    "SEC-1 no existing database object can enforce staff authorization or audit coupling at the privileged write: only read-only definer predicates, only SELECT policies, no ordinary write grants, and a row-security-bypassing service role",
+    () => {
+      const definers = sql(
+        "select coalesce(string_agg(p.proname || ':' || p.provolatile::text, ',' order by p.proname), '') from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prosecdef;",
+      );
+      assert.equal(
+        definers,
+        "has_manage_attorney_verification_scope:s,has_resource_metadata_access:s",
+      );
+      assert.equal(
+        sql(
+          "select count(*) from pg_policies where schemaname = 'public' and cmd <> 'SELECT';",
+        ),
+        "0",
+      );
+      const m4 =
+        "'attorney_profiles','licenses','insurance_records','discipline_records','practice_area_authorisations','verification_evidence','verification_evidence_subjects','eligibility_evaluations','audit_events'";
+      assert.equal(
+        sql(
+          `select count(*) from information_schema.role_table_grants where table_schema = 'public' and table_name in (${m4}) and grantee in ('authenticated', 'anon') and privilege_type <> 'SELECT';`,
+        ),
+        "0",
+      );
+      assert.equal(
+        sql(
+          `select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in (${m4}) and not t.tgisinternal and t.tgname not like '%set_updated_at' and t.tgname <> 'audit_events_immutable';`,
+        ),
+        "0",
+      );
+      assert.equal(
+        sql(
+          "select rolbypassrls from pg_roles where rolname = 'service_role';",
+        ),
+        "t",
+      );
+      return {
+        security_definer_functions: definers.split(","),
+        write_policies: 0,
+      };
+    },
+  );
+
+  check(
+    "SEC-2 the final check-to-write window is open at the database: after a grant is revoked, the service role's guarded writes still succeed, because nothing in the write path consults the grant",
+    () => {
+      sql(
+        `update public.capability_grants set revoked_at = now() where user_id = '${USER.staffA}';`,
+      );
+      const predicate = SCOPE(AUTH.staffA, J_A);
+      const written = sql(
+        `set role service_role; with e as (insert into public.verification_evidence (jurisdiction_id, retrieved_at, retrieved_by_user_id, evidence_summary) values ('${J_A}', now(), '${USER.staffA}', 'synthetic after revocation') returning 1) select count(*) from e;`,
+      );
+      assert.equal(predicate, "f");
+      assert.equal(written, "1");
+      return {
+        predicate_after_revocation: predicate,
+        service_role_write_rows: written,
+      };
+    },
+  );
+
+  check(
+    "SEC-3 the scope predicate ignores staff and account state: a deactivated Staff Profile and suspended User holding an unrevoked grant still pass it and still read evidence under the row policies",
+    () => {
+      sql(
+        `update public.staff_profiles set staff_state = 'deactivated' where user_id = '${USER.staffGlobal}';`,
+      );
+      sql(
+        `update public.users set account_state = 'suspended' where id = '${USER.staffGlobal}';`,
+      );
+      const predicate = SCOPE(AUTH.staffGlobal, J_A);
+      const evidence = COUNT(AUTH.staffGlobal, "verification_evidence");
+      const profiles = COUNT(AUTH.staffGlobal, "attorney_profiles");
+      assert.equal(predicate, "t");
+      assert.ok(evidence > 0 && profiles > 0);
+      return {
+        predicate: predicate,
+        evidence_rows_readable: evidence,
+        profile_rows_readable: profiles,
+      };
+    },
+  );
+
+  check(
+    "APP-4 server-generated ids and write-ahead attempt/outcome audit rows are accepted by the real schema, and a generated id cannot be inserted twice",
+    () => {
+      const licenseId = U(611);
+      sql(
+        `set role service_role; insert into public.licenses (id, attorney_id, jurisdiction_id, license_number) values ('${licenseId}', '${PROFILE_A}', '${J_B}', 'SYN-GEN-1');`,
+      );
+      assert.equal(
+        sql(`select count(*) from public.licenses where id = '${licenseId}';`),
+        "1",
+      );
+      assert.equal(
+        sqlstateOf(
+          as(
+            "service_role",
+            null,
+            `insert into public.licenses (id, attorney_id, jurisdiction_id, license_number) values ('${licenseId}', '${PROFILE_A}', '${J_B}', 'SYN-GEN-2');`,
+          ),
+        ),
+        "23505",
+      );
+      const append = (event) =>
+        sql(
+          `set role service_role; insert into public.audit_events select * from jsonb_populate_record(null::public.audit_events, $a$${JSON.stringify(event)}$a$::jsonb || jsonb_build_object('id', gen_random_uuid(), 'created_at', now())) returning id;`,
+        );
+      const attemptId = append(
+        auditEventOf({
+          actorUserId: USER.staffA,
+          actorType: "staff",
+          action: "attorney_profile_state_changed",
+          resourceType: "attorney_profile",
+          resourceId: PROFILE_B,
+          before: { profile_state: "under_review" },
+          after: { profile_state: "approved", audit_phase: "attempt" },
+          occurredAtMs: Date.now(),
+        }),
+      );
+      const outcomeId = append(
+        auditEventOf({
+          actorUserId: USER.staffA,
+          actorType: "staff",
+          action: "audited_change_outcome",
+          resourceType: "attorney_profile",
+          resourceId: PROFILE_B,
+          after: {
+            audit_phase: "outcome",
+            attempt_event_id: attemptId,
+            outcome: "applied",
+            authority: "held",
+            authority_checked: "at_completion",
+          },
+          occurredAtMs: Date.now(),
+        }),
+      );
+      assert.equal(
+        sql(
+          `select after_snapshot->>'attempt_event_id' from public.audit_events where id = '${outcomeId}';`,
+        ),
+        attemptId,
+      );
+      return { attempt: attemptId, outcome: outcomeId };
+    },
+  );
 }
 
 function main() {
