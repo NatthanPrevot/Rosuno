@@ -64,6 +64,19 @@ jobs:
           git fetch --no-tags https://github.com/"$REPO".git "+refs/heads/${HEAD_REF}:refs/rosuno/approved" \
             || { echo "::error::owner repository has no branch $HEAD_REF (Packet not published by the owner)"; exit 1; }
           git cat-file -e "$BASE_SHA^{commit}"
+          # P2-914: only the exact P3-904 combined-history PR needs the
+          # immutable, separately owner-approved P3-003 Packet as data.
+          if [ "$HEAD_REF" = 'wi/P3-904-p3-003-security-correction' ]; then
+            git fetch --no-tags https://github.com/"$REPO".git \
+              '+refs/heads/wi/P3-003-attorney-trust-professional-setup:refs/rosuno/p3-003-approved' \
+              || { echo '::error::P3-003 owner approval branch unavailable'; exit 1; }
+            test "$(git rev-parse refs/rosuno/p3-003-approved)" = \
+              'ae9c644967c702972f8c14a964d78e4bb4c2a83b' \
+              || { echo '::error::P3-003 owner approval commit changed'; exit 1; }
+            test "$(git rev-parse refs/rosuno/p3-003-approved:docs/work-items/P3-003/PACKET.md)" = \
+              'c394078a7440d5e48bce81c33d7a581d951d1c74' \
+              || { echo '::error::P3-003 approved Packet blob changed'; exit 1; }
+          fi
       - name: rosuno-guard (script from the default branch; both head sources)
         id: guard
         if: steps.trust.outputs.MODE == 'builder' || steps.trust.outputs.MODE == 'owner'
