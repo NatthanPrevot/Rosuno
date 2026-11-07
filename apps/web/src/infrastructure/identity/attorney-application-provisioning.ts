@@ -6,14 +6,19 @@
 // account's User and the User's Attorney Profile through the same kind of
 // client, under the database's own-row policies, keyed only by the verified
 // account id and the User row it names; neither holds a privileged credential
-// or writes anything. The applicant provisioning port is the shared,
-// server-only provisioning boundary's narrow attorney-applicant port, which
-// alone reads the privileged credential, verifies the project binding, and
-// builds its cookie-free client; this module never sees a credential or a
-// privileged client, and only bounds each of that port's calls in time. Every
-// call answers within its deadline, and anything that fails, throws, or is
-// too slow is reported as unreadable, with no provider detail. Nothing is
-// cached or shared between requests, and nothing the browser sends is read.
+// or writes anything. The applicant provisioning port joins two parts. Its
+// reads are the shared, server-only provisioning boundary's narrow
+// attorney-applicant reads, which alone read the privileged credential,
+// verify the project binding, and build their cookie-free client. Its one
+// write is the database's own attorney_start_application function, called
+// through the request-scoped client, so the database itself derives the User
+// from the request's own authenticated session and creates at most that
+// User's one applicant profile (P3-904); the privileged credential cannot
+// create or change an Attorney Profile. This module never sees a credential
+// or a privileged client, and only bounds each call in time. Every call
+// answers within its deadline, and anything that fails, throws, or is too
+// slow is reported as unreadable, with no provider detail. Nothing is cached
+// or shared between requests, and nothing the browser sends is read.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -33,9 +38,15 @@ type RequestReadClient = Pick<SupabaseClient, "auth" | "from">;
 
 type RequestClientSource = () => Promise<RequestReadClient | null>;
 
+type RequestRpcClient = Pick<SupabaseClient, "rpc">;
+
+type RequestRpcClientSource = () => Promise<RequestRpcClient | null>;
+
+type ApplicantReadsSource = () => Promise<AttorneyApplicationRecords | null>;
+
 type ProvisioningSource = () => Promise<AttorneyApplicantProvisioning | null>;
 
-async function createDefaultRequestClient(): Promise<RequestReadClient | null> {
+async function createDefaultRequestClient(): Promise<SupabaseClient | null> {
   const { createSupabaseServerClient } = await import("./supabase-server.ts");
 
   return createSupabaseServerClient();
@@ -170,11 +181,17 @@ export function createAttorneyApplicationRecordSource(
   };
 }
 
-// The shared boundary's applicant provisioning port, each call bounded in
-// time, or null when that boundary reports no verified binding.
+// The applicant provisioning port, each call bounded in time, or null when
+// the shared boundary reports no verified binding. Reads come from the shared
+// boundary. The one insert is the database's attorney_start_application
+// function through the request's own client: it sends no User id (the
+// database derives the User from the session), so the userId the caller
+// passes is not sent; the caller compares it with the row the function
+// reports and decides only from a fresh read afterwards.
 export function createBoundedApplicantProvisioning(
-  shared: ProvisioningSource = () => createAttorneyApplicantProvisioning(),
+  shared: ApplicantReadsSource = () => createAttorneyApplicantProvisioning(),
   deadlineMs: number = CALL_DEADLINE_MS,
+  clientSource: RequestRpcClientSource = createDefaultRequestClient,
 ): ProvisioningSource {
   checkDeadline(deadlineMs);
   return async () => {
@@ -188,8 +205,13 @@ export function createBoundedApplicantProvisioning(
       usersOf: (accountId) => bounded(() => port.usersOf(accountId)),
       attorneyProfilesOf: (userId) =>
         bounded(() => port.attorneyProfilesOf(userId)),
-      insertApplicantProfile: (userId) =>
-        bounded(() => port.insertApplicantProfile(userId)),
+      insertApplicantProfile: () =>
+        bounded(async () => {
+          const client = await clientSource();
+          return client === null
+            ? UNREADABLE_ROWS
+            : rowsResultOf(await client.rpc("attorney_start_application"));
+        }),
     } satisfies AttorneyApplicantProvisioning);
   };
 }

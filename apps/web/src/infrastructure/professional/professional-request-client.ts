@@ -1,14 +1,19 @@
 // Request-scoped building blocks for the professional adapters (P3-003).
 //
 // The request's own, unprivileged server client (cookie session, publishable
-// key) and two bounds used by the attorney and staff adapters: a fresh read
-// of the request's own Auth user, and a time limit on every port call. No
-// privileged credential or client is seen here, nothing is cached between
-// requests, and nothing the browser sends is read beyond the session cookie
-// the server client itself uses.
+// key) and the bounds used by the attorney and staff adapters: a fresh read
+// of the request's own Auth user, a time limit on every port call, and the
+// strict reading of one write function's answer (P3-904). No privileged
+// credential or client is seen here, nothing is cached between requests, and
+// nothing the browser sends is read beyond the session cookie the server
+// client itself uses.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  WRITE_OUTCOMES,
+  type WriteAnswer,
+} from "../../application/professional-audit.ts";
 import {
   UNREADABLE_ROWS,
   withinDeadline,
@@ -16,9 +21,70 @@ import {
   type AccountSource,
 } from "../../application/professional-identity.ts";
 
-// The request's own server client. The staff adapter alone makes the one
-// read-only predicate call through it; the attorney adapter only reads.
+// The request's own server client. Reads go through it under the row
+// policies; the staff adapter makes the read-only scope predicate call
+// through it; and every professional write is one write function called
+// through it, so the database sees the request's own authenticated session.
 export type RequestClient = SupabaseClient;
+
+const REJECTED: WriteAnswer = Object.freeze({ kind: "rejected" });
+const UNREADABLE_WRITE: WriteAnswer = Object.freeze({ kind: "unreadable" });
+
+// A PostgreSQL error code (SQLSTATE): five digits or capital letters.
+const SQLSTATE = /^[0-9A-Z]{5}$/;
+
+function ownField(value: unknown, key: string): unknown {
+  if (value === null || typeof value !== "object") {
+    return undefined;
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return descriptor !== undefined && "value" in descriptor
+    ? descriptor.value
+    : undefined;
+}
+
+// One write function's answer as the API reported it. A success carrying one
+// of the fixed outcomes is that outcome. An HTTP error response carrying a
+// database error code means the database raised the error inside the call's
+// own transaction, which therefore rolled back: "rejected", nothing
+// committed. Connection-class errors (08) and operator interventions (57P)
+// are excluded, since they can end a session around its commit. Anything
+// else (a transport failure, a gateway error without a database code, a
+// malformed body) leaves the outcome unknown.
+export function writeAnswerOf(result: unknown): WriteAnswer {
+  const error = ownField(result, "error");
+  if (error === null) {
+    const data = ownField(result, "data");
+    const outcome = WRITE_OUTCOMES.find((entry) => entry === data);
+    return outcome === undefined
+      ? UNREADABLE_WRITE
+      : Object.freeze({ kind: "outcome", outcome });
+  }
+  const code = ownField(error, "code");
+  const status = ownField(result, "status");
+  return typeof code === "string" &&
+    SQLSTATE.test(code) &&
+    !code.startsWith("08") &&
+    !code.startsWith("57P") &&
+    typeof status === "number" &&
+    status >= 400 &&
+    status <= 599
+    ? REJECTED
+    : UNREADABLE_WRITE;
+}
+
+// A refusal made before anything was sent: nothing can have committed.
+export const NOT_SENT: WriteAnswer = REJECTED;
+
+// Calls one named write function with exactly the given named arguments
+// through the request's own client and reads its answer strictly.
+export async function callWrite(
+  client: Pick<RequestClient, "rpc">,
+  name: string,
+  args: Readonly<Record<string, unknown>>,
+): Promise<WriteAnswer> {
+  return writeAnswerOf(await client.rpc(name, args));
+}
 
 export type RequestClientSource = () => Promise<RequestClient | null>;
 

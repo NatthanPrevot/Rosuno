@@ -1,15 +1,19 @@
-// Server-only attorney professional setup adapter (P3-003).
+// Server-only attorney professional setup adapter (P3-003, P3-904).
 //
 // Builds the attorney professional setup ports for one request. Reads of the
 // attorney's own User, profile, claims, and requests go through the
 // request-scoped, unprivileged server client under the database's own-row
 // policies, keyed only by the verified account, User, and profile ids the
-// application boundary derives. The privileged port is the shared,
-// server-only provisioning boundary's narrow professional port, which alone
-// reads the privileged credential and verifies the project binding; this
-// module never sees a credential or a privileged client, and only bounds
-// each call in time. Every call answers within its deadline; anything that
-// fails, throws, or is too slow is reported as unreadable.
+// application boundary derives. Every change is one attorney write function
+// called through that same request-scoped client, so the database decides
+// the actor from the request's own authenticated session and writes the
+// change and its audit event in one transaction; no write sends an actor,
+// User, or profile id. The privileged port is the shared, server-only
+// provisioning boundary's narrow professional port, now reads only, which
+// alone reads the privileged credential and verifies the project binding;
+// this module never sees a credential or a privileged client, and only
+// bounds each call in time. Every call answers within its deadline; anything
+// that fails, throws, or is too slow is reported as unreadable.
 
 import { randomUUID } from "node:crypto";
 
@@ -17,6 +21,7 @@ import type {
   AttorneyProfessionalProvisioning,
   AttorneyProfessionalReads,
   AttorneyProfessionalSources,
+  AttorneyProfessionalWrites,
 } from "../../application/attorney-professional.ts";
 import {
   rowsResultOf,
@@ -36,6 +41,7 @@ import {
   boundedPort,
   boundedSource,
   CALL_DEADLINE_MS,
+  callWrite,
   checkDeadline,
   createDefaultRequestClient,
   createRequestAccountSource,
@@ -117,6 +123,81 @@ export function createBoundedProfessionalProvisioning(
   return boundedSource(shared, deadlineMs);
 }
 
+// The attorney write port over one request-scoped client: each call is one
+// fixed write function with exactly its named arguments. A call that fails,
+// throws, or is too slow is unreadable (outcome unknown).
+export function createAttorneyProfessionalWrites(
+  clientSource: RequestClientSource = createDefaultRequestClient,
+  deadlineMs: number = CALL_DEADLINE_MS,
+): () => Promise<AttorneyProfessionalWrites | null> {
+  checkDeadline(deadlineMs);
+  return async () => {
+    const client = await withinDeadline(clientSource, null, deadlineMs);
+    if (client === null) {
+      return null;
+    }
+    return boundedPort(
+      {
+        saveProfileDetails: (expectedStage, details) =>
+          callWrite(client, "attorney_save_profile_details", {
+            p_expected_state: expectedStage,
+            p_display_name: details.display_name,
+            p_headline: details.headline,
+            p_bio: details.bio,
+            p_years_experience: details.years_experience,
+          }),
+        saveLicense: (licenseId, expectedUpdatedAt, claim) =>
+          callWrite(client, "attorney_save_license_claim", {
+            p_license_id: licenseId,
+            p_expected_updated_at: expectedUpdatedAt,
+            p_jurisdiction_id: claim.jurisdiction_id,
+            p_license_number: claim.license_number,
+            p_license_type: claim.license_type,
+            p_effective_from: claim.effective_from,
+            p_effective_until: claim.effective_until,
+          }),
+        saveInsurance: (recordId, expectedUpdatedAt, claim) =>
+          callWrite(client, "attorney_save_insurance_claim", {
+            p_record_id: recordId,
+            p_expected_updated_at: expectedUpdatedAt,
+            p_jurisdiction_id: claim.jurisdiction_id,
+            p_carrier_name: claim.carrier_name,
+            p_policy_reference: claim.policy_reference,
+            p_coverage_type: claim.coverage_type,
+            p_per_occurrence_limit_minor: claim.per_occurrence_limit_minor,
+            p_aggregate_limit_minor: claim.aggregate_limit_minor,
+            p_currency_code: claim.currency_code,
+            p_coverage_from: claim.coverage_from,
+            p_coverage_until: claim.coverage_until,
+          }),
+        requestPracticeArea: (
+          authorisationId,
+          jurisdictionId,
+          practiceAreaId,
+        ) =>
+          callWrite(client, "attorney_request_practice_area", {
+            p_authorisation_id: authorisationId,
+            p_jurisdiction_id: jurisdictionId,
+            p_practice_area_id: practiceAreaId,
+          }),
+        changePracticeAreaRequest: (
+          authorisationId,
+          intent,
+          expectedUpdatedAt,
+        ) =>
+          callWrite(client, "attorney_change_practice_area_request", {
+            p_authorisation_id: authorisationId,
+            p_intent: intent,
+            p_expected_updated_at: expectedUpdatedAt,
+          }),
+        submitApplication: () =>
+          callWrite(client, "attorney_submit_application", {}),
+      } satisfies AttorneyProfessionalWrites,
+      deadlineMs,
+    );
+  };
+}
+
 // The trusted wiring for one request of the attorney professional setup.
 export const ATTORNEY_PROFESSIONAL_SOURCES: AttorneyProfessionalSources =
   Object.freeze({
@@ -124,6 +205,7 @@ export const ATTORNEY_PROFESSIONAL_SOURCES: AttorneyProfessionalSources =
     account: createRequestAccountSource(),
     reads: createAttorneyProfessionalReads(),
     provisioning: createBoundedProfessionalProvisioning(),
+    writes: createAttorneyProfessionalWrites(),
     clock: () => Date.now(),
     newId: () => randomUUID(),
   });

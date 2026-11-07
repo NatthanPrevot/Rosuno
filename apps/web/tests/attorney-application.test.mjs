@@ -1377,11 +1377,9 @@ test("12. the attorney-applicant port is built only for a verified project bindi
       factory.create,
     );
     assert.ok(Object.isFrozen(port));
-    assert.deepEqual(Object.keys(port), [
-      "usersOf",
-      "attorneyProfilesOf",
-      "insertApplicantProfile",
-    ]);
+    // P3-904: the privileged port only reads; creation is the database's
+    // own function, called through the request's own session.
+    assert.deepEqual(Object.keys(port), ["usersOf", "attorneyProfilesOf"]);
     assert.deepEqual(factory.made, [
       [
         PROJECT_URL,
@@ -1462,6 +1460,34 @@ function syntheticApi({
           })
         : json(401, { code: 401, msg: "invalid" });
     }
+    if (route === "POST /rest/v1/rpc/attorney_start_application") {
+      // The P3-904 function: executable by the authenticated role only, it
+      // takes no arguments, derives the User from the session's own subject,
+      // and creates at most that active User's one applicant profile.
+      if (!own) {
+        return json(own === false && privileged ? 403 : 401, {
+          code: "42501",
+          message: "permission denied",
+        });
+      }
+      assert.equal(body, "{}");
+      const user = db.users.find(
+        (row) => row.auth_user_id === SUBJECT && row.account_state === "active",
+      );
+      if (
+        user === undefined ||
+        db.attorney_profiles.some((row) => row.user_id === user.id)
+      ) {
+        return json(200, []);
+      }
+      const row = {
+        id: db.nextId(),
+        user_id: user.id,
+        profile_state: "applicant",
+      };
+      db.attorney_profiles.push(row);
+      return json(200, [row]);
+    }
     const table = url.pathname.replace(/^\/rest\/v1\//, "");
     if (!["users", "attorney_profiles"].includes(table)) {
       return json(404, { message: "not found" });
@@ -1495,8 +1521,8 @@ function syntheticApi({
       );
     }
     if (request.method === "POST" && table === "attorney_profiles") {
-      // Only the privileged key may insert, as the grants say.
-      if (!privileged) {
+      // P3-904: no API role may insert directly any more, as the grants say.
+      if (privileged || own) {
         return json(403, { code: "42501", message: "permission denied" });
       }
       const values = JSON.parse(body);
@@ -1574,7 +1600,7 @@ function sentOf(requests) {
   ]);
 }
 
-test("13. through the installed client, the port sends only exact-key reads and one applicant-state insert with the privileged key and no cookie", async () => {
+test("13. through the installed clients, the privileged port sends only exact-key reads with the privileged key and no cookie, and the one creation is the database function called with the request's own session and no arguments", async () => {
   const api = syntheticApi();
   const port = await createAttorneyApplicantProvisioning(
     boundEnvironment(),
@@ -1582,16 +1608,6 @@ test("13. through the installed client, the port sends only exact-key reads and 
   );
   assert.deepEqual(await port.usersOf(SUBJECT), rowsResult([activeUser()]));
   assert.deepEqual(await port.attorneyProfilesOf(USER_ID), rowsResult([]));
-  const inserted = await port.insertApplicantProfile(USER_ID);
-  assert.equal(inserted.kind, "rows");
-  assert.equal(inserted.rows.length, 1);
-  assert.deepEqual(Object.keys(inserted.rows[0]), [
-    "id",
-    "user_id",
-    "profile_state",
-  ]);
-  assert.equal(inserted.rows[0].user_id, USER_ID);
-  assert.equal(inserted.rows[0].profile_state, "applicant");
   assert.deepEqual(sentOf(api.requests), [
     [
       "GET",
@@ -1613,42 +1629,94 @@ test("13. through the installed client, the port sends only exact-key reads and 
       },
       null,
     ],
-    [
-      "POST",
-      "/rest/v1/attorney_profiles",
-      { select: "id,user_id,profile_state" },
-      { user_id: USER_ID, profile_state: "applicant" },
-    ],
   ]);
   for (const { headers, url } of api.requests) {
     assert.equal(url.origin, PROJECT_URL);
     assert.equal(headers.get("authorization"), `Bearer ${ADMIN}`);
     assert.equal(headers.get("cookie"), null);
   }
-  // A duplicate, a missing User, or any failure is unreadable, never rows.
-  assert.deepEqual(await port.insertApplicantProfile(USER_ID), UNREADABLE);
+  assert.equal("insertApplicantProfile" in port, false);
+  api.requests.length = 0;
+  // The bounded port's one creation: the database function, through the
+  // request's own client, with the session's own token and no User id.
+  const bounded = await createBoundedApplicantProvisioning(
+    () =>
+      createAttorneyApplicantProvisioning(boundEnvironment(), factoryOver(api)),
+    undefined,
+    async () => requestClient(api),
+  )();
+  const inserted = await bounded.insertApplicantProfile(USER_ID);
+  assert.equal(inserted.kind, "rows");
+  assert.equal(inserted.rows.length, 1);
+  assert.deepEqual(Object.keys(inserted.rows[0]), [
+    "id",
+    "user_id",
+    "profile_state",
+  ]);
+  assert.equal(inserted.rows[0].user_id, USER_ID);
+  assert.equal(inserted.rows[0].profile_state, "applicant");
+  const sent = api.requests.filter(({ url }) =>
+    url.pathname.startsWith("/rest"),
+  );
+  assert.deepEqual(sentOf(sent), [
+    ["POST", "/rest/v1/rpc/attorney_start_application", {}, {}],
+  ]);
+  assert.equal(sent[0].headers.get("authorization"), `Bearer ${api.jwt}`);
+  assert.equal(sent[0].headers.get("apikey"), PUBLISHABLE);
+  assert.equal(JSON.stringify(sentOf(sent)).includes(USER_ID), false);
+  // A repeated creation creates nothing: no row comes back.
   assert.deepEqual(
-    await port.insertApplicantProfile(OTHER_USER_ID),
-    UNREADABLE,
+    await bounded.insertApplicantProfile(USER_ID),
+    rowsResult([]),
   );
-  const failing = syntheticApi({
-    failing: [
-      "GET /rest/v1/users",
-      "GET /rest/v1/attorney_profiles",
-      "POST /rest/v1/attorney_profiles",
-    ],
+  assert.equal(api.db.attorney_profiles.length, 1);
+  // A direct insert is refused for every key now.
+  const admin = createClient(PROJECT_URL, ADMIN, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+    global: { fetch: api.fetch },
   });
-  const failingPort = await createAttorneyApplicantProvisioning(
-    boundEnvironment(),
-    factoryOver(failing),
-  );
-  assert.deepEqual(await failingPort.usersOf(SUBJECT), UNREADABLE);
-  assert.deepEqual(await failingPort.attorneyProfilesOf(USER_ID), UNREADABLE);
+  const direct = await admin
+    .from("attorney_profiles")
+    .insert({ user_id: USER_ID, profile_state: "approved" })
+    .select("id");
+  assert.equal(direct.error?.code, "42501");
+  // A failing or anonymous call is unreadable and creates nothing.
+  const failing = syntheticApi({
+    failing: ["POST /rest/v1/rpc/attorney_start_application"],
+  });
+  const failingPort = await createBoundedApplicantProvisioning(
+    () =>
+      createAttorneyApplicantProvisioning(
+        boundEnvironment(),
+        factoryOver(failing),
+      ),
+    undefined,
+    async () => requestClient(failing),
+  )();
   assert.deepEqual(
     await failingPort.insertApplicantProfile(USER_ID),
     UNREADABLE,
   );
+  const anonymous = syntheticApi();
+  const anonymousPort = await createBoundedApplicantProvisioning(
+    () =>
+      createAttorneyApplicantProvisioning(
+        boundEnvironment(),
+        factoryOver(anonymous),
+      ),
+    undefined,
+    async () => requestClient(anonymous, { signedIn: false }),
+  )();
+  assert.deepEqual(
+    await anonymousPort.insertApplicantProfile(USER_ID),
+    UNREADABLE,
+  );
   assert.equal(failing.db.attorney_profiles.length, 0);
+  assert.equal(anonymous.db.attorney_profiles.length, 0);
 });
 
 test("14. end to end through the installed clients: the trusted session, a fresh Auth read, and the shared port create one profile, and concurrent starts keep one", async () => {
@@ -1658,8 +1726,14 @@ test("14. end to end through the installed clients: the trusted session, a fresh
     account: createAttorneyApplicationAccountSource(async () =>
       requestClient(api),
     ),
-    provisioning: createBoundedApplicantProvisioning(() =>
-      createAttorneyApplicantProvisioning(boundEnvironment(), factoryOver(api)),
+    provisioning: createBoundedApplicantProvisioning(
+      () =>
+        createAttorneyApplicantProvisioning(
+          boundEnvironment(),
+          factoryOver(api),
+        ),
+      undefined,
+      async () => requestClient(api),
     ),
   });
   const entrySources = () => ({
@@ -1697,26 +1771,24 @@ test("14. end to end through the installed clients: the trusted session, a fresh
     "on-record",
     "on-record",
   ]);
-  // The Auth read used the request's own session; every database call used
-  // the privileged key with no cookie; only the insert wrote.
+  // The Auth read and the one creation call used the request's own session
+  // and publishable key; every read used the privileged key with no cookie;
+  // only the database function wrote, and it was sent no User id.
   for (const { method, url, headers, body } of api.requests) {
-    if (url.pathname === "/auth/v1/user") {
+    if (
+      url.pathname === "/auth/v1/user" ||
+      url.pathname === "/rest/v1/rpc/attorney_start_application"
+    ) {
       assert.equal(headers.get("authorization"), `Bearer ${api.jwt}`);
       assert.equal(headers.get("apikey"), PUBLISHABLE);
+      if (method !== "GET") {
+        assert.equal(body, "{}");
+      }
       continue;
     }
+    assert.equal(method, "GET");
     assert.equal(headers.get("authorization"), `Bearer ${ADMIN}`);
     assert.equal(headers.get("cookie"), null);
-    if (method !== "GET") {
-      assert.equal(
-        `${method} ${url.pathname}`,
-        "POST /rest/v1/attorney_profiles",
-      );
-      assert.deepEqual(JSON.parse(body), {
-        user_id: USER_ID,
-        profile_state: "applicant",
-      });
-    }
   }
   assertExactly(
     await resolveAttorneyApplicationEntry(entrySources()),
@@ -1744,11 +1816,14 @@ test("14. end to end through the installed clients: the trusted session, a fresh
         account: createAttorneyApplicationAccountSource(async () =>
           requestClient(anonymousApi, { signedIn: false }),
         ),
-        provisioning: createBoundedApplicantProvisioning(() =>
-          createAttorneyApplicantProvisioning(
-            boundEnvironment(),
-            factoryOver(anonymousApi),
-          ),
+        provisioning: createBoundedApplicantProvisioning(
+          () =>
+            createAttorneyApplicantProvisioning(
+              boundEnvironment(),
+              factoryOver(anonymousApi),
+            ),
+          undefined,
+          async () => requestClient(anonymousApi, { signedIn: false }),
         ),
       },
       startForm(),
@@ -1768,11 +1843,14 @@ test("14. end to end through the installed clients: the trusted session, a fresh
         account: createAttorneyApplicationAccountSource(async () =>
           requestClient(unconfirmed),
         ),
-        provisioning: createBoundedApplicantProvisioning(() =>
-          createAttorneyApplicantProvisioning(
-            boundEnvironment(),
-            factoryOver(unconfirmed),
-          ),
+        provisioning: createBoundedApplicantProvisioning(
+          () =>
+            createAttorneyApplicantProvisioning(
+              boundEnvironment(),
+              factoryOver(unconfirmed),
+            ),
+          undefined,
+          async () => requestClient(unconfirmed),
         ),
       },
       startForm(),
@@ -1941,14 +2019,30 @@ test("16. the entry's record port reads only through the request-scoped client, 
   assert.equal(await ATTORNEY_APPLICATION_RECORDS(), null);
 });
 
-test("17. the bounded applicant port delegates every call to the shared boundary unchanged and turns failure or delay into unreadable", async () => {
+test("17. the bounded applicant port delegates reads to the shared boundary unchanged, creates only through the request client's database function, and turns failure or delay into unreadable", async () => {
   const db = memoryDatabase();
   const shared = memoryProvisioning(db);
   let built = 0;
-  const port = await createBoundedApplicantProvisioning(async () => {
-    built += 1;
-    return shared.port;
-  })();
+  const rpcCalls = [];
+  const rpcClient = {
+    rpc: async (...args) => {
+      rpcCalls.push(args);
+      return {
+        data: [
+          { id: PROFILE_ID, user_id: USER_ID, profile_state: "applicant" },
+        ],
+        error: null,
+      };
+    },
+  };
+  const port = await createBoundedApplicantProvisioning(
+    async () => {
+      built += 1;
+      return shared.port;
+    },
+    undefined,
+    async () => rpcClient,
+  )();
   assert.ok(Object.isFrozen(port));
   assert.deepEqual(Object.keys(port), [
     "usersOf",
@@ -1958,10 +2052,10 @@ test("17. the bounded applicant port delegates every call to the shared boundary
   assert.deepEqual(await port.usersOf(SUBJECT), rowsResult([activeUser()]));
   const inserted = await port.insertApplicantProfile(USER_ID);
   assert.equal(inserted.rows[0].user_id, USER_ID);
-  assert.deepEqual(shared.calls, [
-    ["usersOf", SUBJECT],
-    ["insertApplicantProfile", USER_ID],
-  ]);
+  // The shared privileged port was only read; the creation went to the
+  // database function with no arguments.
+  assert.deepEqual(shared.calls, [["usersOf", SUBJECT]]);
+  assert.deepEqual(rpcCalls, [["attorney_start_application"]]);
   assert.equal(built, 1);
   for (const source of [
     async () => null,
@@ -1979,23 +2073,33 @@ test("17. the bounded applicant port delegates every call to the shared boundary
     attorneyProfilesOf: async () => {
       throw new Error(DETAIL);
     },
-    insertApplicantProfile: async (_userId, real) => {
-      await delay(60);
-      return real();
-    },
   });
-  const bounded = await createBoundedApplicantProvisioning(
-    async () => slow.port,
-    25,
-  )();
-  const started = performance.now();
-  assert.deepEqual(await bounded.usersOf(SUBJECT), UNREADABLE);
-  assert.deepEqual(await bounded.attorneyProfilesOf(USER_ID), UNREADABLE);
-  // A late insert answer is ignored: its outcome is unknown here, and only
-  // the application's fresh read afterwards decides.
-  assert.deepEqual(await bounded.insertApplicantProfile(USER_ID), UNREADABLE);
-  assert.ok(performance.now() - started < 2000);
-  await delay(80);
+  for (const client of [
+    async () => ({ rpc: never }),
+    async () => null,
+    async () => ({
+      rpc: async () => {
+        throw new Error(DETAIL);
+      },
+    }),
+    async () => ({
+      rpc: async () => ({ data: null, error: { code: "42501" } }),
+    }),
+    never,
+  ]) {
+    const bounded = await createBoundedApplicantProvisioning(
+      async () => slow.port,
+      25,
+      client,
+    )();
+    const started = performance.now();
+    assert.deepEqual(await bounded.usersOf(SUBJECT), UNREADABLE);
+    assert.deepEqual(await bounded.attorneyProfilesOf(USER_ID), UNREADABLE);
+    // A late, failed, or refused creation answer is unreadable here, and only
+    // the application's fresh read afterwards decides.
+    assert.deepEqual(await bounded.insertApplicantProfile(USER_ID), UNREADABLE);
+    assert.ok(performance.now() - started < 2000);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -2081,7 +2185,7 @@ test("18. the application boundary is provider-neutral, holds no state, and deci
   );
 });
 
-test("19. the adapter holds no credential and builds no privileged client: it delegates to the shared boundary and reads only through the request client", () => {
+test("19. the adapter holds no credential and builds no privileged client: it delegates reads to the shared boundary, reads only through the request client, and creates only through the database function", () => {
   const file =
     "src/infrastructure/identity/attorney-application-provisioning.ts";
   const source = read(file);
@@ -2111,8 +2215,16 @@ test("19. the adapter holds no credential and builds no privileged client: it de
   assert.doesNotMatch(code, PRIVILEGED_NAMES);
   assert.doesNotMatch(
     code,
-    /createServerClient|\.insert\(|\.update\(|\.upsert\(|\.delete\(|\brpc\b|\.admin\b|\bconsole\b|cookies|headers|getSession|getClaims|user_metadata|app_metadata|\.email\b|searchParams|globalThis|localStorage|client_profiles/,
+    /createServerClient|\.insert\(|\.update\(|\.upsert\(|\.delete\(|\.admin\b|\bconsole\b|cookies|headers|getSession|getClaims|user_metadata|app_metadata|\.email\b|searchParams|globalThis|localStorage|client_profiles/,
   );
+  // P3-904: exactly one database function call, with no arguments, through
+  // the request-scoped client.
+  assert.deepEqual(
+    [...code.matchAll(/\.rpc\(([^)]*)\)/g)].map((match) => match[1]),
+    ['"attorney_start_application"'],
+  );
+  assert.equal(code.match(/\brpc\b/g).length, 2);
+  assert.match(code, /type RequestRpcClient = Pick<SupabaseClient, "rpc">;/);
   assert.equal(code.match(/createAttorneyApplicantProvisioning\(/g).length, 1);
   assert.deepEqual(
     [...code.matchAll(/\.from\("([a-z_]+)"\)/g)].map((match) => match[1]),
@@ -2140,7 +2252,7 @@ test("19. the adapter holds no credential and builds no privileged client: it de
   assert.equal(code.match(/\bexport\b/g).length, 7);
 });
 
-test("20. the shared boundary's attorney section is narrow: exact tables, columns, keys, and one applicant insert, with no generic executor", () => {
+test("20. the shared boundary's attorney section is narrow: exact tables, columns, and keys, reads only, with no insert and no generic executor", () => {
   const code = codeOf(
     read("src/infrastructure/identity/registration-provisioning.ts"),
   );
@@ -2158,21 +2270,16 @@ test("20. the shared boundary's attorney section is narrow: exact tables, column
   );
   assert.deepEqual(
     [...section.matchAll(/\.from\("([a-z_]+)"\)/g)].map((match) => match[1]),
-    ["users", "attorney_profiles", "attorney_profiles"],
+    ["users", "attorney_profiles"],
   );
   assert.deepEqual(
     [...section.matchAll(/\.eq\(([^)]*)\)/g)].map((match) => match[1]),
     ['"auth_user_id", accountId', '"user_id", userId'],
   );
   assert.equal(section.match(/\.limit\(2\)/g).length, 2);
-  assert.equal(section.match(/\.insert\(/g).length, 1);
-  assert.match(
-    section,
-    /\.insert\(\{ user_id: userId, profile_state: "applicant" \}\)/,
-  );
   assert.doesNotMatch(
     section,
-    /\.update\(|\.upsert\(|\.delete\(|\brpc\b|auth\.admin|\bthrow\b|process\.env|return admin|admin[,;)]|\.\.\./,
+    /\.insert\(|\.update\(|\.upsert\(|\.delete\(|\brpc\b|auth\.admin|\bthrow\b|process\.env|return admin|admin[,;)]|\.\.\./,
   );
   assert.match(
     code,
@@ -2188,8 +2295,8 @@ test("20. the shared boundary's attorney section is narrow: exact tables, column
   assert.ok(professionalStart > 0 && professionalEnd > professionalStart);
   const outside =
     code.slice(0, professionalStart) + code.slice(professionalEnd);
-  assert.equal(outside.match(/profile_state/g).length, 2);
-  assert.equal(outside.match(/attorney_profiles/g).length, 2);
+  assert.equal(outside.match(/profile_state/g).length, 1);
+  assert.equal(outside.match(/attorney_profiles/g).length, 1);
 });
 
 test("21. privileged credentials and modules never reach presentation: the page, action, and application code name none, and no client module imports infrastructure", () => {

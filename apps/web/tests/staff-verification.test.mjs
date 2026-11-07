@@ -32,7 +32,7 @@ import {
   addPolicy,
   addPracticeArea,
   addStaff,
-  auditPair,
+  auditsOf,
   createWorld,
   form,
   idOf,
@@ -272,9 +272,13 @@ test("M4-S3. staff never review their own attorney profile", async () => {
   );
 });
 
-test("M4-S4. a source-grounded finding writes immutable evidence linked to exactly one record before any observed status, attributed to the reviewer and audited", async () => {
+test("M4-S4. a source-grounded finding writes immutable evidence linked to exactly one record together with any observed status, attributed to the reviewer and audited in the same change", async () => {
   const s = setup();
   const sources = staffSources(s.world, s.scopedA.authId);
+  let sent = null;
+  s.world.hooks.set("writes.recordFinding", (write) => {
+    sent = write;
+  });
   const outcome = await recordVerificationFinding(
     sources,
     finding("license", s.licenseA.id, {
@@ -316,24 +320,23 @@ test("M4-S4. a source-grounded finding writes immutable evidence linked to exact
   assert.ok(
     Date.parse(evidence.created_at) <= Date.parse(s.licenseA.updated_at),
   );
-  // The attempt row preceded every write; the outcome row confirms them.
-  const { attempt: audit, outcome: auditOutcome } = auditPair(
-    s.world,
-    "verification_evidence_recorded",
-  );
-  assert.deepEqual(
-    s.world.calls.filter((call) =>
-      /^audit:|^prov\.(insertEvidence|linkEvidence)$/.test(call),
-    ),
-    [
-      "audit:attempt",
-      "prov.insertEvidence",
-      "prov.linkEvidence",
-      "audit:outcome",
-    ],
-  );
-  assert.equal(auditOutcome.after_snapshot.outcome, "applied");
-  assert.equal(auditOutcome.after_snapshot.authority, "held");
+  // One write call carried the evidence, the record and its version, and
+  // the observed status; no reviewer, User, account, or scope was sent.
+  assert.deepEqual(Object.keys(sent).sort(), [
+    "disciplineStatus",
+    "evidence",
+    "evidenceId",
+    "expectedUpdatedAt",
+    "observedStatus",
+    "resolvedAt",
+    "subjectId",
+    "subjectKind",
+  ]);
+  for (const identity of [s.scopedA.userId, s.scopedA.authId]) {
+    assert.equal(JSON.stringify(sent).includes(identity), false);
+  }
+  const [audit] = auditsOf(s.world, "verification_evidence_recorded");
+  assert.equal(s.world.audit_events.length, 1);
   assert.deepEqual(
     [
       audit.actor_type,
@@ -385,7 +388,7 @@ test("M4-S4. a source-grounded finding writes immutable evidence linked to exact
   );
 });
 
-test("M4-S5. an unavailable source is an audit event only, never evidence or verification; partial evidence writes are unconfirmed", async () => {
+test("M4-S5. an unavailable source is an audit event only, never evidence or verification; a finding is never left partial", async () => {
   const s = setup();
   const sources = staffSources(s.world, s.scopedA.authId);
   const before = s.world.verification_evidence.length;
@@ -406,10 +409,12 @@ test("M4-S5. an unavailable source is an audit event only, never evidence or ver
     s.world.audit_events.at(-1).action_code,
     "verification_source_unavailable",
   );
-  // A failed link stops the remaining writes: the observed status is never
-  // set without linked evidence, and the outcome row says only part of the
-  // change persisted.
-  s.world.failures.add("prov.linkEvidence");
+  // When the audit row cannot be written the database refuses the whole
+  // finding: no evidence, no link, no observed status, no audit row.
+  const evidenceBefore = s.world.verification_evidence.length;
+  const linksBefore = s.world.verification_evidence_subjects.length;
+  const auditBefore = s.world.audit_events.length;
+  s.world.failures.add("writes.audit");
   assert.deepEqual(
     await recordVerificationFinding(
       sources,
@@ -417,21 +422,28 @@ test("M4-S5. an unavailable source is an audit event only, never evidence or ver
         observed_status: "synthetic-active",
       }),
     ),
-    { status: "unconfirmed" },
+    { status: "not-saved" },
   );
+  assert.equal(s.world.verification_evidence.length, evidenceBefore);
+  assert.equal(s.world.verification_evidence_subjects.length, linksBefore);
+  assert.equal(s.world.audit_events.length, auditBefore);
   assert.equal(s.licenseA.reported_status, null);
-  assert.equal(
-    auditPair(s.world, "verification_evidence_recorded").outcome.after_snapshot
-      .outcome,
-    "partially_applied",
-  );
   s.world.failures.clear();
-  // Write-ahead audit: without a recorded attempt nothing is written.
-  const evidenceBefore = s.world.verification_evidence.length;
-  s.world.failures.add("prov.audit");
+  // An unknown answer is unconfirmed, never recorded.
+  s.world.failures.add("writes.recordFinding");
   assert.deepEqual(
     await recordVerificationFinding(sources, finding("license", s.licenseA.id)),
-    { status: "unavailable" },
+    { status: "unconfirmed" },
+  );
+  assert.equal(s.world.verification_evidence.length, evidenceBefore);
+  s.world.failures.clear();
+  // A record changed since it was read is a conflict, and nothing is written.
+  s.world.hooks.set("writes.recordFinding", () => {
+    s.licenseA.updated_at = stamp(s.world.tick());
+  });
+  assert.deepEqual(
+    await recordVerificationFinding(sources, finding("license", s.licenseA.id)),
+    { status: "not-saved" },
   );
   assert.equal(s.world.verification_evidence.length, evidenceBefore);
 });
@@ -502,9 +514,9 @@ test("M4-S6. discipline findings and practice-area decisions are scoped, guarded
     [s.request.status, s.request.effective_from],
     ["authorised", "2026-11-04T00:00:00.000Z"],
   );
-  const decided = auditPair(s.world, "practice_area_authorisation_decided");
-  assert.equal(decided.attempt.after_snapshot.note, "Synthetic basis");
-  assert.equal(decided.outcome.after_snapshot.outcome, "applied");
+  const [decided] = auditsOf(s.world, "practice_area_authorisation_decided");
+  assert.equal(decided.after_snapshot.note, "Synthetic basis");
+  assert.equal(decided.actor_user_id, s.scopedA.userId);
   // A decided request is never decided again.
   assert.deepEqual(
     await decidePracticeArea(
@@ -554,13 +566,12 @@ test("M4-S7. profile transitions: only the three supported transitions, from the
     { status: "recorded" },
   );
   assert.equal(profile.profile_state, "applicant");
-  const request = auditPair(s.world, "attorney_information_requested");
-  assert.deepEqual(request.attempt.after_snapshot, {
+  const [request] = auditsOf(s.world, "attorney_information_requested");
+  assert.deepEqual(request.after_snapshot, {
     profile_state: "applicant",
     message_to_applicant: "Please add your synthetic insurance.",
-    audit_phase: "attempt",
   });
-  assert.equal(request.outcome.after_snapshot.outcome, "applied");
+  assert.equal(request.actor_user_id, s.global.userId);
   profile.profile_state = "under_review";
   assert.deepEqual(
     await changeProfileStage(
@@ -619,7 +630,7 @@ test("M4-S8. viewing computes assessments without persisting; an explicit determ
     "undetermined",
   );
   assert.equal(s.world.eligibility_evaluations.length, 0);
-  assert.ok(!s.world.calls.includes("prov.insertEvaluation"));
+  assert.equal(s.world.audit_events.length, 0);
   addPolicy(s.world, s.a);
   view = await resolveStaffReview(sources, s.applicant.attorneyId);
   assert.equal(
@@ -650,9 +661,10 @@ test("M4-S8. viewing computes assessments without persisting; an explicit determ
     t1.policy_references[0].policy_type_code,
     "attorney_eligibility",
   );
-  const recorded = auditPair(s.world, "eligibility_evaluation_recorded");
-  assert.equal(recorded.attempt.resource_id, t1.id);
-  assert.equal(recorded.outcome.after_snapshot.outcome, "applied");
+  const [recorded] = auditsOf(s.world, "eligibility_evaluation_recorded");
+  assert.equal(recorded.resource_id, t1.id);
+  assert.equal(recorded.actor_user_id, s.global.userId);
+  assert.deepEqual(recorded.policy_references, t1.policy_references);
   // Adverse fact, then T2.
   s.world.now += DAY;
   assert.deepEqual(
@@ -756,6 +768,20 @@ test("M4-S9. a failed scope read, an unreadable port, or a missing write boundar
     await recordVerificationFinding(
       staffSources(s.world, s.global.authId),
       form({ subject_kind: "profile", record: s.licenseA.id }),
+    ),
+    { status: "unavailable" },
+  );
+  // Without the write boundary neither the review nor any change is offered.
+  const noWrites = staffSources(s.world, s.global.authId, {
+    writes: async () => null,
+  });
+  assert.deepEqual(await resolveStaffReview(noWrites, s.applicant.attorneyId), {
+    status: "unavailable",
+  });
+  assert.deepEqual(
+    await recordVerificationFinding(
+      noWrites,
+      finding("license", s.licenseA.id),
     ),
     { status: "unavailable" },
   );

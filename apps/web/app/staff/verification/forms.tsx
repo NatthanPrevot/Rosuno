@@ -77,8 +77,8 @@ function Outcome({ state }: { readonly state: StaffActionState }) {
     case "unconfirmed":
       return (
         <Alert tone="error" title="Could not be confirmed" role="alert">
-          Part of this change may have been written without being confirmed.
-          Refresh the page and reconcile the record before trying again.
+          This change may or may not have been saved; it is never saved in part.
+          Refresh the page to see the current record before trying again.
         </Alert>
       );
     case "sign-in-required":

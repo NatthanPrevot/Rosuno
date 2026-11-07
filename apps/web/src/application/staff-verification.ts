@@ -21,6 +21,17 @@
 // verified label, policy, or approval rule is invented. Eligibility
 // determinations are persisted only on an explicit request, as immutable
 // evaluations; viewing a current assessment persists nothing.
+//
+// Every change is one call of one staff write function through the
+// request's own authenticated session (P3-904). The checks below decide what
+// the reviewer is told before anything is sent; the database function
+// decides again, on rows it locks for the session's own identity (active
+// User, active Staff Profile, one currently valid grant for the exact scope,
+// the target profile's stage, and the record's version), whether the change
+// happens, and writes it together with its audit event in one transaction.
+// A revocation, expiry, re-scoping, deactivation, or suspension therefore
+// either denies the change or waits for it to finish; it can never slip in
+// between the decisive check and the write.
 
 import {
   assessEligibility,
@@ -32,12 +43,10 @@ import {
   POLICY_VERSION_COLUMNS,
 } from "./policy-selection.ts";
 import {
-  auditEventOf,
   AUDIT_ACTIONS,
-  runAuditedChange,
-  type AuditedOutcome,
-  type AuditedResult,
-  type AuditEvent,
+  writeOnce,
+  type WriteAnswer,
+  type WriteResult,
 } from "./professional-audit.ts";
 import {
   activeUserOf,
@@ -118,14 +127,14 @@ export type StaffReads = {
   readonly practiceAreas: () => Promise<RowsResult>;
 };
 
-export type EvidenceInsert = {
-  readonly id: string;
-  readonly jurisdiction_id: string | null;
+// The source-grounded evidence a reviewer submits. The evidence row's id,
+// jurisdiction, and reviewer are never taken from here: the database uses
+// the server-generated id, the record's own jurisdiction, and the caller.
+export type EvidenceFields = {
   readonly source_type: string;
   readonly source_uri: string | null;
   readonly source_reference: string;
   readonly retrieved_at: string;
-  readonly retrieved_by_user_id: string;
   readonly evidence_summary: string;
   readonly evidence_digest: string | null;
   readonly verification_method: string;
@@ -141,9 +150,9 @@ export type DisciplineInsert = {
   readonly status: string;
 };
 
+// A practice-area decision; the database records the decision time.
 export type AuthorisationDecision = {
   readonly status: "authorised" | "refused";
-  readonly decided_at: string;
   readonly effective_from: string | null;
   readonly effective_until: string | null;
 };
@@ -153,7 +162,59 @@ export type ReviewTransition = {
   readonly to: "approved" | "applicant" | "suspended";
 };
 
-// Server-only, privileged port with narrow, exact-key operations.
+export type FindingWrite = {
+  readonly evidenceId: string;
+  readonly subjectKind: SubjectKind;
+  readonly subjectId: string;
+  // The record's updated_at exactly as read.
+  readonly expectedUpdatedAt: string;
+  readonly evidence: EvidenceFields;
+  readonly observedStatus: string | null;
+  readonly disciplineStatus: string | null;
+  readonly resolvedAt: string | null;
+};
+
+export type DisciplineWrite = {
+  readonly disciplineId: string;
+  readonly evidenceId: string;
+  readonly attorneyId: string;
+  readonly record: DisciplineInsert;
+  readonly evidence: EvidenceFields;
+};
+
+// Request-scoped write port: each call is one staff write function run for
+// the request's own authenticated session. None takes an actor, reviewer,
+// User, grant, or scope; the database derives and locks them itself.
+export type StaffWrites = {
+  readonly recordFinding: (write: FindingWrite) => Promise<WriteAnswer>;
+  readonly recordSourceUnavailable: (
+    subjectKind: SubjectKind,
+    subjectId: string,
+    note: string,
+  ) => Promise<WriteAnswer>;
+  readonly recordDisciplineFinding: (
+    write: DisciplineWrite,
+  ) => Promise<WriteAnswer>;
+  readonly decidePracticeArea: (
+    authorisationId: string,
+    expectedUpdatedAt: string,
+    decision: AuthorisationDecision,
+    note: string,
+  ) => Promise<WriteAnswer>;
+  readonly changeProfileStage: (
+    attorneyId: string,
+    intent: ReviewIntent,
+    message: string | null,
+    note: string | null,
+  ) => Promise<WriteAnswer>;
+  // One evaluation row as the assessment builds it, with its new id.
+  readonly recordEvaluation: (
+    row: Readonly<Record<string, unknown>>,
+  ) => Promise<WriteAnswer>;
+};
+
+// Server-only, privileged port with narrow, exact-key reads only (P3-904:
+// it no longer writes anything).
 export type StaffProvisioning = {
   readonly jurisdictions: () => Promise<RowsResult>;
   readonly attorneyProfileOf: (attorneyId: string) => Promise<RowsResult>;
@@ -186,45 +247,6 @@ export type StaffProvisioning = {
   readonly authorityReferencesFor: (
     versionIds: readonly string[],
   ) => Promise<RowsResult>;
-  readonly insertEvidence: (evidence: EvidenceInsert) => Promise<RowsResult>;
-  readonly linkEvidence: (
-    evidenceId: string,
-    kind: SubjectKind,
-    recordId: string,
-  ) => Promise<RowsResult>;
-  readonly recordLicenseObservation: (
-    attorneyId: string,
-    licenseId: string,
-    expectedUpdatedAt: string,
-    reportedStatus: string,
-  ) => Promise<RowsResult>;
-  readonly insertDiscipline: (
-    attorneyId: string,
-    disciplineId: string,
-    record: DisciplineInsert,
-  ) => Promise<RowsResult>;
-  readonly updateDisciplineStatus: (
-    attorneyId: string,
-    recordId: string,
-    expectedUpdatedAt: string,
-    status: string,
-    resolvedAt: string | null,
-  ) => Promise<RowsResult>;
-  readonly decideAuthorisation: (
-    attorneyId: string,
-    authorisationId: string,
-    expectedUpdatedAt: string,
-    decision: AuthorisationDecision,
-  ) => Promise<RowsResult>;
-  readonly transitionProfile: (
-    attorneyId: string,
-    transition: ReviewTransition,
-  ) => Promise<RowsResult>;
-  readonly evaluationById: (evaluationId: string) => Promise<RowsResult>;
-  readonly insertEvaluation: (
-    row: Readonly<Record<string, unknown>>,
-  ) => Promise<RowsResult>;
-  readonly insertAuditEvent: (event: AuditEvent) => Promise<RowsResult>;
   readonly profileHistoryOf: (attorneyId: string) => Promise<RowsResult>;
 };
 
@@ -233,9 +255,10 @@ export type StaffSources = {
   readonly account: AccountSource;
   readonly reads: () => Promise<StaffReads | null>;
   readonly provisioning: () => Promise<StaffProvisioning | null>;
+  readonly writes: () => Promise<StaffWrites | null>;
   readonly clock: () => number;
-  // A new record id generated on the server for each insert, so the audit
-  // attempt names the exact record and verification reads it by id.
+  // A new record id generated on the server for each insert, so a repeated
+  // call can never create a second record.
   readonly newId: () => string;
 };
 
@@ -850,21 +873,14 @@ async function gatingProfileOf(
   return profile?.id === attorneyId ? profile : null;
 }
 
+// Each audit row is written in the same transaction as the change it
+// records, so every label names a change that happened.
 const HISTORY_LABELS: Readonly<Record<string, string>> = Object.freeze({
-  [AUDIT_ACTIONS.applicationSubmitted]: "Application submission requested",
-  [AUDIT_ACTIONS.profileStateChanged]:
-    "Profile stage change requested by review staff",
+  [AUDIT_ACTIONS.applicationSubmitted]: "Application submitted for review",
+  [AUDIT_ACTIONS.profileStateChanged]: "Profile stage changed by review staff",
   [AUDIT_ACTIONS.informationRequested]: "Additional information requested",
   [AUDIT_ACTIONS.profileDetailsRevised]:
-    "Profile details revision requested by the applicant",
-  [AUDIT_ACTIONS.outcome]: "Outcome recorded",
-});
-
-const OUTCOME_LABELS: Readonly<Record<string, string>> = Object.freeze({
-  applied: "applied",
-  partially_applied: "partially applied",
-  not_applied: "not applied",
-  unknown: "could not be confirmed",
+    "Profile details revised by the applicant",
 });
 
 // One own string field of a snapshot object, or undefined.
@@ -884,9 +900,8 @@ function snapshotText(snapshot: unknown, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-// The profile's audit history. Under the write-ahead protocol an attempt
-// row records what was requested and an outcome row what actually
-// persisted, with whether the actor's authority still held at completion.
+// The profile's audit history, newest first. Every row is a committed
+// change, recorded by the database together with it.
 function historyOf(rows: readonly unknown[]): readonly HistoryView[] | null {
   const views: { at: number; view: HistoryView }[] = [];
   for (const row of rows) {
@@ -904,21 +919,10 @@ function historyOf(rows: readonly unknown[]): readonly HistoryView[] | null {
     const after = f.get("after_snapshot");
     const state = snapshotText(after, "profile_state");
     const message = snapshotText(after, "message_to_applicant");
-    const outcome = snapshotText(after, "outcome");
-    const authority = snapshotText(after, "authority");
-    const attempted = snapshotText(after, "attempted_action");
-    const detail =
-      action === AUDIT_ACTIONS.outcome
-        ? [
-            `${HISTORY_LABELS[attempted ?? ""] ?? "Change"}: ${OUTCOME_LABELS[outcome ?? ""] ?? "not recorded"}`,
-            authority === "held"
-              ? ""
-              : `Actor authority at check: ${authority ?? "not recorded"}`,
-          ]
-        : [
-            typeof state === "string" ? `Stage: ${state}` : "",
-            typeof message === "string" ? `Message: ${message}` : "",
-          ];
+    const detail = [
+      typeof state === "string" ? `Stage: ${state}` : "",
+      typeof message === "string" ? `Message: ${message}` : "",
+    ];
     views.push({
       at: Date.parse(at),
       view: Object.freeze({
@@ -975,7 +979,10 @@ export async function resolveStaffReview(
   try {
     const reads = await portFrom(sources.reads);
     const provisioning = await portFrom(sources.provisioning);
-    if (reads === null || provisioning === null) {
+    // Without the trusted write boundary no review form could be recorded,
+    // so the review is not offered at all.
+    const writes = await portFrom(sources.writes);
+    if (reads === null || provisioning === null || writes === null) {
       return UNAVAILABLE;
     }
     const staff = await staffContextOf(sources, reads);
@@ -1383,11 +1390,6 @@ function optionalDay(
   return value;
 }
 
-type EvidenceFields = Omit<
-  EvidenceInsert,
-  "id" | "jurisdiction_id" | "retrieved_by_user_id"
->;
-
 // The source-grounded evidence a reviewer submits: what source, which
 // record at that source, when it was retrieved, how, what it showed, and
 // whether it contradicts the claim.
@@ -1480,6 +1482,7 @@ type Authorized = {
   readonly staff: StaffContext;
   readonly reads: StaffReads;
   readonly provisioning: StaffProvisioning;
+  readonly writes: StaffWrites;
 };
 
 async function authorizedStaffOf(
@@ -1494,10 +1497,11 @@ async function authorizedStaffOf(
     return staff;
   }
   const provisioning = await portFrom(sources.provisioning);
-  if (provisioning === null) {
+  const writes = await portFrom(sources.writes);
+  if (provisioning === null || writes === null) {
     return UNAVAILABLE;
   }
-  return { staff, reads, provisioning };
+  return { staff, reads, provisioning, writes };
 }
 
 // One record the caller's own session can read, by kind and id, or null.
@@ -1556,12 +1560,6 @@ function subjectKindOf(raw: string | null): SubjectKind | null {
   return isOneOf(SUBJECT_KINDS, raw) ? raw : null;
 }
 
-// Exactly one row reported by one write.
-async function wroteOne(call: () => Promise<RowsResult>): Promise<boolean> {
-  const rows = rowsOf(await attempt(call));
-  return rows !== null && rows.length === 1;
-}
-
 // A new record id generated on the server, or null when unusable.
 function newIdOf(sources: StaffSources): string | null {
   try {
@@ -1572,148 +1570,25 @@ function newIdOf(sources: StaffSources): string | null {
   }
 }
 
-type Authority = {
-  readonly forWrite: () => Promise<boolean | null>;
-  readonly atCompletion: () => Promise<boolean | null>;
-  readonly staffHolds: () => Promise<boolean | null>;
-};
-
-// A fresh re-check of the reviewer's authority for one change: the whole
-// staff chain again (session, confirmed Auth read, active User, active Staff
-// Profile) for the same User, the database's own scope predicate for the
-// change's exact jurisdiction (null is the global scope), and the change's
-// own precondition. A revoked, expired, or re-scoped grant, a deactivated
-// Staff Profile, or a suspended User therefore stops every remaining write.
-function staffAuthorityOf(
-  sources: StaffSources,
-  authorized: Authorized,
-  jurisdictionId: string | null,
-  precondition: () => Promise<boolean | null> = async () => true,
-): Authority {
-  const staffHolds = async (): Promise<boolean | null> => {
-    const fresh = await staffContextOf(sources, authorized.reads);
-    if (!("userId" in fresh)) {
-      return fresh === UNAVAILABLE ? null : false;
-    }
-    if (fresh.userId !== authorized.staff.userId) {
-      return false;
-    }
-    return await holds(authorized.reads, jurisdictionId);
-  };
-  return {
-    forWrite: async () => {
-      const held = await staffHolds();
-      return held === true ? await precondition() : held;
-    },
-    atCompletion: staffHolds,
-    staffHolds,
-  };
-}
-
-// Whether the attorney's profile is still in one of the stages a change
-// needs, read afresh through the privileged port.
-function stageStill(
-  provisioning: StaffProvisioning,
-  attorneyId: string,
-  stages: readonly ProfileState[],
-): () => Promise<boolean | null> {
-  return async () => {
-    const profile = await gatingProfileOf(provisioning, attorneyId);
-    return profile === null ? null : stages.includes(profile.state);
-  };
-}
-
-// The fixed state shown for one audited change. Only a change whose attempt
-// and applied outcome were both recorded, under authority that still held at
-// completion, is reported recorded. A change stopped before any write is
-// explained by a fresh re-check: lost access is denied, anything else is a
-// stage or state that no longer allows it.
-async function staffStateOf(
-  result: AuditedResult,
-  authority: Authority,
-): Promise<StaffActionState> {
-  if (result.status === "unrecorded") {
-    return UNAVAILABLE;
-  }
-  if (result.status === "stopped") {
-    if (result.outcome !== "not_applied") {
+// The fixed state shown for one write call. Only the database's own
+// "applied" answer, given after the change and its audit row committed
+// together, is reported recorded. A refusal by the database committed
+// nothing. An unknown outcome is never claimed either way.
+function stateOf(result: WriteResult): StaffActionState {
+  switch (result) {
+    case "applied":
+      return RECORDED;
+    case "denied":
+      return DENIED;
+    case "locked":
+      return LOCKED;
+    case "conflict":
+    case "invalid":
+    case "rejected":
+      return NOT_SAVED;
+    default:
       return UNCONFIRMED;
-    }
-    if (result.authority === "unreadable") {
-      return UNAVAILABLE;
-    }
-    const staff = await attempt(authority.staffHolds);
-    return staff === true ? LOCKED : staff === false ? DENIED : UNAVAILABLE;
   }
-  if (result.outcome === "not_applied") {
-    return NOT_SAVED;
-  }
-  return result.outcome === "applied" &&
-    result.authorityAtCompletion === "held" &&
-    result.outcomeRecorded
-    ? RECORDED
-    : UNCONFIRMED;
-}
-
-// What persisted of one evidence write and its link, read by id through the
-// privileged port (so a reviewer whose access just lapsed cannot make a
-// persisted row look absent).
-async function evidencePersisted(
-  provisioning: StaffProvisioning,
-  evidenceId: string,
-  kind: SubjectKind,
-  recordId: string,
-): Promise<{ readonly evidence: boolean; readonly link: boolean } | null> {
-  const [evidence, subjects] = await Promise.all([
-    attempt(() => provisioning.evidenceOf([evidenceId])),
-    attempt(() => provisioning.evidenceSubjectsOf(kind, [recordId])),
-  ]);
-  const evidenceRows = listOf(evidence, readEvidence);
-  const subjectRows = listOf(subjects, readEvidenceSubject);
-  if (evidenceRows === null || subjectRows === null) {
-    return null;
-  }
-  return {
-    evidence: evidenceRows.some((row) => row.id === evidenceId),
-    link: subjectRows.some(
-      (row) =>
-        row.evidenceId === evidenceId &&
-        row.kind === kind &&
-        row.subjectId === recordId,
-    ),
-  };
-}
-
-function outcomeOfParts(parts: readonly boolean[]): AuditedOutcome {
-  if (parts.every(Boolean)) {
-    return "applied";
-  }
-  return parts.some(Boolean) ? "partially_applied" : "not_applied";
-}
-
-// One professional record by id, read afresh through the privileged port
-// within its own attorney and jurisdiction.
-async function persistedRecordOf(
-  provisioning: StaffProvisioning,
-  kind: "license" | "discipline" | "practice_area_authorisation",
-  record: AnyRecord,
-): Promise<AnyRecord | null | undefined> {
-  const jurisdictionId = record.jurisdictionId;
-  if (jurisdictionId === null) {
-    return undefined;
-  }
-  const call =
-    kind === "license"
-      ? () => provisioning.licensesIn(record.attorneyId, jurisdictionId)
-      : kind === "discipline"
-        ? () => provisioning.disciplineIn(record.attorneyId, jurisdictionId)
-        : () =>
-            provisioning.authorisationsIn(record.attorneyId, jurisdictionId);
-  const rows = listOf(await attempt(call), READERS[kind]);
-  if (rows === null) {
-    return undefined;
-  }
-  return rows.find((row) => row.id === record.id) ?? null;
 }
 
 // Records a source-grounded verification finding for one professional
@@ -1783,111 +1658,30 @@ export async function recordVerificationFinding(
     if (!("record" in checked)) {
       return checked;
     }
-    const { staff, provisioning } = authorized;
     const record = checked.record;
     const evidenceId = newIdOf(sources);
     if (evidenceId === null) {
       return UNAVAILABLE;
     }
-    const statusChange =
-      kind === "license" && observed !== null
-        ? () =>
-            wroteOne(() =>
-              provisioning.recordLicenseObservation(
-                record.attorneyId,
-                recordId,
-                record.updatedAt,
-                observed,
-              ),
-            )
-        : kind === "discipline" && disciplineStatus !== null
-          ? () =>
-              wroteOne(() =>
-                provisioning.updateDisciplineStatus(
-                  record.attorneyId,
-                  recordId,
-                  record.updatedAt,
-                  disciplineStatus,
-                  resolvedAt,
-                ),
-              )
-          : null;
-    const authority = staffAuthorityOf(
-      sources,
-      authorized,
-      record.jurisdictionId,
-      stageStill(provisioning, record.attorneyId, FINDING_STAGES),
+    // The evidence, its link, any status the source reported, and the audit
+    // event are one database transaction: a finding is never left partial.
+    return stateOf(
+      await writeOnce(() =>
+        authorized.writes.recordFinding({
+          evidenceId,
+          subjectKind: kind,
+          subjectId: recordId,
+          expectedUpdatedAt: record.updatedAt,
+          evidence: fields,
+          observedStatus: kind === "license" ? observed : null,
+          disciplineStatus: kind === "discipline" ? disciplineStatus : null,
+          resolvedAt:
+            kind === "discipline" && disciplineStatus !== null
+              ? resolvedAt
+              : null,
+        }),
+      ),
     );
-    const result = await runAuditedChange(
-      {
-        port: provisioning,
-        attempt: {
-          actorUserId: staff.userId,
-          actorType: "staff",
-          action: AUDIT_ACTIONS.evidenceRecorded,
-          resourceType: "verification_evidence",
-          resourceId: evidenceId,
-          after: {
-            subject_kind: kind,
-            subject_id: recordId,
-            discrepancy: fields.discrepancy_flag,
-            observed_status: observed,
-            discipline_status: disciplineStatus,
-          },
-          jurisdictionId: record.jurisdictionId,
-          occurredAtMs: sources.clock(),
-        },
-        authorizedForWrite: authority.forWrite,
-        authorizedAtCompletion: authority.atCompletion,
-        steps: [
-          () =>
-            wroteOne(() =>
-              provisioning.insertEvidence({
-                ...fields,
-                id: evidenceId,
-                jurisdiction_id: record.jurisdictionId,
-                retrieved_by_user_id: staff.userId,
-              }),
-            ),
-          () =>
-            wroteOne(() =>
-              provisioning.linkEvidence(evidenceId, kind, recordId),
-            ),
-          ...(statusChange === null ? [] : [statusChange]),
-        ],
-        verify: async () => {
-          const persisted = await evidencePersisted(
-            provisioning,
-            evidenceId,
-            kind,
-            recordId,
-          );
-          if (persisted === null) {
-            return "unknown";
-          }
-          const parts = [persisted.evidence, persisted.link];
-          if (statusChange !== null) {
-            const fresh = await persistedRecordOf(
-              provisioning,
-              kind as "license" | "discipline",
-              record,
-            );
-            if (fresh === undefined) {
-              return "unknown";
-            }
-            parts.push(
-              fresh !== null &&
-                (kind === "license"
-                  ? (fresh as LicenseRecord).reportedStatus === observed
-                  : (fresh as DisciplineRecord).status === disciplineStatus),
-            );
-          }
-          return outcomeOfParts(parts);
-        },
-      },
-      sources.clock,
-    );
-    return await staffStateOf(result, authority);
   } catch {
     return UNAVAILABLE;
   }
@@ -1895,7 +1689,8 @@ export async function recordVerificationFinding(
 
 // Records that a verification source could not be consulted. It is an audit
 // event only: no evidence row, no status, and no verification. The audit row
-// is itself the whole record, appended after a fresh authority re-check.
+// is itself the whole record, appended by the database after it decides the
+// caller's authority on locked rows.
 export async function recordSourceUnavailable(
   sources: StaffSources,
   formData: unknown,
@@ -1933,39 +1728,11 @@ export async function recordSourceUnavailable(
     if (!("record" in checked)) {
       return checked;
     }
-    const authority = staffAuthorityOf(
-      sources,
-      authorized,
-      checked.record.jurisdictionId,
-    );
-    const held = await attempt(authority.forWrite);
-    if (held !== true) {
-      return held === false ? DENIED : UNAVAILABLE;
-    }
-    const resourceTypes = {
-      license: "license",
-      insurance: "insurance_record",
-      discipline: "discipline_record",
-      practice_area_authorisation: "practice_area_authorisation",
-    } as const;
-    const rows = rowsOf(
-      await attempt(() =>
-        authorized.provisioning.insertAuditEvent(
-          auditEventOf({
-            actorUserId: authorized.staff.userId,
-            actorType: "staff",
-            action: AUDIT_ACTIONS.sourceUnavailable,
-            resourceType: resourceTypes[kind],
-            resourceId: recordId,
-            after: { note },
-            reasonCode: "verification_source_unavailable",
-            jurisdictionId: checked.record.jurisdictionId,
-            occurredAtMs: sources.clock(),
-          }),
-        ),
+    return stateOf(
+      await writeOnce(() =>
+        authorized.writes.recordSourceUnavailable(kind, recordId, note),
       ),
     );
-    return rows !== null && rows.length === 1 ? RECORDED : UNCONFIRMED;
   } catch {
     return UNAVAILABLE;
   }
@@ -2087,78 +1854,19 @@ export async function recordDisciplineFinding(
       resolved_at: resolvedAt,
       status,
     };
-    const authority = staffAuthorityOf(
-      sources,
-      authorized,
-      jurisdictionId,
-      stageStill(provisioning, attorneyId, FINDING_STAGES),
+    // The discipline record, its evidence, their link, and the audit event
+    // are one database transaction.
+    return stateOf(
+      await writeOnce(() =>
+        authorized.writes.recordDisciplineFinding({
+          disciplineId,
+          evidenceId,
+          attorneyId,
+          record: insert,
+          evidence: fields,
+        }),
+      ),
     );
-    const result = await runAuditedChange(
-      {
-        port: provisioning,
-        attempt: {
-          actorUserId: staff.userId,
-          actorType: "staff",
-          action: AUDIT_ACTIONS.disciplineRecorded,
-          resourceType: "discipline_record",
-          resourceId: disciplineId,
-          after: {
-            attorney_id: attorneyId,
-            status,
-            finding_type: findingType,
-            external_reference: externalReference,
-            evidence_id: evidenceId,
-          },
-          jurisdictionId,
-          occurredAtMs: sources.clock(),
-        },
-        authorizedForWrite: authority.forWrite,
-        authorizedAtCompletion: authority.atCompletion,
-        steps: [
-          () =>
-            wroteOne(() =>
-              provisioning.insertDiscipline(attorneyId, disciplineId, insert),
-            ),
-          () =>
-            wroteOne(() =>
-              provisioning.insertEvidence({
-                ...fields,
-                id: evidenceId,
-                jurisdiction_id: jurisdictionId,
-                retrieved_by_user_id: staff.userId,
-              }),
-            ),
-          () =>
-            wroteOne(() =>
-              provisioning.linkEvidence(evidenceId, "discipline", disciplineId),
-            ),
-        ],
-        verify: async () => {
-          const rows = listOf(
-            await attempt(() =>
-              provisioning.disciplineIn(attorneyId, jurisdictionId),
-            ),
-            readDiscipline,
-          );
-          const persisted = await evidencePersisted(
-            provisioning,
-            evidenceId,
-            "discipline",
-            disciplineId,
-          );
-          if (rows === null || persisted === null) {
-            return "unknown";
-          }
-          return outcomeOfParts([
-            rows.some((row) => row.id === disciplineId),
-            persisted.evidence,
-            persisted.link,
-          ]);
-        },
-      },
-      sources.clock,
-    );
-    return await staffStateOf(result, authority);
   } catch {
     return UNAVAILABLE;
   }
@@ -2241,66 +1949,23 @@ export async function decidePracticeArea(
     if (entry.status !== "requested") {
       return LOCKED;
     }
-    const { staff, provisioning } = authorized;
     const outcome: AuthorisationDecision = {
       status: decision,
-      decided_at: new Date(nowMs).toISOString(),
       effective_from:
         effectiveFrom === null ? null : new Date(effectiveFrom).toISOString(),
       effective_until:
         effectiveUntil === null ? null : new Date(effectiveUntil).toISOString(),
     };
-    const authority = staffAuthorityOf(
-      sources,
-      authorized,
-      entry.jurisdictionId,
-      stageStill(provisioning, entry.attorneyId, DECISION_STAGES),
+    return stateOf(
+      await writeOnce(() =>
+        authorized.writes.decidePracticeArea(
+          recordId,
+          entry.updatedAt,
+          outcome,
+          note,
+        ),
+      ),
     );
-    const result = await runAuditedChange(
-      {
-        port: provisioning,
-        attempt: {
-          actorUserId: staff.userId,
-          actorType: "staff",
-          action: AUDIT_ACTIONS.practiceAreaDecided,
-          resourceType: "practice_area_authorisation",
-          resourceId: recordId,
-          before: { status: "requested" },
-          after: { ...outcome, note },
-          jurisdictionId: entry.jurisdictionId,
-          occurredAtMs: sources.clock(),
-        },
-        authorizedForWrite: authority.forWrite,
-        authorizedAtCompletion: authority.atCompletion,
-        steps: [
-          () =>
-            wroteOne(() =>
-              provisioning.decideAuthorisation(
-                entry.attorneyId,
-                recordId,
-                entry.updatedAt,
-                outcome,
-              ),
-            ),
-        ],
-        verify: async () => {
-          const fresh = await persistedRecordOf(
-            provisioning,
-            "practice_area_authorisation",
-            entry,
-          );
-          if (fresh === undefined) {
-            return "unknown";
-          }
-          return fresh !== null &&
-            (fresh as PracticeAuthorisationRecord).status === decision
-            ? "applied"
-            : "not_applied";
-        },
-      },
-      sources.clock,
-    );
-    return await staffStateOf(result, authority);
   } catch {
     return UNAVAILABLE;
   }
@@ -2345,7 +2010,7 @@ export async function changeProfileStage(
     if (!("staff" in authorized)) {
       return authorized;
     }
-    const { staff, reads, provisioning } = authorized;
+    const { staff, reads } = authorized;
     if (attorneyId === staff.ownAttorneyId) {
       return DENIED;
     }
@@ -2370,46 +2035,11 @@ export async function changeProfileStage(
     if (visible[0].state !== transition.from) {
       return LOCKED;
     }
-    const authority = staffAuthorityOf(sources, authorized, null);
-    const result = await runAuditedChange(
-      {
-        port: provisioning,
-        attempt: {
-          actorUserId: staff.userId,
-          actorType: "staff",
-          action:
-            intent === "request_information"
-              ? AUDIT_ACTIONS.informationRequested
-              : AUDIT_ACTIONS.profileStateChanged,
-          resourceType: "attorney_profile",
-          resourceId: attorneyId,
-          before: { profile_state: transition.from },
-          after:
-            intent === "request_information"
-              ? { profile_state: transition.to, message_to_applicant: message }
-              : { profile_state: transition.to, staff_note: note },
-          reasonCode: `staff_review_${intent}`,
-          occurredAtMs: sources.clock(),
-        },
-        authorizedForWrite: authority.forWrite,
-        authorizedAtCompletion: authority.atCompletion,
-        steps: [
-          () =>
-            wroteOne(() =>
-              provisioning.transitionProfile(attorneyId, transition),
-            ),
-        ],
-        verify: async () => {
-          const fresh = await gatingProfileOf(provisioning, attorneyId);
-          if (fresh === null) {
-            return "unknown";
-          }
-          return fresh.state === transition.to ? "applied" : "not_applied";
-        },
-      },
-      sources.clock,
+    return stateOf(
+      await writeOnce(() =>
+        authorized.writes.changeProfileStage(attorneyId, intent, message, note),
+      ),
     );
-    return await staffStateOf(result, authority);
   } catch {
     return UNAVAILABLE;
   }
@@ -2491,50 +2121,12 @@ export async function recordEligibilityDetermination(
       return UNAVAILABLE;
     }
     const row = Object.freeze({ id: evaluationId, ...evaluated });
-    const authority = staffAuthorityOf(sources, authorized, jurisdictionId);
-    const result = await runAuditedChange(
-      {
-        port: provisioning,
-        attempt: {
-          actorUserId: staff.userId,
-          actorType: "staff",
-          action: AUDIT_ACTIONS.eligibilityRecorded,
-          resourceType: "eligibility_evaluation",
-          resourceId: evaluationId,
-          after: {
-            result: assessment.result,
-            attorney_id: attorneyId,
-            practice_area_id: practiceAreaId,
-            as_of: assessment.asOf,
-          },
-          policyReferences: assessment.policyReferences,
-          jurisdictionId,
-          occurredAtMs: sources.clock(),
-        },
-        authorizedForWrite: authority.forWrite,
-        authorizedAtCompletion: authority.atCompletion,
-        steps: [() => wroteOne(() => provisioning.insertEvaluation(row))],
-        verify: async () => {
-          const rows = listOf(
-            await attempt(() => provisioning.evaluationById(evaluationId)),
-            readEvaluation,
-          );
-          if (rows === null) {
-            return "unknown";
-          }
-          return rows.some(
-            (e) =>
-              e.id === evaluationId &&
-              e.attorneyId === attorneyId &&
-              e.result === assessment.result,
-          )
-            ? "applied"
-            : "not_applied";
-        },
-      },
-      sources.clock,
+    // The evaluation and its audit event are one database transaction; the
+    // database records the evaluation time and admits only references to
+    // this attorney's own rows in this jurisdiction.
+    return stateOf(
+      await writeOnce(() => authorized.writes.recordEvaluation(row)),
     );
-    return await staffStateOf(result, authority);
   } catch {
     return UNAVAILABLE;
   }

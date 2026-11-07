@@ -2,9 +2,12 @@
 //
 // The attorney professional setup boundary runs against the synthetic M4
 // world in m4-fixtures.mjs, whose read port applies the committed own-row
-// read policies and whose privileged port applies the same guarded writes
-// the real port sends. No provider, network, or database is contacted, and
-// every account, id, and value is synthetic test data.
+// read policies, whose privileged port only reads, and whose write port
+// answers as the P3-904 attorney write functions do (one change and one
+// audit row together, or nothing). The database's own enforcement is proven
+// against real PostgreSQL in p3-904-db-proof.mjs. No provider, network, or
+// database is contacted here, and every account, id, and value is synthetic
+// test data.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -28,8 +31,8 @@ import {
   addLicense,
   addPracticeArea,
   attorneySources,
+  auditsOf,
   createWorld,
-  auditPair,
   form,
   idOf,
   UNREADABLE,
@@ -217,6 +220,10 @@ test("M4-A2. the setup view keeps account, stage, evidence status, recorded elig
     }),
   );
   assert.equal(throwing.status, "unavailable");
+  const noWrites = await resolveProfessionalSetup(
+    attorneySources(s.world, s.me.authId, { writes: async () => null }),
+  );
+  assert.equal(noWrites.status, "unavailable");
 });
 
 test("M4-A3. license claims: added and revised only as claims, never with an observed status, and audited with the verified attorney as actor", async () => {
@@ -240,24 +247,10 @@ test("M4-A3. license claims: added and revised only as claims, never with an obs
       .profile_state,
     "applicant",
   );
-  // The attempt row was appended before the insert and names the exact
-  // record; its outcome row confirms the insert was applied.
-  const { attempt: audit, outcome } = auditPair(
-    s.world,
-    "attorney_claim_recorded",
-  );
-  assert.ok(
-    s.world.audit_events.indexOf(audit) < s.world.audit_events.indexOf(outcome),
-  );
-  assert.deepEqual(
-    [
-      outcome.after_snapshot.outcome,
-      outcome.after_snapshot.authority,
-      outcome.resource_id,
-      outcome.actor_user_id,
-    ],
-    ["applied", "held", row.id, s.me.userId],
-  );
+  // Exactly one audit row, written with the insert, names the exact record
+  // and the verified attorney as actor.
+  assert.equal(s.world.audit_events.length, 1);
+  const [audit] = auditsOf(s.world, "attorney_claim_recorded");
   assert.deepEqual(
     [
       audit.actor_user_id,
@@ -283,10 +276,11 @@ test("M4-A3. license claims: added and revised only as claims, never with an obs
   );
   assert.deepEqual(revised, { status: "saved" });
   assert.deepEqual([row.jurisdiction_id, row.license_number], [s.b, "SYN-101"]);
-  const revision = auditPair(s.world, "attorney_claim_revised");
-  assert.equal(revision.attempt.before_snapshot.license_number, "SYN-100");
-  assert.equal(revision.attempt.after_snapshot.license_number, "SYN-101");
-  assert.equal(revision.outcome.after_snapshot.outcome, "applied");
+  const [revision] = auditsOf(s.world, "attorney_claim_revised");
+  assert.equal(revision.before_snapshot.license_number, "SYN-100");
+  assert.equal(revision.after_snapshot.license_number, "SYN-101");
+  assert.equal(revision.actor_user_id, s.me.userId);
+  assert.equal(s.world.audit_events.length, 2);
   // Validation: bad jurisdiction, empty number, impossible or inverted dates.
   const invalid = await saveLicenseClaim(
     sources,
@@ -389,7 +383,7 @@ test("M4-A4. IDOR and locks: another attorney's record, a record with evidence o
   }
 });
 
-test("M4-A5. insurance claims and profile details: own fields only, validated, and confirmed by a fresh read", async () => {
+test("M4-A5. insurance claims and profile details: own fields only, validated, and saved only on the database's applied answer", async () => {
   const s = setup();
   const sources = attorneySources(s.world, s.me.authId);
   const saved = await saveInsuranceClaim(
@@ -586,12 +580,12 @@ test("M4-A7. submission asks for review only: it needs the exact intent, imposes
       .profile_state,
     "under_review",
   );
-  const submitted = auditPair(s.world, "attorney_application_submitted");
-  assert.deepEqual(submitted.attempt.after_snapshot, {
+  const submitted = auditsOf(s.world, "attorney_application_submitted");
+  assert.equal(submitted.length, 2);
+  assert.deepEqual(submitted[1].after_snapshot, {
     profile_state: "under_review",
-    audit_phase: "attempt",
   });
-  assert.equal(submitted.outcome.after_snapshot.outcome, "applied");
+  assert.equal(submitted[1].actor_user_id, s.me.userId);
   // A second submission changes nothing.
   assert.deepEqual(await submitApplicationForReview(sources, form(intent)), {
     status: "locked",
@@ -604,30 +598,76 @@ test("M4-A7. submission asks for review only: it needs the exact intent, imposes
   );
 });
 
-test("M4-A8. failure semantics: unreadable reads, failed writes, and a missing audit row never report success", async () => {
+test("M4-A8. failure semantics: unreadable reads, a refused or failed audit, and unknown or lost answers never report success", async () => {
   const s = setup();
   addLicense(s.world, s.me.attorneyId, s.a);
   const sources = attorneySources(s.world, s.me.authId);
-  // Write-ahead audit: when the attempt row cannot be appended, nothing is
-  // written at all, so no change can persist without its audit evidence.
+  // The change and its audit row are one transaction: when the audit row
+  // cannot be written the database refuses the whole call and nothing is
+  // written.
   const licensesBefore = s.world.licenses.length;
-  s.world.failures.add("prov.audit");
+  s.world.failures.add("writes.audit");
   assert.deepEqual(
     await saveLicenseClaim(sources, LICENSE(s.b, { license_number: "SYN-A8" })),
-    { status: "unavailable" },
+    { status: "not-saved" },
   );
   assert.equal(s.world.licenses.length, licensesBefore);
   assert.equal(s.world.audit_events.length, 0);
   s.world.failures.clear();
-  s.world.failures.add("prov.insertLicense");
+  // An answer that never arrives is unknown: nothing is claimed.
+  s.world.failures.add("writes.saveLicense");
   assert.deepEqual(
     await saveLicenseClaim(
       sources,
       LICENSE(s.b, { license_number: "SYN-A8B" }),
     ),
-    { status: "not-saved" },
+    { status: "unconfirmed" },
   );
+  assert.equal(s.world.licenses.length, licensesBefore);
   s.world.failures.clear();
+  // An answer lost after the change committed is unconfirmed too; the
+  // change and its one audit row exist together.
+  s.world.lost.add("writes.saveLicense");
+  assert.deepEqual(
+    await saveLicenseClaim(
+      sources,
+      LICENSE(s.b, { license_number: "SYN-A8L" }),
+    ),
+    { status: "unconfirmed" },
+  );
+  s.world.lost.clear();
+  const lost = s.world.licenses.find((l) => l.license_number === "SYN-A8L");
+  assert.equal(
+    s.world.audit_events.filter((e) => e.resource_id === lost.id).length,
+    1,
+  );
+  // A malformed or thrown write answer is never success.
+  for (const answer of [
+    async () => ({ kind: "outcome", outcome: "saved" }),
+    async () => ({ kind: "outcome", outcome: "applied", extra: true }),
+    async () => {
+      throw new Error("synthetic");
+    },
+  ]) {
+    const odd = attorneySources(s.world, s.me.authId, {
+      writes: async () => ({
+        ...(await attorneySources(s.world, s.me.authId).writes()),
+        saveLicense: answer,
+      }),
+    });
+    assert.deepEqual(
+      await saveLicenseClaim(odd, LICENSE(s.b, { license_number: "SYN-ODD" })),
+      { status: "unconfirmed" },
+    );
+  }
+  // Without the write boundary nothing is attempted.
+  assert.deepEqual(
+    await saveLicenseClaim(
+      attorneySources(s.world, s.me.authId, { writes: async () => null }),
+      LICENSE(s.b, { license_number: "SYN-A8W" }),
+    ),
+    { status: "unavailable" },
+  );
   s.world.failures.add("prov.jurisdictions");
   assert.deepEqual(
     await saveLicenseClaim(
@@ -698,10 +738,10 @@ test("M4-A9. an approved attorney may revise presentation fields only; years of 
       "approved",
     ],
   );
-  const pair = auditPair(s.world, "attorney_profile_details_revised");
+  const [revised] = auditsOf(s.world, "attorney_profile_details_revised");
   assert.deepEqual(
-    [pair.attempt.reason_code, pair.outcome.after_snapshot.outcome],
-    ["presentation_only", "applied"],
+    [revised.reason_code, revised.actor_user_id, s.world.audit_events.length],
+    ["presentation_only", s.me.userId, 1],
   );
   // A changed years value is refused; the same value is accepted.
   const refused = await saveProfileDetails(
@@ -733,14 +773,17 @@ test("M4-A9. an approved attorney may revise presentation fields only; years of 
     { status: "denied" },
   );
   assert.equal(profile.display_name, "Y");
-  // Approval ending between the check and the write stops the write.
+  // A suspension landing between the application's check and the write is
+  // decided by the write function itself, which refuses the change.
   profile.profile_state = "approved";
-  s.world.hooks.set("prov.insertAuditEvent", () => {
+  s.world.hooks.set("writes.saveProfileDetails", () => {
     profile.profile_state = "suspended";
   });
+  const audits = s.world.audit_events.length;
   assert.deepEqual(
     await saveProfileDetails(sources, form({ display_name: "Raced" })),
-    { status: "locked" },
+    { status: "denied" },
   );
   assert.equal(profile.display_name, "Y");
+  assert.equal(s.world.audit_events.length, audits);
 });

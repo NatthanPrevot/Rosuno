@@ -2630,12 +2630,29 @@ const STAFF_ADAPTER = "src/infrastructure/staff/staff-verification-adapter.ts";
 const SCOPE_PREDICATE_RPC =
   'const { data, error } = await client.rpc(\n            "has_manage_attorney_verification_scope",\n            {\n              required_jurisdiction: jurisdictionId,\n              allow_any_jurisdiction: false,\n            },\n          );';
 
+// P3-904: the professional writes and the P3-002 applicant creation are the
+// database's own write functions, called through the request's own
+// unprivileged session: one generic call helper in the shared request-client
+// module (its type and its one call) and one fixed call in the P3-002
+// adapter (its type and its one call). Neither module builds or receives a
+// privileged client.
+const REQUEST_WRITE_MODULE =
+  "src/infrastructure/professional/professional-request-client.ts";
+const APPLICANT_ADAPTER =
+  "src/infrastructure/identity/attorney-application-provisioning.ts";
+const RPC_OCCURRENCES = Object.freeze({
+  [PRIVILEGED_MODULE]: 1,
+  [STAFF_ADAPTER]: 1,
+  [REQUEST_WRITE_MODULE]: 2,
+  [APPLICANT_ADAPTER]: 2,
+});
+
 // codes: app/ and src/ source paths mapped to their comment-free code.
 function assertQuotaRpcContract(codes) {
   for (const [file, code] of codes) {
     assert.equal(
       code.match(/\brpc\b/gi)?.length ?? 0,
-      file === PRIVILEGED_MODULE || file === STAFF_ADAPTER ? 1 : 0,
+      RPC_OCCURRENCES[file] ?? 0,
       file,
     );
     assert.equal(
@@ -2652,16 +2669,35 @@ function assertQuotaRpcContract(codes) {
   const staffAdapter = codes.get(STAFF_ADAPTER);
   assert.equal(staffAdapter.split(SCOPE_PREDICATE_RPC).length, 2);
   // Its receiver is the request's own client, built from the request client
-  // source, and never a privileged client or the any-jurisdiction mode.
+  // source, and never a privileged client or the any-jurisdiction mode. The
+  // staff adapter builds that request client in exactly two places: its read
+  // port and its P3-904 write port.
   assert.equal(
     staffAdapter.split(
       "const client = await withinDeadline(clientSource, null, deadlineMs);",
     ).length,
-    2,
+    3,
   );
   assert.doesNotMatch(
     staffAdapter,
     /\badmin\b|createClient\b|adminKey|allow_any_jurisdiction: true/,
+  );
+  for (const file of [REQUEST_WRITE_MODULE, APPLICANT_ADAPTER]) {
+    const code = codes.get(file);
+    assert.equal(code.match(/\.rpc\(/g).length, 1, file);
+    assert.doesNotMatch(
+      code,
+      /\badmin\b|createClient\b|adminKey|registration_quota_decide|has_manage_attorney_verification_scope/,
+      file,
+    );
+  }
+  assert.match(
+    codes.get(REQUEST_WRITE_MODULE),
+    /return writeAnswerOf\(await client\.rpc\(name, args\)\);/,
+  );
+  assert.match(
+    codes.get(APPLICANT_ADAPTER),
+    /rowsResultOf\(await client\.rpc\("attorney_start_application"\)\)/,
   );
   const provisioning = codes.get(PRIVILEGED_MODULE);
   assert.ok(provisioning.endsWith(`\n${QUOTA_DECISION_RPC}`));

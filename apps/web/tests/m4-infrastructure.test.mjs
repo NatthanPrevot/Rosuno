@@ -1,8 +1,9 @@
 // P3-003 infrastructure and source contract tests (fixture-only).
 //
-// The two narrow P3-003 privileged ports and the request-scoped adapters run
-// against recording stand-ins for the installed client: every query chain
-// they build is captured and compared exactly, and nothing is sent anywhere.
+// The two narrow P3-003 privileged read ports and the request-scoped read
+// and write adapters (P3-904) run against recording stand-ins for the
+// installed client: every query chain and write function call they build is
+// captured and compared exactly, and nothing is sent anywhere.
 // Synthetic project values only; no provider, network, credential, or
 // database is contacted.
 
@@ -22,7 +23,6 @@ import {
   PROFILE_COLUMNS,
 } from "../src/application/professional-records.ts";
 import { POLICY_VERSION_COLUMNS } from "../src/application/policy-selection.ts";
-import { auditEventOf } from "../src/application/professional-audit.ts";
 import {
   createAttorneyProfessionalProvisioning,
   createStaffVerificationProvisioning,
@@ -30,11 +30,16 @@ import {
 import {
   ATTORNEY_PROFESSIONAL_SOURCES,
   createAttorneyProfessionalReads,
+  createAttorneyProfessionalWrites,
   createBoundedProfessionalProvisioning,
 } from "../src/infrastructure/professional/attorney-professional-adapter.ts";
-import { createRequestAccountSource } from "../src/infrastructure/professional/professional-request-client.ts";
+import {
+  createRequestAccountSource,
+  writeAnswerOf,
+} from "../src/infrastructure/professional/professional-request-client.ts";
 import {
   createStaffReads,
+  createStaffWrites,
   STAFF_VERIFICATION_SOURCES,
 } from "../src/infrastructure/staff/staff-verification-adapter.ts";
 
@@ -127,7 +132,7 @@ function factoryOf(client) {
   };
 }
 
-test("M4-I1. both P3-003 privileged ports are built only for a verified project binding, as one cookie-free client each, with exact operation lists", async () => {
+test("M4-I1. both P3-003 privileged ports are built only for a verified project binding, as one cookie-free client each, and offer reads only", async () => {
   for (const factory of [
     createAttorneyProfessionalProvisioning,
     createStaffVerificationProvisioning,
@@ -171,16 +176,6 @@ test("M4-I1. both P3-003 privileged ports are built only for a verified project 
     "evidenceFlagsOf",
     "evaluationsOf",
     "informationRequestsOf",
-    "updateProfileDetails",
-    "updatePresentationDetails",
-    "insertLicense",
-    "updateLicense",
-    "insertInsurance",
-    "updateInsurance",
-    "insertAuthorisationRequest",
-    "updateAuthorisationRequest",
-    "submitApplication",
-    "insertAuditEvent",
   ]);
   const staff = await createStaffVerificationProvisioning(
     ENVIRONMENT,
@@ -198,29 +193,48 @@ test("M4-I1. both P3-003 privileged ports are built only for a verified project 
     "evidenceOf",
     "policyVersionsFor",
     "authorityReferencesFor",
-    "insertEvidence",
-    "linkEvidence",
-    "recordLicenseObservation",
-    "insertDiscipline",
-    "updateDisciplineStatus",
-    "decideAuthorisation",
-    "transitionProfile",
-    "evaluationById",
-    "insertEvaluation",
-    "insertAuditEvent",
     "profileHistoryOf",
   ]);
-  // The unconfigured deployed wiring builds nothing privileged.
+  // The privileged module itself no longer contains any write builder.
+  const privileged = codeOf(
+    read("src/infrastructure/identity/registration-provisioning.ts"),
+  );
+  const professional = privileged.slice(
+    privileged.indexOf(
+      "export async function createAttorneyProfessionalProvisioning",
+    ),
+    privileged.indexOf("type QuotaDigests"),
+  );
+  assert.doesNotMatch(professional, /\.(insert|update|upsert|delete)\(/);
+  assert.doesNotMatch(professional, /\brpc\b/);
+  assert.ok(professional.includes("createAttorneyApplicantProvisioning"));
+  // The unconfigured deployed wiring builds nothing privileged, and no
+  // request client exists to write through.
   assert.equal(await ATTORNEY_PROFESSIONAL_SOURCES.provisioning(), null);
   assert.equal(await STAFF_VERIFICATION_SOURCES.provisioning(), null);
+  assert.equal(await ATTORNEY_PROFESSIONAL_SOURCES.writes(), null);
+  assert.equal(await STAFF_VERIFICATION_SOURCES.writes(), null);
 });
 
-test("M4-I2. the attorney port writes only keyed, guarded claims and never a lifecycle, observed status, or decision chosen elsewhere", async () => {
-  const { client, log } = recordingClient(() => ({ data: [{}], error: null }));
-  const port = await createAttorneyProfessionalProvisioning(
-    ENVIRONMENT,
-    factoryOf(client).create,
-  );
+test("M4-I2. the attorney write port calls exactly one fixed write function per change through the request's own client, with only named arguments and no actor, User, or profile", async () => {
+  const { client, log } = recordingClient(() => ({
+    data: "applied",
+    error: null,
+    status: 200,
+  }));
+  const writes = await createAttorneyProfessionalWrites(
+    async () => client,
+    50,
+  )();
+  assert.ok(Object.isFrozen(writes));
+  assert.deepEqual(Object.keys(writes), [
+    "saveProfileDetails",
+    "saveLicense",
+    "saveInsurance",
+    "requestPracticeArea",
+    "changePracticeAreaRequest",
+    "submitApplication",
+  ]);
   const claim = {
     jurisdiction_id: ID(5),
     license_number: "SYN-1",
@@ -228,237 +242,385 @@ test("M4-I2. the attorney port writes only keyed, guarded claims and never a lif
     effective_from: null,
     effective_until: null,
   };
-  await port.updateLicense(
-    ID(3),
-    ID(7),
-    "2026-11-04T12:00:00.000000+00:00",
-    claim,
+  const insurance = {
+    jurisdiction_id: ID(5),
+    carrier_name: "Synthetic",
+    policy_reference: null,
+    coverage_type: null,
+    per_occurrence_limit_minor: 100,
+    aggregate_limit_minor: null,
+    currency_code: "XTS",
+    coverage_from: null,
+    coverage_until: null,
+  };
+  const applied = { kind: "outcome", outcome: "applied" };
+  assert.deepEqual(
+    await writes.saveProfileDetails("approved", {
+      display_name: "S",
+      headline: null,
+      bio: null,
+      years_experience: 1,
+    }),
+    applied,
   );
-  await port.insertLicense(ID(3), ID(7), claim);
-  await port.submitApplication(ID(3), ID(2));
-  await port.updateAuthorisationRequest(
-    ID(3),
-    ID(8),
-    "requested",
+  await writes.saveLicense(ID(7), null, claim);
+  await writes.saveLicense(ID(7), "2026-11-04T12:00:00.000000+00:00", claim);
+  await writes.saveInsurance(ID(8), null, insurance);
+  await writes.requestPracticeArea(ID(9), ID(5), ID(6));
+  await writes.changePracticeAreaRequest(
+    ID(9),
+    "withdraw",
     "2026-11-04T12:00:00.000000+00:00",
-    { status: "withdrawn" },
   );
-  await port.updateProfileDetails(ID(3), ID(2), {
-    display_name: "S",
-    headline: null,
-    bio: null,
-    years_experience: 1,
-  });
+  await writes.submitApplication();
   assert.deepEqual(log, [
     [
-      ["from", "licenses"],
-      ["update", claim],
-      ["eq", "id", ID(7)],
-      ["eq", "attorney_id", ID(3)],
-      ["eq", "updated_at", "2026-11-04T12:00:00.000000+00:00"],
-      ["is", "reported_status", null],
-      ["select", LICENSE_COLUMNS],
-    ],
-    [
-      ["from", "licenses"],
-      ["insert", { id: ID(7), attorney_id: ID(3), ...claim }],
-      ["select", LICENSE_COLUMNS],
-    ],
-    [
-      ["from", "attorney_profiles"],
-      ["update", { profile_state: "under_review" }],
-      ["eq", "id", ID(3)],
-      ["eq", "user_id", ID(2)],
-      ["eq", "profile_state", "applicant"],
-      ["select", PROFILE_COLUMNS],
-    ],
-    [
-      ["from", "practice_area_authorisations"],
-      ["update", { status: "withdrawn" }],
-      ["eq", "id", ID(8)],
-      ["eq", "attorney_id", ID(3)],
-      ["eq", "status", "requested"],
-      ["eq", "updated_at", "2026-11-04T12:00:00.000000+00:00"],
-      ["is", "decided_at", null],
-      ["select", PRACTICE_AUTHORISATION_COLUMNS],
-    ],
-    [
-      ["from", "attorney_profiles"],
       [
-        "update",
-        { display_name: "S", headline: null, bio: null, years_experience: 1 },
+        "rpc",
+        "attorney_save_profile_details",
+        {
+          p_expected_state: "approved",
+          p_display_name: "S",
+          p_headline: null,
+          p_bio: null,
+          p_years_experience: 1,
+        },
       ],
-      ["eq", "id", ID(3)],
-      ["eq", "user_id", ID(2)],
-      ["eq", "profile_state", "applicant"],
-      ["select", PROFILE_COLUMNS],
+    ],
+    [
+      [
+        "rpc",
+        "attorney_save_license_claim",
+        {
+          p_license_id: ID(7),
+          p_expected_updated_at: null,
+          p_jurisdiction_id: ID(5),
+          p_license_number: "SYN-1",
+          p_license_type: null,
+          p_effective_from: null,
+          p_effective_until: null,
+        },
+      ],
+    ],
+    [
+      [
+        "rpc",
+        "attorney_save_license_claim",
+        {
+          p_license_id: ID(7),
+          p_expected_updated_at: "2026-11-04T12:00:00.000000+00:00",
+          p_jurisdiction_id: ID(5),
+          p_license_number: "SYN-1",
+          p_license_type: null,
+          p_effective_from: null,
+          p_effective_until: null,
+        },
+      ],
+    ],
+    [
+      [
+        "rpc",
+        "attorney_save_insurance_claim",
+        {
+          p_record_id: ID(8),
+          p_expected_updated_at: null,
+          p_jurisdiction_id: ID(5),
+          p_carrier_name: "Synthetic",
+          p_policy_reference: null,
+          p_coverage_type: null,
+          p_per_occurrence_limit_minor: 100,
+          p_aggregate_limit_minor: null,
+          p_currency_code: "XTS",
+          p_coverage_from: null,
+          p_coverage_until: null,
+        },
+      ],
+    ],
+    [
+      [
+        "rpc",
+        "attorney_request_practice_area",
+        {
+          p_authorisation_id: ID(9),
+          p_jurisdiction_id: ID(5),
+          p_practice_area_id: ID(6),
+        },
+      ],
+    ],
+    [
+      [
+        "rpc",
+        "attorney_change_practice_area_request",
+        {
+          p_authorisation_id: ID(9),
+          p_intent: "withdraw",
+          p_expected_updated_at: "2026-11-04T12:00:00.000000+00:00",
+        },
+      ],
+    ],
+    [["rpc", "attorney_submit_application", {}]],
+  ]);
+  // No request client: no port. A slow or throwing client: unreadable.
+  assert.equal(
+    await createAttorneyProfessionalWrites(async () => null, 50)(),
+    null,
+  );
+  const slow = await createAttorneyProfessionalWrites(
+    async () => ({
+      rpc: () => new Promise(() => {}),
+    }),
+    25,
+  )();
+  assert.deepEqual(await slow.submitApplication(), { kind: "unreadable" });
+});
+
+test("M4-I3. the staff write port calls exactly one fixed write function per change with only named arguments and no reviewer, User, grant, or scope; a malformed evaluation row is refused before sending; answers are read strictly", async () => {
+  const { client, log } = recordingClient(() => ({
+    data: "applied",
+    error: null,
+    status: 200,
+  }));
+  const writes = await createStaffWrites(async () => client, 50)();
+  assert.deepEqual(Object.keys(writes), [
+    "recordFinding",
+    "recordSourceUnavailable",
+    "recordDisciplineFinding",
+    "decidePracticeArea",
+    "changeProfileStage",
+    "recordEvaluation",
+  ]);
+  const evidence = {
+    source_type: "synthetic register",
+    source_uri: null,
+    source_reference: "synthetic entry",
+    retrieved_at: "2026-11-04T11:00:00.000Z",
+    evidence_summary: "synthetic",
+    evidence_digest: null,
+    verification_method: "synthetic lookup",
+    discrepancy_flag: false,
+  };
+  const evidenceArgs = {
+    p_source_type: "synthetic register",
+    p_source_uri: null,
+    p_source_reference: "synthetic entry",
+    p_retrieved_at: "2026-11-04T11:00:00.000Z",
+    p_verification_method: "synthetic lookup",
+    p_evidence_summary: "synthetic",
+    p_evidence_digest: null,
+    p_discrepancy_flag: false,
+  };
+  await writes.recordFinding({
+    evidenceId: ID(10),
+    subjectKind: "license",
+    subjectId: ID(7),
+    expectedUpdatedAt: "u",
+    evidence,
+    observedStatus: "synthetic-active",
+    disciplineStatus: null,
+    resolvedAt: null,
+  });
+  await writes.recordSourceUnavailable("insurance", ID(8), "synthetic");
+  await writes.recordDisciplineFinding({
+    disciplineId: ID(11),
+    evidenceId: ID(12),
+    attorneyId: ID(3),
+    record: {
+      jurisdiction_id: ID(5),
+      external_reference: null,
+      finding_type: null,
+      opened_at: null,
+      resolved_at: null,
+      status: "synthetic",
+    },
+    evidence,
+  });
+  await writes.decidePracticeArea(
+    ID(9),
+    "u",
+    { status: "authorised", effective_from: "f", effective_until: null },
+    "basis",
+  );
+  await writes.changeProfileStage(ID(3), "request_information", "m", null);
+  const row = {
+    id: ID(13),
+    attorney_id: ID(3),
+    jurisdiction_id: ID(5),
+    context_type: "jurisdiction",
+    context_id: null,
+    evaluated_at: "2026-11-04T12:00:00.000Z",
+    as_of: "2026-11-04T12:00:00.000Z",
+    result: "undetermined",
+    factor_results: [],
+    policy_references: [],
+    evidence_references: { evidence_ids: [] },
+  };
+  await writes.recordEvaluation(row);
+  assert.deepEqual(log, [
+    [
+      [
+        "rpc",
+        "staff_record_verification_finding",
+        {
+          p_evidence_id: ID(10),
+          p_subject_kind: "license",
+          p_subject_id: ID(7),
+          p_expected_updated_at: "u",
+          ...evidenceArgs,
+          p_observed_status: "synthetic-active",
+          p_discipline_status: null,
+          p_resolved_at: null,
+        },
+      ],
+    ],
+    [
+      [
+        "rpc",
+        "staff_record_source_unavailable",
+        {
+          p_subject_kind: "insurance",
+          p_subject_id: ID(8),
+          p_note: "synthetic",
+        },
+      ],
+    ],
+    [
+      [
+        "rpc",
+        "staff_record_discipline_finding",
+        {
+          p_discipline_id: ID(11),
+          p_evidence_id: ID(12),
+          p_attorney_id: ID(3),
+          p_jurisdiction_id: ID(5),
+          p_external_reference: null,
+          p_finding_type: null,
+          p_opened_at: null,
+          p_resolved_at: null,
+          p_status: "synthetic",
+          ...evidenceArgs,
+        },
+      ],
+    ],
+    [
+      [
+        "rpc",
+        "staff_decide_practice_area",
+        {
+          p_authorisation_id: ID(9),
+          p_expected_updated_at: "u",
+          p_decision: "authorised",
+          p_effective_from: "f",
+          p_effective_until: null,
+          p_note: "basis",
+        },
+      ],
+    ],
+    [
+      [
+        "rpc",
+        "staff_change_profile_stage",
+        {
+          p_attorney_id: ID(3),
+          p_intent: "request_information",
+          p_message: "m",
+          p_note: null,
+        },
+      ],
+    ],
+    [
+      [
+        "rpc",
+        "staff_record_eligibility_evaluation",
+        {
+          p_evaluation_id: ID(13),
+          p_attorney_id: ID(3),
+          p_jurisdiction_id: ID(5),
+          p_context_type: "jurisdiction",
+          p_context_id: null,
+          p_as_of: "2026-11-04T12:00:00.000Z",
+          p_result: "undetermined",
+          p_factor_results: [],
+          p_policy_references: [],
+          p_evidence_references: { evidence_ids: [] },
+        },
+      ],
     ],
   ]);
   log.length = 0;
-  // Id lists must be canonical, bounded, and non-empty; audit rows must be
-  // the attorney's own exact shape. Anything else sends nothing.
-  for (const call of [
-    () => port.evidenceSubjectsOf("license", ["not-an-id"]),
-    () => port.evidenceSubjectsOf("license", []),
-    () =>
-      port.evidenceFlagsOf(Array.from({ length: 501 }, (_v, i) => ID(i + 1))),
-    () =>
-      port.insertAuditEvent(
-        auditEventOf({
-          actorUserId: ID(2),
-          actorType: "staff",
-          action: "attorney_claim_recorded",
-          resourceType: "license",
-          resourceId: ID(7),
-          occurredAtMs: 0,
-        }),
-      ),
-    () =>
-      port.insertAuditEvent({
-        ...auditEventOf({
-          actorUserId: ID(2),
-          actorType: "attorney",
-          action: "attorney_claim_recorded",
-          resourceType: "license",
-          resourceId: ID(7),
-          occurredAtMs: 0,
-        }),
-        extra: 1,
-      }),
+  for (const malformed of [
+    { ...row, extra: 1 },
+    { id: ID(13), attorney_id: ID(3), result: "eligible" },
   ]) {
-    assert.deepEqual(await call(), { kind: "unreadable" });
+    assert.deepEqual(await writes.recordEvaluation(malformed), {
+      kind: "rejected",
+    });
   }
   assert.deepEqual(log, []);
-  await port.evidenceSubjectsOf("insurance", [ID(9), ID(9)]);
-  assert.deepEqual(log[0], [
-    ["from", "verification_evidence_subjects"],
-    ["select", "verification_evidence_id, insurance_record_id"],
-    ["in", "insurance_record_id", [ID(9)]],
-    ["limit", 500],
-  ]);
-  const errored = await createAttorneyProfessionalProvisioning(
-    ENVIRONMENT,
-    factoryOf(
-      recordingClient(() => ({ data: null, error: { message: "synthetic" } }))
-        .client,
-    ).create,
-  );
-  assert.deepEqual(await errored.jurisdictions(), { kind: "unreadable" });
-});
-
-test("M4-I3. the staff port refuses unsupported transitions, other policy types, malformed evaluations, and non-staff audit rows before sending anything", async () => {
-  const { client, log } = recordingClient(() => ({ data: [{}], error: null }));
+  // The privileged staff read port still refuses other policy types.
   const port = await createStaffVerificationProvisioning(
     ENVIRONMENT,
     factoryOf(client).create,
   );
-  for (const [from, to] of [
-    ["applicant", "approved"],
-    ["suspended", "approved"],
-    ["approved", "removed"],
-    ["under_review", "removed"],
-  ]) {
-    assert.deepEqual(
-      await port.transitionProfile(ID(3), { from, to }),
-      { kind: "unreadable" },
-      `${from}>${to}`,
-    );
-  }
   assert.deepEqual(
     await port.policyVersionsFor("synthetic_fee_policy", ID(5)),
     { kind: "unreadable" },
   );
-  assert.deepEqual(
-    await port.insertEvaluation({ attorney_id: ID(3), result: "eligible" }),
-    { kind: "unreadable" },
-  );
-  assert.deepEqual(
-    await port.insertAuditEvent(
-      auditEventOf({
-        actorUserId: ID(2),
-        actorType: "attorney",
-        action: "attorney_profile_state_changed",
-        resourceType: "attorney_profile",
-        resourceId: ID(3),
-        occurredAtMs: 0,
-      }),
-    ),
-    { kind: "unreadable" },
-  );
   assert.deepEqual(log, []);
-  await port.transitionProfile(ID(3), { from: "under_review", to: "approved" });
-  await port.decideAuthorisation(ID(3), ID(8), "u", {
-    status: "authorised",
-    decided_at: "d",
-    effective_from: "f",
-    effective_until: null,
-  });
-  await port.updateDisciplineStatus(ID(3), ID(9), "u", "synthetic", null);
-  await port.recordLicenseObservation(ID(3), ID(7), "u", "synthetic-active");
-  await port.policyVersionsFor("attorney_eligibility", ID(5));
-  await port.linkEvidence(ID(10), "discipline", ID(9));
-  assert.deepEqual(log, [
+  // Answers: only a fixed outcome counts; a database error code with an HTTP
+  // error status means the call rolled back; anything else is unknown.
+  const cases = [
     [
-      ["from", "attorney_profiles"],
-      ["update", { profile_state: "approved" }],
-      ["eq", "id", ID(3)],
-      ["eq", "profile_state", "under_review"],
-      ["select", PROFILE_COLUMNS],
+      { data: "applied", error: null, status: 200 },
+      { kind: "outcome", outcome: "applied" },
     ],
     [
-      ["from", "practice_area_authorisations"],
-      [
-        "update",
-        {
-          status: "authorised",
-          decided_at: "d",
-          effective_from: "f",
-          effective_until: null,
-        },
-      ],
-      ["eq", "id", ID(8)],
-      ["eq", "attorney_id", ID(3)],
-      ["eq", "status", "requested"],
-      ["eq", "updated_at", "u"],
-      ["select", PRACTICE_AUTHORISATION_COLUMNS],
+      { data: "conflict", error: null, status: 200 },
+      { kind: "outcome", outcome: "conflict" },
+    ],
+    [{ data: "approved", error: null, status: 200 }, { kind: "unreadable" }],
+    [{ data: ["applied"], error: null, status: 200 }, { kind: "unreadable" }],
+    [
+      { data: null, error: { code: "42501" }, status: 403 },
+      { kind: "rejected" },
     ],
     [
-      ["from", "discipline_records"],
-      ["update", { status: "synthetic" }],
-      ["eq", "id", ID(9)],
-      ["eq", "attorney_id", ID(3)],
-      ["eq", "updated_at", "u"],
-      ["select", DISCIPLINE_COLUMNS],
+      { data: null, error: { code: "40P01" }, status: 500 },
+      { kind: "rejected" },
     ],
     [
-      ["from", "licenses"],
-      ["update", { reported_status: "synthetic-active" }],
-      ["eq", "id", ID(7)],
-      ["eq", "attorney_id", ID(3)],
-      ["eq", "updated_at", "u"],
-      ["select", LICENSE_COLUMNS],
+      { data: null, error: { code: "08006" }, status: 503 },
+      { kind: "unreadable" },
     ],
     [
-      ["from", "policy_versions"],
-      ["select", POLICY_VERSION_COLUMNS],
-      ["eq", "policy_type_code", "attorney_eligibility"],
-      ["eq", "jurisdiction_id", ID(5)],
-      ["limit", 50],
+      { data: null, error: { code: "57P01" }, status: 503 },
+      { kind: "unreadable" },
     ],
     [
-      ["from", "verification_evidence_subjects"],
-      [
-        "insert",
-        { verification_evidence_id: ID(10), discipline_record_id: ID(9) },
-      ],
-      ["select", EVIDENCE_SUBJECT_COLUMNS],
+      { data: null, error: { code: "PGRST202" }, status: 404 },
+      { kind: "unreadable" },
     ],
-  ]);
+    [
+      { data: null, error: { code: "EPIPE" }, status: 0 },
+      { kind: "unreadable" },
+    ],
+    [{ data: null, error: { code: "" }, status: 504 }, { kind: "unreadable" }],
+    [{ data: null, error: { message: "x" } }, { kind: "unreadable" }],
+    [null, { kind: "unreadable" }],
+  ];
+  for (const [answer, expected] of cases) {
+    assert.deepEqual(writeAnswerOf(answer), expected, JSON.stringify(answer));
+  }
   void [
+    DISCIPLINE_COLUMNS,
     EVALUATION_COLUMNS,
     EVIDENCE_COLUMNS,
+    EVIDENCE_SUBJECT_COLUMNS,
     INSURANCE_COLUMNS,
     JURISDICTION_COLUMNS,
+    LICENSE_COLUMNS,
+    PRACTICE_AUTHORISATION_COLUMNS,
+    PROFILE_COLUMNS,
+    POLICY_VERSION_COLUMNS,
   ];
 });
 

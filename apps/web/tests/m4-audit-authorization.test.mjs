@@ -1,10 +1,18 @@
-// P3-003 audit integrity and authorization race tests (fixture-only).
+// P3-003 audit integrity and authorization race tests (fixture-only),
+// corrected by P3-904.
 //
 // Runs the attorney and staff boundaries against the synthetic M4 world in
-// m4-fixtures.mjs, instrumented so a test can make an audit append fail,
-// lose a write's answer after it was applied, or change a grant, account,
-// profile, or record at an exact point of an operation. No provider,
-// network, or database is contacted; every value is synthetic.
+// m4-fixtures.mjs, whose write ports answer as the P3-904 database write
+// functions do: each decides the caller's authority, the target's stage, and
+// the record's version itself, and writes the change and its one audit row
+// together, or nothing. The world is instrumented so a test can make the
+// audit append fail, lose a write's answer after it was applied, or change a
+// grant, account, profile, or record just before the write call, after the
+// application's own checks passed. These tests pin the application's side of
+// the contract; the database's own enforcement, including separately
+// controlled concurrent sessions, is proven against real PostgreSQL in
+// p3-904-db-proof.mjs. No provider, network, or database is contacted; every
+// value is synthetic.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -19,7 +27,10 @@ import {
   submitApplicationForReview,
   SUBMIT_APPLICATION_INTENT,
 } from "../src/application/attorney-professional.ts";
-import { runAuditedChange } from "../src/application/professional-audit.ts";
+import {
+  writeOnce,
+  writeResultOf,
+} from "../src/application/professional-audit.ts";
 import {
   changeProfileStage,
   decidePracticeArea,
@@ -38,7 +49,6 @@ import {
   addPracticeArea,
   addStaff,
   attorneySources,
-  auditPair,
   createWorld,
   form,
   staffSources,
@@ -138,13 +148,19 @@ function operations(s) {
     ]);
   return {
     domain,
+    // [name, run, write method, success status, actor]
     list: [
       [
         "profile details",
         () =>
           saveProfileDetails(attorney(), form({ display_name: "Synthetic" })),
+        "saveProfileDetails",
       ],
-      ["license claim", () => saveLicenseClaim(attorney(), LICENSE(s))],
+      [
+        "license claim",
+        () => saveLicenseClaim(attorney(), LICENSE(s)),
+        "saveLicense",
+      ],
       [
         "insurance claim",
         () =>
@@ -156,6 +172,7 @@ function operations(s) {
               carrier_name: "Synthetic",
             }),
           ),
+        "saveInsurance",
       ],
       [
         "practice-area request",
@@ -164,27 +181,29 @@ function operations(s) {
             attorney(),
             form({ jurisdiction_id: s.a, practice_area_id: s.area }),
           ),
+        "requestPracticeArea",
       ],
       [
         "submission",
-        async () => {
-          addLicense(s.w, s.applicant.attorneyId, s.b);
-          return submitApplicationForReview(
+        () =>
+          submitApplicationForReview(
             attorney(),
             form({
               [SUBMIT_APPLICATION_INTENT.field]:
                 SUBMIT_APPLICATION_INTENT.value,
             }),
-          );
-        },
+          ),
+        "submitApplication",
       ],
       [
         "verification finding",
         () => recordVerificationFinding(reviewer(), FINDING(s.licenseA.id)),
+        "recordFinding",
       ],
       [
         "discipline finding",
         () => recordDisciplineFinding(reviewer(), DISCIPLINE(s)),
+        "recordDisciplineFinding",
       ],
       [
         "practice-area decision",
@@ -197,6 +216,7 @@ function operations(s) {
               note: "Synthetic basis",
             }),
           ),
+        "decidePracticeArea",
       ],
       [
         "profile transition",
@@ -205,6 +225,7 @@ function operations(s) {
             reviewer(),
             form({ attorney: s.reviewed.attorneyId, intent: "approve" }),
           ),
+        "changeProfileStage",
       ],
       [
         "eligibility determination",
@@ -217,220 +238,188 @@ function operations(s) {
               practice_area_id: "",
             }),
           ),
+        "recordEvaluation",
       ],
     ],
   };
 }
 
-test("M4-AU1. no consequential operation writes anything when its attempt audit row cannot be appended", async () => {
+const ATTORNEY_WRITES = [
+  "saveProfileDetails",
+  "saveLicense",
+  "saveInsurance",
+  "requestPracticeArea",
+  "submitApplication",
+];
+
+function expectedFor(s, method) {
+  return ATTORNEY_WRITES.includes(method)
+    ? { status: "saved", actor: s.applicant.userId, type: "attorney" }
+    : { status: "recorded", actor: s.staff.userId, type: "staff" };
+}
+
+test("M4-AU1. no consequential operation leaves a domain change when its mandatory audit row cannot be written: the database refuses the whole call", async () => {
   for (const index of operations(world()).list.keys()) {
     const s = world();
     const { domain, list } = operations(s);
     const [name, run] = list[index];
-    // The submission case seeds its own license claim first.
-    if (name === "submission") {
-      addLicense(s.w, s.applicant.attorneyId, s.b);
-    }
     const before = domain();
-    s.w.failures.add("prov.audit.attempt");
+    s.w.failures.add("writes.audit");
     const result = await run();
-    if (name === "submission") {
-      // The seeding call inside run added one more claim; remove it again.
-      s.w.licenses.pop();
-    }
-    assert.equal(result.status, "unavailable", name);
+    assert.equal(result.status, "not-saved", name);
     assert.equal(domain(), before, name);
     assert.equal(s.w.audit_events.length, 0, name);
   }
 });
 
-test("M4-AU2. every applied change has its attempt row before it and an applied outcome after it; a missing outcome row is never reported as fully recorded", async () => {
-  for (const index of operations(world()).list.keys()) {
-    const s = world();
-    const [name, run] = operations(s).list[index];
-    const result = await run();
-    assert.ok(
-      result.status === "saved" || result.status === "recorded",
-      `${name}: ${result.status}`,
-    );
-    const attempts = s.w.audit_events.filter(
-      (e) => e.after_snapshot?.audit_phase === "attempt",
-    );
-    const outcomes = s.w.audit_events.filter(
-      (e) => e.after_snapshot?.audit_phase === "outcome",
-    );
-    assert.equal(attempts.length, 1, name);
-    assert.deepEqual(
-      outcomes.map((e) => [
-        e.after_snapshot.attempt_event_id,
-        e.after_snapshot.outcome,
-        e.after_snapshot.authority,
-      ]),
-      [[attempts[0].id, "applied", "held"]],
-      name,
-    );
-    assert.ok(
-      s.w.audit_events.indexOf(attempts[0]) <
-        s.w.audit_events.indexOf(outcomes[0]),
-      name,
-    );
-  }
-  // Outcome append fails: the change persisted with its attempt row, and
-  // the state says it could not be fully confirmed.
+test("M4-AU2. every applied change commits with exactly one audit row naming the verified caller; nothing else is appended", async () => {
   for (const index of operations(world()).list.keys()) {
     const s = world();
     const { domain, list } = operations(s);
-    const [name, run] = list[index];
+    const [name, run, method] = list[index];
+    const expected = expectedFor(s, method);
     const before = domain();
-    s.w.failures.add("prov.audit.outcome");
     const result = await run();
-    assert.equal(result.status, "unconfirmed", name);
+    assert.equal(result.status, expected.status, name);
     assert.notEqual(domain(), before, name);
+    assert.equal(s.w.audit_events.length, 1, name);
+    const [row] = s.w.audit_events;
+    assert.deepEqual(
+      [row.actor_user_id, row.actor_type],
+      [expected.actor, expected.type],
+      name,
+    );
     assert.equal(
-      s.w.audit_events.filter(
-        (e) => e.after_snapshot?.audit_phase === "attempt",
-      ).length,
-      1,
+      Object.hasOwn(row.after_snapshot ?? {}, "audit_phase"),
+      false,
       name,
     );
   }
 });
 
-test("M4-AU3. failed writes record a not-applied outcome; lost answers are resolved by reading the generated id; retries never duplicate", async () => {
+test("M4-AU3. an unknown or lost answer is never reported as success: a lost call changed nothing, and a lost answer left exactly one change and one audit row", async () => {
+  for (const index of operations(world()).list.keys()) {
+    let s = world();
+    let ops = operations(s);
+    const [name, , method] = ops.list[index];
+    // The answer never arrives and the call did not run.
+    let before = ops.domain();
+    s.w.failures.add(`writes.${method}`);
+    assert.equal((await ops.list[index][1]()).status, "unconfirmed", name);
+    assert.equal(ops.domain(), before, name);
+    assert.equal(s.w.audit_events.length, 0, name);
+    // The call ran and committed, but its answer was lost.
+    s = world();
+    ops = operations(s);
+    before = ops.domain();
+    s.w.lost.add(`writes.${method}`);
+    assert.equal((await ops.list[index][1]()).status, "unconfirmed", name);
+    assert.notEqual(ops.domain(), before, name);
+    assert.equal(s.w.audit_events.length, 1, name);
+  }
+});
+
+test("M4-AU4. a replayed write with the same server-generated id never duplicates a record or an audit row", async () => {
   const s = world();
-  const sources = attorneySources(s.w, s.applicant.authId);
-  // Refused insert: nothing persists, and the audit says so.
-  s.w.failures.add("prov.insertLicense");
-  assert.deepEqual(await saveLicenseClaim(sources, LICENSE(s)), {
-    status: "not-saved",
+  const fixedId = "00000000-0000-4000-8000-000099990001";
+  const attorney = attorneySources(s.w, s.applicant.authId, {
+    newId: () => fixedId,
   });
-  assert.equal(
-    s.w.licenses.filter((l) => l.attorney_id === s.applicant.attorneyId).length,
-    0,
-  );
-  assert.equal(
-    auditPair(s.w, "attorney_claim_recorded").outcome.after_snapshot.outcome,
-    "not_applied",
-  );
-  s.w.failures.clear();
-  // Applied insert whose answer is lost: the id-keyed read shows it applied.
-  s.w.lost.add("prov.insertLicense");
-  assert.deepEqual(await saveLicenseClaim(sources, LICENSE(s)), {
+  assert.deepEqual(await saveLicenseClaim(attorney, LICENSE(s)), {
     status: "saved",
   });
-  assert.equal(
-    auditPair(s.w, "attorney_claim_recorded").outcome.after_snapshot.outcome,
-    "applied",
+  assert.deepEqual(
+    await saveLicenseClaim(attorney, LICENSE(s, { license_number: "SYN-2" })),
+    { status: "not-saved" },
   );
-  s.w.lost.clear();
-  // A retry of the same claim is refused by the unique license number.
-  assert.deepEqual(await saveLicenseClaim(sources, LICENSE(s)), {
-    status: "not-saved",
+  assert.equal(s.w.licenses.filter((l) => l.id === fixedId).length, 1);
+  const evidenceId = "00000000-0000-4000-8000-000099990002";
+  const reviewer = staffSources(s.w, s.staff.authId, {
+    newId: () => evidenceId,
   });
-  assert.equal(
-    s.w.licenses.filter((l) => l.license_number === "SYN-NEW").length,
-    1,
-  );
-  // A retry after a failed attempt append succeeds exactly once.
-  s.w.failures.add("prov.audit.attempt");
   assert.deepEqual(
-    await saveLicenseClaim(
-      sources,
-      LICENSE(s, { license_number: "SYN-RETRY" }),
-    ),
-    { status: "unavailable" },
-  );
-  s.w.failures.clear();
-  assert.deepEqual(
-    await saveLicenseClaim(
-      sources,
-      LICENSE(s, { license_number: "SYN-RETRY" }),
-    ),
-    { status: "saved" },
-  );
-  assert.equal(
-    s.w.licenses.filter((l) => l.license_number === "SYN-RETRY").length,
-    1,
-  );
-  // Staff: a lost evidence answer stops the link and the status, and the
-  // outcome truthfully records only part of the change.
-  const reviewer = staffSources(s.w, s.staff.authId);
-  s.w.lost.add("prov.insertEvidence");
-  assert.deepEqual(
-    await recordVerificationFinding(reviewer, FINDING(s.licenseA.id)),
-    { status: "unconfirmed" },
-  );
-  assert.equal(s.licenseA.reported_status, null);
-  assert.equal(
-    auditPair(s.w, "verification_evidence_recorded").outcome.after_snapshot
-      .outcome,
-    "partially_applied",
-  );
-  s.w.lost.clear();
-  // Unreadable verification is recorded as unknown, never as applied.
-  s.w.failures.add("prov.evaluationById");
-  assert.deepEqual(
-    await recordEligibilityDetermination(
+    await recordVerificationFinding(
       reviewer,
-      form({
-        attorney: s.reviewed.attorneyId,
-        jurisdiction_id: s.a,
-        practice_area_id: "",
-      }),
+      FINDING(s.licenseA.id, { observed_status: "" }),
     ),
-    { status: "unconfirmed" },
+    { status: "recorded" },
+  );
+  assert.deepEqual(
+    await recordVerificationFinding(
+      reviewer,
+      FINDING(s.licenseA.id, { observed_status: "" }),
+    ),
+    { status: "not-saved" },
   );
   assert.equal(
-    auditPair(s.w, "eligibility_evaluation_recorded").outcome.after_snapshot
-      .outcome,
-    "unknown",
+    s.w.verification_evidence.filter((e) => e.id === evidenceId).length,
+    1,
+  );
+  assert.equal(
+    s.w.audit_events.filter((e) =>
+      [fixedId, evidenceId].includes(e.resource_id),
+    ).length,
+    2,
   );
 });
 
-test("M4-AU4. the applicant sees a staff message only once its return to the applicant stage is confirmed or actually in effect", async () => {
+test("M4-AU5. the applicant sees every committed request for more information, newest first, and only the message written for the applicant", async () => {
   const s = world();
   const reviewer = staffSources(s.w, s.staff.authId);
-  const ask = (message) =>
-    changeProfileStage(
+  const attorney = attorneySources(s.w, s.reviewed.authId);
+  for (const message of [
+    "Synthetic first request",
+    "Synthetic second request",
+  ]) {
+    s.w.now += DAY;
+    assert.deepEqual(
+      await changeProfileStage(
+        reviewer,
+        form({
+          attorney: s.reviewed.attorneyId,
+          intent: "request_information",
+          message,
+        }),
+      ),
+      { status: "recorded" },
+    );
+    s.w.attorney_profiles.find(
+      (p) => p.id === s.reviewed.attorneyId,
+    ).profile_state = "under_review";
+  }
+  s.w.attorney_profiles.find(
+    (p) => p.id === s.reviewed.attorneyId,
+  ).profile_state = "applicant";
+  const view = await resolveProfessionalSetup(attorney);
+  assert.deepEqual(
+    view.informationRequests.map((r) => r.message),
+    ["Synthetic second request", "Synthetic first request"],
+  );
+  // A refused request leaves nothing to show.
+  s.w.attorney_profiles.find(
+    (p) => p.id === s.reviewed.attorneyId,
+  ).profile_state = "approved";
+  assert.deepEqual(
+    await changeProfileStage(
       reviewer,
       form({
         attorney: s.reviewed.attorneyId,
         intent: "request_information",
-        message,
+        message: "Synthetic refused request",
       }),
-    );
-  const messages = async () => {
-    const view = await resolveProfessionalSetup(
-      attorneySources(s.w, s.reviewed.authId),
-    );
-    return view.informationRequests.map((r) => r.message);
-  };
-  // A request whose transition does not apply is never shown.
-  s.w.failures.add("prov.transitionProfile");
-  assert.deepEqual(await ask("Synthetic not applied"), { status: "not-saved" });
-  s.w.failures.clear();
-  assert.deepEqual(await messages(), []);
-  // Applied with its outcome row: shown.
-  assert.deepEqual(await ask("Synthetic applied"), { status: "recorded" });
-  assert.deepEqual(await messages(), ["Synthetic applied"]);
-  // Applied but its outcome row failed: still shown, because the profile
-  // really is back in the applicant stage, and the staff state was honest.
-  s.w.attorney_profiles.find(
-    (p) => p.id === s.reviewed.attorneyId,
-  ).profile_state = "under_review";
-  s.w.now += 1000;
-  s.w.failures.add("prov.audit.outcome");
-  assert.deepEqual(await ask("Synthetic outcome missing"), {
-    status: "unconfirmed",
-  });
-  s.w.failures.clear();
-  assert.deepEqual(await messages(), [
-    "Synthetic outcome missing",
-    "Synthetic applied",
-  ]);
+    ),
+    { status: "locked" },
+  );
+  assert.equal(
+    s.w.audit_events.filter(
+      (e) =>
+        e.after_snapshot?.message_to_applicant === "Synthetic refused request",
+    ).length,
+    0,
+  );
 });
 
-test("M4-AZ1. a grant revoked, expired, or re-scoped, a deactivated Staff Profile, or a suspended User after the check stops every remaining write", async () => {
+test("M4-AZ1. a grant revoked, expired, re-scoped, or resource-scoped, a deactivated Staff Profile, or a suspended User landing after the application's check is decided by the write itself: denied, nothing written", async () => {
   const changes = {
     revoked: (s) =>
       (s.w.capability_grants.find(
@@ -456,151 +445,90 @@ test("M4-AZ1. a grant revoked, expired, or re-scoped, a deactivated Staff Profil
       (s.w.users.find((u) => u.id === s.staff.userId).account_state =
         "suspended"),
   };
-  for (const [name, change] of Object.entries(changes)) {
-    // Between the attempt row and the first write: nothing is written.
-    let s = world();
-    s.w.hooks.set("prov.insertAuditEvent", () => change(s));
-    assert.deepEqual(
-      await recordVerificationFinding(
-        staffSources(s.w, s.staff.authId),
-        FINDING(s.licenseA.id),
-      ),
-      { status: "denied" },
-      name,
-    );
-    assert.equal(s.w.verification_evidence.length, 0, name);
-    assert.equal(s.licenseA.reported_status, null, name);
-    let pair = auditPair(s.w, "verification_evidence_recorded");
-    assert.deepEqual(
-      [
-        pair.outcome.after_snapshot.outcome,
-        pair.outcome.after_snapshot.authority,
-        pair.outcome.after_snapshot.authority_checked,
-      ],
-      ["not_applied", "lapsed", "before_write"],
-      name,
-    );
-    // Between the evidence write and the link: the link and the status are
-    // never written, and the outcome records the partial change.
-    s = world();
-    s.w.hooks.set("prov.insertEvidence", () => change(s));
-    assert.deepEqual(
-      await recordVerificationFinding(
-        staffSources(s.w, s.staff.authId),
-        FINDING(s.licenseA.id),
-      ),
-      { status: "unconfirmed" },
-      name,
-    );
-    assert.equal(s.w.verification_evidence.length, 1, name);
-    assert.equal(
-      s.w.verification_evidence_subjects.filter(
-        (l) => l.license_id === s.licenseA.id,
-      ).length,
-      0,
-      name,
-    );
-    assert.equal(s.licenseA.reported_status, null, name);
-    pair = auditPair(s.w, "verification_evidence_recorded");
-    assert.deepEqual(
-      [
-        pair.outcome.after_snapshot.outcome,
-        pair.outcome.after_snapshot.authority,
-      ],
-      ["partially_applied", "lapsed"],
-      name,
-    );
-    // Profile transitions and determinations stop the same way.
-    s = world();
-    s.w.hooks.set("prov.insertAuditEvent", () => change(s));
-    assert.deepEqual(
-      await changeProfileStage(
-        staffSources(s.w, s.staff.authId),
-        form({ attorney: s.reviewed.attorneyId, intent: "approve" }),
-      ),
-      { status: "denied" },
-      name,
-    );
-    assert.equal(
-      s.w.attorney_profiles.find((p) => p.id === s.reviewed.attorneyId)
-        .profile_state,
-      "under_review",
-      name,
-    );
-    s = world();
-    s.w.hooks.set("prov.insertAuditEvent", () => change(s));
-    assert.deepEqual(
-      await recordEligibilityDetermination(
-        staffSources(s.w, s.staff.authId),
-        form({
-          attorney: s.reviewed.attorneyId,
-          jurisdiction_id: s.a,
-          practice_area_id: "",
-        }),
-      ),
-      { status: "denied" },
-      name,
-    );
-    assert.equal(s.w.eligibility_evaluations.length, 0, name);
+  const staffOps = [
+    "recordFinding",
+    "recordDisciplineFinding",
+    "decidePracticeArea",
+    "changeProfileStage",
+    "recordEvaluation",
+  ];
+  for (const [change, apply] of Object.entries(changes)) {
+    for (const method of staffOps) {
+      const s = world();
+      const ops = operations(s);
+      const [, run] = ops.list.find((entry) => entry[2] === method);
+      const before = ops.domain();
+      s.w.hooks.set(`writes.${method}`, () => apply(s));
+      assert.deepEqual(
+        await run(),
+        { status: "denied" },
+        `${change} ${method}`,
+      );
+      assert.equal(ops.domain(), before, `${change} ${method}`);
+      assert.equal(s.w.audit_events.length, 0, `${change} ${method}`);
+    }
   }
 });
 
-test("M4-AZ2. a change of authority inside the final write's own window is detected at completion and never reported as recorded", async () => {
-  const s = world();
-  // The hook runs after the last re-check and just before the write itself:
-  // the one window the application cannot close without a database-side
-  // check in the same statement.
-  s.w.hooks.set("prov.transitionProfile", () => {
-    s.w.capability_grants.find((g) => g.user_id === s.staff.userId).revoked_at =
-      s.w.now - 1;
-  });
-  assert.deepEqual(
-    await changeProfileStage(
-      staffSources(s.w, s.staff.authId),
-      form({ attorney: s.reviewed.attorneyId, intent: "approve" }),
-    ),
-    { status: "unconfirmed" },
-  );
-  assert.equal(
-    s.w.attorney_profiles.find((p) => p.id === s.reviewed.attorneyId)
-      .profile_state,
-    "approved",
-  );
-  const pair = auditPair(s.w, "attorney_profile_state_changed");
-  assert.deepEqual(
-    [
-      pair.outcome.after_snapshot.outcome,
-      pair.outcome.after_snapshot.authority,
-      pair.outcome.after_snapshot.authority_checked,
-    ],
-    ["applied", "lapsed", "at_completion"],
-  );
+test("M4-AZ2. no write call sends an actor, User, account, reviewer, or grant: the database derives the caller from the session", async () => {
+  for (const index of operations(world()).list.keys()) {
+    const s = world();
+    const [name, run, method] = operations(s).list[index];
+    let sent = null;
+    s.w.hooks.set(`writes.${method}`, (...args) => {
+      sent = args;
+    });
+    await run();
+    assert.notEqual(sent, null, name);
+    const text = JSON.stringify(sent);
+    for (const identity of [
+      s.applicant.userId,
+      s.applicant.authId,
+      s.staff.userId,
+      s.staff.authId,
+    ]) {
+      assert.equal(text.includes(identity), false, name);
+    }
+    // No argument key names an actor, User, reviewer, or grant.
+    assert.doesNotMatch(
+      text,
+      /"(actor[a-z_]*|[a-z_]*user_id|retrieved_by[a-z_]*|reviewer[a-z_]*|grant[a-z_]*)":/,
+      name,
+    );
+  }
 });
 
-test("M4-AZ3. concurrent stage and record changes stop or fail the remaining writes instead of overwriting them", async () => {
-  // The applicant is returned to editing mid-finding: the remaining writes
-  // stop as a stage that no longer allows them.
+test("M4-AZ3. a stage or record change landing after the application's check makes the write refuse: a changed record is a conflict and a changed stage is locked", async () => {
+  // Record version changed: the reviewer's decision is not saved.
   let s = world();
-  s.w.hooks.set("prov.insertEvidence", () => {
-    s.w.attorney_profiles.find(
-      (p) => p.id === s.reviewed.attorneyId,
-    ).profile_state = "applicant";
+  s.w.hooks.set("writes.decidePracticeArea", () => {
+    s.request.updated_at = "2026-11-04T12:30:00.000000+00:00";
   });
   assert.deepEqual(
-    await recordVerificationFinding(
+    await decidePracticeArea(
       staffSources(s.w, s.staff.authId),
-      FINDING(s.licenseA.id),
+      form({ record: s.request.id, decision: "refused", note: "Synthetic" }),
     ),
-    { status: "unconfirmed" },
+    { status: "not-saved" },
   );
-  assert.equal(
-    s.w.verification_evidence_subjects.filter(
-      (l) => l.license_id === s.licenseA.id,
-    ).length,
-    0,
-  );
+  assert.equal(s.request.status, "requested");
+  assert.equal(s.w.audit_events.length, 0);
+  // Another reviewer decided first: locked.
   s = world();
-  s.w.hooks.set("prov.insertAuditEvent", () => {
+  s.w.hooks.set("writes.decidePracticeArea", () => {
+    s.request.status = "authorised";
+  });
+  assert.deepEqual(
+    await decidePracticeArea(
+      staffSources(s.w, s.staff.authId),
+      form({ record: s.request.id, decision: "refused", note: "Synthetic" }),
+    ),
+    { status: "locked" },
+  );
+  assert.equal(s.w.audit_events.length, 0);
+  // The profile returned to the applicant: findings are locked.
+  s = world();
+  s.w.hooks.set("writes.recordFinding", () => {
     s.w.attorney_profiles.find(
       (p) => p.id === s.reviewed.attorneyId,
     ).profile_state = "applicant";
@@ -613,88 +541,53 @@ test("M4-AZ3. concurrent stage and record changes stop or fail the remaining wri
     { status: "locked" },
   );
   assert.equal(s.w.verification_evidence.length, 0);
-  // The license changes between the read and the status write: the guarded
-  // update writes nothing and the status is never overwritten.
-  s = world();
-  s.w.hooks.set("prov.recordLicenseObservation", () => {
-    s.licenseA.updated_at = "2026-11-04T12:30:00.000000+00:00";
-  });
-  assert.deepEqual(
-    await recordVerificationFinding(
-      staffSources(s.w, s.staff.authId),
-      FINDING(s.licenseA.id),
-    ),
-    { status: "unconfirmed" },
-  );
   assert.equal(s.licenseA.reported_status, null);
-  assert.equal(
-    auditPair(s.w, "verification_evidence_recorded").outcome.after_snapshot
-      .outcome,
-    "partially_applied",
-  );
-  // A competing decision wins: this one is not applied and says so.
-  s = world();
-  s.w.hooks.set("prov.decideAuthorisation", () => {
-    Object.assign(s.request, {
-      status: "authorised",
-      updated_at: "2026-11-04T12:30:00.000000+00:00",
-    });
-  });
-  assert.deepEqual(
-    await decidePracticeArea(
-      staffSources(s.w, s.staff.authId),
-      form({ record: s.request.id, decision: "refused", note: "Synthetic" }),
-    ),
-    { status: "not-saved" },
-  );
-  assert.equal(s.request.status, "authorised");
 });
 
-test("M4-AZ4. an attorney's own authority and preconditions are re-checked before the write: submission, suspension, or new evidence stop it", async () => {
-  const cases = {
-    "submitted elsewhere": (s) =>
-      (s.w.attorney_profiles.find(
-        (p) => p.id === s.applicant.attorneyId,
-      ).profile_state = "under_review"),
-    "profile suspended": (s) =>
-      (s.w.attorney_profiles.find(
-        (p) => p.id === s.applicant.attorneyId,
-      ).profile_state = "suspended"),
-    "user suspended": (s) =>
-      (s.w.users.find((u) => u.id === s.applicant.userId).account_state =
-        "suspended"),
-  };
-  for (const [name, change] of Object.entries(cases)) {
+test("M4-AZ4. an attorney's own submission, suspension, or newly linked evidence landing after the application's check makes the write refuse", async () => {
+  const cases = [
+    [
+      "submitted meanwhile",
+      (s) =>
+        (s.w.attorney_profiles.find(
+          (p) => p.id === s.applicant.attorneyId,
+        ).profile_state = "under_review"),
+      "locked",
+    ],
+    [
+      "profile suspended meanwhile",
+      (s) =>
+        (s.w.attorney_profiles.find(
+          (p) => p.id === s.applicant.attorneyId,
+        ).profile_state = "suspended"),
+      "denied",
+    ],
+    [
+      "user suspended meanwhile",
+      (s) =>
+        (s.w.users.find((u) => u.id === s.applicant.userId).account_state =
+          "suspended"),
+      "denied",
+    ],
+  ];
+  for (const [name, apply, expected] of cases) {
     const s = world();
-    s.w.hooks.set("prov.insertAuditEvent", () => change(s));
+    s.w.hooks.set("writes.saveLicense", () => apply(s));
     assert.deepEqual(
       await saveLicenseClaim(
         attorneySources(s.w, s.applicant.authId),
         LICENSE(s),
       ),
-      { status: "locked" },
+      { status: expected },
       name,
     );
-    assert.equal(
-      s.w.licenses.filter((l) => l.attorney_id === s.applicant.attorneyId)
-        .length,
-      0,
-      name,
-    );
-    assert.equal(
-      auditPair(s.w, "attorney_claim_recorded").outcome.after_snapshot.outcome,
-      "not_applied",
-      name,
-    );
+    assert.equal(s.w.licenses.length, 1, name);
+    assert.equal(s.w.audit_events.length, 0, name);
   }
-  // Evidence linked to a claim between the edit's check and its write.
+  // Evidence linked to the claim meanwhile: the revision is locked.
   const s = world();
-  const own = addLicense(s.w, s.applicant.attorneyId, s.a, {
-    license_number: "SYN-OWN",
-  });
-  s.w.hooks.set("prov.insertAuditEvent", () =>
-    addEvidence(s.w, "license", own),
-  );
+  const own = addLicense(s.w, s.applicant.attorneyId, s.a);
+  s.w.hooks.set("writes.saveLicense", () => addEvidence(s.w, "license", own));
   assert.deepEqual(
     await saveLicenseClaim(
       attorneySources(s.w, s.applicant.authId),
@@ -702,104 +595,62 @@ test("M4-AZ4. an attorney's own authority and preconditions are re-checked befor
     ),
     { status: "locked" },
   );
-  assert.equal(own.license_number, "SYN-OWN");
-  // A withdrawal raced by a staff decision is not applied.
-  const t = world();
-  const pending = addAuthorisation(t.w, t.applicant.attorneyId, t.a, t.area);
-  t.w.hooks.set("prov.updateAuthorisationRequest", () => {
-    Object.assign(pending, {
-      status: "authorised",
-      decided_at: "2026-11-04T12:00:00.000000+00:00",
-    });
+  assert.equal(own.license_number === "SYN-CHANGED", false);
+  // Withdrawal of a request decided meanwhile is locked too.
+  const request = addAuthorisation(s.w, s.applicant.attorneyId, s.b, s.area);
+  s.w.hooks.set("writes.changePracticeAreaRequest", () => {
+    request.status = "refused";
+    request.decided_at = "2026-11-04T12:00:00.000000+00:00";
   });
   assert.deepEqual(
     await changePracticeAreaRequest(
-      attorneySources(t.w, t.applicant.authId),
-      form({ record: pending.id, intent: "withdraw" }),
+      attorneySources(s.w, s.applicant.authId),
+      form({ record: request.id, intent: "withdraw" }),
     ),
-    { status: "not-saved" },
+    { status: "locked" },
   );
-  assert.equal(pending.status, "authorised");
-  void DAY;
+  assert.equal(request.status, "refused");
 });
 
-test("M4-AU5. the protocol runner itself: unreadable authority stops writes, a thrown step stops the rest, and malformed append answers count as unrecorded", async () => {
-  const appended = [];
-  const port = {
-    insertAuditEvent: async (event) => {
-      appended.push(event);
-      return {
-        kind: "rows",
-        rows: [
-          {
-            id: `00000000-0000-4000-8000-${String(appended.length).padStart(12, "0")}`,
-          },
-        ],
-      };
-    },
-  };
-  const attempt = {
-    actorUserId: "00000000-0000-4000-8000-000000000001",
-    actorType: "staff",
-    action: "attorney_profile_state_changed",
-    resourceType: "attorney_profile",
-    resourceId: "00000000-0000-4000-8000-000000000002",
-    occurredAtMs: 0,
-  };
-  const ran = [];
-  let result = await runAuditedChange(
-    {
-      port,
-      attempt,
-      authorizedForWrite: async () => null,
-      authorizedAtCompletion: async () => true,
-      steps: [async () => ran.push(1) > 0],
-      verify: async () => "applied",
-    },
-    () => 0,
-  );
-  assert.deepEqual(
-    [result.status, result.authority, result.outcome, ran.length],
-    ["stopped", "unreadable", "not_applied", 0],
-  );
-  result = await runAuditedChange(
-    {
-      port,
-      attempt,
-      authorizedForWrite: async () => true,
-      authorizedAtCompletion: async () => true,
-      steps: [
-        async () => {
-          throw new Error("synthetic");
-        },
-        async () => ran.push(2) > 0,
-      ],
-      verify: async () => "not_applied",
-    },
-    () => 0,
-  );
-  assert.deepEqual(
-    [result.status, result.outcome, ran.length],
-    ["completed", "not_applied", 0],
-  );
-  for (const answer of [
-    { kind: "rows", rows: [] },
-    { kind: "rows", rows: [{ id: "x" }] },
-    { kind: "unreadable" },
-    null,
-  ]) {
-    const r = await runAuditedChange(
-      {
-        port: { insertAuditEvent: async () => answer },
-        attempt,
-        authorizedForWrite: async () => true,
-        authorizedAtCompletion: async () => true,
-        steps: [async () => ran.push(3) > 0],
-        verify: async () => "applied",
-      },
-      () => 0,
-    );
-    assert.equal(r.status, "unrecorded");
+test("M4-AU6. the outcome reader is strict: only the five fixed outcomes or a database refusal count, and anything thrown or malformed is unknown", async () => {
+  const answers = [
+    [{ kind: "outcome", outcome: "applied" }, "applied"],
+    [{ kind: "outcome", outcome: "denied" }, "denied"],
+    [{ kind: "outcome", outcome: "locked" }, "locked"],
+    [{ kind: "outcome", outcome: "conflict" }, "conflict"],
+    [{ kind: "outcome", outcome: "invalid" }, "invalid"],
+    [{ kind: "rejected" }, "rejected"],
+    [{ kind: "unreadable" }, "unknown"],
+    [{ kind: "outcome", outcome: "saved" }, "unknown"],
+    [{ kind: "outcome", outcome: "applied", detail: "x" }, "unknown"],
+    [{ kind: "rejected", code: "42501" }, "unknown"],
+    [{ kind: "rows", rows: [] }, "unknown"],
+    [Object.create({ kind: "outcome", outcome: "applied" }), "unknown"],
+    ["applied", "unknown"],
+    [null, "unknown"],
+    [undefined, "unknown"],
+  ];
+  for (const [answer, expected] of answers) {
+    assert.equal(writeResultOf(answer), expected, JSON.stringify(answer));
   }
-  assert.equal(ran.length, 0);
+  const accessor = {};
+  Object.defineProperty(accessor, "kind", {
+    get: () => "outcome",
+    enumerable: true,
+  });
+  Object.defineProperty(accessor, "outcome", {
+    get: () => "applied",
+    enumerable: true,
+  });
+  assert.equal(writeResultOf(accessor), "unknown");
+  assert.equal(
+    await writeOnce(async () => {
+      throw new Error("synthetic");
+    }),
+    "unknown",
+  );
+  assert.equal(
+    await writeOnce(async () => ({ kind: "outcome", outcome: "applied" })),
+    "applied",
+  );
 });

@@ -19,12 +19,19 @@
 // account access, the profile lifecycle stage, verification evidence status,
 // recorded Eligibility determinations, and marketplace and scheduling
 // readiness apart; this page becomes the source of none of them.
+//
+// Every change is one call of one attorney write function through the
+// request's own authenticated session (P3-904). The checks below decide what
+// the page tells the attorney before anything is sent; the database function
+// decides again, on locked rows and for the session's own identity, whether
+// the change happens, and writes it together with its audit event in one
+// transaction. Only its "applied" answer is reported as saved.
 
 import {
   AUDIT_ACTIONS,
-  runAuditedChange,
-  type AuditedResult,
-  type AuditEvent,
+  writeOnce,
+  type WriteAnswer,
+  type WriteResult,
 } from "./professional-audit.ts";
 import {
   activeUserOf,
@@ -102,9 +109,8 @@ export type InsuranceClaim = {
   readonly coverage_until: string | null;
 };
 
-// Server-only, privileged port with narrow, exact-key operations. Every
-// write names the verified profile; none takes a lifecycle stage, verified
-// status, observed status, or decision from the caller.
+// Server-only, privileged port with narrow, exact-key reads only (P3-904:
+// it no longer writes anything).
 export type AttorneyProfessionalProvisioning = {
   readonly jurisdictions: () => Promise<RowsResult>;
   readonly evidenceSubjectsOf: (
@@ -116,61 +122,44 @@ export type AttorneyProfessionalProvisioning = {
   ) => Promise<RowsResult>;
   readonly evaluationsOf: (attorneyId: string) => Promise<RowsResult>;
   readonly informationRequestsOf: (attorneyId: string) => Promise<RowsResult>;
-  readonly updateProfileDetails: (
-    attorneyId: string,
-    userId: string,
+};
+
+// Request-scoped write port: each call is one attorney write function run
+// for the request's own authenticated session. None takes an actor, User,
+// profile, lifecycle stage, observed status, or decision; the database
+// derives the caller and the caller's own profile itself. A version string is
+// the updated_at value exactly as read, so a changed record is a conflict.
+export type AttorneyProfessionalWrites = {
+  // In the applicant stage all four fields change; in the approved stage
+  // only the presentation fields do, and years of experience must be the
+  // reviewed value unchanged.
+  readonly saveProfileDetails: (
+    expectedStage: "applicant" | "approved",
     details: ProfileDetails,
-  ) => Promise<RowsResult>;
-  // An approved profile's presentation fields only: display name, headline,
-  // and biography. Years of experience, a reviewed claim, never changes here.
-  readonly updatePresentationDetails: (
-    attorneyId: string,
-    userId: string,
-    details: PresentationDetails,
-  ) => Promise<RowsResult>;
-  readonly insertLicense: (
-    attorneyId: string,
+  ) => Promise<WriteAnswer>;
+  // A null version adds a claim with the given new id; a version revises the
+  // claim with that id.
+  readonly saveLicense: (
     licenseId: string,
+    expectedUpdatedAt: string | null,
     claim: LicenseClaim,
-  ) => Promise<RowsResult>;
-  readonly updateLicense: (
-    attorneyId: string,
-    licenseId: string,
-    expectedUpdatedAt: string,
-    claim: LicenseClaim,
-  ) => Promise<RowsResult>;
-  readonly insertInsurance: (
-    attorneyId: string,
+  ) => Promise<WriteAnswer>;
+  readonly saveInsurance: (
     recordId: string,
+    expectedUpdatedAt: string | null,
     claim: InsuranceClaim,
-  ) => Promise<RowsResult>;
-  readonly updateInsurance: (
-    attorneyId: string,
-    recordId: string,
-    expectedUpdatedAt: string,
-    claim: InsuranceClaim,
-  ) => Promise<RowsResult>;
-  readonly insertAuthorisationRequest: (
-    attorneyId: string,
+  ) => Promise<WriteAnswer>;
+  readonly requestPracticeArea: (
     authorisationId: string,
     jurisdictionId: string,
     practiceAreaId: string,
-    requestedAt: string,
-  ) => Promise<RowsResult>;
-  readonly updateAuthorisationRequest: (
-    attorneyId: string,
+  ) => Promise<WriteAnswer>;
+  readonly changePracticeAreaRequest: (
     authorisationId: string,
-    expectedStatus: "requested" | "withdrawn",
+    intent: "withdraw" | "renew",
     expectedUpdatedAt: string,
-    next:
-      | { readonly status: "withdrawn" }
-      | { readonly status: "requested"; readonly requestedAt: string },
-  ) => Promise<RowsResult>;
-  readonly submitApplication: (
-    attorneyId: string,
-    userId: string,
-  ) => Promise<RowsResult>;
-  readonly insertAuditEvent: (event: AuditEvent) => Promise<RowsResult>;
+  ) => Promise<WriteAnswer>;
+  readonly submitApplication: () => Promise<WriteAnswer>;
 };
 
 export type AttorneyProfessionalSources = {
@@ -178,9 +167,10 @@ export type AttorneyProfessionalSources = {
   readonly account: AccountSource;
   readonly reads: () => Promise<AttorneyProfessionalReads | null>;
   readonly provisioning: () => Promise<AttorneyProfessionalProvisioning | null>;
+  readonly writes: () => Promise<AttorneyProfessionalWrites | null>;
   readonly clock: () => number;
-  // A new record id generated on the server for each insert, so the audit
-  // attempt names the exact record and verification reads it by id.
+  // A new record id generated on the server for each insert, so a repeated
+  // call can never create a second record.
   readonly newId: () => string;
 };
 
@@ -503,22 +493,17 @@ function snapshotField(snapshot: unknown, key: string): unknown {
     : undefined;
 }
 
-// The staff messages asking this applicant for more information. Under the
-// write-ahead audit protocol a request is an attempt row; it is shown when
-// its outcome row confirms the return to the applicant stage. The newest
-// request is also shown, without such a confirmation, only while the profile
-// actually is in the applicant stage, the state that request produces. Only
-// the message written for the applicant is ever read.
+// The staff messages asking this applicant for more information, newest
+// first. Each audit row is written in the same transaction as the return to
+// the applicant stage it records, so every row read is a change that
+// happened. Only the message written for the applicant is ever read.
 function informationRequestsOf(
   rows: readonly unknown[],
-  stage: ProfileState,
 ): readonly InformationRequestView[] | null {
   const requests: {
-    readonly id: string;
     readonly at: number;
     readonly view: InformationRequestView;
   }[] = [];
-  const outcomes = new Map<string, unknown>();
   for (const row of rows) {
     const fields = readExact(row, [
       "id",
@@ -526,40 +511,29 @@ function informationRequestsOf(
       "action_code",
       "after_snapshot",
     ]);
-    const id = fields?.get("id");
     const at = fields?.get("occurred_at");
-    const action = fields?.get("action_code");
-    if (fields === null || !isUuid(id) || !isTimestamp(at)) {
+    if (
+      fields === null ||
+      !isUuid(fields.get("id")) ||
+      !isTimestamp(at) ||
+      fields.get("action_code") !== AUDIT_ACTIONS.informationRequested
+    ) {
       return null;
     }
-    const snapshot = fields.get("after_snapshot");
-    if (action === AUDIT_ACTIONS.outcome) {
-      const attemptId = snapshotField(snapshot, "attempt_event_id");
-      if (isUuid(attemptId)) {
-        outcomes.set(attemptId, snapshotField(snapshot, "outcome"));
-      }
-      continue;
-    }
-    if (action !== AUDIT_ACTIONS.informationRequested) {
-      return null;
-    }
-    const message = snapshotField(snapshot, "message_to_applicant");
+    const message = snapshotField(
+      fields.get("after_snapshot"),
+      "message_to_applicant",
+    );
     if (typeof message !== "string" || message.trim() === "") {
       continue;
     }
     requests.push({
-      id,
       at: Date.parse(at),
       view: Object.freeze({ requestedAt: at, message }),
     });
   }
   requests.sort((a, b) => b.at - a.at);
-  const shown = requests.filter(
-    (request, index) =>
-      outcomes.get(request.id) === "applied" ||
-      (index === 0 && stage === "applicant" && !outcomes.has(request.id)),
-  );
-  return Object.freeze(shown.map((entry) => entry.view));
+  return Object.freeze(requests.map((entry) => entry.view));
 }
 
 function authorisationStatusOf(status: string): AuthorisationView["status"] {
@@ -585,10 +559,11 @@ export async function resolveProfessionalSetup(
     if (!("profile" in context)) {
       return context;
     }
-    // Without the trusted write boundary nothing on this page could be
-    // saved, so no form is offered at all.
+    // Without the trusted read and write boundaries nothing on this page
+    // could be saved, so no form is offered at all.
     const provisioning = await portFrom(sources.provisioning);
-    if (provisioning === null) {
+    const writes = await portFrom(sources.writes);
+    if (provisioning === null || writes === null) {
       return UNAVAILABLE;
     }
     const profile = context.profile;
@@ -656,7 +631,7 @@ export async function resolveProfessionalSetup(
       jurisdictionNames,
       areaNames,
     );
-    const informationRequests = informationRequestsOf(requests, profile.state);
+    const informationRequests = informationRequestsOf(requests);
     if (eligibility === null || informationRequests === null) {
       return UNAVAILABLE;
     }
@@ -907,11 +882,12 @@ type Writable = {
   readonly context: AttorneyContext;
   readonly reads: AttorneyProfessionalReads;
   readonly provisioning: AttorneyProfessionalProvisioning;
+  readonly writes: AttorneyProfessionalWrites;
 };
 
 // The verified context of a change: the attorney's own profile, in one of
-// the stages the change allows (the applicant stage unless stated), and both
-// ports. Anything else refuses before any write.
+// the stages the change allows (the applicant stage unless stated), and the
+// three ports. Anything else refuses before any write is sent.
 async function writableOf(
   sources: AttorneyProfessionalSources,
   stages: readonly ProfileState[] = ["applicant"],
@@ -928,10 +904,11 @@ async function writableOf(
     return LOCKED;
   }
   const provisioning = await portFrom(sources.provisioning);
-  if (provisioning === null) {
+  const writes = await portFrom(sources.writes);
+  if (provisioning === null || writes === null) {
     return UNAVAILABLE;
   }
-  return { context, reads, provisioning };
+  return { context, reads, provisioning, writes };
 }
 
 // The jurisdiction and practice-area options a submission may name, read
@@ -954,72 +931,25 @@ async function activePracticeAreaIdsOf(
     : read.filter((area) => area.active).map((area) => area.id);
 }
 
-// A fresh re-check of the attorney's authority for one change: the same
-// verified identity and active User still hold exactly the same own profile,
-// still in the stage the change started from while writes remain, and any
-// precondition of the change still holds. true holds, false lapsed, null
-// unreadable.
-function authorityOf(
-  sources: AttorneyProfessionalSources,
-  writable: Writable,
-  precondition: () => Promise<boolean | null> = async () => true,
-): {
-  readonly forWrite: () => Promise<boolean | null>;
-  readonly atCompletion: () => Promise<boolean | null>;
-} {
-  const current = async (
-    stageMustBeApplicant: boolean,
-  ): Promise<boolean | null> => {
-    const fresh = await attorneyContextOf(sources, writable.reads);
-    if (!("profile" in fresh)) {
-      return fresh === UNAVAILABLE ? null : false;
-    }
-    if (
-      fresh.userId !== writable.context.userId ||
-      fresh.profile.id !== writable.context.profile.id
-    ) {
-      return false;
-    }
-    return stageMustBeApplicant
-      ? fresh.profile.state === writable.context.profile.state
-      : true;
-  };
-  return {
-    forWrite: async () => {
-      const held = await current(true);
-      return held === true ? await precondition() : held;
-    },
-    atCompletion: () => current(false),
-  };
-}
-
-// The fixed state shown for one audited change. Only a change whose attempt
-// and applied outcome were both recorded, under authority that still held
-// at completion, is reported saved.
-function stateOf(result: AuditedResult): ProfessionalActionState {
-  if (result.status === "unrecorded") {
-    return UNAVAILABLE;
-  }
-  if (result.status === "stopped") {
-    if (result.outcome !== "not_applied") {
+// The fixed state shown for one write call. Only the database's own
+// "applied" answer, given after the change and its audit row committed
+// together, is reported saved. A refusal by the database committed nothing.
+// An unknown outcome is never claimed either way.
+function stateOf(result: WriteResult): ProfessionalActionState {
+  switch (result) {
+    case "applied":
+      return SAVED;
+    case "denied":
+      return DENIED;
+    case "locked":
+      return LOCKED;
+    case "conflict":
+    case "invalid":
+    case "rejected":
+      return NOT_SAVED;
+    default:
       return UNCONFIRMED;
-    }
-    return result.authority === "lapsed" ? LOCKED : UNAVAILABLE;
   }
-  if (result.outcome === "not_applied") {
-    return NOT_SAVED;
-  }
-  return result.outcome === "applied" &&
-    result.authorityAtCompletion === "held" &&
-    result.outcomeRecorded
-    ? SAVED
-    : UNCONFIRMED;
-}
-
-// Exactly one row reported by one write.
-async function wroteOne(call: () => Promise<RowsResult>): Promise<boolean> {
-  const rows = rowsOf(await attempt(call));
-  return rows !== null && rows.length === 1;
 }
 
 // A new record id generated on the server, or null when unusable.
@@ -1030,36 +960,6 @@ function newIdOf(sources: AttorneyProfessionalSources): string | null {
   } catch {
     return null;
   }
-}
-
-function claimSnapshotOfLicense(record: LicenseRecord | LicenseClaim) {
-  if ("licenseNumber" in record) {
-    return {
-      jurisdiction_id: record.jurisdictionId,
-      license_number: record.licenseNumber,
-      license_type: record.licenseType,
-      effective_from: record.effectiveFrom,
-      effective_until: record.effectiveUntil,
-    };
-  }
-  return { ...record };
-}
-
-function claimSnapshotOfInsurance(record: InsuranceRecord | InsuranceClaim) {
-  if ("carrierName" in record) {
-    return {
-      jurisdiction_id: record.jurisdictionId,
-      carrier_name: record.carrierName,
-      policy_reference: record.policyReference,
-      coverage_type: record.coverageType,
-      per_occurrence_limit_minor: record.perOccurrenceLimitMinor,
-      aggregate_limit_minor: record.aggregateLimitMinor,
-      currency_code: record.currencyCode,
-      coverage_from: record.coverageFrom,
-      coverage_until: record.coverageUntil,
-    };
-  }
-  return { ...record };
 }
 
 // Saves the attorney's own ordinary profile details. In the applicant stage
@@ -1105,7 +1005,7 @@ export async function saveProfileDetails(
     if (!("context" in writable)) {
       return writable;
     }
-    const { context, reads, provisioning } = writable;
+    const { context, writes } = writable;
     const presentationOnly = context.profile.state === "approved";
     const yearsSubmitted = formData.getAll("years_experience").length > 0;
     if (
@@ -1127,64 +1027,12 @@ export async function saveProfileDetails(
         ? context.profile.yearsExperience
         : years,
     });
-    const authority = authorityOf(sources, writable);
     return stateOf(
-      await runAuditedChange(
-        {
-          port: provisioning,
-          attempt: {
-            actorUserId: context.userId,
-            actorType: "attorney",
-            action: AUDIT_ACTIONS.profileDetailsRevised,
-            resourceType: "attorney_profile",
-            resourceId: context.profile.id,
-            before: {
-              display_name: context.profile.displayName,
-              headline: context.profile.headline,
-              bio: context.profile.bio,
-              years_experience: context.profile.yearsExperience,
-            },
-            after: details,
-            reasonCode: presentationOnly ? "presentation_only" : null,
-            occurredAtMs: sources.clock(),
-          },
-          authorizedForWrite: authority.forWrite,
-          authorizedAtCompletion: authority.atCompletion,
-          steps: [
-            () =>
-              wroteOne(() =>
-                presentationOnly
-                  ? provisioning.updatePresentationDetails(
-                      context.profile.id,
-                      context.userId,
-                      {
-                        display_name: details.display_name,
-                        headline: details.headline,
-                        bio: details.bio,
-                      },
-                    )
-                  : provisioning.updateProfileDetails(
-                      context.profile.id,
-                      context.userId,
-                      details,
-                    ),
-              ),
-          ],
-          verify: async () => {
-            const fresh = await attorneyContextOf(sources, reads);
-            if (!("profile" in fresh)) {
-              return "unknown";
-            }
-            const after = fresh.profile;
-            return after.displayName === details.display_name &&
-              after.headline === details.headline &&
-              after.bio === details.bio &&
-              after.yearsExperience === details.years_experience
-              ? "applied"
-              : "not_applied";
-          },
-        },
-        sources.clock,
+      await writeOnce(() =>
+        writes.saveProfileDetails(
+          presentationOnly ? "approved" : "applicant",
+          details,
+        ),
       ),
     );
   } catch {
@@ -1254,17 +1102,6 @@ function licenseClaimOf(
     effective_from: from,
     effective_until: until,
   });
-}
-
-function sameLicense(record: LicenseRecord, claim: LicenseClaim): boolean {
-  return (
-    record.jurisdictionId === claim.jurisdiction_id &&
-    record.licenseNumber === claim.license_number &&
-    record.licenseType === claim.license_type &&
-    record.effectiveFrom === claim.effective_from &&
-    record.effectiveUntil === claim.effective_until &&
-    record.reportedStatus === null
-  );
 }
 
 // Whether a record still has no linked verification evidence, read afresh.
@@ -1340,62 +1177,9 @@ export async function saveLicenseClaim(
       return UNAVAILABLE;
     }
     const expectedUpdatedAt = before?.updatedAt ?? null;
-    const authority = authorityOf(
-      sources,
-      writable,
-      recordId === null
-        ? undefined
-        : stillUnreviewed(provisioning, "license", recordId),
-    );
     return stateOf(
-      await runAuditedChange(
-        {
-          port: provisioning,
-          attempt: {
-            actorUserId: context.userId,
-            actorType: "attorney",
-            action:
-              before === null
-                ? AUDIT_ACTIONS.claimRecorded
-                : AUDIT_ACTIONS.claimRevised,
-            resourceType: "license",
-            resourceId: id,
-            before: before === null ? null : claimSnapshotOfLicense(before),
-            after: claimSnapshotOfLicense(claim),
-            jurisdictionId: claim.jurisdiction_id,
-            occurredAtMs: sources.clock(),
-          },
-          authorizedForWrite: authority.forWrite,
-          authorizedAtCompletion: authority.atCompletion,
-          steps: [
-            () =>
-              wroteOne(() =>
-                expectedUpdatedAt === null
-                  ? provisioning.insertLicense(attorneyId, id, claim)
-                  : provisioning.updateLicense(
-                      attorneyId,
-                      id,
-                      expectedUpdatedAt,
-                      claim,
-                    ),
-              ),
-          ],
-          verify: async () => {
-            const fresh = ownedRows(
-              await attempt(() => reads.licensesOf(attorneyId)),
-              readLicense,
-              attorneyId,
-            );
-            if (fresh === null) {
-              return "unknown";
-            }
-            const kept = fresh.find((record) => record.id === id) ?? null;
-            return kept !== null && sameLicense(kept, claim)
-              ? "applied"
-              : "not_applied";
-          },
-        },
-        sources.clock,
+      await writeOnce(() =>
+        writable.writes.saveLicense(id, expectedUpdatedAt, claim),
       ),
     );
   } catch {
@@ -1512,23 +1296,6 @@ function insuranceClaimOf(
   });
 }
 
-function sameInsurance(
-  record: InsuranceRecord,
-  claim: InsuranceClaim,
-): boolean {
-  return (
-    record.jurisdictionId === claim.jurisdiction_id &&
-    record.carrierName === claim.carrier_name &&
-    record.policyReference === claim.policy_reference &&
-    record.coverageType === claim.coverage_type &&
-    record.perOccurrenceLimitMinor === claim.per_occurrence_limit_minor &&
-    record.aggregateLimitMinor === claim.aggregate_limit_minor &&
-    record.currencyCode === claim.currency_code &&
-    record.coverageFrom === claim.coverage_from &&
-    record.coverageUntil === claim.coverage_until
-  );
-}
-
 // Adds an insurance claim or revises one of the attorney's own unreviewed
 // insurance claims.
 export async function saveInsuranceClaim(
@@ -1589,62 +1356,9 @@ export async function saveInsuranceClaim(
       return UNAVAILABLE;
     }
     const expectedUpdatedAt = before?.updatedAt ?? null;
-    const authority = authorityOf(
-      sources,
-      writable,
-      recordId === null
-        ? undefined
-        : stillUnreviewed(provisioning, "insurance", recordId),
-    );
     return stateOf(
-      await runAuditedChange(
-        {
-          port: provisioning,
-          attempt: {
-            actorUserId: context.userId,
-            actorType: "attorney",
-            action:
-              before === null
-                ? AUDIT_ACTIONS.claimRecorded
-                : AUDIT_ACTIONS.claimRevised,
-            resourceType: "insurance_record",
-            resourceId: id,
-            before: before === null ? null : claimSnapshotOfInsurance(before),
-            after: claimSnapshotOfInsurance(claim),
-            jurisdictionId: claim.jurisdiction_id,
-            occurredAtMs: sources.clock(),
-          },
-          authorizedForWrite: authority.forWrite,
-          authorizedAtCompletion: authority.atCompletion,
-          steps: [
-            () =>
-              wroteOne(() =>
-                expectedUpdatedAt === null
-                  ? provisioning.insertInsurance(attorneyId, id, claim)
-                  : provisioning.updateInsurance(
-                      attorneyId,
-                      id,
-                      expectedUpdatedAt,
-                      claim,
-                    ),
-              ),
-          ],
-          verify: async () => {
-            const fresh = ownedRows(
-              await attempt(() => reads.insuranceOf(attorneyId)),
-              readInsurance,
-              attorneyId,
-            );
-            if (fresh === null) {
-              return "unknown";
-            }
-            const kept = fresh.find((record) => record.id === id) ?? null;
-            return kept !== null && sameInsurance(kept, claim)
-              ? "applied"
-              : "not_applied";
-          },
-        },
-        sources.clock,
+      await writeOnce(() =>
+        writable.writes.saveInsurance(id, expectedUpdatedAt, claim),
       ),
     );
   } catch {
@@ -1718,55 +1432,9 @@ export async function requestPracticeArea(
     if (id === null) {
       return UNAVAILABLE;
     }
-    const requestedAt = new Date(sources.clock()).toISOString();
-    const authority = authorityOf(sources, writable);
     return stateOf(
-      await runAuditedChange(
-        {
-          port: provisioning,
-          attempt: {
-            actorUserId: context.userId,
-            actorType: "attorney",
-            action: AUDIT_ACTIONS.practiceAreaRequestChanged,
-            resourceType: "practice_area_authorisation",
-            resourceId: id,
-            after: { status: "requested", practice_area_id: area },
-            jurisdictionId: jurisdiction,
-            occurredAtMs: sources.clock(),
-          },
-          authorizedForWrite: authority.forWrite,
-          authorizedAtCompletion: authority.atCompletion,
-          steps: [
-            () =>
-              wroteOne(() =>
-                provisioning.insertAuthorisationRequest(
-                  attorneyId,
-                  id,
-                  jurisdiction,
-                  area,
-                  requestedAt,
-                ),
-              ),
-          ],
-          verify: async () => {
-            const fresh = ownedRows(
-              await attempt(() => reads.authorisationsOf(attorneyId)),
-              readPracticeAuthorisation,
-              attorneyId,
-            );
-            if (fresh === null) {
-              return "unknown";
-            }
-            const kept = fresh.find((entry) => entry.id === id) ?? null;
-            return kept !== null &&
-              kept.status === "requested" &&
-              kept.jurisdictionId === jurisdiction &&
-              kept.practiceAreaId === area
-              ? "applied"
-              : "not_applied";
-          },
-        },
-        sources.clock,
+      await writeOnce(() =>
+        writable.writes.requestPracticeArea(id, jurisdiction, area),
       ),
     );
   } catch {
@@ -1798,7 +1466,7 @@ export async function changePracticeAreaRequest(
     if (!("context" in writable)) {
       return writable;
     }
-    const { context, reads, provisioning } = writable;
+    const { context, reads } = writable;
     const attorneyId = context.profile.id;
     const own = ownedRows(
       await attempt(() => reads.authorisationsOf(attorneyId)),
@@ -1817,58 +1485,13 @@ export async function changePracticeAreaRequest(
     if (entry.status !== expected) {
       return LOCKED;
     }
-    const nextStatus = intent === "withdraw" ? "withdrawn" : "requested";
-    const next =
-      nextStatus === "withdrawn"
-        ? ({ status: "withdrawn" } as const)
-        : ({
-            status: "requested",
-            requestedAt: new Date(sources.clock()).toISOString(),
-          } as const);
-    const authority = authorityOf(sources, writable);
     return stateOf(
-      await runAuditedChange(
-        {
-          port: provisioning,
-          attempt: {
-            actorUserId: context.userId,
-            actorType: "attorney",
-            action: AUDIT_ACTIONS.practiceAreaRequestChanged,
-            resourceType: "practice_area_authorisation",
-            resourceId: recordId,
-            before: { status: expected },
-            after: { status: nextStatus },
-            jurisdictionId: entry.jurisdictionId,
-            occurredAtMs: sources.clock(),
-          },
-          authorizedForWrite: authority.forWrite,
-          authorizedAtCompletion: authority.atCompletion,
-          steps: [
-            () =>
-              wroteOne(() =>
-                provisioning.updateAuthorisationRequest(
-                  attorneyId,
-                  recordId,
-                  expected,
-                  entry.updatedAt,
-                  next,
-                ),
-              ),
-          ],
-          verify: async () => {
-            const fresh = ownedRows(
-              await attempt(() => reads.authorisationsOf(attorneyId)),
-              readPracticeAuthorisation,
-              attorneyId,
-            );
-            if (fresh === null) {
-              return "unknown";
-            }
-            const kept = fresh.find((record) => record.id === recordId);
-            return kept?.status === nextStatus ? "applied" : "not_applied";
-          },
-        },
-        sources.clock,
+      await writeOnce(() =>
+        writable.writes.changePracticeAreaRequest(
+          recordId,
+          intent,
+          entry.updatedAt,
+        ),
       ),
     );
   } catch {
@@ -1900,50 +1523,10 @@ export async function submitApplicationForReview(
     if (!("context" in writable)) {
       return writable;
     }
-    const { context, reads, provisioning } = writable;
     // No completeness rule is imposed here: an application without a license
     // claim can be submitted, and review staff can return it for more
     // information. Submission verifies, approves, and decides nothing.
-    const authority = authorityOf(sources, writable);
-    return stateOf(
-      await runAuditedChange(
-        {
-          port: provisioning,
-          attempt: {
-            actorUserId: context.userId,
-            actorType: "attorney",
-            action: AUDIT_ACTIONS.applicationSubmitted,
-            resourceType: "attorney_profile",
-            resourceId: context.profile.id,
-            before: { profile_state: "applicant" },
-            after: { profile_state: "under_review" },
-            occurredAtMs: sources.clock(),
-          },
-          authorizedForWrite: authority.forWrite,
-          authorizedAtCompletion: authority.atCompletion,
-          steps: [
-            () =>
-              wroteOne(() =>
-                provisioning.submitApplication(
-                  context.profile.id,
-                  context.userId,
-                ),
-              ),
-          ],
-          verify: async () => {
-            const fresh = await attorneyContextOf(sources, reads);
-            if (!("profile" in fresh)) {
-              return "unknown";
-            }
-            return fresh.profile.id === context.profile.id &&
-              fresh.profile.state === "under_review"
-              ? "applied"
-              : "not_applied";
-          },
-        },
-        sources.clock,
-      ),
-    );
+    return stateOf(await writeOnce(() => writable.writes.submitApplication()));
   } catch {
     return UNAVAILABLE;
   }
