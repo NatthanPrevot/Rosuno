@@ -18,6 +18,13 @@
 // are not evidence of any remote project's grants. All fourteen committed
 // migrations are then applied unmodified, in order, each in one transaction.
 //
+// P3-904 update: the run now applies the single P3-904 migration after the
+// fourteen historical ones. The checks that documented the P3-003 defects
+// (SEC-1, SEC-2, SEC-3) assert the corrected behaviour instead, and the
+// checks that wrote through the retired service-role grants (APP-1, APP-3,
+// APP-4) write through the operation-specific database functions. The full
+// P3-904 proof is p3-904-db-proof.mjs.
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -33,7 +40,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -42,7 +49,6 @@ import {
   assessEligibility,
   evaluationRowOf,
 } from "../src/application/eligibility-assessment.ts";
-import { auditEventOf } from "../src/application/professional-audit.ts";
 import {
   AUTHORITY_REFERENCE_COLUMNS,
   POLICY_VERSION_COLUMNS,
@@ -202,6 +208,49 @@ function valueAs(role, subject, statement) {
 
 function sqlstateOf(result) {
   return /ERROR:\s+([0-9A-Z]{5}):/.exec(result.stderr ?? "")?.[1] ?? null;
+}
+
+// A synthetic audit row of the audit_events shape (test data only).
+function syntheticAuditRow(fields) {
+  return {
+    actor_user_id: fields.actor,
+    actor_type: fields.actorType,
+    action_code: fields.action,
+    resource_type: fields.resourceType,
+    resource_id: fields.resourceId,
+    before_snapshot: fields.before ?? null,
+    after_snapshot: fields.after ?? null,
+    reason_code: null,
+    policy_references: null,
+    jurisdiction_id: fields.jurisdictionId ?? null,
+    occurred_at: new Date().toISOString(),
+  };
+}
+
+const lit = (value) =>
+  value === null ? "null" : `'${String(value).replaceAll("'", "''")}'`;
+
+// One P3-904 write function called as a principal, committed.
+function callAs(subject, name, args) {
+  const named = Object.entries(args)
+    .map(
+      ([key, value]) =>
+        `${key} => ${typeof value === "object" && value !== null ? `${lit(JSON.stringify(value))}` : lit(value)}`,
+    )
+    .join(", ");
+  const result = psql(
+    [
+      "begin;",
+      "set local role authenticated;",
+      `select set_config('request.jwt.claim.sub', '${subject}', true) is not null;`,
+      `select public.${name}(${named});`,
+      "commit;",
+      "",
+    ].join("\n"),
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const lines = result.stdout.trim().split("\n");
+  return lines[lines.length - 1];
 }
 
 // Rows exactly as the database serializes them to JSON for a column list.
@@ -402,7 +451,12 @@ function applyMigrations() {
     .readdirSync(MIGRATIONS)
     .filter((f) => f.endsWith(".sql"))
     .sort();
-  assert.equal(files.length, 14);
+  // The fourteen historical migrations and the single P3-904 correction.
+  assert.equal(files.length, 15);
+  assert.equal(
+    files[14],
+    "20261106090000_p3_904_professional_write_boundary.sql",
+  );
   for (const file of files) {
     const bytes = fs.readFileSync(path.join(MIGRATIONS, file));
     const result = run(
@@ -563,58 +617,63 @@ function probes() {
     () => {
       const service = (statement) =>
         sqlstateOf(as("service_role", null, statement));
+      // P3-904 removed the service role's DML on these relations, so the
+      // table constraints themselves are probed as the table owner, in a
+      // transaction that is always rolled back.
+      const owner = (statement) =>
+        sqlstateOf(psql(["begin;", statement, "rollback;", ""].join("\n")));
       // Two subjects, or none, violate the one-subject check; a repeated link
       // violates the per-subject unique index.
       assert.equal(
-        service(
+        owner(
           `insert into public.verification_evidence_subjects (verification_evidence_id, license_id, insurance_record_id) values ('${U(702)}', '${U(601)}', '${U(601)}');`,
         ),
         "23514",
       );
       assert.equal(
-        service(
+        owner(
           `insert into public.verification_evidence_subjects (verification_evidence_id) values ('${U(702)}');`,
         ),
         "23514",
       );
       assert.equal(
-        service(
+        owner(
           `insert into public.verification_evidence_subjects (verification_evidence_id, license_id) values ('${U(701)}', '${U(601)}');`,
         ),
         "23505",
       );
       assert.equal(
-        service(
+        owner(
           `insert into public.licenses (attorney_id, jurisdiction_id, license_number) values ('${PROFILE_B}', '${J_A}', 'SYN-A-1');`,
         ),
         "23505",
       );
       assert.equal(
-        service(
+        owner(
           `insert into public.licenses (attorney_id, jurisdiction_id, license_number, effective_from, effective_until) values ('${PROFILE_A}', '${J_B}', 'SYN-D', '2026-02-01', '2026-01-01');`,
         ),
         "23514",
       );
       assert.equal(
-        service(
+        owner(
           `update public.attorney_profiles set profile_state = 'verified' where id = '${PROFILE_A}';`,
         ),
         "23514",
       );
       assert.equal(
-        service(
+        owner(
           `insert into public.capability_grants (user_id, capability_code, granted_by_user_id) values ('${USER.client}', 'manage_attorney_verification', '${USER.grantor}');`,
         ),
         "23503",
       );
       assert.equal(
-        service(
+        owner(
           `insert into public.practice_area_authorisations (attorney_id, jurisdiction_id, practice_area_id, status, requested_at) values ('${PROFILE_A}', '${J_A}', '${AREA}', 'requested', now()), ('${PROFILE_A}', '${J_A}', '${AREA}', 'requested', now());`,
         ),
         "23505",
       );
       assert.equal(
-        service(
+        owner(
           `insert into public.practice_area_authorisations (attorney_id, jurisdiction_id, practice_area_id, status, requested_at) values ('${PROFILE_A}', '${J_A}', '${AREA}', '', now());`,
         ),
         "23514",
@@ -640,33 +699,72 @@ function probes() {
   );
 
   check(
-    "APP-1 guarded claim and review writes behave as the ports require: exact updated_at matches once, stale or wrong-stage writes change nothing",
+    "APP-1 guarded claim and review writes behave as the ports require, now through the P3-904 write functions: an exact updated_at applies once, stale or wrong-stage writes change nothing, and the retired service-role writes are refused",
     () => {
+      const license = U(612);
+      sql(
+        `insert into public.licenses (id, attorney_id, jurisdiction_id, license_number) values ('${license}', '${PROFILE_A}', '${J_B}', 'SYN-APP-1');`,
+      );
       const stampOf = () =>
         sql(
-          `select to_json(updated_at)#>>'{}' from public.licenses where id = '${U(601)}';`,
+          `select to_json(updated_at)#>>'{}' from public.licenses where id = '${license}';`,
         );
       const first = stampOf();
-      const update = (stamp) =>
-        sql(
-          `set role service_role; with u as (update public.licenses set license_type = 'synthetic' where id = '${U(601)}' and attorney_id = '${PROFILE_A}' and updated_at = '${stamp}' and reported_status is null returning 1) select count(*) from u;`,
-        );
-      assert.equal(update(first), "1");
-      assert.equal(update(first), "0");
-      const transition = (from, to) =>
-        sql(
-          `set role service_role; with u as (update public.attorney_profiles set profile_state = '${to}' where id = '${PROFILE_B}' and profile_state = '${from}' returning 1) select count(*) from u;`,
-        );
-      assert.equal(transition("under_review", "approved"), "1");
-      assert.equal(transition("under_review", "approved"), "0");
-      assert.equal(transition("approved", "suspended"), "1");
+      const revise = (stamp) =>
+        callAs(AUTH.attorneyA, "attorney_save_license_claim", {
+          p_license_id: license,
+          p_expected_updated_at: stamp,
+          p_jurisdiction_id: J_B,
+          p_license_number: "SYN-APP-1",
+          p_license_type: "synthetic",
+          p_effective_from: null,
+          p_effective_until: null,
+        });
+      assert.equal(revise(first), "applied");
+      assert.equal(revise(first), "conflict");
+      const transition = (intent) =>
+        callAs(AUTH.staffGlobal, "staff_change_profile_stage", {
+          p_attorney_id: PROFILE_B,
+          p_intent: intent,
+          p_message: null,
+          p_note: null,
+        });
+      assert.equal(transition("approve"), "applied");
+      assert.equal(transition("approve"), "locked");
+      assert.equal(transition("suspend"), "applied");
       assert.equal(
         sql(
           `select profile_state from public.attorney_profiles where id = '${PROFILE_B}';`,
         ),
         "suspended",
       );
-      return { first_stamp_format: first };
+      // The retired privileged writes are refused outright.
+      assert.equal(
+        sqlstateOf(
+          as(
+            "service_role",
+            null,
+            `update public.licenses set license_type = 'x' where id = '${license}';`,
+          ),
+        ),
+        "42501",
+      );
+      assert.equal(
+        sqlstateOf(
+          as(
+            "service_role",
+            null,
+            `update public.attorney_profiles set profile_state = 'approved' where id = '${PROFILE_B}';`,
+          ),
+        ),
+        "42501",
+      );
+      return {
+        license_first: "applied",
+        license_stale: "conflict",
+        transitions: ["applied", "locked", "applied"],
+        service_role_direct_writes: "42501",
+      };
     },
   );
 
@@ -808,12 +906,27 @@ function probes() {
       }
       const t1 = assessEligibility(t1Facts, nowMs);
       assert.equal(t1.result, "eligible", JSON.stringify(t1.factors));
+      // Persisted through the P3-904 staff write function as the
+      // jurisdiction-scoped reviewer, never by the service role.
       const insertEvaluation = (assessment) => {
         const row = evaluationRowOf(assessment, nowMs);
-        const json = JSON.stringify(row);
-        return sql(
-          `set role service_role; insert into public.eligibility_evaluations select * from jsonb_populate_record(null::public.eligibility_evaluations, $e$${json}$e$::jsonb || jsonb_build_object('id', gen_random_uuid(), 'created_at', now())) returning id;`,
+        const id = randomUUID();
+        assert.equal(
+          callAs(AUTH.staffA, "staff_record_eligibility_evaluation", {
+            p_evaluation_id: id,
+            p_attorney_id: row.attorney_id,
+            p_jurisdiction_id: row.jurisdiction_id,
+            p_context_type: row.context_type,
+            p_context_id: row.context_id,
+            p_as_of: row.as_of,
+            p_result: row.result,
+            p_factor_results: row.factor_results,
+            p_policy_references: row.policy_references,
+            p_evidence_references: row.evidence_references,
+          }),
+          "applied",
         );
+        return id;
       };
       const t1Id = insertEvaluation(t1);
       const t1Before = jsonRows(
@@ -883,17 +996,16 @@ function probes() {
   );
 
   check(
-    "AUD-1 application audit rows insert as the service role and are immutable",
+    "AUD-1 audit rows of the audit_events shape still insert as the service role (its grant is unchanged by P3-904) and are immutable",
     () => {
-      const event = auditEventOf({
-        actorUserId: USER.staffA,
+      const event = syntheticAuditRow({
+        actor: USER.staffA,
         actorType: "staff",
         action: "verification_evidence_recorded",
         resourceType: "verification_evidence",
         resourceId: U(701),
         after: { subject_kind: "license", discrepancy: false },
         jurisdictionId: J_A,
-        occurredAtMs: Date.now(),
       });
       const id = sql(
         `set role service_role; insert into public.audit_events select * from jsonb_populate_record(null::public.audit_events, $a$${JSON.stringify(event)}$a$::jsonb || jsonb_build_object('id', gen_random_uuid(), 'created_at', now())) returning id;`,
@@ -943,14 +1055,30 @@ function probes() {
   );
 
   check(
-    "SEC-1 no existing database object can enforce staff authorization or audit coupling at the privileged write: only read-only definer predicates, only SELECT policies, no ordinary write grants, and a row-security-bypassing service role",
+    "SEC-1 (corrected by P3-904) the only write path to the M4 relations is the operation-specific definer functions executable by authenticated: no write policies, no API-role DML grant on any M4 relation, and the service role's row-security bypass grants no write",
     () => {
       const definers = sql(
         "select coalesce(string_agg(p.proname || ':' || p.provolatile::text, ',' order by p.proname), '') from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prosecdef;",
       );
       assert.equal(
         definers,
-        "has_manage_attorney_verification_scope:s,has_resource_metadata_access:s",
+        [
+          "attorney_change_practice_area_request:v",
+          "attorney_request_practice_area:v",
+          "attorney_save_insurance_claim:v",
+          "attorney_save_license_claim:v",
+          "attorney_save_profile_details:v",
+          "attorney_start_application:v",
+          "attorney_submit_application:v",
+          "has_manage_attorney_verification_scope:s",
+          "has_resource_metadata_access:s",
+          "staff_change_profile_stage:v",
+          "staff_decide_practice_area:v",
+          "staff_record_discipline_finding:v",
+          "staff_record_eligibility_evaluation:v",
+          "staff_record_source_unavailable:v",
+          "staff_record_verification_finding:v",
+        ].join(","),
       );
       assert.equal(
         sql(
@@ -959,16 +1087,28 @@ function probes() {
         "0",
       );
       const m4 =
-        "'attorney_profiles','licenses','insurance_records','discipline_records','practice_area_authorisations','verification_evidence','verification_evidence_subjects','eligibility_evaluations','audit_events'";
+        "'attorney_profiles','licenses','insurance_records','discipline_records','practice_area_authorisations','verification_evidence','verification_evidence_subjects','eligibility_evaluations'";
       assert.equal(
         sql(
-          `select count(*) from information_schema.role_table_grants where table_schema = 'public' and table_name in (${m4}) and grantee in ('authenticated', 'anon') and privilege_type <> 'SELECT';`,
+          `select count(*) from information_schema.role_table_grants where table_schema = 'public' and table_name in (${m4}) and grantee in ('authenticated', 'anon', 'service_role', 'PUBLIC') and privilege_type <> 'SELECT';`,
         ),
         "0",
       );
       assert.equal(
         sql(
-          `select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in (${m4}) and not t.tgisinternal and t.tgname not like '%set_updated_at' and t.tgname <> 'audit_events_immutable';`,
+          `select count(*) from information_schema.column_privileges where table_schema = 'public' and table_name in (${m4}) and grantee in ('authenticated', 'anon', 'service_role', 'PUBLIC') and privilege_type <> 'SELECT';`,
+        ),
+        "0",
+      );
+      assert.equal(
+        sql(
+          `select count(*) from information_schema.role_table_grants where table_schema = 'public' and table_name = 'audit_events' and grantee in ('authenticated', 'anon') and privilege_type <> 'SELECT';`,
+        ),
+        "0",
+      );
+      assert.equal(
+        sql(
+          `select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in (${m4}, 'audit_events') and not t.tgisinternal and t.tgname not like '%set_updated_at' and t.tgname <> 'audit_events_immutable';`,
         ),
         "0",
       );
@@ -981,112 +1121,119 @@ function probes() {
       return {
         security_definer_functions: definers.split(","),
         write_policies: 0,
+        m4_api_role_write_grants: 0,
       };
     },
   );
 
   check(
-    "SEC-2 the final check-to-write window is open at the database: after a grant is revoked, the service role's guarded writes still succeed, because nothing in the write path consults the grant",
+    "SEC-2 (corrected by P3-904) the check-to-write window is closed at the database: after a grant is revoked, the reviewer's write function denies and the service role cannot write directly at all",
     () => {
       sql(
         `update public.capability_grants set revoked_at = now() where user_id = '${USER.staffA}';`,
       );
       const predicate = SCOPE(AUTH.staffA, J_A);
-      const written = sql(
-        `set role service_role; with e as (insert into public.verification_evidence (jurisdiction_id, retrieved_at, retrieved_by_user_id, evidence_summary) values ('${J_A}', now(), '${USER.staffA}', 'synthetic after revocation') returning 1) select count(*) from e;`,
+      const direct = sqlstateOf(
+        as(
+          "service_role",
+          null,
+          `insert into public.verification_evidence (jurisdiction_id, retrieved_at, retrieved_by_user_id, evidence_summary) values ('${J_A}', now(), '${USER.staffA}', 'synthetic after revocation');`,
+        ),
       );
+      const before = sql("select count(*) from public.verification_evidence;");
+      const outcome = callAs(AUTH.staffA, "staff_record_source_unavailable", {
+        p_subject_kind: "license",
+        p_subject_id: U(601),
+        p_note: "synthetic after revocation",
+      });
       assert.equal(predicate, "f");
-      assert.equal(written, "1");
+      assert.equal(direct, "42501");
+      assert.equal(outcome, "denied");
+      assert.equal(
+        sql("select count(*) from public.verification_evidence;"),
+        before,
+      );
       return {
         predicate_after_revocation: predicate,
-        service_role_write_rows: written,
+        service_role_direct_write: direct,
+        write_function_after_revocation: outcome,
       };
     },
   );
 
   check(
-    "SEC-3 the scope predicate ignores staff and account state: a deactivated Staff Profile and suspended User holding an unrevoked grant still pass it and still read evidence under the row policies",
+    "SEC-3 (corrected by P3-904) the scope predicate requires an active User and an active Staff Profile: a deactivated Staff Profile and a suspended User holding an unrevoked grant fail it and read no evidence or other attorneys' profiles",
     () => {
       sql(
         `update public.staff_profiles set staff_state = 'deactivated' where user_id = '${USER.staffGlobal}';`,
       );
+      const deactivated = [
+        SCOPE(AUTH.staffGlobal, J_A),
+        COUNT(AUTH.staffGlobal, "verification_evidence"),
+        COUNT(AUTH.staffGlobal, "attorney_profiles"),
+      ];
+      sql(
+        `update public.staff_profiles set staff_state = 'active' where user_id = '${USER.staffGlobal}';`,
+      );
+      assert.equal(SCOPE(AUTH.staffGlobal, J_A), "t");
       sql(
         `update public.users set account_state = 'suspended' where id = '${USER.staffGlobal}';`,
       );
-      const predicate = SCOPE(AUTH.staffGlobal, J_A);
-      const evidence = COUNT(AUTH.staffGlobal, "verification_evidence");
-      const profiles = COUNT(AUTH.staffGlobal, "attorney_profiles");
-      assert.equal(predicate, "t");
-      assert.ok(evidence > 0 && profiles > 0);
-      return {
-        predicate: predicate,
-        evidence_rows_readable: evidence,
-        profile_rows_readable: profiles,
-      };
+      const suspended = [
+        SCOPE(AUTH.staffGlobal, J_A),
+        COUNT(AUTH.staffGlobal, "verification_evidence"),
+        COUNT(AUTH.staffGlobal, "attorney_profiles"),
+      ];
+      assert.deepEqual(deactivated, ["f", 0, 0]);
+      assert.deepEqual(suspended, ["f", 0, 0]);
+      return { deactivated_staff: deactivated, suspended_user: suspended };
     },
   );
 
   check(
-    "APP-4 server-generated ids and write-ahead attempt/outcome audit rows are accepted by the real schema, and a generated id cannot be inserted twice",
+    "APP-4 (P3-904) a server-generated id is written once through the attorney write function with exactly one audit row naming the attorney; the same id cannot be written twice and no write-ahead attempt or outcome row exists",
     () => {
+      const auth = U(121);
+      const user = U(221);
+      const profile = U(403);
+      sql(`insert into auth.users (id) values ('${auth}');
+        insert into public.users (id, auth_user_id, account_state) values ('${user}', '${auth}', 'active');
+        insert into public.attorney_profiles (id, user_id, profile_state) values ('${profile}', '${user}', 'applicant');`);
       const licenseId = U(611);
-      sql(
-        `set role service_role; insert into public.licenses (id, attorney_id, jurisdiction_id, license_number) values ('${licenseId}', '${PROFILE_A}', '${J_B}', 'SYN-GEN-1');`,
+      const claim = (number) => ({
+        p_license_id: licenseId,
+        p_expected_updated_at: null,
+        p_jurisdiction_id: J_B,
+        p_license_number: number,
+        p_license_type: null,
+        p_effective_from: null,
+        p_effective_until: null,
+      });
+      assert.equal(
+        callAs(auth, "attorney_save_license_claim", claim("SYN-GEN-1")),
+        "applied",
+      );
+      assert.equal(
+        callAs(auth, "attorney_save_license_claim", claim("SYN-GEN-2")),
+        "conflict",
       );
       assert.equal(
         sql(`select count(*) from public.licenses where id = '${licenseId}';`),
         "1",
       );
       assert.equal(
-        sqlstateOf(
-          as(
-            "service_role",
-            null,
-            `insert into public.licenses (id, attorney_id, jurisdiction_id, license_number) values ('${licenseId}', '${PROFILE_A}', '${J_B}', 'SYN-GEN-2');`,
-          ),
-        ),
-        "23505",
-      );
-      const append = (event) =>
         sql(
-          `set role service_role; insert into public.audit_events select * from jsonb_populate_record(null::public.audit_events, $a$${JSON.stringify(event)}$a$::jsonb || jsonb_build_object('id', gen_random_uuid(), 'created_at', now())) returning id;`,
-        );
-      const attemptId = append(
-        auditEventOf({
-          actorUserId: USER.staffA,
-          actorType: "staff",
-          action: "attorney_profile_state_changed",
-          resourceType: "attorney_profile",
-          resourceId: PROFILE_B,
-          before: { profile_state: "under_review" },
-          after: { profile_state: "approved", audit_phase: "attempt" },
-          occurredAtMs: Date.now(),
-        }),
-      );
-      const outcomeId = append(
-        auditEventOf({
-          actorUserId: USER.staffA,
-          actorType: "staff",
-          action: "audited_change_outcome",
-          resourceType: "attorney_profile",
-          resourceId: PROFILE_B,
-          after: {
-            audit_phase: "outcome",
-            attempt_event_id: attemptId,
-            outcome: "applied",
-            authority: "held",
-            authority_checked: "at_completion",
-          },
-          occurredAtMs: Date.now(),
-        }),
+          `select count(*) || '|' || min(actor_user_id::text) || '|' || min(actor_type) from public.audit_events where resource_id = '${licenseId}';`,
+        ),
+        `1|${user}|attorney`,
       );
       assert.equal(
         sql(
-          `select after_snapshot->>'attempt_event_id' from public.audit_events where id = '${outcomeId}';`,
+          "select count(*) from public.audit_events where action_code = 'audited_change_outcome' or after_snapshot ? 'audit_phase';",
         ),
-        attemptId,
+        "0",
       );
-      return { attempt: attemptId, outcome: outcomeId };
+      return { first: "applied", repeated: "conflict", audit_rows: 1 };
     },
   );
 }
