@@ -8,7 +8,7 @@
 //   Command-string denies are AUTHORIZATION LIMITS, not a Shell containment
 //   boundary: a general-purpose interpreter used by approved tests can perform
 //   arbitrary local operations. Nothing here claims otherwise (Packet §2, §4).
-// - It runs the genuine, unchanged rosuno-guard against synthetic disposable Git
+// - It runs the genuine live rosuno-guard against synthetic disposable Git
 //   histories to show that per-commit scope, Packet binding, linear history and
 //   migration rules are enforced at the merge boundary as guard outcomes.
 // - Effective runtime behaviour (tool-level denials, credential boundary) is
@@ -45,10 +45,25 @@ const PACKET_PATH = "docs/work-items/P2-916/PACKET.md";
 const TEST_PATH =
   "tools/p0/tests/p2-916-builder-runtime-commissioning.test.mjs";
 const OWNER_MAIN = "b003c23475b8fd22c2ad7496df51923c5d3fa6e3";
-// Protected controls that P2-916 must leave byte-identical to Owner main.
-const OWNER_MAIN_GUARD_BLOB = "2dad1d6e866684d1d6f3422f413779b061594559";
-const OWNER_MAIN_TRUST_BLOB = "d6a16c8db64a95f47916323f90ef06f294190457";
-const OWNER_MAIN_WORKFLOW_BLOB = "6c64a49d270f3ab81b2272b0a30ff163e32703ec";
+// P2-916's own merged history, all reachable from main (P2-917 Packet §1).
+// P2-916 had to leave the protected controls unchanged within these commits
+// only; later separately authorized work items may change the live files.
+const P2_916_MERGE = "537c62a421d230d877519eea02c687652bd2f78a";
+const P2_916_COMMITS = [
+  "04b53f51ce030782c9589d98b9a08d4d76fd05c9", // Packet only
+  "9cd408ca1efb7a5cb9c7c15ff415c7df5809a724", // CLAUDE.md, .claude/settings.json
+  "8fdf1eb475ba2f2b0d7a1dc6a348f1f630d5c988", // this regression test
+];
+const P2_916_HEAD = P2_916_COMMITS[P2_916_COMMITS.length - 1];
+// Protected entries (mode and blob) at the P2-916 base and every P2-916 commit.
+const P2_916_PROTECTED = {
+  ".github/scripts/rosuno-guard.sh":
+    "100755 2dad1d6e866684d1d6f3422f413779b061594559",
+  ".github/scripts/rosuno-guard-trust.sh":
+    "100755 d6a16c8db64a95f47916323f90ef06f294190457",
+  ".github/workflows/rosuno-guard.yml":
+    "100644 6c64a49d270f3ab81b2272b0a30ff163e32703ec",
+};
 
 // Every deny present at the P2-916 base, in order. P2-916 may add limits but
 // must retain each of these exactly.
@@ -105,6 +120,31 @@ const gitBlobId = (bytes) =>
     .update(bytes)
     .digest("hex");
 const normalized = (text) => text.replace(/\s+/g, " ");
+
+// Read-only Git object plumbing on the real repository, used only by the
+// historical P2-916 assertion: no fetch, lazy fetch, replace refs, ref or
+// object write, and no working-tree read.
+function repoGit(args) {
+  const result = spawnSync("git", args, {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      GIT_NO_LAZY_FETCH: "1",
+      GIT_NO_REPLACE_OBJECTS: "1",
+      GIT_TERMINAL_PROMPT: "0",
+    },
+    encoding: "utf8",
+  });
+  if (result.error) throw result.error;
+  return { status: result.status, stdout: result.stdout.trimEnd() };
+}
+const hasCommit = (oid) =>
+  repoGit(["cat-file", "-e", `${oid}^{commit}`]).status === 0;
+function repoGitOk(args) {
+  const result = repoGit(args);
+  assert.equal(result.status, 0, `git ${args.join(" ")} failed`);
+  return result.stdout;
+}
 
 describe("P2-916 settings contract (authorization limits, not containment)", () => {
   const settings = JSON.parse(readFileSync(SETTINGS, "utf8"));
@@ -246,10 +286,78 @@ describe("P2-916 CLAUDE.md local engineering contract", () => {
 });
 
 describe("P2-916 unchanged protected controls", () => {
-  test("guard, trust binding and workflow are byte-identical to Owner main", () => {
-    assert.equal(gitBlobId(readFileSync(GUARD)), OWNER_MAIN_GUARD_BLOB);
-    assert.equal(gitBlobId(readFileSync(TRUST)), OWNER_MAIN_TRUST_BLOB);
-    assert.equal(gitBlobId(readFileSync(WORKFLOW)), OWNER_MAIN_WORKFLOW_BLOB);
+  test("P2-916's own commits kept guard, trust binding and workflow as at its base", () => {
+    // Historical, not live: the present-day protected files are never compared
+    // with these pins. Missing history fails closed (no skip, no fallback).
+    const pinned = [OWNER_MAIN, ...P2_916_COMMITS, P2_916_MERGE];
+    const missing = pinned.filter((oid) => !hasCommit(oid));
+    assert.deepEqual(
+      missing,
+      [],
+      `pinned P2-916 history missing; full main history is required: ${missing.join(", ")}`,
+    );
+
+    // The P2-916 merge is HEAD or its ancestor, with the pinned parents.
+    assert.equal(
+      repoGit(["merge-base", "--is-ancestor", P2_916_MERGE, "HEAD"]).status,
+      0,
+      `${P2_916_MERGE} is not HEAD or an ancestor of HEAD`,
+    );
+    assert.deepEqual(
+      repoGitOk(["rev-list", "--parents", "-n", "1", P2_916_MERGE]).split(" "),
+      [P2_916_MERGE, OWNER_MAIN, P2_916_HEAD],
+    );
+
+    // Exactly the three linear single-parent P2-916 commits, in order.
+    assert.deepEqual(
+      repoGitOk([
+        "rev-list",
+        "--reverse",
+        "--topo-order",
+        "--parents",
+        `${OWNER_MAIN}..${P2_916_HEAD}`,
+      ]).split("\n"),
+      P2_916_COMMITS.map(
+        (oid, index) =>
+          `${oid} ${index === 0 ? OWNER_MAIN : P2_916_COMMITS[index - 1]}`,
+      ),
+    );
+    // The first adds only the P2-916 Packet, with the in-tree Packet's blob.
+    assert.equal(
+      repoGitOk([
+        "diff-tree",
+        "--no-commit-id",
+        "-r",
+        "--raw",
+        "--no-abbrev",
+        "--no-renames",
+        P2_916_COMMITS[0],
+      ]),
+      `:000000 100644 ${"0".repeat(40)} ${gitBlobId(readFileSync(PACKET))} A\t${PACKET_PATH}`,
+    );
+
+    // Each protected path keeps its pinned mode and blob at the base and at
+    // every P2-916 commit, so none changed, vanished or was re-moded.
+    for (const commit of [OWNER_MAIN, ...P2_916_COMMITS]) {
+      const entries = {};
+      const listing = repoGitOk([
+        "ls-tree",
+        commit,
+        "--",
+        ...Object.keys(P2_916_PROTECTED),
+      ]);
+      for (const line of listing.split("\n").filter(Boolean)) {
+        const [meta, file] = line.split("\t");
+        const [mode, type, oid] = meta.split(" ");
+        assert.equal(type, "blob", `${commit}:${file}`);
+        entries[file] = `${mode} ${oid}`;
+      }
+      assert.deepEqual(
+        entries,
+        P2_916_PROTECTED,
+        `protected entries at ${commit}`,
+      );
+    }
   });
 
   test("the adopted Packet allows exactly the three P2-916 paths", () => {
