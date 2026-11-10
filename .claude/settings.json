@@ -11,7 +11,8 @@
       "Bash(supabase projects*)", "Bash(supabase functions deploy*)",
       "Bash(npx supabase login*)", "Bash(npx supabase link*)", "Bash(npx supabase db push*)",
       "Bash(npx supabase secrets*)", "Bash(npx supabase projects*)", "Bash(npx supabase functions deploy*)",
-      "Bash(gh *)", "Bash(git merge *)", "Bash(git pull *)"
+      "Bash(gh *)", "Bash(git merge *)", "Bash(git pull *)",
+      "Bash(git push*)", "Bash(git worktree add*)"
     ]
   },
   "enableAllProjectMcpServers": false,
