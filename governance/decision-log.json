@@ -1675,6 +1675,37 @@
         "Independent exact-byte review PASS of MB-A1 before adoption"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261113-P3-904-P3-003-SECURITY-CORRECTION",
+      "title": "Adopt P3-904 revision 3: P3-003 security correction and eligibility decision integrity",
+      "status": "accepted",
+      "scope": "P3-904 FIX only: correction of the P3-003 security defects R1 to R3, the revision 3 section 4.2a eligibility decision-integrity requirement, the section 4.2b reading that P3-002 initial applicant creation keeps its accepted behaviour, and one unreviewed, unapplied migration candidate. No product capability, eligibility factor, threshold, policy, provider or persistent environment change.",
+      "decision": "The owner adopted P3-904 Packet revision 3, including the new section 4.2a requirement: a persisted eligibility evaluation must be derived or verified by the database from the canonical rows with exactly the adopted P3-003 rules, so forged or unsupported determinations are rejected while truthful negative and undetermined evaluations remain persistable; and the section 4.2b reading that P3-904 neither adds nor removes an audit obligation for P3-002 initial applicant creation. The single P3-904 migration is registered as an unreviewed, unapplied candidate.",
+      "rationale": "Moving staff evaluation persistence to a request-scoped interface (R1) made it directly callable by authorized staff, and the recovered implementation stored caller-authored results, contrary to P3-003 A7 and A8 and to Technical Architecture sections 40 and 55. Neither the adopted P3-002 Packet nor its accepted closure requires an audit event for applicant creation. DL-ENG-1 R3 requires a Decision Log entry for a change that creates or interprets a requirement.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-P3-904-P3-003-SECURITY-CORRECTION"],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-13T12:02:23Z",
+      "updated_at": "2026-11-13T12:02:23Z",
+      "supersedes": [],
+      "impact": "Repository only until a separately authorized application: one unapplied migration candidate and the corrected attorney and staff write paths. No Staging, Production, release or live database effect.",
+      "evidence": [
+        "Owner adoption: P3-904 Packet revision 3 commit c986509de535e3a57f877eb8eea711049c7581fd on owner branch wi/P3-904-p3-003-security-correction (parent 279a066b2fb3a46aecec5554d4f680344d14b0a3), Packet SHA-256 e9df0b5148c7de69c01433e3930c99f9401a3db16bec25dcda2e36a50947b18f, Git blob 02d5a4a9ae8b8e391ff7908e2c60a6cf4909a871.",
+        "Independent Backup Gate 0 PASS of revision 3, accepted by the owner before adoption.",
+        "Original P3-904 implementation commits 2cfd62900f3d4281fb813f9e1ceac4cafc6d226e, 90ef51fcaac6d5737ed41cd4465dc99bcb7c9898 and 1c4acec9df60fa0c59f8bd61e8053d744ed36478, recovered from evidence archive SHA-256 f641fde3fd69fe38fab61d099f41163ac7f79a7878c23bddd3c92085301e2e3e and carried unchanged.",
+        "Disposable PostgreSQL proof of the corrected migration (SHA-256 7f05e4066a245471a8e33d5cfb27a539373eb75b270a17990afced441e4ebbe1) with synthetic test data only: authorization, concurrency, atomicity, eligibility decision integrity, application and database parity, rollback-only validation and catalog reconciliation against an explicit allowlist. Not a claim about Staging or any persistent environment."
+      ],
+      "expiry": null
     }
   ]
 }

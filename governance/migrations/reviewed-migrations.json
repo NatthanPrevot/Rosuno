@@ -353,6 +353,30 @@
       "drift_check": "clean",
       "rollback_plan": "Verified Staging defects require a separately authorized, reviewed forward-only compensating migration with default-deny registration; preserve this migration and all prior SQL/migration history bytes.",
       "depends_on": ["20260921051204_p1_compliance_foundation"]
+    },
+    {
+      "migration_id": "20261106090000_p3_904_professional_write_boundary",
+      "migration_kind": "product",
+      "sequence": 15,
+      "artifact_path": "supabase/migrations/20261106090000_p3_904_professional_write_boundary.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-P3-904-P3-003-SECURITY-CORRECTION"],
+      "decision_refs": ["DEC-20261113-P3-904-P3-003-SECURITY-CORRECTION"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the work-item branch. After merge: a separately reviewed forward corrective migration that restores the prior function definitions and grants; no destructive rollback, and no evidence, evaluation or audit row is removed.",
+      "depends_on": ["20261020070000_p2_registration_abuse_control"]
     }
   ]
 }
