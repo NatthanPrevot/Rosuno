@@ -88,6 +88,50 @@
       "integrity": "sha256:ca7d257b6fbf6081c7bd48194a0d39b6fad7a6a6af0f4191e734f9af0d2af1c0",
       "usage": "reference-only",
       "status": "active"
+    },
+    {
+      "authority_id": "MASTER-BLUEPRINT-V1-LOCKED",
+      "title": "Rosuno Master Blueprint - MVP Foundation Version 1 - LOCKED",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "sha256:85e01b1df333932d7693e925363e62d45bf797ccae2eb2bb8de17b38e265822b",
+      "usage": "reference-only",
+      "status": "active"
+    },
+    {
+      "authority_id": "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+      "title": "Rosuno MVP Build Specification V1.0 - LOCKED",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "sha256:18c40825f685d04bf6e68186a837b4cd357caae2fa8441435c5fff7694c939f2",
+      "usage": "reference-only",
+      "status": "active"
+    },
+    {
+      "authority_id": "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED",
+      "title": "Rosuno Payment / Engagement Sequence Matrix V0.2 - LOCKED",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "sha256:157052f74500c706332e84717530186417c6576d0ccbbbeee4cbb81a33ca6119",
+      "usage": "reference-only",
+      "status": "active"
+    },
+    {
+      "authority_id": "MASTER-BLUEPRINT-AMENDMENT-MB-A1-LOCKED",
+      "title": "Rosuno Master Blueprint Bounded Authority Amendment MB-A1",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "sha256:61baa7cd9a33d59f4593f6654872c5bca326a4a2f5ae9f0e1c4b124a08801cbc",
+      "usage": "reference-only",
+      "status": "active"
     }
   ]
 }

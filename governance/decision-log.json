@@ -1608,6 +1608,73 @@
         "Forward-only recovery: any later correction is a separately authorized forward-only record; accepted records, Git history and migration history are never rewritten."
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261113-P2-919-DL-ENG-1-ENGINEERING-PROCESS-RULINGS",
+      "title": "Adopt DL-ENG-1 engineering-process rulings for autonomous development and forward-only correction",
+      "status": "accepted",
+      "scope": "Engineering process only: the Implementation Master Plan, MVP Build Specification and Physical Specification process provisions that those authorities route to the Decision Log. No product, domain, architecture, physical-model, policy-boundary, counsel-gated value, launch condition or production gate is changed.",
+      "decision": "The owner adopts DL-ENG-1, rulings R1 to R16, exactly as recorded in governance/dl-eng-1-engineering-process-rulings.md (SHA-256 d3e84ddcd940cd8feefe4a6718e759d46546c756c09882e1c048e591d6e09b17). In summary: in-Packet conformance corrections are made and reported, with stop-report-wait kept for interpretation, design, scope and locked-artifact questions (R1); Claude Code Cloud in the Builder fork is the execution environment and the historical Replit repository and build roles end (R2); one adopted Packet cycle is one task and an adopted FIX Packet is the defect entry (R3); independent review is risk-based while designated human approval before merge stays mandatory (R4); FIX short form (R5); commits cite the work-item ID and required CI on the final head is the test evidence (R6); FIX work may target any phase (R7); persistent environments, historical migrations and forward-only migration correction are defined (R8); mechanism and conformance fixes are not physical-model changes (R9); testing and read-only boundaries (R10, R11); defects versus unsettled values (R12); forward-only data correction (R13); human steps inside the product remain (R14); downstream artifacts and manifest reconciliation (R15); clerical notes (R16).",
+      "rationale": "The LOCKED authorities route these process changes to the project Decision Log (Implementation Master Plan section 47; MVP Build Specification sections 30 and 32; Physical Specification section 53). The rulings remove procedural obstacles to autonomous engineering and to correction of any existing work while keeping every product, legal, security, privacy, financial and data-integrity protection. Recording them in the P2-919 installation makes them operative together with the controls that implement them.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED"
+      ],
+      "work_item_refs": [],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-11-13T07:15:41Z",
+      "updated_at": "2026-11-13T07:15:41Z",
+      "supersedes": [],
+      "impact": "Process only, installed together with the P2-919 controls (guard v3, workflow_run trusted runner, Builder settings and instructions). No database, product or production effect.",
+      "evidence": [
+        "Owner adoption: P2-919 Packet commit eaa62ec1df8f379f143c8ce899fa455b7990156f on owner branch wi/P2-919-guard-v3-install, which names the adopted SHA-256 of DL-ENG-1",
+        "Exact rulings text: governance/dl-eng-1-engineering-process-rulings.md, SHA-256 d3e84ddcd940cd8feefe4a6718e759d46546c756c09882e1c048e591d6e09b17",
+        "Independent exact-byte review PASS of DL-ENG-1, MB-A1, UOM v1.7.10 Candidate 4, C1 rev5.11 Candidate 4 and the P2-919 Packet before adoption"
+      ],
+      "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261113-P2-919-MASTER-BLUEPRINT-AMENDMENT-MB-A1",
+      "title": "Adopt Master Blueprint bounded authority amendment MB-A1 (configurable mechanisms before parameter decisions)",
+      "status": "accepted",
+      "scope": "Master Blueprint section 53 (post-consultation messaging) and section 76 (scheduled payment sequencing) only. No other provision, value or gate.",
+      "decision": "The owner adopts bounded supplemental authority MB-A1, registered as MASTER-BLUEPRINT-AMENDMENT-MB-A1-LOCKED (SHA-256 61baa7cd9a33d59f4593f6654872c5bca326a4a2f5ae9f0e1c4b124a08801cbc; text held in the external locked authority package and not copied here). The post-consultation messaging mechanism and the scheduled payment sequencing capability may be designed, implemented and tested before their parameters are decided, as configuration with no default, seed, constraint or fallback value. Production activation of post-consultation messaging requires the owner's recorded approval of the period, with counsel where required; production enablement of the affected payment behaviour requires the counsel-informed G-2/G-3 decision. MB-A1 decides no period, sequence, fee or policy.",
+      "rationale": "Master Blueprint section 53 requires configurability but asked for the period before technical implementation, and section 76 requires the sequencing architecture while its sequencing awaits counsel. The subordinate LOCKED authorities already treat both values as configuration (Domain Model sections 9 and 10; MVP Build Specification sections 2.5, 12 and 15; Implementation Master Plan sections 23 and 26; Payment/Engagement Matrix sections 2 and 16). MB-A1 moves the decision point to production activation, following the FP-1 bounded-amendment precedent, with the Master Blueprint bytes unchanged.",
+      "authority_refs": [
+        "MASTER-BLUEPRINT-V1-LOCKED",
+        "MASTER-BLUEPRINT-AMENDMENT-MB-A1-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED"
+      ],
+      "work_item_refs": [],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "approved"
+      },
+      "created_at": "2026-11-13T07:15:41Z",
+      "updated_at": "2026-11-13T07:15:41Z",
+      "supersedes": [],
+      "impact": "Authority timing only, for two configurable mechanisms. No database, product behaviour or production effect until a separately approved policy value or counsel decision exists.",
+      "evidence": [
+        "Owner adoption: P2-919 Packet commit eaa62ec1df8f379f143c8ce899fa455b7990156f on owner branch wi/P2-919-guard-v3-install, which names the adopted SHA-256 of MB-A1",
+        "Authority registration: governance/authority-references.json entry MASTER-BLUEPRINT-AMENDMENT-MB-A1-LOCKED, integrity sha256:61baa7cd9a33d59f4593f6654872c5bca326a4a2f5ae9f0e1c4b124a08801cbc",
+        "Independent exact-byte review PASS of MB-A1 before adoption"
+      ],
+      "expiry": null
     }
   ]
 }
