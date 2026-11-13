@@ -6,8 +6,8 @@
 // sends, the trusted session subject, a fresh Auth read of that same account
 // with a confirmed email, that account's one Rosuno User in the active state,
 // and whether that User already holds an Attorney Profile. Entry only reads.
-// Creation runs only on an explicit start request, asks the privileged port to
-// insert one Attorney Profile in the applicant state for the verified User,
+// Creation runs only on an explicit start request, asks the database to
+// create one Attorney Profile in the applicant state for the verified User,
 // and claims creation only when a fresh read afterwards shows exactly the row
 // that insert reported. A duplicate or a concurrent start leaves the one
 // existing profile as it is, and an uncertain write is never reported as
@@ -50,8 +50,10 @@ export type AttorneyApplicationRecords = {
   ) => Promise<AttorneyApplicationRows>;
 };
 
-// Server-only, privileged port: the same two exact-key reads and one insert
-// of an applicant-state Attorney Profile for an exact User id.
+// Server-only port: the same two exact-key reads and one creation of an
+// applicant-state Attorney Profile. The creation is made by the database for
+// the request's own authenticated session and its own User only (P3-904); the
+// verified User id is passed so the reported row can be checked against it.
 export type AttorneyApplicantProvisioning = AttorneyApplicationRecords & {
   readonly insertApplicantProfile: (
     userId: string,
@@ -64,6 +66,10 @@ export type AttorneyApplicationEntrySources = {
   readonly session: ServerSessionSource;
   readonly account: AttorneyApplicationAccountSource;
   readonly records: () => Promise<AttorneyApplicationRecords | null>;
+  // Whether the privileged start boundary is configured, answered without
+  // building it. When given, the entry offers a start only if it answers
+  // exactly true, so no form is shown that would certainly fail (P3-003).
+  readonly startConfigured?: () => Promise<boolean>;
 };
 
 export type AttorneyApplicationStartSources = {
@@ -365,7 +371,14 @@ export async function resolveAttorneyApplicationEntry(
       return UNAVAILABLE;
     }
     const standing = await standingOf(records, identity.accountId);
-    return standing.status === "none" ? CAN_START : standing;
+    if (standing.status !== "none") {
+      return standing;
+    }
+    if (sources.startConfigured === undefined) {
+      return CAN_START;
+    }
+    const configured = await attempt(() => sources.startConfigured!());
+    return configured === true ? CAN_START : UNAVAILABLE;
   } catch {
     return UNAVAILABLE;
   }

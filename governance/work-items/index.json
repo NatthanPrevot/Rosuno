@@ -2296,6 +2296,62 @@
       "rollback_reference": "Repository-only closure. Before protected acceptance, discard only the authorized unmerged P2-913 closure candidate under separate authorization if needed; after acceptance, make forward-only corrections under a separately authorized work item. This closure does not revert the merged P3-002 implementation. Never rewrite accepted records, Git history or migration history. No database rollback applies.",
       "created_at": "2026-11-04T06:12:13Z",
       "updated_at": "2026-11-04T06:12:13Z"
+    },
+    {
+      "work_item_id": "WI-P2-P3-904-P3-003-SECURITY-CORRECTION",
+      "title": "P3-904 correction of P3-003: database write boundary, staff predicate, atomic audit and eligibility decision integrity",
+      "objective": "Correct the P3-003 security defects R1 (authorization-to-write race), R2 (inactive staff principals in the verification predicate) and R3 (non-atomic audit), and enforce eligibility decision integrity (revision 3 section 4.2a), under the owner-adopted P3-904 FIX Packet revision 3. The unmerged P3-003 implementation is carried and corrected. No new product capability.",
+      "in_scope": [
+        "One forward-only migration, 20261106090000_p3_904_professional_write_boundary: operation-specific database write functions, the corrected verification predicate, revoked bypassing table privileges and database-derived eligibility evaluations.",
+        "The attorney and staff application paths and disposable PostgreSQL proofs within the P3-904 Packet revision 3 ALLOWED_SCOPE, carrying the unmerged P3-003 implementation."
+      ],
+      "out_of_scope": [
+        "Application to Staging, Production or any persistent database, and any release or deployment.",
+        "New tables, roles, capabilities, eligibility factors, thresholds, policies or providers.",
+        "Any change to the accepted P3-002 applicant-creation audit behaviour."
+      ],
+      "status": "in_progress",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED"
+      ],
+      "decision_refs": ["DEC-20261113-P3-904-P3-003-SECURITY-CORRECTION"],
+      "dependencies": [
+        "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION",
+        "WI-P2-913-P3-002-GOVERNANCE-CLOSURE"
+      ],
+      "acceptance_criteria": [
+        "The P3-904 disposable PostgreSQL proof passes on the final head: authorization, concurrency, atomicity, eligibility decision integrity, application and database parity, and rollback and catalog reconciliation.",
+        "P3-001, P3-002 and P3-003 regressions, p0:validate and the P0 suite pass on the final head.",
+        "Exact-head independent security review and designated human review pass before merge."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "node apps/web/tests/p3-904-db-proof.mjs",
+        "node apps/web/tests/m4-db-proof.mjs"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": ["20261106090000_p3_904_professional_write_boundary"],
+      "rollback_reference": "Before merge: forward-only correction commits on the work-item branch. After merge: a separately reviewed forward corrective migration that restores the prior function definitions and grants; no destructive rollback, and no evidence, evaluation or audit row is removed.",
+      "created_at": "2026-11-13T12:02:23Z",
+      "updated_at": "2026-11-13T12:02:23Z"
     }
   ]
 }

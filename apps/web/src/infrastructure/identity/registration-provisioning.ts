@@ -1,14 +1,23 @@
 // Server-only registration provisioning (P2-006), attorney-applicant
-// provisioning (P3-002), and quota decision (P2-007).
+// provisioning (P3-002), professional setup and staff verification
+// provisioning (P3-003), and quota decision (P2-007).
 //
 // The only module that reads the privileged project credential. For each
 // request it builds a separate, cookie-free Supabase client that is used for
 // nothing but Admin creation and rereads of one unconfirmed account and the
 // bounded User and Client-profile operations of that account's registration.
 // Another such client is used for nothing but the bounded User and Attorney
-// Profile reads, and the one applicant-state Attorney Profile insert, of an
-// already verified account's attorney application. Another makes only the
-// one fixed registration quota decision call. A further client, built from
+// Profile reads of an already verified account's attorney application. Two
+// more serve only the fixed, exact-key reads of the attorney professional
+// setup and the staff verification workspace; neither offers a generic
+// query, a write, a removal, or an Admin operation. No privileged client
+// writes an attorney profile, professional record, evidence row, evaluation,
+// or audit event (P3-904): those changes are made only by the database's own
+// operation-specific functions, called through the request's own
+// authenticated session, so a privileged credential can never stand in for
+// an attorney's or a reviewer's current authority.
+// Another makes only the one fixed registration quota decision call. A
+// further client, built from
 // the publishable key alone and never given the privileged credential, only
 // requests signup confirmation emails. No client receives a request cookie or
 // Authorization header, stores or refreshes a session, or reaches
@@ -19,7 +28,8 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-import type { AttorneyApplicantProvisioning } from "../../application/attorney-application.ts";
+import type { AttorneyApplicationRecords } from "../../application/attorney-application.ts";
+import type { AttorneyProfessionalProvisioning } from "../../application/attorney-professional.ts";
 import type {
   AccountCreation,
   AccountRead,
@@ -27,6 +37,25 @@ import type {
   RegistrationProvisioning,
   RowsResult,
 } from "../../application/client-registration.ts";
+import {
+  AUTHORITY_REFERENCE_COLUMNS,
+  ELIGIBILITY_POLICY_TYPE,
+  POLICY_VERSION_COLUMNS,
+} from "../../application/policy-selection.ts";
+import {
+  DISCIPLINE_COLUMNS,
+  EVIDENCE_COLUMNS,
+  EVIDENCE_SUBJECT_COLUMNS,
+  INSURANCE_COLUMNS,
+  isUuid,
+  JURISDICTION_COLUMNS,
+  LICENSE_COLUMNS,
+  PRACTICE_AUTHORISATION_COLUMNS,
+  PROFILE_COLUMNS as ATTORNEY_PROFESSIONAL_PROFILE_COLUMNS,
+  subjectColumnOf,
+  type SubjectKind,
+} from "../../application/professional-records.ts";
+import type { StaffProvisioning } from "../../application/staff-verification.ts";
 
 // The four server runtime inputs this module reads, and nothing else. The URL
 // and publishable key are the ones the request-scoped session client already
@@ -281,20 +310,251 @@ export async function createConfirmationDispatch(
   } satisfies ConfirmationDispatch);
 }
 
+// Whether the environment holds a verified project binding, answered without
+// building any client and without returning the binding or a credential. It
+// lets a page refrain from offering an action that the privileged boundary
+// would certainly refuse (P3-003 correction of the P3-002 entry limitation).
+export function hasPrivilegedProjectBinding(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+): boolean {
+  return readProjectBinding(environment) !== null;
+}
+
+// P3-003 professional read ports. Every list read is bounded and every id
+// list is checked to hold only canonical ids before it reaches a filter. The
+// caller derives each id from a verified server-side read; nothing here takes
+// request input, decides authorization, or writes anything.
+const MAX_IDS = 500;
+
+function idListOf(ids: readonly string[]): readonly string[] | null {
+  return ids.length > 0 && ids.length <= MAX_IDS && ids.every(isUuid)
+    ? [...new Set(ids)]
+    : null;
+}
+
+const EVIDENCE_FLAG_COLUMNS = "id, discrepancy_flag, retrieved_at";
+const ATTORNEY_EVALUATION_COLUMNS =
+  "id, jurisdiction_id, context_type, context_id, result, evaluated_at";
+
+export async function createAttorneyProfessionalProvisioning(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<AttorneyProfessionalProvisioning | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    jurisdictions: async () =>
+      rowsResultOf(
+        await admin
+          .from("jurisdictions")
+          .select(JURISDICTION_COLUMNS)
+          .order("code")
+          .limit(MAX_IDS),
+      ),
+    evidenceSubjectsOf: async (kind: SubjectKind, recordIds) => {
+      const ids = idListOf(recordIds);
+      if (ids === null) {
+        return UNREADABLE_ROWS;
+      }
+      const column = subjectColumnOf(kind);
+      return rowsResultOf(
+        await admin
+          .from("verification_evidence_subjects")
+          .select(`verification_evidence_id, ${column}`)
+          .in(column, ids)
+          .limit(MAX_IDS),
+      );
+    },
+    evidenceFlagsOf: async (evidenceIds) => {
+      const ids = idListOf(evidenceIds);
+      if (ids === null) {
+        return UNREADABLE_ROWS;
+      }
+      return rowsResultOf(
+        await admin
+          .from("verification_evidence")
+          .select(EVIDENCE_FLAG_COLUMNS)
+          .in("id", ids)
+          .limit(MAX_IDS),
+      );
+    },
+    evaluationsOf: async (attorneyId) =>
+      rowsResultOf(
+        await admin
+          .from("eligibility_evaluations")
+          .select(ATTORNEY_EVALUATION_COLUMNS)
+          .eq("attorney_id", attorneyId)
+          .order("evaluated_at", { ascending: false })
+          .limit(MAX_IDS),
+      ),
+    // The staff requests for more information about this applicant's own
+    // profile, each recorded together with its return to the applicant stage.
+    informationRequestsOf: async (attorneyId) =>
+      rowsResultOf(
+        await admin
+          .from("audit_events")
+          .select("id, occurred_at, action_code, after_snapshot")
+          .eq("resource_type", "attorney_profile")
+          .eq("resource_id", attorneyId)
+          .eq("action_code", "attorney_information_requested")
+          .order("occurred_at", { ascending: false })
+          .limit(100),
+      ),
+  } satisfies AttorneyProfessionalProvisioning);
+}
+
+export async function createStaffVerificationProvisioning(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<StaffProvisioning | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    jurisdictions: async () =>
+      rowsResultOf(
+        await admin
+          .from("jurisdictions")
+          .select(JURISDICTION_COLUMNS)
+          .order("code")
+          .limit(MAX_IDS),
+      ),
+    attorneyProfileOf: async (attorneyId) =>
+      rowsResultOf(
+        await admin
+          .from("attorney_profiles")
+          .select(ATTORNEY_PROFESSIONAL_PROFILE_COLUMNS)
+          .eq("id", attorneyId)
+          .limit(2),
+      ),
+    accountStateOf: async (userId) =>
+      rowsResultOf(
+        await admin
+          .from("users")
+          .select("id, account_state")
+          .eq("id", userId)
+          .limit(2),
+      ),
+    // Each professional table is named literally; the privileged client
+    // never receives a table chosen at run time.
+    licensesIn: async (attorneyId, jurisdictionId) =>
+      rowsResultOf(
+        await admin
+          .from("licenses")
+          .select(LICENSE_COLUMNS)
+          .eq("attorney_id", attorneyId)
+          .eq("jurisdiction_id", jurisdictionId)
+          .limit(MAX_IDS),
+      ),
+    insuranceIn: async (attorneyId, jurisdictionId) =>
+      rowsResultOf(
+        await admin
+          .from("insurance_records")
+          .select(INSURANCE_COLUMNS)
+          .eq("attorney_id", attorneyId)
+          .eq("jurisdiction_id", jurisdictionId)
+          .limit(MAX_IDS),
+      ),
+    disciplineIn: async (attorneyId, jurisdictionId) =>
+      rowsResultOf(
+        await admin
+          .from("discipline_records")
+          .select(DISCIPLINE_COLUMNS)
+          .eq("attorney_id", attorneyId)
+          .eq("jurisdiction_id", jurisdictionId)
+          .limit(MAX_IDS),
+      ),
+    authorisationsIn: async (attorneyId, jurisdictionId) =>
+      rowsResultOf(
+        await admin
+          .from("practice_area_authorisations")
+          .select(PRACTICE_AUTHORISATION_COLUMNS)
+          .eq("attorney_id", attorneyId)
+          .eq("jurisdiction_id", jurisdictionId)
+          .limit(MAX_IDS),
+      ),
+    evidenceSubjectsOf: async (kind: SubjectKind, recordIds) => {
+      const ids = idListOf(recordIds);
+      if (ids === null) {
+        return UNREADABLE_ROWS;
+      }
+      return rowsResultOf(
+        await admin
+          .from("verification_evidence_subjects")
+          .select(EVIDENCE_SUBJECT_COLUMNS)
+          .in(subjectColumnOf(kind), ids)
+          .limit(MAX_IDS),
+      );
+    },
+    evidenceOf: async (evidenceIds) => {
+      const ids = idListOf(evidenceIds);
+      if (ids === null) {
+        return UNREADABLE_ROWS;
+      }
+      return rowsResultOf(
+        await admin
+          .from("verification_evidence")
+          .select(EVIDENCE_COLUMNS)
+          .in("id", ids)
+          .limit(MAX_IDS),
+      );
+    },
+    // Only the one eligibility policy type, for exactly one jurisdiction.
+    policyVersionsFor: async (policyTypeCode, jurisdictionId) =>
+      policyTypeCode !== ELIGIBILITY_POLICY_TYPE
+        ? UNREADABLE_ROWS
+        : rowsResultOf(
+            await admin
+              .from("policy_versions")
+              .select(POLICY_VERSION_COLUMNS)
+              .eq("policy_type_code", ELIGIBILITY_POLICY_TYPE)
+              .eq("jurisdiction_id", jurisdictionId)
+              .limit(50),
+          ),
+    authorityReferencesFor: async (versionIds) => {
+      const ids = idListOf(versionIds);
+      if (ids === null) {
+        return UNREADABLE_ROWS;
+      }
+      return rowsResultOf(
+        await admin
+          .from("policy_authority_references")
+          .select(AUTHORITY_REFERENCE_COLUMNS)
+          .in("policy_version_id", ids)
+          .limit(MAX_IDS),
+      );
+    },
+    profileHistoryOf: async (attorneyId) =>
+      rowsResultOf(
+        await admin
+          .from("audit_events")
+          .select("occurred_at, action_code, after_snapshot")
+          .eq("resource_type", "attorney_profile")
+          .eq("resource_id", attorneyId)
+          .order("occurred_at", { ascending: false })
+          .limit(100),
+      ),
+  } satisfies StaffProvisioning);
+}
+
 const ATTORNEY_PROFILE_COLUMNS = "id, user_id, profile_state";
 
-// Attorney-applicant provisioning (P3-002), through its own cookie-free
-// privileged client. It reads the User of exactly one Auth account id and the
-// Attorney Profile of exactly one User id, and inserts at most one Attorney
-// Profile for exactly one User id, always in the applicant state. The
-// profile's id and timestamps are the database's own defaults, its unique
-// User link decides duplicates, and no other column, state, update, removal,
-// or Admin operation is offered. The caller derives every id from a verified
-// server-side read; nothing here takes request input.
+// Attorney-applicant reads (P3-002), through their own cookie-free privileged
+// client: the User of exactly one Auth account id and the Attorney Profile of
+// exactly one User id. No insert, update, removal, or Admin operation is
+// offered; the one applicant-state creation is the database's own
+// attorney_start_application function, called through the request's own
+// session (P3-904). The caller derives every id from a verified server-side
+// read; nothing here takes request input.
 export async function createAttorneyApplicantProvisioning(
   environment: RegistrationEnvironment = runtimeEnvironment(),
   create: ClientFactory = createClient,
-): Promise<AttorneyApplicantProvisioning | null> {
+): Promise<AttorneyApplicationRecords | null> {
   const binding = readProjectBinding(environment);
   if (binding === null) {
     return null;
@@ -317,16 +577,7 @@ export async function createAttorneyApplicantProvisioning(
           .eq("user_id", userId)
           .limit(2),
       ),
-    // A failed or refused insert, a duplicate included, is unreadable here;
-    // the caller decides only from a fresh read afterwards.
-    insertApplicantProfile: async (userId) =>
-      rowsResultOf(
-        await admin
-          .from("attorney_profiles")
-          .insert({ user_id: userId, profile_state: "applicant" })
-          .select(ATTORNEY_PROFILE_COLUMNS),
-      ),
-  } satisfies AttorneyApplicantProvisioning);
+  } satisfies AttorneyApplicationRecords);
 }
 
 // The opaque digests and validated deployment maxima of one quota decision.

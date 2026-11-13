@@ -8,10 +8,12 @@
 // offers no form or mutation, and redirects nowhere. An admitted attorney sees
 // a restricted entry that keeps active User account access, the Attorney
 // Profile lifecycle stage, professional verification, and current eligibility
-// apart: this slice establishes no verification and determines no
-// eligibility. Refused and unavailable requests each see one fixed message and
-// no profile data; every refusal also offers the same fixed link to the
-// attorney application entry (P3-002), which decides afresh on its own.
+// apart: this page establishes no verification and determines no
+// eligibility, and points to the professional setup (P3-003), which shows
+// claims, evidence status, and recorded determinations separately. Refused
+// and unavailable requests each see one fixed message and no profile data;
+// every refusal also offers the same fixed link to the attorney application
+// entry (P3-002), which decides afresh on its own.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -114,13 +116,13 @@ export default async function AttorneyWorkspacePage() {
             <tr>
               <th scope="row">Professional verification</th>
               <td>
-                <Status tone="warning">Not established</Status>
+                <Status tone="neutral">Shown in professional setup</Status>
               </td>
             </tr>
             <tr>
               <th scope="row">Current eligibility</th>
               <td>
-                <Status tone="warning">Not determined</Status>
+                <Status tone="neutral">Shown in professional setup</Status>
               </td>
             </tr>
           </tbody>
@@ -129,9 +131,14 @@ export default async function AttorneyWorkspacePage() {
           Entry to this workspace does not establish professional verification
           or determine current eligibility. An attorney profile lifecycle stage,
           approved included, is a record stage that establishes neither, and
-          this workspace makes no such decision.
+          this workspace makes no such decision. Your claims, their review, and
+          any recorded eligibility determination are shown separately in
+          professional setup.
         </Alert>
         <Cluster>
+          <ButtonLink variant="primary" href="/attorney/professional">
+            Professional setup
+          </ButtonLink>
           <ButtonLink variant="tertiary" href="/">
             Return to the home page
           </ButtonLink>
