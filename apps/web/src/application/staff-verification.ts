@@ -2121,9 +2121,11 @@ export async function recordEligibilityDetermination(
       return UNAVAILABLE;
     }
     const row = Object.freeze({ id: evaluationId, ...evaluated });
-    // The evaluation and its audit event are one database transaction; the
-    // database records the evaluation time and admits only references to
-    // this attorney's own rows in this jurisdiction.
+    // The evaluation and its audit event are one database transaction. The
+    // database records the evaluation time and keeps the evaluation only when
+    // this determination equals the assessment it derives itself from the
+    // canonical rows (P3-904 §4.2a); otherwise it answers invalid and
+    // nothing is saved.
     return stateOf(
       await writeOnce(() => authorized.writes.recordEvaluation(row)),
     );
