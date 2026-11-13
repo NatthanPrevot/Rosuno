@@ -11,6 +11,15 @@
 // refs exist only inside these disposable repositories; the trusted workflow's
 // fetches name explicit refspecs, none under refs/replace/ (asserted below).
 //
+// P2-919: the live guard and workflow are now rosuno-guard v3 (adopted P2-919
+// Packet), which retires this one-time special path. This file stays the
+// permanent regression record of the adopted P2-914 accommodation: it runs
+// unchanged against the exact P2-914 guard and workflow blobs, read from main's
+// history with read-only Git plumbing (no fetch, lazy fetch, replace objects,
+// ref or object write), and fails closed if either blob is missing. The live v3
+// controls, including every ordinary-path protection that remains in force, are
+// covered by tools/p0/tests/p2-919-guard-v3-install.test.mjs.
+//
 // A structural guard PASS proves Git history, Packet and scope boundaries only.
 // It is never P3-904 security acceptance, CI success, Independent Backup review,
 // designated human approval or merge authorization; those remain separate,
@@ -36,9 +45,41 @@ const ROOT = path.resolve(
   "..",
   "..",
 );
-const GUARD = path.join(ROOT, ".github/scripts/rosuno-guard.sh");
+// P2-919: pinned P2-914 guard and workflow blobs (Owner main ed95b006 and every
+// earlier P2-914-era main); the trust binding is unchanged and stays live.
+const P2_914_GUARD_BLOB = "2dad1d6e866684d1d6f3422f413779b061594559";
+const P2_914_WORKFLOW_BLOB = "6c64a49d270f3ab81b2272b0a30ff163e32703ec";
+const HISTORICAL = mkdtempSync(path.join(tmpdir(), "rosuno-p2-914-history-"));
+after(() => rmSync(HISTORICAL, { recursive: true, force: true }));
+function historicalBlob(oid, name) {
+  const result = spawnSync("git", ["cat-file", "blob", oid], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      GIT_NO_LAZY_FETCH: "1",
+      GIT_NO_REPLACE_OBJECTS: "1",
+      GIT_TERMINAL_PROMPT: "0",
+    },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `pinned P2-914 blob ${oid} (${name}) is missing; a full-history checkout is required`,
+    );
+  }
+  const id = createHash("sha1")
+    .update(`blob ${result.stdout.length}\0`)
+    .update(result.stdout)
+    .digest("hex");
+  if (id !== oid) throw new Error(`pinned P2-914 blob ${oid} read as ${id}`);
+  const file = path.join(HISTORICAL, name);
+  writeFileSync(file, result.stdout);
+  return file;
+}
+const GUARD = historicalBlob(P2_914_GUARD_BLOB, "rosuno-guard.sh");
 const TRUST = path.join(ROOT, ".github/scripts/rosuno-guard-trust.sh");
-const WORKFLOW = path.join(ROOT, ".github/workflows/rosuno-guard.yml");
+const WORKFLOW = historicalBlob(P2_914_WORKFLOW_BLOB, "rosuno-guard.yml");
 const PACKET = path.join(ROOT, "docs/work-items/P2-914/PACKET.md");
 
 // Exact immutable P3-003 identities from the adopted P2-914 Packet §2.

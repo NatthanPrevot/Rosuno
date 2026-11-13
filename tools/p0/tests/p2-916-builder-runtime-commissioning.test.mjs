@@ -14,6 +14,14 @@
 // - Effective runtime behaviour (tool-level denials, credential boundary) is
 //   evidenced separately in the Gate 2 report, not by these static tests.
 //
+// P2-919: the live settings, CLAUDE.md and guard were changed by the adopted
+// P2-919 Packet. This file stays the permanent regression record of the
+// adopted P2-916 contract: the settings, CLAUDE.md and guard assertions run
+// unchanged against the exact blobs P2-916 placed or relied on (read from
+// main's history with read-only Git plumbing; fail closed if missing). The live
+// contract, including every P2-916 protection that remains in force, is covered
+// by tools/p0/tests/p2-919-guard-v3-install.test.mjs.
+//
 // Fixtures are synthetic. Disposable repositories are built with Git plumbing
 // only (no working-tree files, so filename case on the host filesystem cannot
 // matter), with no user/global Git configuration and only the file transport.
@@ -21,7 +29,13 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,10 +47,43 @@ const ROOT = path.resolve(
   "..",
   "..",
 );
-const SETTINGS = path.join(ROOT, ".claude/settings.json");
-const INSTRUCTIONS = path.join(ROOT, "CLAUDE.md");
+// P2-919: pinned P2-916 blobs. Settings and CLAUDE.md are those placed by
+// P2-916 commit 9cd408ca; the guard is the P2-914/P2-916-era guard.
+const P2_916_SETTINGS_BLOB = "518ee2ef47db1531b4a001d21c72dc6fee25def9";
+const P2_916_INSTRUCTIONS_BLOB = "db8ab94ba25e166aa4d2c86b35c20438e8e1e08d";
+const P2_916_GUARD_BLOB = "2dad1d6e866684d1d6f3422f413779b061594559";
+const HISTORICAL = mkdtempSync(path.join(tmpdir(), "rosuno-p2-916-history-"));
+after(() => rmSync(HISTORICAL, { recursive: true, force: true }));
+function historicalBlob(oid, name) {
+  const result = spawnSync("git", ["cat-file", "blob", oid], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      GIT_NO_LAZY_FETCH: "1",
+      GIT_NO_REPLACE_OBJECTS: "1",
+      GIT_TERMINAL_PROMPT: "0",
+    },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `pinned P2-916 blob ${oid} (${name}) is missing; a full-history checkout is required`,
+    );
+  }
+  const id = createHash("sha1")
+    .update(`blob ${result.stdout.length}\0`)
+    .update(result.stdout)
+    .digest("hex");
+  if (id !== oid) throw new Error(`pinned P2-916 blob ${oid} read as ${id}`);
+  const file = path.join(HISTORICAL, name);
+  writeFileSync(file, result.stdout);
+  return file;
+}
+const SETTINGS = historicalBlob(P2_916_SETTINGS_BLOB, "settings.json");
+const INSTRUCTIONS = historicalBlob(P2_916_INSTRUCTIONS_BLOB, "CLAUDE.md");
 const PACKET = path.join(ROOT, "docs/work-items/P2-916/PACKET.md");
-const GUARD = path.join(ROOT, ".github/scripts/rosuno-guard.sh");
+const GUARD = historicalBlob(P2_916_GUARD_BLOB, "rosuno-guard.sh");
 const TRUST = path.join(ROOT, ".github/scripts/rosuno-guard-trust.sh");
 const WORKFLOW = path.join(ROOT, ".github/workflows/rosuno-guard.yml");
 
