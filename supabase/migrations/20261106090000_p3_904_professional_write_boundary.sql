@@ -33,6 +33,14 @@
 -- audit_events grants are unchanged: no other writer exists today, and no
 -- unrelated auditing is disabled.
 --
+-- Eligibility decision integrity (P3-904 revision 3 §4.2a). An evaluation is
+-- recorded only when the submitted result, factor results, policy references
+-- and evidence references equal the assessment the database itself derives,
+-- under the locks above, from the canonical rows with exactly the adopted
+-- P3-003 rules. Truthful negative and undetermined evaluations are recorded;
+-- forged, unsupported, stale or unverifiable ones are refused as invalid. The
+-- derivation helpers are executable by no API role.
+--
 -- Every function returns one fixed outcome: applied, denied, locked,
 -- conflict, or invalid. Only applied means anything changed. No business
 -- table, role, capability, policy, or regulatory rule is introduced.
@@ -1452,13 +1460,815 @@ begin
 end;
 $function$;
 
+-- ---------------------------------------------------------------------------
+-- P3-904 revision 3 §4.2a: eligibility decision integrity.
+--
+-- The database derives the current Eligibility assessment from the canonical
+-- rows with exactly the adopted P3-003 rules (eligibility-assessment.ts and
+-- policy-selection.ts) and records an evaluation only when the submitted
+-- determination equals it. No factor, threshold, status, policy or
+-- parameter is added, removed or reinterpreted here: each helper mirrors one
+-- adopted rule, including the strict readers (a row the application would
+-- refuse to read makes the facts unreadable) and JavaScript's millisecond
+-- time and safe-integer semantics. Where the application's bounded reads could
+-- see only part of the rows, the assessment is unverifiable and nothing is
+-- recorded. The helpers are executable by no API role.
+-- ---------------------------------------------------------------------------
+
+-- JavaScript String.prototype.trim() whitespace: a value that trims to ''.
+create function public.eligibility_js_blank(value text)
+returns boolean
+language sql
+immutable
+security invoker
+set search_path = pg_catalog
+as $function$
+  select value ~ '^[\t\n\v\f\r    -     　﻿]*$';
+$function$;
+
+-- Milliseconds since the epoch, sub-millisecond digits dropped, as
+-- Date.parse reads a timestamp reported by the API.
+create function public.eligibility_epoch_ms(value timestamptz)
+returns bigint
+language sql
+stable
+security invoker
+set search_path = pg_catalog
+as $function$
+  select (extract(epoch from date_trunc('milliseconds', value)) * 1000)::bigint;
+$function$;
+
+-- A JSON number that JSON.parse reads as a safe integer of at least the
+-- minimum (Number.isSafeInteger), or null.
+create function public.eligibility_safe_integer(value jsonb, minimum numeric)
+returns numeric
+language plpgsql
+immutable
+security invoker
+set search_path = pg_catalog
+as $function$
+declare
+  v_number numeric;
+  v_float double precision;
+begin
+  if value is null or jsonb_typeof(value) <> 'number' then
+    return null;
+  end if;
+  v_number := (value #>> '{}')::numeric;
+  if abs(v_number) >= 1e300 then
+    return null;
+  end if;
+  if abs(v_number) < 1e-300 then
+    v_float := 0;
+  else
+    v_float := v_number::double precision;
+  end if;
+  if v_float <> trunc(v_float)
+     or v_float < minimum
+     or v_float > 9007199254740991 then
+    return null;
+  end if;
+  return v_float::numeric;
+end;
+$function$;
+
+-- A non-empty-string, duplicate-free JSON array of strings (isStatusList), in
+-- its own order, or null.
+create function public.eligibility_status_list(value jsonb)
+returns text[]
+language sql
+immutable
+security invoker
+set search_path = pg_catalog
+as $function$
+  select case
+    when value is null or jsonb_typeof(value) <> 'array' then null
+    when exists (
+      select 1 from jsonb_array_elements(value) as e(item)
+      where jsonb_typeof(e.item) <> 'string'
+         or public.eligibility_js_blank(e.item #>> '{}')
+    ) then null
+    when (select count(*) from jsonb_array_elements_text(value))
+         <> (select count(distinct x.t collate "C")
+             from jsonb_array_elements_text(value) as x(t)) then null
+    else coalesce(
+      (select array_agg(x.t order by x.n)
+       from jsonb_array_elements_text(value) with ordinality as x(t, n)),
+      array[]::text[]
+    )
+  end;
+$function$;
+
+-- A JSON object holding exactly these keys (readExact).
+create function public.eligibility_exact_object(value jsonb, keys text[])
+returns boolean
+language sql
+immutable
+security invoker
+set search_path = pg_catalog
+as $function$
+  select value is not null
+     and jsonb_typeof(value) = 'object'
+     and (select coalesce(array_agg(o.k collate "C" order by o.k collate "C"), array[]::text[])
+          from jsonb_object_keys(value) as o(k))
+         = (select array_agg(u.k collate "C" order by u.k collate "C")
+            from unnest(keys) as u(k));
+$function$;
+
+-- selectEligibilityPolicy: the one applicable attorney_eligibility policy
+-- of exactly this jurisdiction at exactly this instant, with its parameters
+-- read in the one declared schema, or a fixed undetermined reason.
+create function public.eligibility_selected_policy(
+  p_jurisdiction_id uuid,
+  p_as_of timestamptz
+)
+returns jsonb
+language plpgsql
+stable
+security invoker
+set search_path = pg_catalog
+as $function$
+declare
+  v_as_of bigint := public.eligibility_epoch_ms(p_as_of);
+  v_version public.policy_versions;
+  v_applicable integer;
+  v_p jsonb;
+  v_license jsonb;
+  v_insurance jsonb;
+  v_discipline jsonb;
+  v_practice jsonb;
+  v_qualifying text[];
+  v_license_age numeric;
+  v_insurance_age numeric;
+  v_per numeric;
+  v_aggregate numeric;
+  v_currency text;
+  v_disqualifying text[];
+  v_cleared text[];
+begin
+  -- The application reads at most 50 versions and 500 authority references.
+  if (select count(*) from public.policy_versions as v
+      where v.policy_type_code = 'attorney_eligibility'
+        and v.jurisdiction_id = p_jurisdiction_id) > 50
+     or (select count(*)
+         from public.policy_authority_references as r
+         join public.policy_versions as v on v.id = r.policy_version_id
+         where v.policy_type_code = 'attorney_eligibility'
+           and v.jurisdiction_id = p_jurisdiction_id) > 500 then
+    return jsonb_build_object('status', 'unverifiable');
+  end if;
+  -- In force: active, approved by a recorded actor, inside its period.
+  if exists (
+    select 1 from public.policy_versions as v
+    where v.policy_type_code = 'attorney_eligibility'
+      and v.jurisdiction_id = p_jurisdiction_id
+      and v.status = 'active'
+      and v.approved_at is not null
+      and v.approved_by_user_id is not null
+      and v.effective_from is not null
+      and public.eligibility_epoch_ms(v.effective_from) <= v_as_of
+      and (v.effective_until is null
+           or public.eligibility_epoch_ms(v.effective_until) > v_as_of)
+      and v.regulatory_mode_id is not null
+  ) then
+    return jsonb_build_object('status', 'undetermined',
+                              'reason', 'regulatory_mode_undetermined');
+  end if;
+  select count(*) into v_applicable
+  from public.policy_versions as v
+  where v.policy_type_code = 'attorney_eligibility'
+    and v.jurisdiction_id = p_jurisdiction_id
+    and v.status = 'active'
+    and v.approved_at is not null
+    and v.approved_by_user_id is not null
+    and v.effective_from is not null
+    and public.eligibility_epoch_ms(v.effective_from) <= v_as_of
+    and (v.effective_until is null
+         or public.eligibility_epoch_ms(v.effective_until) > v_as_of);
+  if v_applicable = 0 then
+    return jsonb_build_object('status', 'undetermined',
+                              'reason', 'no_applicable_policy');
+  end if;
+  if v_applicable > 1 then
+    return jsonb_build_object('status', 'undetermined',
+                              'reason', 'conflicting_policies');
+  end if;
+  select v.* into v_version
+  from public.policy_versions as v
+  where v.policy_type_code = 'attorney_eligibility'
+    and v.jurisdiction_id = p_jurisdiction_id
+    and v.status = 'active'
+    and v.approved_at is not null
+    and v.approved_by_user_id is not null
+    and v.effective_from is not null
+    and public.eligibility_epoch_ms(v.effective_from) <= v_as_of
+    and (v.effective_until is null
+         or public.eligibility_epoch_ms(v.effective_until) > v_as_of);
+  if not exists (
+    select 1 from public.policy_authority_references as r
+    where r.policy_version_id = v_version.id
+      and r.verification_status = 'verified'
+      and r.verified_by_user_id is not null
+  ) then
+    return jsonb_build_object('status', 'undetermined',
+                              'reason', 'authority_unverified');
+  end if;
+  -- readParameters: every key required, null only where the schema allows.
+  v_p := v_version.parameters;
+  if not public.eligibility_exact_object(
+       v_p, array['schema', 'license', 'insurance', 'discipline', 'practice_area'])
+     or jsonb_typeof(v_p -> 'schema') <> 'string'
+     or (v_p ->> 'schema') <> 'rosuno.attorney_eligibility.v1' then
+    return jsonb_build_object('status', 'undetermined',
+                              'reason', 'policy_parameters_unreadable');
+  end if;
+  v_license := v_p -> 'license';
+  v_insurance := v_p -> 'insurance';
+  v_discipline := v_p -> 'discipline';
+  v_practice := v_p -> 'practice_area';
+  if not public.eligibility_exact_object(
+       v_license, array['qualifying_reported_statuses', 'evidence_max_age_days'])
+     or not public.eligibility_exact_object(
+       v_insurance, array['required', 'evidence_max_age_days',
+                          'minimum_per_occurrence_minor',
+                          'minimum_aggregate_minor', 'currency_code'])
+     or not public.eligibility_exact_object(
+       v_discipline, array['disqualifying_statuses', 'cleared_statuses'])
+     or not public.eligibility_exact_object(
+       v_practice, array['authorisation_required']) then
+    return jsonb_build_object('status', 'undetermined',
+                              'reason', 'policy_parameters_unreadable');
+  end if;
+  v_qualifying := public.eligibility_status_list(v_license -> 'qualifying_reported_statuses');
+  v_license_age := public.eligibility_safe_integer(v_license -> 'evidence_max_age_days', 1);
+  v_disqualifying := public.eligibility_status_list(v_discipline -> 'disqualifying_statuses');
+  v_cleared := public.eligibility_status_list(v_discipline -> 'cleared_statuses');
+  if jsonb_typeof(v_insurance -> 'evidence_max_age_days') <> 'null' then
+    v_insurance_age := public.eligibility_safe_integer(v_insurance -> 'evidence_max_age_days', 1);
+    if v_insurance_age is null then
+      return jsonb_build_object('status', 'undetermined',
+                                'reason', 'policy_parameters_unreadable');
+    end if;
+  end if;
+  if jsonb_typeof(v_insurance -> 'minimum_per_occurrence_minor') <> 'null' then
+    v_per := public.eligibility_safe_integer(v_insurance -> 'minimum_per_occurrence_minor', 0);
+    if v_per is null then
+      return jsonb_build_object('status', 'undetermined',
+                                'reason', 'policy_parameters_unreadable');
+    end if;
+  end if;
+  if jsonb_typeof(v_insurance -> 'minimum_aggregate_minor') <> 'null' then
+    v_aggregate := public.eligibility_safe_integer(v_insurance -> 'minimum_aggregate_minor', 0);
+    if v_aggregate is null then
+      return jsonb_build_object('status', 'undetermined',
+                                'reason', 'policy_parameters_unreadable');
+    end if;
+  end if;
+  if jsonb_typeof(v_insurance -> 'currency_code') <> 'null' then
+    if jsonb_typeof(v_insurance -> 'currency_code') <> 'string'
+       or not ((v_insurance ->> 'currency_code') collate "C" ~ '^[A-Z]{3}$') then
+      return jsonb_build_object('status', 'undetermined',
+                                'reason', 'policy_parameters_unreadable');
+    end if;
+    v_currency := v_insurance ->> 'currency_code';
+  end if;
+  if v_qualifying is null
+     or cardinality(v_qualifying) = 0
+     or v_license_age is null
+     or jsonb_typeof(v_insurance -> 'required') <> 'boolean'
+     or v_disqualifying is null
+     or v_cleared is null
+     or v_disqualifying && v_cleared
+     or jsonb_typeof(v_practice -> 'authorisation_required') <> 'boolean'
+     or ((v_per is not null or v_aggregate is not null) and v_currency is null) then
+    return jsonb_build_object('status', 'undetermined',
+                              'reason', 'policy_parameters_unreadable');
+  end if;
+  return jsonb_build_object(
+    'status', 'selected',
+    'policy_version_id', v_version.id,
+    'version_label', v_version.version_label,
+    'qualifying', to_jsonb(v_qualifying),
+    'license_age', v_license_age,
+    'insurance_required', (v_insurance -> 'required')::boolean,
+    'insurance_age', v_insurance_age,
+    'minimum_per_occurrence', v_per,
+    'minimum_aggregate', v_aggregate,
+    'currency', v_currency,
+    'disqualifying', to_jsonb(v_disqualifying),
+    'cleared', to_jsonb(v_cleared),
+    'authorisation_required', (v_practice -> 'authorisation_required')::boolean
+  );
+end;
+$function$;
+
+-- assessEligibility: the factor results, combined result, policy references
+-- and evidence references the adopted engine produces for one attorney, one
+-- jurisdiction and optionally one practice area at exactly this instant, in
+-- the evaluation row's JSON shape, with record outcomes ordered by id.
+-- verifiable is false when the application's bounded reads could be partial.
+create function public.eligibility_assessment(
+  p_attorney_id uuid,
+  p_jurisdiction_id uuid,
+  p_practice_area_id uuid,
+  p_as_of timestamptz
+)
+returns jsonb
+language plpgsql
+stable
+security invoker
+set search_path = pg_catalog
+as $function$
+declare
+  v_as_of bigint := public.eligibility_epoch_ms(p_as_of);
+  v_today date := (p_as_of at time zone 'UTC')::date;
+  v_day constant bigint := 86400000;
+  v_user uuid;
+  v_profile_state text;
+  v_account text;
+  v_policy jsonb;
+  v_factors jsonb;
+  v_records jsonb;
+  v_relied text[] := array[]::text[];
+  v_outcome text;
+  v_reason text;
+  v_standing text;
+  v_evidence record;
+  v_row record;
+  v_none jsonb := '[]'::jsonb;
+  v_unreadable jsonb;
+  v_qualifying text[];
+  v_disqualifying text[];
+  v_cleared text[];
+  v_license_age numeric;
+  v_insurance_age numeric;
+  v_per numeric;
+  v_aggregate numeric;
+  v_currency text;
+  v_result text;
+begin
+  v_unreadable := jsonb_build_object(
+    'verifiable', true,
+    'result', 'undetermined',
+    'factor_results', jsonb_build_array(jsonb_build_object(
+      'factor', 'account', 'outcome', 'undetermined',
+      'reason', 'facts_unreadable', 'records', v_none)),
+    'policy_references', v_none,
+    'evidence_references', jsonb_build_object(
+      'evidence_ids', v_none, 'license_ids', v_none,
+      'insurance_record_ids', v_none, 'discipline_record_ids', v_none,
+      'practice_area_authorisation_ids', v_none)
+  );
+
+  -- The application's bounded reads: 500 rows per record list, per subject
+  -- kind and for the evidence set.
+  if (select count(*) from public.licenses as l
+      where l.attorney_id = p_attorney_id and l.jurisdiction_id = p_jurisdiction_id) > 500
+     or (select count(*) from public.insurance_records as i
+         where i.attorney_id = p_attorney_id and i.jurisdiction_id = p_jurisdiction_id) > 500
+     or (select count(*) from public.discipline_records as d
+         where d.attorney_id = p_attorney_id and d.jurisdiction_id = p_jurisdiction_id) > 500
+     or (select count(*) from public.practice_area_authorisations as a
+         where a.attorney_id = p_attorney_id and a.jurisdiction_id = p_jurisdiction_id) > 500
+     or (select count(*) from public.verification_evidence_subjects as s
+         join public.licenses as l on l.id = s.license_id
+         where l.attorney_id = p_attorney_id and l.jurisdiction_id = p_jurisdiction_id) > 500
+     or (select count(*) from public.verification_evidence_subjects as s
+         join public.insurance_records as i on i.id = s.insurance_record_id
+         where i.attorney_id = p_attorney_id and i.jurisdiction_id = p_jurisdiction_id) > 500
+     or (select count(*) from public.verification_evidence_subjects as s
+         join public.discipline_records as d on d.id = s.discipline_record_id
+         where d.attorney_id = p_attorney_id and d.jurisdiction_id = p_jurisdiction_id) > 500
+     or (select count(*) from public.verification_evidence_subjects as s
+         join public.practice_area_authorisations as a on a.id = s.practice_area_authorisation_id
+         where a.attorney_id = p_attorney_id and a.jurisdiction_id = p_jurisdiction_id) > 500 then
+    return jsonb_build_object('verifiable', false);
+  end if;
+  -- More than 500 linked evidence ids is a refused read in the application,
+  -- so its facts are unreadable.
+  if (select count(distinct s.verification_evidence_id)
+      from public.verification_evidence_subjects as s
+      left join public.licenses as l on l.id = s.license_id
+      left join public.insurance_records as i on i.id = s.insurance_record_id
+      left join public.discipline_records as d on d.id = s.discipline_record_id
+      left join public.practice_area_authorisations as a on a.id = s.practice_area_authorisation_id
+      where coalesce(l.attorney_id, i.attorney_id, d.attorney_id, a.attorney_id) = p_attorney_id
+        and coalesce(l.jurisdiction_id, i.jurisdiction_id, d.jurisdiction_id, a.jurisdiction_id)
+            = p_jurisdiction_id) > 500 then
+    return v_unreadable;
+  end if;
+
+  -- The profile and its User, as the trusted reads return them.
+  select p.user_id, p.profile_state into v_user, v_profile_state
+  from public.attorney_profiles as p
+  where p.id = p_attorney_id;
+  if not found then
+    return jsonb_build_object('verifiable', false);
+  end if;
+  select u.account_state into v_account
+  from public.users as u
+  where u.id = v_user;
+
+  -- The strict readers: one row the application cannot read makes the facts
+  -- unreadable.
+  if exists (
+       select 1 from public.licenses as l
+       where l.attorney_id = p_attorney_id and l.jurisdiction_id = p_jurisdiction_id
+         and (coalesce(public.eligibility_js_blank(l.license_number), true)
+              or (l.reported_status is not null
+                  and public.eligibility_js_blank(l.reported_status))))
+     or exists (
+       select 1 from public.insurance_records as i
+       where i.attorney_id = p_attorney_id and i.jurisdiction_id = p_jurisdiction_id
+         and ((i.currency_code is not null
+               and not (i.currency_code collate "C" ~ '^[A-Z]{3}$'))
+              or (i.per_occurrence_limit_minor is not null
+                  and (i.per_occurrence_limit_minor < 0
+                       or i.per_occurrence_limit_minor > 9007199254740991))
+              or (i.aggregate_limit_minor is not null
+                  and (i.aggregate_limit_minor < 0
+                       or i.aggregate_limit_minor > 9007199254740991))))
+     or exists (
+       select 1 from public.practice_area_authorisations as a
+       where a.attorney_id = p_attorney_id and a.jurisdiction_id = p_jurisdiction_id
+         and public.eligibility_js_blank(a.status)) then
+    return v_unreadable;
+  end if;
+
+  v_policy := public.eligibility_selected_policy(p_jurisdiction_id, p_as_of);
+  if v_policy ->> 'status' = 'unverifiable' then
+    return jsonb_build_object('verifiable', false);
+  end if;
+
+  v_factors := jsonb_build_array(
+    case
+      when v_account = 'active' then
+        jsonb_build_object('factor', 'account', 'outcome', 'pass',
+                           'reason', 'account_active', 'records', v_none)
+      when v_account in ('pending_verification', 'suspended', 'closed') then
+        jsonb_build_object('factor', 'account', 'outcome', 'fail',
+                           'reason', 'account_not_active', 'records', v_none)
+      else
+        jsonb_build_object('factor', 'account', 'outcome', 'undetermined',
+                           'reason', 'account_state_unreadable', 'records', v_none)
+    end,
+    case v_profile_state
+      when 'approved' then
+        jsonb_build_object('factor', 'profile', 'outcome', 'pass',
+                           'reason', 'profile_approved', 'records', v_none)
+      when 'suspended' then
+        jsonb_build_object('factor', 'profile', 'outcome', 'fail',
+                           'reason', 'profile_suspended_or_removed', 'records', v_none)
+      when 'removed' then
+        jsonb_build_object('factor', 'profile', 'outcome', 'fail',
+                           'reason', 'profile_suspended_or_removed', 'records', v_none)
+      else
+        jsonb_build_object('factor', 'profile', 'outcome', 'fail',
+                           'reason', 'profile_not_approved', 'records', v_none)
+    end
+  );
+
+  if v_policy ->> 'status' <> 'selected' then
+    v_factors := v_factors || jsonb_build_array(
+      jsonb_build_object('factor', 'policy', 'outcome', 'undetermined',
+                         'reason', v_policy ->> 'reason', 'records', v_none),
+      jsonb_build_object('factor', 'license', 'outcome', 'undetermined',
+                         'reason', 'policy_undetermined', 'records', v_none),
+      jsonb_build_object('factor', 'insurance', 'outcome', 'undetermined',
+                         'reason', 'policy_undetermined', 'records', v_none),
+      jsonb_build_object('factor', 'discipline', 'outcome', 'undetermined',
+                         'reason', 'policy_undetermined', 'records', v_none),
+      case when p_practice_area_id is null then
+        jsonb_build_object('factor', 'practice_area', 'outcome', 'not_applicable',
+                           'reason', 'jurisdiction_context', 'records', v_none)
+      else
+        jsonb_build_object('factor', 'practice_area', 'outcome', 'undetermined',
+                           'reason', 'policy_undetermined', 'records', v_none)
+      end
+    );
+  else
+    v_qualifying := array(select jsonb_array_elements_text(v_policy -> 'qualifying'));
+    v_disqualifying := array(select jsonb_array_elements_text(v_policy -> 'disqualifying'));
+    v_cleared := array(select jsonb_array_elements_text(v_policy -> 'cleared'));
+    v_license_age := (v_policy ->> 'license_age')::numeric;
+    v_insurance_age := (v_policy ->> 'insurance_age')::numeric;
+    v_per := (v_policy ->> 'minimum_per_occurrence')::numeric;
+    v_aggregate := (v_policy ->> 'minimum_aggregate')::numeric;
+    v_currency := v_policy ->> 'currency';
+    v_factors := v_factors || jsonb_build_array(jsonb_build_object(
+      'factor', 'policy', 'outcome', 'pass', 'reason', 'policy_selected',
+      'records', v_none));
+
+    -- License: one passing record suffices.
+    v_records := v_none;
+    for v_row in
+      select l.* from public.licenses as l
+      where l.attorney_id = p_attorney_id and l.jurisdiction_id = p_jurisdiction_id
+      order by l.id
+    loop
+      if v_row.effective_until is not null and v_row.effective_until < v_today then
+        v_outcome := 'fail'; v_reason := 'license_expired';
+      elsif v_row.effective_from is not null and v_row.effective_from > v_today then
+        v_outcome := 'fail'; v_reason := 'license_not_yet_effective';
+      else
+        select e.id, e.retrieved_at, e.discrepancy_flag into v_evidence
+        from public.verification_evidence_subjects as s
+        join public.verification_evidence as e on e.id = s.verification_evidence_id
+        where s.license_id = v_row.id and e.jurisdiction_id = p_jurisdiction_id
+        order by public.eligibility_epoch_ms(e.retrieved_at) desc,
+                 public.eligibility_epoch_ms(e.created_at) desc,
+                 e.id::text collate "C" desc
+        limit 1;
+        if not found then
+          v_standing := 'no_evidence';
+        else
+          v_relied := v_relied || v_evidence.id::text;
+          if public.eligibility_epoch_ms(v_evidence.retrieved_at) > v_as_of then
+            v_standing := 'evidence_after_assessment';
+          elsif v_as_of - public.eligibility_epoch_ms(v_evidence.retrieved_at)
+                > v_license_age * v_day then
+            v_standing := 'evidence_stale';
+          elsif v_evidence.discrepancy_flag then
+            v_standing := 'evidence_discrepancy_unresolved';
+          else
+            v_standing := null;
+          end if;
+        end if;
+        if v_standing is not null and v_standing <> 'evidence_discrepancy_unresolved' then
+          v_outcome := 'undetermined'; v_reason := v_standing;
+        elsif v_row.reported_status is null then
+          v_outcome := 'undetermined'; v_reason := 'no_source_observation';
+        elsif not (v_row.reported_status collate "C" = any (v_qualifying)) then
+          v_outcome := 'fail'; v_reason := 'reported_status_not_qualifying';
+        elsif v_standing is not null then
+          v_outcome := 'undetermined'; v_reason := v_standing;
+        else
+          v_outcome := 'pass'; v_reason := 'license_verified';
+        end if;
+      end if;
+      v_records := v_records || jsonb_build_array(jsonb_build_object(
+        'id', v_row.id, 'outcome', v_outcome, 'reason', v_reason));
+    end loop;
+    v_factors := v_factors || jsonb_build_array(
+      case
+        when jsonb_array_length(v_records) = 0 then
+          jsonb_build_object('factor', 'license', 'outcome', 'fail',
+                             'reason', 'no_license_in_jurisdiction', 'records', v_none)
+        when jsonb_path_exists(v_records, '$[*] ? (@.outcome == "pass")') then
+          jsonb_build_object('factor', 'license', 'outcome', 'pass',
+                             'reason', 'license_verified', 'records', v_records)
+        when jsonb_path_exists(v_records, '$[*] ? (@.outcome == "undetermined")') then
+          jsonb_build_object('factor', 'license', 'outcome', 'undetermined',
+                             'reason', 'no_record_determined', 'records', v_records)
+        else
+          jsonb_build_object('factor', 'license', 'outcome', 'fail',
+                             'reason', 'no_record_qualifies', 'records', v_records)
+      end);
+
+    -- Insurance: only when the selected policy requires it.
+    if not (v_policy ->> 'insurance_required')::boolean then
+      v_factors := v_factors || jsonb_build_array(jsonb_build_object(
+        'factor', 'insurance', 'outcome', 'not_required',
+        'reason', 'insurance_not_required', 'records', v_none));
+    else
+      v_records := v_none;
+      for v_row in
+        select i.* from public.insurance_records as i
+        where i.attorney_id = p_attorney_id and i.jurisdiction_id = p_jurisdiction_id
+        order by i.id
+      loop
+        v_standing := null;
+        if v_row.coverage_from is null or v_row.coverage_until is null then
+          v_outcome := 'undetermined'; v_reason := 'coverage_period_missing';
+        elsif v_row.coverage_from > v_today or v_row.coverage_until < v_today then
+          v_outcome := 'fail'; v_reason := 'coverage_not_current';
+        elsif (v_per is not null or v_aggregate is not null)
+              and v_row.currency_code is distinct from v_currency then
+          v_outcome := 'undetermined'; v_reason := 'currency_mismatch';
+        elsif v_per is not null and v_row.per_occurrence_limit_minor is null then
+          v_outcome := 'undetermined'; v_reason := 'limit_missing';
+        elsif v_per is not null and v_row.per_occurrence_limit_minor < v_per then
+          v_outcome := 'fail'; v_reason := 'limit_below_minimum';
+        elsif v_aggregate is not null and v_row.aggregate_limit_minor is null then
+          v_outcome := 'undetermined'; v_reason := 'limit_missing';
+        elsif v_aggregate is not null and v_row.aggregate_limit_minor < v_aggregate then
+          v_outcome := 'fail'; v_reason := 'limit_below_minimum';
+        else
+          select e.id, e.retrieved_at, e.discrepancy_flag into v_evidence
+          from public.verification_evidence_subjects as s
+          join public.verification_evidence as e on e.id = s.verification_evidence_id
+          where s.insurance_record_id = v_row.id and e.jurisdiction_id = p_jurisdiction_id
+          order by public.eligibility_epoch_ms(e.retrieved_at) desc,
+                   public.eligibility_epoch_ms(e.created_at) desc,
+                   e.id::text collate "C" desc
+          limit 1;
+          if not found then
+            v_standing := 'no_evidence';
+          else
+            v_relied := v_relied || v_evidence.id::text;
+            if public.eligibility_epoch_ms(v_evidence.retrieved_at) > v_as_of then
+              v_standing := 'evidence_after_assessment';
+            elsif v_insurance_age is not null
+                  and v_as_of - public.eligibility_epoch_ms(v_evidence.retrieved_at)
+                      > v_insurance_age * v_day then
+              v_standing := 'evidence_stale';
+            elsif v_evidence.discrepancy_flag then
+              v_standing := 'evidence_discrepancy_unresolved';
+            end if;
+          end if;
+          if v_standing is not null then
+            v_outcome := 'undetermined'; v_reason := v_standing;
+          else
+            v_outcome := 'pass'; v_reason := 'insurance_verified';
+          end if;
+        end if;
+        v_records := v_records || jsonb_build_array(jsonb_build_object(
+          'id', v_row.id, 'outcome', v_outcome, 'reason', v_reason));
+      end loop;
+      v_factors := v_factors || jsonb_build_array(
+        case
+          when jsonb_array_length(v_records) = 0 then
+            jsonb_build_object('factor', 'insurance', 'outcome', 'fail',
+                               'reason', 'no_insurance_in_jurisdiction', 'records', v_none)
+          when jsonb_path_exists(v_records, '$[*] ? (@.outcome == "pass")') then
+            jsonb_build_object('factor', 'insurance', 'outcome', 'pass',
+                               'reason', 'insurance_verified', 'records', v_records)
+          when jsonb_path_exists(v_records, '$[*] ? (@.outcome == "undetermined")') then
+            jsonb_build_object('factor', 'insurance', 'outcome', 'undetermined',
+                               'reason', 'no_record_determined', 'records', v_records)
+          else
+            jsonb_build_object('factor', 'insurance', 'outcome', 'fail',
+                               'reason', 'no_record_qualifies', 'records', v_records)
+        end);
+    end if;
+
+    -- Discipline: every linked evidence item is relied upon.
+    v_records := v_none;
+    for v_row in
+      select d.* from public.discipline_records as d
+      where d.attorney_id = p_attorney_id and d.jurisdiction_id = p_jurisdiction_id
+      order by d.id
+    loop
+      v_relied := v_relied || array(
+        select e.id::text
+        from public.verification_evidence_subjects as s
+        join public.verification_evidence as e on e.id = s.verification_evidence_id
+        where s.discipline_record_id = v_row.id and e.jurisdiction_id = p_jurisdiction_id);
+      if v_row.status is not null and v_row.status collate "C" = any (v_disqualifying) then
+        v_outcome := 'fail'; v_reason := 'disqualifying_record';
+      elsif v_row.status is not null and v_row.status collate "C" = any (v_cleared) then
+        v_outcome := 'pass'; v_reason := 'record_cleared';
+      else
+        v_outcome := 'undetermined'; v_reason := 'status_not_classified';
+      end if;
+      v_records := v_records || jsonb_build_array(jsonb_build_object(
+        'id', v_row.id, 'outcome', v_outcome, 'reason', v_reason));
+    end loop;
+    v_factors := v_factors || jsonb_build_array(
+      case
+        when jsonb_path_exists(v_records, '$[*] ? (@.outcome == "fail")') then
+          jsonb_build_object('factor', 'discipline', 'outcome', 'fail',
+                             'reason', 'disqualifying_record', 'records', v_records)
+        when jsonb_path_exists(v_records, '$[*] ? (@.outcome == "undetermined")') then
+          jsonb_build_object('factor', 'discipline', 'outcome', 'undetermined',
+                             'reason', 'status_not_classified', 'records', v_records)
+        else
+          jsonb_build_object('factor', 'discipline', 'outcome', 'pass',
+                             'reason', 'no_disqualifying_record_on_file', 'records', v_records)
+      end);
+
+    -- Practice area: only for a practice-area context and only when the
+    -- selected policy requires an authorisation.
+    if p_practice_area_id is null then
+      v_factors := v_factors || jsonb_build_array(jsonb_build_object(
+        'factor', 'practice_area', 'outcome', 'not_applicable',
+        'reason', 'jurisdiction_context', 'records', v_none));
+    elsif not (v_policy ->> 'authorisation_required')::boolean then
+      v_factors := v_factors || jsonb_build_array(jsonb_build_object(
+        'factor', 'practice_area', 'outcome', 'not_required',
+        'reason', 'authorisation_not_required', 'records', v_none));
+    else
+      select a.* into v_row
+      from public.practice_area_authorisations as a
+      where a.attorney_id = p_attorney_id and a.jurisdiction_id = p_jurisdiction_id
+        and a.practice_area_id = p_practice_area_id;
+      if not found then
+        v_factors := v_factors || jsonb_build_array(jsonb_build_object(
+          'factor', 'practice_area', 'outcome', 'fail',
+          'reason', 'no_authorisation', 'records', v_none));
+      else
+        if v_row.status = 'authorised' then
+          if v_row.effective_from is null
+             or public.eligibility_epoch_ms(v_row.effective_from) > v_as_of
+             or (v_row.effective_until is not null
+                 and public.eligibility_epoch_ms(v_row.effective_until) <= v_as_of) then
+            v_outcome := 'fail'; v_reason := 'authorisation_not_current';
+          else
+            v_outcome := 'pass'; v_reason := 'authorisation_current';
+          end if;
+        elsif v_row.status = 'requested' then
+          v_outcome := 'undetermined'; v_reason := 'authorisation_pending';
+        elsif v_row.status = 'refused' then
+          v_outcome := 'fail'; v_reason := 'authorisation_refused';
+        elsif v_row.status = 'withdrawn' then
+          v_outcome := 'fail'; v_reason := 'authorisation_withdrawn';
+        else
+          v_outcome := 'undetermined'; v_reason := 'status_not_classified';
+        end if;
+        v_factors := v_factors || jsonb_build_array(jsonb_build_object(
+          'factor', 'practice_area', 'outcome', v_outcome, 'reason', v_reason,
+          'records', jsonb_build_array(jsonb_build_object(
+            'id', v_row.id, 'outcome', v_outcome, 'reason', v_reason))));
+      end if;
+    end if;
+  end if;
+
+  -- combine: any definite failure, then anything undetermined, else eligible.
+  if jsonb_path_exists(v_factors, '$[*] ? (@.outcome == "fail")') then
+    v_result := 'not_eligible';
+  elsif jsonb_path_exists(v_factors, '$[*] ? (@.outcome == "undetermined")') then
+    v_result := 'undetermined';
+  else
+    v_result := 'eligible';
+  end if;
+
+  return jsonb_build_object(
+    'verifiable', true,
+    'result', v_result,
+    'factor_results', v_factors,
+    'policy_references',
+      case when v_policy ->> 'status' = 'selected' then
+        jsonb_build_array(jsonb_build_object(
+          'policy_version_id', v_policy ->> 'policy_version_id',
+          'version_label', v_policy ->> 'version_label',
+          'policy_type_code', 'attorney_eligibility'))
+      else v_none end,
+    'evidence_references', jsonb_build_object(
+      'evidence_ids', coalesce(
+        (select jsonb_agg(x.id order by x.id collate "C")
+         from (select distinct r.id from unnest(v_relied) as r(id)) as x), v_none),
+      'license_ids', coalesce(
+        (select jsonb_agg(l.id::text order by l.id::text collate "C")
+         from public.licenses as l
+         where l.attorney_id = p_attorney_id and l.jurisdiction_id = p_jurisdiction_id), v_none),
+      'insurance_record_ids', coalesce(
+        (select jsonb_agg(i.id::text order by i.id::text collate "C")
+         from public.insurance_records as i
+         where i.attorney_id = p_attorney_id and i.jurisdiction_id = p_jurisdiction_id), v_none),
+      'discipline_record_ids', coalesce(
+        (select jsonb_agg(d.id::text order by d.id::text collate "C")
+         from public.discipline_records as d
+         where d.attorney_id = p_attorney_id and d.jurisdiction_id = p_jurisdiction_id), v_none),
+      'practice_area_authorisation_ids', coalesce(
+        (select jsonb_agg(a.id::text order by a.id::text collate "C")
+         from public.practice_area_authorisations as a
+         where a.attorney_id = p_attorney_id and a.jurisdiction_id = p_jurisdiction_id), v_none)
+    )
+  );
+end;
+$function$;
+
+-- Factor results with each factor's record outcomes ordered by record id, so
+-- the comparison does not depend on the order in which rows were read.
+create function public.eligibility_normalized_factors(value jsonb)
+returns jsonb
+language sql
+immutable
+security invoker
+set search_path = pg_catalog
+as $function$
+  select case
+    when value is null or jsonb_typeof(value) <> 'array' then null
+    else coalesce(
+      (select jsonb_agg(
+         case
+           when jsonb_typeof(f.item) = 'object'
+                and jsonb_typeof(f.item -> 'records') = 'array' then
+             jsonb_set(f.item, '{records}', coalesce(
+               (select jsonb_agg(r.rec order by (r.rec ->> 'id') collate "C",
+                                                r.rec::text collate "C")
+                from jsonb_array_elements(f.item -> 'records') as r(rec)),
+               '[]'::jsonb))
+           else f.item
+         end
+         order by f.n)
+       from jsonb_array_elements(value) with ordinality as f(item, n)),
+      '[]'::jsonb)
+  end;
+$function$;
+
 -- Persists one consequential Eligibility determination for another attorney
--- in a jurisdiction the caller holds, as a new immutable evaluation. The
--- server application computes the assessment; the database decides the
--- actor and authority, records the time, and admits only a structurally
--- valid evaluation whose every policy, record, and evidence reference names
--- an existing row of this attorney and jurisdiction, assessed no more than
--- fifteen minutes earlier.
+-- in a jurisdiction the caller holds, as a new immutable evaluation, with its
+-- audit event in the same transaction. Only the shape of the arguments is
+-- checked before the caller's authority is locked and decided. Then the
+-- target's User and Attorney Profile, the attorney's professional records in
+-- the jurisdiction and the jurisdiction's eligibility policy rows are locked,
+-- the database derives the assessment from those rows with the adopted P3-003
+-- rules, and the evaluation is recorded only when the submitted result, factor
+-- results, policy references and evidence references equal the derived ones
+-- (record outcomes compared in id order). Truthful negative and undetermined
+-- evaluations are recorded; a forged, unsupported, stale or unverifiable
+-- determination is refused as invalid and nothing is written.
 create function public.staff_record_eligibility_evaluation(
   p_evaluation_id uuid,
   p_attorney_id uuid,
@@ -1480,10 +2290,13 @@ set lock_timeout = '3s'
 as $function$
 declare
   v_staff uuid;
+  v_target_user uuid;
   v_target public.attorney_profiles;
   v_time timestamptz;
+  v_derived jsonb;
   v_uuid constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
 begin
+  -- Shape only: nothing is read before the caller's authority is decided.
   if p_evaluation_id is null
      or p_attorney_id is null
      or p_jurisdiction_id is null
@@ -1519,82 +2332,26 @@ begin
      ) then
     return 'invalid';
   end if;
-  if p_context_type = 'practice_area'
-     and not exists (
-       select 1 from public.practice_areas as a where a.id = p_context_id
-     ) then
-    return 'invalid';
-  end if;
-  if exists (
-       select 1 from jsonb_array_elements(p_policy_references) as r
-       where jsonb_typeof(r) <> 'object'
-          or (r ->> 'policy_type_code') is distinct from 'attorney_eligibility'
-          or not exists (
-            select 1 from public.policy_versions as v
-            where v.id::text = r ->> 'policy_version_id'
-              and v.policy_type_code = 'attorney_eligibility'
-              and v.jurisdiction_id = p_jurisdiction_id
-              and v.version_label = r ->> 'version_label'
-          )
-     )
-     or exists (
-       select 1 from jsonb_array_elements_text(p_evidence_references -> 'license_ids') as x
-       where not exists (
-         select 1 from public.licenses as l
-         where l.id::text = x and l.attorney_id = p_attorney_id
-           and l.jurisdiction_id = p_jurisdiction_id
-       )
-     )
-     or exists (
-       select 1 from jsonb_array_elements_text(p_evidence_references -> 'insurance_record_ids') as x
-       where not exists (
-         select 1 from public.insurance_records as i
-         where i.id::text = x and i.attorney_id = p_attorney_id
-           and i.jurisdiction_id = p_jurisdiction_id
-       )
-     )
-     or exists (
-       select 1 from jsonb_array_elements_text(p_evidence_references -> 'discipline_record_ids') as x
-       where not exists (
-         select 1 from public.discipline_records as d
-         where d.id::text = x and d.attorney_id = p_attorney_id
-           and d.jurisdiction_id = p_jurisdiction_id
-       )
-     )
-     or exists (
-       select 1 from jsonb_array_elements_text(p_evidence_references -> 'practice_area_authorisation_ids') as x
-       where not exists (
-         select 1 from public.practice_area_authorisations as a
-         where a.id::text = x and a.attorney_id = p_attorney_id
-           and a.jurisdiction_id = p_jurisdiction_id
-       )
-     )
-     or exists (
-       select 1 from jsonb_array_elements_text(p_evidence_references -> 'evidence_ids') as x
-       where not exists (
-         select 1
-         from public.verification_evidence_subjects as s
-         left join public.licenses as l on l.id = s.license_id
-         left join public.insurance_records as i on i.id = s.insurance_record_id
-         left join public.discipline_records as d on d.id = s.discipline_record_id
-         left join public.practice_area_authorisations as a
-           on a.id = s.practice_area_authorisation_id
-         where s.verification_evidence_id::text = x
-           and coalesce(l.attorney_id, i.attorney_id, d.attorney_id, a.attorney_id)
-             = p_attorney_id
-       )
-     ) then
-    return 'invalid';
-  end if;
+
+  -- Authority, decided on locked rows: the caller's User, Staff Profile and
+  -- grant for the jurisdiction.
   v_staff := public.lock_current_verification_staff(p_jurisdiction_id);
   if v_staff is null then
     return 'denied';
   end if;
+  -- Then the target's User and Attorney Profile, in that order.
+  select p.user_id into v_target_user
+  from public.attorney_profiles as p
+  where p.id = p_attorney_id;
+  if not found or v_target_user = v_staff then
+    return 'denied';
+  end if;
+  perform 1 from public.users as u where u.id = v_target_user for share;
   select p.* into v_target
   from public.attorney_profiles as p
   where p.id = p_attorney_id
   for share;
-  if not found or v_target.user_id = v_staff then
+  if not found or v_target.user_id is distinct from v_target_user then
     return 'denied';
   end if;
   v_time := clock_timestamp();
@@ -1602,6 +2359,52 @@ begin
      or p_as_of < v_time - interval '15 minutes' then
     return 'invalid';
   end if;
+  if p_context_type = 'practice_area'
+     and not exists (
+       select 1 from public.practice_areas as a where a.id = p_context_id
+     ) then
+    return 'invalid';
+  end if;
+  -- Then the attorney's professional records in the jurisdiction and the
+  -- jurisdiction's eligibility policy rows, each set in id order, so the facts
+  -- the assessment relies on cannot change before this transaction ends.
+  perform 1 from public.licenses as l
+  where l.attorney_id = p_attorney_id and l.jurisdiction_id = p_jurisdiction_id
+  order by l.id for share;
+  perform 1 from public.insurance_records as i
+  where i.attorney_id = p_attorney_id and i.jurisdiction_id = p_jurisdiction_id
+  order by i.id for share;
+  perform 1 from public.discipline_records as d
+  where d.attorney_id = p_attorney_id and d.jurisdiction_id = p_jurisdiction_id
+  order by d.id for share;
+  perform 1 from public.practice_area_authorisations as a
+  where a.attorney_id = p_attorney_id and a.jurisdiction_id = p_jurisdiction_id
+  order by a.id for share;
+  perform 1 from public.policy_versions as v
+  where v.policy_type_code = 'attorney_eligibility'
+    and v.jurisdiction_id = p_jurisdiction_id
+  order by v.id for share;
+  perform 1 from public.policy_authority_references as r
+  where r.policy_version_id in (
+    select v.id from public.policy_versions as v
+    where v.policy_type_code = 'attorney_eligibility'
+      and v.jurisdiction_id = p_jurisdiction_id)
+  order by r.id for share of r;
+
+  -- §4.2a: the determination must be the one the adopted engine derives.
+  v_derived := public.eligibility_assessment(
+    p_attorney_id, p_jurisdiction_id,
+    case when p_context_type = 'practice_area' then p_context_id end,
+    p_as_of);
+  if not coalesce((v_derived ->> 'verifiable')::boolean, false)
+     or p_result is distinct from v_derived ->> 'result'
+     or public.eligibility_normalized_factors(p_factor_results)
+        is distinct from public.eligibility_normalized_factors(v_derived -> 'factor_results')
+     or p_policy_references is distinct from v_derived -> 'policy_references'
+     or p_evidence_references is distinct from v_derived -> 'evidence_references' then
+    return 'invalid';
+  end if;
+
   begin
     insert into public.eligibility_evaluations (
       id, attorney_id, jurisdiction_id, context_type, context_id,
@@ -1609,8 +2412,10 @@ begin
       evidence_references, as_of
     ) values (
       p_evaluation_id, p_attorney_id, p_jurisdiction_id, p_context_type,
-      p_context_id, v_time, p_policy_references, p_result, p_factor_results,
-      p_evidence_references, p_as_of
+      p_context_id, v_time, v_derived -> 'policy_references',
+      v_derived ->> 'result',
+      public.eligibility_normalized_factors(v_derived -> 'factor_results'),
+      v_derived -> 'evidence_references', p_as_of
     );
   exception
     when unique_violation then
@@ -1627,12 +2432,12 @@ begin
     'eligibility_evaluation', p_evaluation_id,
     null,
     jsonb_build_object(
-      'result', p_result,
+      'result', v_derived ->> 'result',
       'attorney_id', p_attorney_id,
       'practice_area_id', p_context_id,
       'as_of', p_as_of
     ),
-    null, p_policy_references, p_jurisdiction_id, v_time
+    null, v_derived -> 'policy_references', p_jurisdiction_id, v_time
   );
   return 'applied';
 end;
@@ -1656,6 +2461,22 @@ revoke all on function public.professional_record_of(text, uuid, text)
 revoke all on function public.verification_evidence_input_valid(
   text, text, text, timestamptz, text, text, text, boolean
 ) from public, anon, authenticated, service_role;
+revoke all on function public.eligibility_js_blank(text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.eligibility_epoch_ms(timestamptz)
+  from public, anon, authenticated, service_role;
+revoke all on function public.eligibility_safe_integer(jsonb, numeric)
+  from public, anon, authenticated, service_role;
+revoke all on function public.eligibility_status_list(jsonb)
+  from public, anon, authenticated, service_role;
+revoke all on function public.eligibility_exact_object(jsonb, text[])
+  from public, anon, authenticated, service_role;
+revoke all on function public.eligibility_selected_policy(uuid, timestamptz)
+  from public, anon, authenticated, service_role;
+revoke all on function public.eligibility_assessment(uuid, uuid, uuid, timestamptz)
+  from public, anon, authenticated, service_role;
+revoke all on function public.eligibility_normalized_factors(jsonb)
+  from public, anon, authenticated, service_role;
 
 revoke all on function public.attorney_start_application()
   from public, anon, authenticated, service_role;
@@ -1787,4 +2608,8 @@ comment on function public.staff_decide_practice_area(uuid, timestamptz, text, t
 comment on function public.staff_change_profile_stage(uuid, text, text, text) is
   'Supported review transition and audit in one transaction; global staff authority locked and decided at the write.';
 comment on function public.staff_record_eligibility_evaluation(uuid, uuid, uuid, text, uuid, timestamptz, text, jsonb, jsonb, jsonb) is
-  'Immutable eligibility evaluation and audit in one transaction; staff authority locked and decided at the write; references validated.';
+  'Immutable eligibility evaluation and audit in one transaction; staff authority locked and decided at the write; recorded only when the submitted determination equals the assessment the database derives from the locked canonical rows with the adopted P3-003 rules (P3-904 revision 3 section 4.2a).';
+comment on function public.eligibility_assessment(uuid, uuid, uuid, timestamptz) is
+  'P3-904 section 4.2a: the adopted P3-003 Eligibility assessment derived from canonical rows (mirrors eligibility-assessment.ts); executable by no API role.';
+comment on function public.eligibility_selected_policy(uuid, timestamptz) is
+  'P3-904 section 4.2a: the adopted P3-003 policy selection (mirrors policy-selection.ts); executable by no API role.';

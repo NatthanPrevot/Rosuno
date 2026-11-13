@@ -186,6 +186,15 @@ const HELPER_FUNCTIONS = Object.freeze([
   "lock_current_attorney_profile(boolean)",
   "professional_record_of(text, uuid, text)",
   "verification_evidence_input_valid(text, text, text, timestamp with time zone, text, text, text, boolean)",
+  // P3-904 revision 3 §4.2a: the eligibility derivation helpers.
+  "eligibility_js_blank(text)",
+  "eligibility_epoch_ms(timestamp with time zone)",
+  "eligibility_safe_integer(jsonb, numeric)",
+  "eligibility_status_list(jsonb)",
+  "eligibility_exact_object(jsonb, text[])",
+  "eligibility_selected_policy(uuid, timestamp with time zone)",
+  "eligibility_assessment(uuid, uuid, uuid, timestamp with time zone)",
+  "eligibility_normalized_factors(jsonb)",
 ]);
 
 const report = {
@@ -355,6 +364,32 @@ function count(table, where = "true") {
 
 function one(statement) {
   return sql(statement);
+}
+
+// The determination the database itself derives (P3-904 revision 3 §4.2a),
+// read as the disposable cluster's superuser, in the argument shape of
+// staff_record_eligibility_evaluation. A test uses it to submit a truthful
+// determination; the separate parity checks compare it with the application.
+function derivedEvaluationArgs(attorneyId, jurisdictionId, practiceAreaId, asOf) {
+  const area = practiceAreaId === null ? "null" : `'${practiceAreaId}'`;
+  const derived = JSON.parse(
+    one(
+      `select public.eligibility_assessment('${attorneyId}', '${jurisdictionId}', ${area}, '${asOf}')::text;`,
+    ),
+  );
+  assert.equal(derived.verifiable, true, "derivation is verifiable");
+  return {
+    p_evaluation_id: uid(),
+    p_attorney_id: attorneyId,
+    p_jurisdiction_id: jurisdictionId,
+    p_context_type: practiceAreaId === null ? "jurisdiction" : "practice_area",
+    p_context_id: practiceAreaId,
+    p_as_of: asOf,
+    p_result: derived.result,
+    p_factor_results: derived.factor_results,
+    p_policy_references: derived.policy_references,
+    p_evidence_references: derived.evidence_references,
+  };
 }
 
 const FIXTURE = `
@@ -1256,6 +1291,8 @@ async function privilegeChecks() {
         "lock_current_active_user()",
         "lock_current_verification_staff(null)",
         "lock_current_attorney_profile(true)",
+        "eligibility_assessment(null, null, null, now())",
+        "eligibility_selected_policy(null, now())",
       ]) {
         assert.equal(
           as("authenticated", attorney.auth, `select public.${helper};`)
@@ -2712,27 +2749,16 @@ async function atomicityChecks() {
           p_message: null,
           p_note: null,
         });
+        // A truthful determination (§4.2a), so the call reaches its audit.
         out.evaluation = fnAs(
           staff.auth,
           "staff_record_eligibility_evaluation",
-          {
-            p_evaluation_id: uid(),
-            p_attorney_id: reviewed.profile,
-            p_jurisdiction_id: J_A,
-            p_context_type: "jurisdiction",
-            p_context_id: null,
-            p_as_of: new Date().toISOString(),
-            p_result: "undetermined",
-            p_factor_results: [],
-            p_policy_references: [],
-            p_evidence_references: {
-              evidence_ids: [],
-              license_ids: [],
-              insurance_record_ids: [],
-              discipline_record_ids: [],
-              practice_area_authorisation_ids: [],
-            },
-          },
+          derivedEvaluationArgs(
+            reviewed.profile,
+            J_A,
+            null,
+            new Date().toISOString(),
+          ),
         );
       });
       for (const [label, outcome] of Object.entries(out)) {
