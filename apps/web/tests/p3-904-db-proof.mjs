@@ -53,6 +53,23 @@ import {
   submitApplicationForReview,
 } from "../src/application/attorney-professional.ts";
 import { startAttorneyApplication } from "../src/application/attorney-application.ts";
+import {
+  assessEligibility,
+  evaluationRowOf,
+} from "../src/application/eligibility-assessment.ts";
+import {
+  AUTHORITY_REFERENCE_COLUMNS,
+  POLICY_VERSION_COLUMNS,
+} from "../src/application/policy-selection.ts";
+import {
+  DISCIPLINE_COLUMNS,
+  EVIDENCE_COLUMNS,
+  EVIDENCE_SUBJECT_COLUMNS,
+  INSURANCE_COLUMNS,
+  LICENSE_COLUMNS,
+  PRACTICE_AUTHORISATION_COLUMNS,
+  PROFILE_COLUMNS,
+} from "../src/application/professional-records.ts";
 import { writeResultOf } from "../src/application/professional-audit.ts";
 import {
   changeProfileStage,
@@ -3564,6 +3581,869 @@ async function regressionChecks() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// P3-904 revision 3 §4.2a: eligibility decision integrity, application and
+// database parity, and rollback and catalog reconciliation (§7, §9)
+// ---------------------------------------------------------------------------
+
+const J_P = uid();
+const J_N = uid();
+const POLICY_P = uid();
+const POLICY_P_DRAFT = uid();
+
+// Rows as PostgreSQL serializes them for the API.
+function jsonRows(columns, from) {
+  return JSON.parse(
+    one(
+      `select coalesce(json_agg(t), '[]'::json) from (select ${columns} from ${from}) t;`,
+    ),
+  );
+}
+
+// Synthetic test-only jurisdictions: J_P with an active policy that requires
+// insurance and practice-area authorisation, plus a draft version that is
+// never applicable; J_N with no policy at all.
+function integritySeed() {
+  const parameters = {
+    schema: "rosuno.attorney_eligibility.v1",
+    license: {
+      qualifying_reported_statuses: ["synthetic-active"],
+      evidence_max_age_days: 30,
+    },
+    insurance: {
+      required: true,
+      evidence_max_age_days: 30,
+      minimum_per_occurrence_minor: 100000,
+      minimum_aggregate_minor: null,
+      currency_code: "XTS",
+    },
+    discipline: {
+      disqualifying_statuses: ["synthetic-revoked"],
+      cleared_statuses: ["synthetic-cleared"],
+    },
+    practice_area: { authorisation_required: true },
+  };
+  sql(`insert into public.jurisdictions (id, code, name, region_type) values ('${J_P}', 'SYN_P', 'Synthetic P', 'synthetic'), ('${J_N}', 'SYN_N', 'Synthetic N', 'synthetic');
+       insert into public.policy_versions (id, policy_type_code, jurisdiction_id, version_label, parameters) values
+         ('${POLICY_P}', 'attorney_eligibility', '${J_P}', 'synthetic-p1', $j$${JSON.stringify(parameters)}$j$::jsonb),
+         ('${POLICY_P_DRAFT}', 'attorney_eligibility', '${J_P}', 'synthetic-p0-draft', $j$${JSON.stringify(parameters)}$j$::jsonb);
+       insert into public.policy_authority_references (policy_version_id, authority_type, citation_text, source_title, retrieved_at, verified_by_user_id, verification_status)
+         values ('${POLICY_P}', 'synthetic', 'synthetic citation', 'synthetic source', now(), '${GRANTOR}', 'verified');
+       update public.policy_versions set status = 'active', approved_at = now() - interval '2 days', approved_by_user_id = '${GRANTOR}', effective_from = now() - interval '1 day' where id = '${POLICY_P}';`);
+}
+
+function evidenceFor(column, subjectId, jurisdiction, options = {}) {
+  const id = uid();
+  sql(`insert into public.verification_evidence (id, jurisdiction_id, source_type, source_reference, retrieved_at, retrieved_by_user_id, evidence_summary, verification_method, discrepancy_flag)
+         values ('${id}', '${jurisdiction}', 'synthetic register', 'synthetic entry', now() - interval '${options.ageHours ?? 1} hours', '${GRANTOR}', 'synthetic', 'synthetic lookup', ${options.discrepancy === true});
+       insert into public.verification_evidence_subjects (verification_evidence_id, ${column}) values ('${id}', '${subjectId}');`);
+  return id;
+}
+
+// One synthetic attorney with records in one jurisdiction (test data only).
+function scenario({
+  jurisdiction = J_P,
+  account = "active",
+  profile = "approved",
+  license = { status: "synthetic-active" },
+  insurance = { limit: 250000, currency: "XTS" },
+  discipline = [],
+  authorisation = "authorised",
+} = {}) {
+  const attorney = newAttorney(profile, newAccount(account));
+  const out = { attorney, jurisdiction, area: uid(), records: {} };
+  if (license !== null) {
+    const id = uid();
+    const expired = license.expired === true;
+    sql(
+      `insert into public.licenses (id, attorney_id, jurisdiction_id, license_number, reported_status, effective_from, effective_until) values ('${id}', '${attorney.profile}', '${jurisdiction}', ${lit(`SYN-INT-${id.slice(-6)}`)}, ${lit(license.status ?? null)}, ${expired ? "current_date - 400" : "null"}, ${expired ? "current_date - 1" : "null"});`,
+    );
+    if (license.evidence !== false) {
+      out.records.licenseEvidence = evidenceFor(
+        "license_id",
+        id,
+        jurisdiction,
+        license.evidence ?? {},
+      );
+    }
+    out.records.license = id;
+  }
+  if (insurance !== null) {
+    const id = uid();
+    sql(
+      `insert into public.insurance_records (id, attorney_id, jurisdiction_id, carrier_name, per_occurrence_limit_minor, currency_code, coverage_from, coverage_until) values ('${id}', '${attorney.profile}', '${jurisdiction}', 'Synthetic carrier', ${insurance.limit}, '${insurance.currency}', current_date - 30, current_date + 30);`,
+    );
+    evidenceFor("insurance_record_id", id, jurisdiction);
+    out.records.insurance = id;
+  }
+  for (const status of discipline) {
+    const id = uid();
+    sql(
+      `insert into public.discipline_records (id, attorney_id, jurisdiction_id, external_reference, status) values ('${id}', '${attorney.profile}', '${jurisdiction}', 'SYN-DISC', ${lit(status)});`,
+    );
+    evidenceFor("discipline_record_id", id, jurisdiction);
+  }
+  sql(
+    `insert into public.practice_areas (id, code, name, active) values ('${out.area}', ${lit(`SYN_I_${out.area.slice(-6)}`)}, 'Synthetic area', true);`,
+  );
+  if (authorisation !== null) {
+    const current = authorisation === "authorised";
+    sql(
+      `insert into public.practice_area_authorisations (id, attorney_id, jurisdiction_id, practice_area_id, status, requested_at, decided_at, effective_from) values ('${uid()}', '${attorney.profile}', '${jurisdiction}', '${out.area}', ${lit(authorisation)}, now() - interval '2 days', ${current ? "now() - interval '1 day'" : "null"}, ${current ? "now() - interval '1 day'" : "null"});`,
+    );
+  }
+  return out;
+}
+
+// The facts exactly as the application's privileged reads return them
+// (registration-provisioning.ts and staff-verification.ts assessmentOf).
+function appFacts(s, practiceAreaId) {
+  const own = `attorney_id = '${s.attorney.profile}' and jurisdiction_id = '${s.jurisdiction}'`;
+  const quoted = (ids) => ids.map((id) => `'${id}'`).join(", ");
+  const profiles = jsonRows(
+    PROFILE_COLUMNS,
+    `public.attorney_profiles where id = '${s.attorney.profile}'`,
+  );
+  const accounts = jsonRows(
+    "id, account_state",
+    `public.users where id = '${s.attorney.user}'`,
+  );
+  const lists = {
+    license_id: jsonRows(LICENSE_COLUMNS, `public.licenses where ${own}`),
+    insurance_record_id: jsonRows(
+      INSURANCE_COLUMNS,
+      `public.insurance_records where ${own}`,
+    ),
+    discipline_record_id: jsonRows(
+      DISCIPLINE_COLUMNS,
+      `public.discipline_records where ${own}`,
+    ),
+    practice_area_authorisation_id: jsonRows(
+      PRACTICE_AUTHORISATION_COLUMNS,
+      `public.practice_area_authorisations where ${own}`,
+    ),
+  };
+  const subjects = [];
+  for (const [column, rows] of Object.entries(lists)) {
+    if (rows.length > 0) {
+      subjects.push(
+        ...jsonRows(
+          EVIDENCE_SUBJECT_COLUMNS,
+          `public.verification_evidence_subjects where ${column} in (${quoted(rows.map((r) => r.id))})`,
+        ),
+      );
+    }
+  }
+  const evidenceIds = [
+    ...new Set(subjects.map((r) => r.verification_evidence_id)),
+  ];
+  const versions = jsonRows(
+    POLICY_VERSION_COLUMNS,
+    `public.policy_versions where policy_type_code = 'attorney_eligibility' and jurisdiction_id = '${s.jurisdiction}'`,
+  );
+  return {
+    attorneyId: s.attorney.profile,
+    jurisdictionId: s.jurisdiction,
+    practiceAreaId,
+    accountState:
+      accounts.length === 1 ? accounts[0].account_state : undefined,
+    profile: profiles.length === 1 ? profiles[0] : null,
+    licenses: lists.license_id,
+    insurance: lists.insurance_record_id,
+    discipline: lists.discipline_record_id,
+    authorisations: lists.practice_area_authorisation_id,
+    evidence:
+      evidenceIds.length === 0
+        ? []
+        : jsonRows(
+            EVIDENCE_COLUMNS,
+            `public.verification_evidence where id in (${quoted(evidenceIds)})`,
+          ),
+    subjects,
+    policyVersions: versions,
+    authorityReferences:
+      versions.length === 0
+        ? []
+        : jsonRows(
+            AUTHORITY_REFERENCE_COLUMNS,
+            `public.policy_authority_references where policy_version_id in (${quoted(versions.map((v) => v.id))})`,
+          ),
+  };
+}
+
+// The evaluation row the application would submit, from its own engine.
+function appRow(s, practiceAreaId, asOfMs = Date.now()) {
+  const row = evaluationRowOf(
+    assessEligibility(appFacts(s, practiceAreaId), asOfMs),
+    asOfMs,
+  );
+  assert.notEqual(row, null);
+  return row;
+}
+
+function dbDerived(s, practiceAreaId, asOf) {
+  const area = practiceAreaId === null ? "null" : `'${practiceAreaId}'`;
+  return JSON.parse(
+    one(
+      `select public.eligibility_assessment('${s.attorney.profile}', '${s.jurisdiction}', ${area}, '${asOf}')::text;`,
+    ),
+  );
+}
+
+// Factor results with record outcomes in id order (the read order of rows is
+// not part of the determination).
+const byRecordId = (factors) =>
+  factors.map((f) => ({
+    ...f,
+    records: [...f.records].sort((a, b) =>
+      a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+    ),
+  }));
+
+function evaluationArgs(row, overrides = {}) {
+  return {
+    p_evaluation_id: uid(),
+    p_attorney_id: row.attorney_id,
+    p_jurisdiction_id: row.jurisdiction_id,
+    p_context_type: row.context_type,
+    p_context_id: row.context_id,
+    p_as_of: row.as_of,
+    p_result: row.result,
+    p_factor_results: row.factor_results,
+    p_policy_references: row.policy_references,
+    p_evidence_references: row.evidence_references,
+    ...overrides,
+  };
+}
+
+const factorOf = (row, name) =>
+  row.factor_results.find((f) => f.factor === name);
+const withFactor = (row, name, change) =>
+  row.factor_results.map((f) => (f.factor === name ? { ...f, ...change } : f));
+
+async function integrityChecks() {
+  integritySeed();
+
+  await check(
+    "INT-1 (§4.2a) the database derives exactly the application's assessment, and every truthful determination persists with its audit: eligible; pending, missing and not-required practice-area authorisations; suspended account and profile; license, insurance and discipline outcomes; no selectable policy; unreadable facts",
+    () => {
+      const staff = newStaff();
+      const cases = {
+        eligible_jurisdiction: [scenario(), false],
+        eligible_practice_area: [scenario(), true],
+        pending_authorisation: [scenario({ authorisation: "requested" }), true],
+        missing_authorisation: [scenario({ authorisation: null }), true],
+        refused_authorisation: [scenario({ authorisation: "refused" }), true],
+        not_required_authorisation: [
+          scenario({ jurisdiction: J_A, insurance: null, authorisation: null }),
+          true,
+        ],
+        suspended_account: [scenario({ account: "suspended" }), false],
+        suspended_profile: [scenario({ profile: "suspended" }), false],
+        under_review_profile: [scenario({ profile: "under_review" }), false],
+        stale_license_evidence: [
+          scenario({
+            license: { status: "synthetic-active", evidence: { ageHours: 960 } },
+          }),
+          false,
+        ],
+        license_without_evidence: [
+          scenario({ license: { status: "synthetic-active", evidence: false } }),
+          false,
+        ],
+        non_qualifying_license: [
+          scenario({ license: { status: "synthetic-lapsed" } }),
+          false,
+        ],
+        license_discrepancy: [
+          scenario({
+            license: {
+              status: "synthetic-active",
+              evidence: { discrepancy: true },
+            },
+          }),
+          false,
+        ],
+        expired_license: [
+          scenario({ license: { status: "synthetic-active", expired: true } }),
+          false,
+        ],
+        no_license: [scenario({ license: null }), false],
+        insurance_below_minimum: [
+          scenario({ insurance: { limit: 5000, currency: "XTS" } }),
+          false,
+        ],
+        insurance_currency_mismatch: [
+          scenario({ insurance: { limit: 250000, currency: "XXX" } }),
+          false,
+        ],
+        no_insurance: [scenario({ insurance: null }), false],
+        disqualifying_discipline: [
+          scenario({ discipline: ["synthetic-revoked"] }),
+          false,
+        ],
+        cleared_discipline: [
+          scenario({ discipline: ["synthetic-cleared"] }),
+          false,
+        ],
+        unclassified_discipline: [
+          scenario({ discipline: ["synthetic-open"] }),
+          false,
+        ],
+        no_policy: [scenario({ jurisdiction: J_N }), false],
+        no_policy_practice_area: [scenario({ jurisdiction: J_N }), true],
+        no_policy_suspended_account: [
+          scenario({ jurisdiction: J_N, account: "suspended" }),
+          false,
+        ],
+        unreadable_facts: [scenario({ authorisation: "\t" }), false],
+      };
+      const summary = {};
+      for (const [label, [s, practiceArea]] of Object.entries(cases)) {
+        const area = practiceArea ? s.area : null;
+        const asOfMs = Date.now();
+        const row = appRow(s, area, asOfMs);
+        const derived = dbDerived(s, area, row.as_of);
+        assert.equal(derived.verifiable, true, label);
+        assert.deepEqual(
+          {
+            result: derived.result,
+            factors: byRecordId(derived.factor_results),
+            policy: derived.policy_references,
+            references: derived.evidence_references,
+          },
+          {
+            result: row.result,
+            factors: byRecordId(row.factor_results),
+            policy: row.policy_references,
+            references: row.evidence_references,
+          },
+          `parity ${label}`,
+        );
+        const evaluations = count(
+          "eligibility_evaluations",
+          `attorney_id = '${s.attorney.profile}'`,
+        );
+        const audits = auditCount(
+          "action_code = 'eligibility_evaluation_recorded'",
+        );
+        const args = evaluationArgs(row);
+        assert.equal(
+          fnAs(staff.auth, "staff_record_eligibility_evaluation", args),
+          "applied",
+          label,
+        );
+        assert.equal(
+          count(
+            "eligibility_evaluations",
+            `attorney_id = '${s.attorney.profile}'`,
+          ),
+          evaluations + 1,
+        );
+        assert.equal(
+          auditCount("action_code = 'eligibility_evaluation_recorded'"),
+          audits + 1,
+        );
+        const stored = JSON.parse(
+          one(
+            `select json_build_object('result', result, 'factors', factor_results, 'policy', policy_references, 'references', evidence_references) from public.eligibility_evaluations where id = '${args.p_evaluation_id}';`,
+          ),
+        );
+        assert.deepEqual(stored, {
+          result: row.result,
+          factors: byRecordId(row.factor_results),
+          policy: row.policy_references,
+          references: row.evidence_references,
+        });
+        summary[label] = {
+          result: row.result,
+          factors: row.factor_results
+            .map((f) => `${f.factor}:${f.outcome}:${f.reason}`)
+            .join(" "),
+          policy_references: row.policy_references.length,
+          persisted: "applied",
+        };
+      }
+      // The adopted P3-003 behaviour the owner's findings name, explicitly.
+      const factor = (label, name) =>
+        summary[label].factors
+          .split(" ")
+          .find((entry) => entry.startsWith(`${name}:`));
+      assert.equal(summary.eligible_jurisdiction.result, "eligible");
+      assert.equal(summary.eligible_practice_area.result, "eligible");
+      assert.equal(
+        factor("suspended_account", "account"),
+        "account:fail:account_not_active",
+      );
+      assert.equal(summary.suspended_account.result, "not_eligible");
+      assert.equal(
+        factor("suspended_profile", "profile"),
+        "profile:fail:profile_suspended_or_removed",
+      );
+      assert.equal(
+        factor("missing_authorisation", "practice_area"),
+        "practice_area:fail:no_authorisation",
+      );
+      assert.equal(
+        factor("pending_authorisation", "practice_area"),
+        "practice_area:undetermined:authorisation_pending",
+      );
+      assert.equal(summary.pending_authorisation.result, "undetermined");
+      assert.equal(
+        factor("not_required_authorisation", "practice_area"),
+        "practice_area:not_required:authorisation_not_required",
+      );
+      assert.equal(
+        factor("no_policy", "policy"),
+        "policy:undetermined:no_applicable_policy",
+      );
+      assert.equal(summary.no_policy.result, "undetermined");
+      assert.equal(summary.no_policy.policy_references, 0);
+      assert.equal(summary.no_policy_suspended_account.result, "not_eligible");
+      assert.equal(summary.no_policy_suspended_account.policy_references, 0);
+      assert.equal(
+        summary.unreadable_facts.factors,
+        "account:undetermined:facts_unreadable",
+      );
+      return summary;
+    },
+  );
+
+  await check(
+    "INT-2 (§4.2a) forged or unsupported determinations are refused at the database interface with nothing written, and unauthorized callers are denied even with a truthful determination",
+    () => {
+      const staff = newStaff();
+      const suspended = scenario({ account: "suspended" });
+      const suspendedProfile = scenario({ profile: "suspended" });
+      const pending = scenario({ authorisation: "requested" });
+      const missing = scenario({ authorisation: null });
+      const lapsed = scenario({ license: { status: "synthetic-lapsed" } });
+      const noPolicy = scenario({ jurisdiction: J_N });
+      const eligible = scenario();
+      const other = scenario();
+      const foreignEvidence = evidenceFor(
+        "license_id",
+        other.records.license,
+        J_A,
+      );
+      const pass = { outcome: "pass" };
+      const allPass = (row) =>
+        row.factor_results.map((f) =>
+          ["not_applicable", "not_required"].includes(f.outcome)
+            ? f
+            : { ...f, outcome: "pass" },
+        );
+      const empty = {
+        evidence_ids: [],
+        license_ids: [],
+        insurance_record_ids: [],
+        discipline_record_ids: [],
+        practice_area_authorisation_ids: [],
+      };
+      const rows = {
+        suspended: appRow(suspended, null),
+        suspendedProfile: appRow(suspendedProfile, null),
+        pending: appRow(pending, pending.area),
+        missing: appRow(missing, missing.area),
+        lapsed: appRow(lapsed, null),
+        noPolicy: appRow(noPolicy, null),
+        eligible: appRow(eligible, null),
+      };
+      assert.equal(rows.eligible.result, "eligible");
+      const attempts = {
+        original_exploit_eligible_with_empty_sets: evaluationArgs(
+          rows.suspended,
+          {
+            p_result: "eligible",
+            p_factor_results: [],
+            p_policy_references: [],
+            p_evidence_references: empty,
+          },
+        ),
+        result_tampered: evaluationArgs(rows.suspended, {
+          p_result: "eligible",
+        }),
+        account_pass_for_suspended_account: evaluationArgs(rows.suspended, {
+          p_result: "eligible",
+          p_factor_results: withFactor(rows.suspended, "account", {
+            ...pass,
+            reason: "account_active",
+          }),
+        }),
+        profile_pass_for_suspended_profile: evaluationArgs(
+          rows.suspendedProfile,
+          {
+            p_result: "eligible",
+            p_factor_results: withFactor(rows.suspendedProfile, "profile", {
+              ...pass,
+              reason: "profile_approved",
+            }),
+          },
+        ),
+        practice_area_pass_when_pending: evaluationArgs(rows.pending, {
+          p_result: "eligible",
+          p_factor_results: withFactor(rows.pending, "practice_area", pass),
+        }),
+        practice_area_pass_when_missing: evaluationArgs(rows.missing, {
+          p_result: "eligible",
+          p_factor_results: withFactor(rows.missing, "practice_area", pass),
+        }),
+        license_record_outcome_forged: evaluationArgs(rows.lapsed, {
+          p_result: "eligible",
+          p_factor_results: withFactor(rows.lapsed, "license", {
+            outcome: "pass",
+            reason: "license_verified",
+            records: factorOf(rows.lapsed, "license").records.map((r) => ({
+              ...r,
+              outcome: "pass",
+              reason: "license_verified",
+            })),
+          }),
+        }),
+        eligible_without_selected_policy: evaluationArgs(rows.noPolicy, {
+          p_result: "eligible",
+          p_factor_results: allPass(rows.noPolicy),
+        }),
+        policy_reference_when_none_is_selectable: evaluationArgs(
+          rows.noPolicy,
+          {
+            p_policy_references: [
+              {
+                policy_version_id: POLICY_A,
+                version_label: "synthetic-v1",
+                policy_type_code: "attorney_eligibility",
+              },
+            ],
+          },
+        ),
+        draft_policy_reference: evaluationArgs(rows.eligible, {
+          p_policy_references: [
+            {
+              policy_version_id: POLICY_P_DRAFT,
+              version_label: "synthetic-p0-draft",
+              policy_type_code: "attorney_eligibility",
+            },
+          ],
+        }),
+        another_attorneys_record_referenced: evaluationArgs(rows.eligible, {
+          p_evidence_references: {
+            ...rows.eligible.evidence_references,
+            license_ids: [
+              ...rows.eligible.evidence_references.license_ids,
+              other.records.license,
+            ].sort(),
+          },
+        }),
+        other_jurisdiction_evidence_referenced: evaluationArgs(rows.eligible, {
+          p_evidence_references: {
+            ...rows.eligible.evidence_references,
+            evidence_ids: [
+              ...rows.eligible.evidence_references.evidence_ids,
+              foreignEvidence,
+            ].sort(),
+          },
+        }),
+        extra_factor_appended: evaluationArgs(rows.eligible, {
+          p_factor_results: [
+            ...rows.eligible.factor_results,
+            {
+              factor: "synthetic",
+              outcome: "pass",
+              reason: "synthetic",
+              records: [],
+            },
+          ],
+        }),
+      };
+      const outcomes = {};
+      const written = {};
+      for (const [label, args] of Object.entries(attempts)) {
+        const evaluations = count(
+          "eligibility_evaluations",
+          `attorney_id = '${args.p_attorney_id}'`,
+        );
+        const audits = auditCount(
+          "action_code = 'eligibility_evaluation_recorded'",
+        );
+        outcomes[label] = fnAs(
+          staff.auth,
+          "staff_record_eligibility_evaluation",
+          args,
+        );
+        written[label] =
+          count(
+            "eligibility_evaluations",
+            `attorney_id = '${args.p_attorney_id}'`,
+          ) -
+          evaluations +
+          (auditCount("action_code = 'eligibility_evaluation_recorded'") -
+            audits);
+      }
+      // Every outcome is collected first, so a run against an uncorrected
+      // function reports each forged determination it accepts.
+      const refused = Object.fromEntries(
+        Object.keys(attempts).map((label) => [label, "invalid"]),
+      );
+      const nothing = Object.fromEntries(
+        Object.keys(attempts).map((label) => [label, 0]),
+      );
+      assert.deepEqual(
+        { outcomes, written },
+        { outcomes: refused, written: nothing },
+        JSON.stringify({ outcomes, written }),
+      );
+      // Unauthorized operations are denied even when the determination is
+      // truthful; API roles cannot call the function at all.
+      const truthful = () => evaluationArgs(appRow(eligible, null));
+      const deactivated = newStaff({ staffState: "deactivated" });
+      const wrongScope = newStaff({ grants: [{ jurisdiction: J_B }] });
+      outcomes.deactivated_staff = fnAs(
+        deactivated.auth,
+        "staff_record_eligibility_evaluation",
+        truthful(),
+      );
+      outcomes.wrong_jurisdiction_scope = fnAs(
+        wrongScope.auth,
+        "staff_record_eligibility_evaluation",
+        truthful(),
+      );
+      outcomes.attorney_self = fnAs(
+        eligible.attorney.auth,
+        "staff_record_eligibility_evaluation",
+        truthful(),
+      );
+      assert.equal(outcomes.deactivated_staff, "denied");
+      assert.equal(outcomes.wrong_jurisdiction_scope, "denied");
+      assert.equal(outcomes.attorney_self, "denied");
+      for (const role of ["anon", "service_role"]) {
+        const statement = `select ${callExpression("staff_record_eligibility_evaluation", truthful())};`;
+        outcomes[`${role}_call`] = as(role, null, statement).sqlstate;
+        assert.equal(outcomes[`${role}_call`], "42501", role);
+      }
+      assert.equal(
+        count(
+          "eligibility_evaluations",
+          `attorney_id = '${eligible.attorney.profile}'`,
+        ),
+        0,
+      );
+      return outcomes;
+    },
+  );
+
+  await check(
+    "INT-3 (§4.2a, §4.4) the evaluation locks the records it relies on: a concurrent change makes it wait, the stale determination is then refused with nothing written, and the fresh determination is recorded",
+    async () => {
+      const staff = newStaff();
+      const s = scenario();
+      const stale = appRow(s, null);
+      assert.equal(stale.result, "eligible");
+      const admin = await session("admin");
+      const reviewer = await session("reviewer", staff.auth);
+      await admin.ok("begin;");
+      await admin.ok(
+        `update public.licenses set reported_status = 'synthetic-lapsed' where id = '${s.records.license}';`,
+      );
+      const pending = reviewer.send(
+        `select ${callExpression("staff_record_eligibility_evaluation", evaluationArgs(stale))};`,
+      );
+      const blocked = await blockedOn(reviewer.pid);
+      await admin.ok("commit;");
+      const answer = await pending;
+      assert.deepEqual(answer.rows, ["invalid"]);
+      assert.equal(
+        count(
+          "eligibility_evaluations",
+          `attorney_id = '${s.attorney.profile}'`,
+        ),
+        0,
+      );
+      const fresh = appRow(s, null);
+      assert.equal(fresh.result, "not_eligible");
+      assert.deepEqual(
+        await reviewer.ok(
+          `select ${callExpression("staff_record_eligibility_evaluation", evaluationArgs(fresh))};`,
+        ),
+        ["applied"],
+      );
+      admin.close();
+      reviewer.close();
+      return {
+        evaluation_waited_on: blocked.waiting,
+        stale_determination: "invalid",
+        fresh_determination: `${fresh.result}: applied`,
+      };
+    },
+  );
+}
+
+// The catalog of the public schema, for rollback and reconciliation.
+const CATALOG = `
+select json_build_object(
+  'functions', (select json_object_agg(p.oid::regprocedure::text, json_build_object(
+      'src', md5(p.prosrc), 'definer', p.prosecdef, 'config', p.proconfig,
+      'volatility', p.provolatile, 'acl', p.proacl::text,
+      'owner', pg_get_userbyid(p.proowner), 'result', pg_get_function_result(p.oid),
+      'comment', obj_description(p.oid, 'pg_proc')))
+    from pg_proc as p where p.pronamespace = 'public'::regnamespace),
+  'relations', (select json_object_agg(c.relname, json_build_object(
+      'kind', c.relkind, 'acl', c.relacl::text, 'rls', c.relrowsecurity,
+      'force_rls', c.relforcerowsecurity, 'comment', obj_description(c.oid, 'pg_class')))
+    from pg_class as c where c.relnamespace = 'public'::regnamespace),
+  'columns', (select json_object_agg(c.relname || '.' || a.attname, json_build_object(
+      'type', format_type(a.atttypid, a.atttypmod), 'not_null', a.attnotnull,
+      'default', pg_get_expr(d.adbin, d.adrelid), 'acl', a.attacl::text,
+      'comment', col_description(c.oid, a.attnum)))
+    from pg_attribute as a
+    join pg_class as c on c.oid = a.attrelid
+    left join pg_attrdef as d on d.adrelid = a.attrelid and d.adnum = a.attnum
+    where c.relnamespace = 'public'::regnamespace and a.attnum > 0 and not a.attisdropped),
+  'policies', (select json_object_agg(pol.polrelid::regclass::text || '.' || pol.polname, json_build_object(
+      'command', pol.polcmd, 'permissive', pol.polpermissive, 'roles', pol.polroles::regrole[]::text,
+      'using', pg_get_expr(pol.polqual, pol.polrelid), 'check', pg_get_expr(pol.polwithcheck, pol.polrelid)))
+    from pg_policy as pol join pg_class as c on c.oid = pol.polrelid
+    where c.relnamespace = 'public'::regnamespace),
+  'constraints', (select json_object_agg(con.conrelid::regclass::text || '.' || con.conname, pg_get_constraintdef(con.oid))
+    from pg_constraint as con where con.connamespace = 'public'::regnamespace),
+  'triggers', (select json_object_agg(t.tgrelid::regclass::text || '.' || t.tgname, pg_get_triggerdef(t.oid))
+    from pg_trigger as t join pg_class as c on c.oid = t.tgrelid
+    where c.relnamespace = 'public'::regnamespace and not t.tgisinternal),
+  'indexes', (select json_object_agg(i.indexrelid::regclass::text, pg_get_indexdef(i.indexrelid))
+    from pg_index as i join pg_class as c on c.oid = i.indrelid
+    where c.relnamespace = 'public'::regnamespace),
+  'types', (select json_object_agg(t.typname, t.typtype)
+    from pg_type as t where t.typnamespace = 'public'::regnamespace),
+  'schema_acl', (select n.nspacl::text from pg_namespace as n where n.nspname = 'public'),
+  'default_acl', (select json_agg(d.defaclacl::text order by d.defaclobjtype) from pg_default_acl as d),
+  'roles', (select json_agg(r.rolname || ':' || r.rolinherit || ':' || r.rolbypassrls order by r.rolname)
+    from pg_roles as r where r.rolname in ('anon', 'authenticated', 'service_role'))
+)::text;`;
+
+// Every object or attribute that differs between two catalogs.
+function catalogDiff(before, after) {
+  const changes = [];
+  for (const category of Object.keys(after)) {
+    const a = before[category];
+    const b = after[category];
+    if (
+      a !== null &&
+      b !== null &&
+      typeof a === "object" &&
+      !Array.isArray(a) &&
+      typeof b === "object" &&
+      !Array.isArray(b)
+    ) {
+      for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+        if (!(key in a)) {
+          changes.push(`${category} added: ${key}`);
+        } else if (!(key in b)) {
+          changes.push(`${category} removed: ${key}`);
+        } else if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) {
+          const attributes =
+            typeof a[key] === "object" && a[key] !== null
+              ? Object.keys(b[key]).filter(
+                  (k) => JSON.stringify(a[key][k]) !== JSON.stringify(b[key][k]),
+                )
+              : ["definition"];
+          changes.push(
+            `${category} changed: ${key} [${attributes.join(", ")}]`,
+          );
+        }
+      }
+    } else if (JSON.stringify(a) !== JSON.stringify(b)) {
+      changes.push(`${category} changed`);
+    }
+  }
+  return changes.sort();
+}
+
+// The explicit allowlist of what the single P3-904 migration may change in
+// the catalog: the operation and helper functions it creates, the predicate it
+// replaces, the table privileges it revokes on the eight M4 relations, the
+// column-level grant that revocation removes, and the comments it writes.
+const EXPECTED_CATALOG_DIFF = Object.freeze([
+  // Every operation and helper function the migration creates.
+  ...[...API_FUNCTIONS, ...HELPER_FUNCTIONS].map(
+    (signature) => `functions added: ${signature.replace(/, /g, ",")}`,
+  ),
+  // R2: the predicate is replaced and re-commented.
+  "functions changed: has_manage_attorney_verification_scope(uuid,boolean) [src, comment]",
+  // R1 bypass prevention: table DML revoked on the eight M4 relations;
+  // verification_evidence is also re-commented.
+  ...M4_TABLES.map((table) =>
+    table === "verification_evidence"
+      ? `relations changed: ${table} [acl, comment]`
+      : `relations changed: ${table} [acl]`,
+  ),
+  // The table-level revocation removes P1-004's column-level UPDATE grant on
+  // the four subject columns.
+  ...[
+    "discipline_record_id",
+    "insurance_record_id",
+    "license_id",
+    "practice_area_authorisation_id",
+  ].map(
+    (column) =>
+      `columns changed: verification_evidence_subjects.${column} [acl]`,
+  ),
+]);
+
+async function reconciliationChecks() {
+  await check(
+    "RB-1 (§7, §9) rollback-only application leaves the catalog exactly as it was, and the committed catalog diff reconciles exactly with the explicit allowlist of objects the migration may create, replace, revoke or grant",
+    () => {
+      const db = `${DB}_recon`;
+      const fixture = FIXTURE.split("\n")
+        .filter((line) => !line.startsWith("create role"))
+        .join("\n")
+        .replaceAll(DB, db);
+      sql(fixture, "postgres");
+      const apply = (input, singleTransaction) => {
+        const args = psqlArgs(db);
+        const result = run(
+          "psql",
+          singleTransaction ? [...args, "-1"] : args,
+          input,
+        );
+        assert.equal(result.status, 0, result.stderr);
+      };
+      const files = inventory();
+      for (const [file] of files.slice(0, 14)) {
+        apply(fs.readFileSync(path.join(MIGRATIONS, file), "utf8"), true);
+      }
+      const before = JSON.parse(sql(CATALOG, db));
+      const migration = fs.readFileSync(
+        path.join(MIGRATIONS, P3_904_MIGRATION),
+        "utf8",
+      );
+      apply(`begin;\n${migration}\nrollback;\n`, false);
+      const afterRollback = JSON.parse(sql(CATALOG, db));
+      assert.deepEqual(
+        catalogDiff(before, afterRollback),
+        [],
+        "rollback leaves no catalog change",
+      );
+      apply(migration, true);
+      const after = JSON.parse(sql(CATALOG, db));
+      const diff = catalogDiff(before, after);
+      const unexpected = diff.filter((d) => !EXPECTED.has(d));
+      const missing = [...EXPECTED].filter((d) => !diff.includes(d));
+      assert.deepEqual(
+        { unexpected, missing },
+        { unexpected: [], missing: [] },
+        JSON.stringify(diff, null, 1),
+      );
+      return {
+        migration: P3_904_MIGRATION,
+        rollback_only: "catalog identical before and after",
+        committed_changes: diff.length,
+        reconciled_with_allowlist: true,
+      };
+    },
+  );
+}
+const EXPECTED = new Set(EXPECTED_CATALOG_DIFF);
+
 async function main() {
   try {
     startCluster();
@@ -3583,6 +4463,8 @@ async function main() {
     await concurrencyChecks();
     await atomicityChecks();
     await regressionChecks();
+    await integrityChecks();
+    await reconciliationChecks();
   } catch (error) {
     report.error = String(error?.stack ?? error);
     failed = true;
