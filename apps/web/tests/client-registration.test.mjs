@@ -2640,16 +2640,42 @@ const REQUEST_WRITE_MODULE =
   "src/infrastructure/professional/professional-request-client.ts";
 const APPLICANT_ADAPTER =
   "src/infrastructure/identity/attorney-application-provisioning.ts";
+// P5-001: the client intake adapter calls the database's own client intake
+// functions (two catalog reads and four writes), each exactly once, through
+// the request's own unprivileged session; it builds or receives no
+// privileged client.
+const CLIENT_INTAKE_ADAPTER =
+  "src/infrastructure/client/client-intake-adapter.ts";
+const CLIENT_INTAKE_RPCS = Object.freeze([
+  "client_intake_practice_areas",
+  "client_intake_jurisdictions",
+  "client_create_intake",
+  "client_save_intake_revision",
+  "client_submit_intake",
+  "client_close_intake",
+]);
 const RPC_OCCURRENCES = Object.freeze({
   [PRIVILEGED_MODULE]: 1,
   [STAFF_ADAPTER]: 1,
   [REQUEST_WRITE_MODULE]: 2,
   [APPLICANT_ADAPTER]: 2,
+  [CLIENT_INTAKE_ADAPTER]: CLIENT_INTAKE_RPCS.length,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
 function assertQuotaRpcContract(codes) {
   for (const [file, code] of codes) {
+    for (const name of CLIENT_INTAKE_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === CLIENT_INTAKE_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+    }
+    if (file === CLIENT_INTAKE_ADAPTER) {
+      assert.doesNotMatch(code, /createClient\b|ADMIN_KEY|service_role/i);
+    }
     assert.equal(
       code.match(/\brpc\b/gi)?.length ?? 0,
       RPC_OCCURRENCES[file] ?? 0,

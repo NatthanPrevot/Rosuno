@@ -221,16 +221,23 @@ const trustedSessionImport =
   'import { SUPABASE_SERVER_SESSION_SOURCE } from "../src/infrastructure/identity/server-session-source.ts";';
 const trustedShellView = "getShellView(SUPABASE_SERVER_SESSION_SOURCE)";
 const sessionEntryImport = 'import { signOut } from "./sign-in/actions.ts";';
+// P5-001: the authenticated branch also offers one fixed first-party link to
+// the client workspace, beside the sign-out form.
 const sessionEntry = `{view.session === "anonymous" ? (
             <ButtonLink variant="primary" href="/sign-in">
               Sign in
             </ButtonLink>
           ) : (
-            <form action={signOut}>
-              <Button variant="secondary" type="submit">
-                Sign out
-              </Button>
-            </form>
+            <Cluster>
+              <ButtonLink variant="primary" href="/client">
+                Client workspace
+              </ButtonLink>
+              <form action={signOut}>
+                <Button variant="secondary" type="submit">
+                  Sign out
+                </Button>
+              </form>
+            </Cluster>
           )}`;
 // P2-006: fixed registration and confirmation-resume navigation, two plain
 // links shown whatever the session, directly after the session entry. This

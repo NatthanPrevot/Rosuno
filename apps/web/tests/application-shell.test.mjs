@@ -121,8 +121,10 @@ const trustedSessionImport =
   'import { SUPABASE_SERVER_SESSION_SOURCE } from "../src/infrastructure/identity/server-session-source.ts";';
 const trustedShellView = "getShellView(SUPABASE_SERVER_SESSION_SOURCE)";
 const sessionEntryImport = 'import { signOut } from "./sign-in/actions.ts";';
+// P5-001: the authenticated branch of the session entry also offers one fixed
+// first-party link to the client workspace, beside the sign-out form.
 const sessionEntry =
-  'view.session === "anonymous" ? ( <ButtonLink variant="primary" href="/sign-in"> Sign in </ButtonLink> ) : ( <form action={signOut}> <Button variant="secondary" type="submit"> Sign out </Button> </form> )';
+  'view.session === "anonymous" ? ( <ButtonLink variant="primary" href="/sign-in"> Sign in </ButtonLink> ) : ( <Cluster> <ButtonLink variant="primary" href="/client"> Client workspace </ButtonLink> <form action={signOut}> <Button variant="secondary" type="submit"> Sign out </Button> </form> </Cluster> )';
 const trustedSourceVocabulary = new Map([
   ["app/page.tsx", [trustedSessionImport, trustedShellView]],
 ]);
@@ -992,7 +994,7 @@ test("12. presentation reaches application state only through application module
     codeOf(page)
       .replace(/\s+/g, " ")
       .includes(
-        ` </form> )} ${registrationEntry} </Stack> </Surface> <Columns columns="split">`,
+        ` </form> </Cluster> )} ${registrationEntry} </Stack> </Surface> <Columns columns="split">`,
       ),
   );
   // Its expressions are the server-derived session state and the one session
@@ -1244,6 +1246,8 @@ test("12. presentation reaches application state only through application module
       "tone=neutral",
       "variant=primary",
       "href=/sign-in",
+      "variant=primary",
+      "href=/client",
       "variant=secondary",
       "type=submit",
       "variant=secondary",

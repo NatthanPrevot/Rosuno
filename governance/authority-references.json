@@ -132,6 +132,17 @@
       "integrity": "sha256:61baa7cd9a33d59f4593f6654872c5bca326a4a2f5ae9f0e1c4b124a08801cbc",
       "usage": "reference-only",
       "status": "active"
+    },
+    {
+      "authority_id": "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A1-LOCKED",
+      "title": "Rosuno Physical Specification Bounded Amendment PS-A1 (intake content revisions and versioned intake question configuration)",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "sha256:1612e751d6d94ffdf4c7c13f168d9e97bd85f793b03ccc5aa41e3d48eb1e803e",
+      "usage": "reference-only",
+      "status": "pending_lock_condition"
     }
   ]
 }
