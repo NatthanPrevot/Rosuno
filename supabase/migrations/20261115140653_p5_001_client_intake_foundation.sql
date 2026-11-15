@@ -702,6 +702,9 @@ $function$;
 -- Client operations (EXECUTE for authenticated only).
 -- ---------------------------------------------------------------------------
 
+-- Fixed outcomes (P5-001 Packet section 3.3): created, rate_limited,
+-- unavailable. A caller without an active Client Profile is refused as
+-- unavailable and nothing is stored.
 create function public.client_create_intake()
 returns table (outcome text, intake_id uuid)
 language plpgsql
@@ -719,7 +722,7 @@ begin
   into v_user, v_client
   from public.lock_current_client() as l;
   if v_client is null then
-    return query select 'denied'::text, null::uuid;
+    return query select 'unavailable'::text, null::uuid;
     return;
   end if;
   select s.definition

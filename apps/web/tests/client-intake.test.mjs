@@ -603,7 +603,7 @@ test("11. submit, close and start send exactly the named Intake and token and ma
   for (const [reply, expected] of [
     [answer("created", "x"), "outcome-unknown"],
     [answer("rate_limited"), "rate-limited"],
-    [answer("denied"), "denied"],
+    [answer("denied"), "outcome-unknown"],
     [answer("unavailable"), "unavailable"],
     [{ kind: "unreadable" }, "outcome-unknown"],
   ]) {

@@ -142,7 +142,7 @@
       "reinterpreted": false,
       "integrity": "sha256:1612e751d6d94ffdf4c7c13f168d9e97bd85f793b03ccc5aa41e3d48eb1e803e",
       "usage": "reference-only",
-      "status": "active"
+      "status": "pending_lock_condition"
     }
   ]
 }

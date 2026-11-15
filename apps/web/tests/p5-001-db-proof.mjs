@@ -1889,7 +1889,7 @@ async function isolationChecks() {
   );
 
   await check(
-    "ISO-3 attorney-only and staff-only principals hold no client context: create is denied, every Intake operation is not_found, and the catalog reads return nothing",
+    "ISO-3 attorney-only and staff-only principals hold no client context: create is refused as unavailable, every Intake operation is not_found, and the catalog reads return nothing",
     () => {
       const owner = draftWithRevision();
       const attorneyOnly = newAccount();
@@ -1899,7 +1899,7 @@ async function isolationChecks() {
       const staffOnly = newStaff();
       for (const principal of [attorneyOnly, staffOnly]) {
         assert.deepEqual(createIntake(principal), {
-          outcome: "denied",
+          outcome: "unavailable",
           intake_id: null,
         });
         assert.equal(
@@ -1934,13 +1934,17 @@ async function isolationChecks() {
         "closed",
       ]) {
         const principal = newClient(accountState);
-        assert.equal(createIntake(principal).outcome, "denied", accountState);
+        assert.equal(
+          createIntake(principal).outcome,
+          "unavailable",
+          accountState,
+        );
       }
       const noProfile = newAccount();
-      assert.equal(createIntake(noProfile).outcome, "denied");
+      assert.equal(createIntake(noProfile).outcome, "unavailable");
       assert.deepEqual(
         rowAs(null, "client_create_intake"),
-        { outcome: "denied", intake_id: null },
+        { outcome: "unavailable", intake_id: null },
         "no subject",
       );
       const owner = draftWithRevision();

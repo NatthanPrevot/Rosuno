@@ -129,7 +129,6 @@ export type CallAnswer =
 
 export const CREATE_OUTCOMES = Object.freeze([
   "created",
-  "denied",
   "rate_limited",
   "unavailable",
 ] as const);
@@ -1201,8 +1200,6 @@ export async function startIntake(
           : STATES.outcomeUnknown;
       case "rate_limited":
         return STATES.rateLimited;
-      case "denied":
-        return DENIED;
       default:
         return UNAVAILABLE;
     }
