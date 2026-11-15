@@ -52,11 +52,16 @@ export default async function HomePage() {
               Sign in
             </ButtonLink>
           ) : (
-            <form action={signOut}>
-              <Button variant="secondary" type="submit">
-                Sign out
-              </Button>
-            </form>
+            <Cluster>
+              <ButtonLink variant="primary" href="/client">
+                Client workspace
+              </ButtonLink>
+              <form action={signOut}>
+                <Button variant="secondary" type="submit">
+                  Sign out
+                </Button>
+              </form>
+            </Cluster>
           )}
           <Cluster>
             <ButtonLink variant="secondary" href="/sign-up">
