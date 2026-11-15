@@ -168,6 +168,8 @@ const HISTORICAL = Object.freeze([
 ]);
 const P3_904_MIGRATION =
   "20261106090000_p3_904_professional_write_boundary.sql";
+const P3_904_SHA256 =
+  "7f05e4066a245471a8e33d5cfb27a539373eb75b270a17990afced441e4ebbe1";
 
 const M4_TABLES = Object.freeze([
   "attorney_profiles",
@@ -387,7 +389,12 @@ function one(statement) {
 // read as the disposable cluster's superuser, in the argument shape of
 // staff_record_eligibility_evaluation. A test uses it to submit a truthful
 // determination; the separate parity checks compare it with the application.
-function derivedEvaluationArgs(attorneyId, jurisdictionId, practiceAreaId, asOf) {
+function derivedEvaluationArgs(
+  attorneyId,
+  jurisdictionId,
+  practiceAreaId,
+  asOf,
+) {
   const area = practiceAreaId === null ? "null" : `'${practiceAreaId}'`;
   const derived = JSON.parse(
     one(
@@ -536,16 +543,37 @@ function inventory() {
 
 function applyMigrations() {
   const files = inventory();
-  assert.equal(
-    files.length,
-    15,
-    "exactly fourteen historical and one new migration",
+  // P5-001 re-pin: the fourteen historical migrations and P3-904 stay an
+  // exact, byte-checked prefix; only later migrations registered in the
+  // migration register may follow, and they are applied after it.
+  assert.ok(
+    files.length >= 15,
+    "the fourteen historical migrations and P3-904",
   );
   assert.deepEqual(
     files.slice(0, 14),
     HISTORICAL.map((entry) => [...entry]),
   );
   assert.equal(files[14][0], P3_904_MIGRATION);
+  assert.equal(files[14][1], P3_904_SHA256);
+  const registered = new Set(
+    JSON.parse(
+      fs.readFileSync(
+        path.join(
+          REPOSITORY_ROOT,
+          "governance/migrations/reviewed-migrations.json",
+        ),
+        "utf8",
+      ),
+    ).migrations.map((migration) => migration.artifact_path),
+  );
+  for (const [file] of files.slice(15)) {
+    assert.ok(
+      registered.has(`supabase/migrations/${file}`),
+      `${file} is not a registered later migration`,
+    );
+  }
+  state.inventoryAtStart = files;
   report.migrations.historical_verified_before = files.slice(0, 14).length;
   report.migrations.p3_904 = { file: files[14][0], sha256: files[14][1] };
   sql(FIXTURE, "postgres");
@@ -3574,7 +3602,10 @@ async function regressionChecks() {
         files.slice(0, 14),
         HISTORICAL.map((entry) => [...entry]),
       );
-      assert.equal(files.length, 15);
+      // P5-001 re-pin: P3-904 and every later registered migration are also
+      // byte-for-byte what the run started with.
+      assert.deepEqual(files[14], [P3_904_MIGRATION, P3_904_SHA256]);
+      assert.deepEqual(files, state.inventoryAtStart);
       report.migrations.historical_verified_after = 14;
       return { historical: 14, p3_904: files[14] };
     },
@@ -3745,8 +3776,7 @@ function appFacts(s, practiceAreaId) {
     attorneyId: s.attorney.profile,
     jurisdictionId: s.jurisdiction,
     practiceAreaId,
-    accountState:
-      accounts.length === 1 ? accounts[0].account_state : undefined,
+    accountState: accounts.length === 1 ? accounts[0].account_state : undefined,
     profile: profiles.length === 1 ? profiles[0] : null,
     licenses: lists.license_id,
     insurance: lists.insurance_record_id,
@@ -3843,12 +3873,17 @@ async function integrityChecks() {
         under_review_profile: [scenario({ profile: "under_review" }), false],
         stale_license_evidence: [
           scenario({
-            license: { status: "synthetic-active", evidence: { ageHours: 960 } },
+            license: {
+              status: "synthetic-active",
+              evidence: { ageHours: 960 },
+            },
           }),
           false,
         ],
         license_without_evidence: [
-          scenario({ license: { status: "synthetic-active", evidence: false } }),
+          scenario({
+            license: { status: "synthetic-active", evidence: false },
+          }),
           false,
         ],
         non_qualifying_license: [
@@ -4342,7 +4377,8 @@ function catalogDiff(before, after) {
           const attributes =
             typeof a[key] === "object" && a[key] !== null
               ? Object.keys(b[key]).filter(
-                  (k) => JSON.stringify(a[key][k]) !== JSON.stringify(b[key][k]),
+                  (k) =>
+                    JSON.stringify(a[key][k]) !== JSON.stringify(b[key][k]),
                 )
               : ["definition"];
           changes.push(

@@ -451,12 +451,31 @@ function applyMigrations() {
     .readdirSync(MIGRATIONS)
     .filter((f) => f.endsWith(".sql"))
     .sort();
-  // The fourteen historical migrations and the single P3-904 correction.
-  assert.equal(files.length, 15);
+  // The fourteen historical migrations and the single P3-904 correction,
+  // followed only by later migrations registered in the migration register
+  // (P5-001 re-pin: the accepted fifteen-migration prefix stays exact).
+  assert.ok(files.length >= 15);
   assert.equal(
     files[14],
     "20261106090000_p3_904_professional_write_boundary.sql",
   );
+  const registered = new Set(
+    JSON.parse(
+      fs.readFileSync(
+        path.join(
+          REPOSITORY_ROOT,
+          "governance/migrations/reviewed-migrations.json",
+        ),
+        "utf8",
+      ),
+    ).migrations.map((migration) => migration.artifact_path),
+  );
+  for (const file of files.slice(15)) {
+    assert.ok(
+      registered.has(`supabase/migrations/${file}`),
+      `${file} is not a registered later migration`,
+    );
+  }
   for (const file of files) {
     const bytes = fs.readFileSync(path.join(MIGRATIONS, file));
     const result = run(
@@ -1070,10 +1089,19 @@ function probes() {
           "attorney_save_profile_details:v",
           "attorney_start_application:v",
           "attorney_submit_application:v",
+          // P5-001 re-pin: the client intake and configuration-publication
+          // functions, which write no M4 relation.
+          "client_close_intake:v",
+          "client_create_intake:v",
+          "client_intake_jurisdictions:s",
+          "client_intake_practice_areas:s",
+          "client_save_intake_revision:v",
+          "client_submit_intake:v",
           "has_manage_attorney_verification_scope:s",
           "has_resource_metadata_access:s",
           "staff_change_profile_stage:v",
           "staff_decide_practice_area:v",
+          "staff_publish_intake_question_set:v",
           "staff_record_discipline_finding:v",
           "staff_record_eligibility_evaluation:v",
           "staff_record_source_unavailable:v",

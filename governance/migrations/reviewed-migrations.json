@@ -377,6 +377,32 @@
       "drift_check": "clean",
       "rollback_plan": "Applied to Rosuno Staging only. A verified defect requires a separately authorized, reviewed forward-only corrective migration that restores the prior function definitions and grants; this migration, every earlier migration and the migration history stay byte-identical, and no evidence, evaluation or audit row is removed.",
       "depends_on": ["20261020070000_p2_registration_abuse_control"]
+    },
+    {
+      "migration_id": "20261115140653_p5_001_client_intake_foundation",
+      "migration_kind": "product",
+      "sequence": 16,
+      "artifact_path": "supabase/migrations/20261115140653_p5_001_client_intake_foundation.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A1-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-P5-001-CLIENT-INTAKE-FOUNDATION"],
+      "decision_refs": ["DEC-20261115-P5-001-CLIENT-INTAKE-FOUNDATION"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the work-item branch. After merge: a separately reviewed forward corrective migration; no destructive rollback, and no intake revision, question-set version, jurisdiction assessment or audit row is removed.",
+      "depends_on": ["20261106090000_p3_904_professional_write_boundary"]
     }
   ]
 }

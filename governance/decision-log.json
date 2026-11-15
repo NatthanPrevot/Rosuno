@@ -1742,6 +1742,41 @@
         "Optional independent review: not performed"
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261115-P5-001-CLIENT-INTAKE-FOUNDATION",
+      "title": "Adopt P5-001 Client Intake Foundation, Physical Specification amendment PS-A1 and intake question configuration intake-questions-v1",
+      "status": "accepted",
+      "scope": "M5 first slice only: append-only intake content revisions, database-managed versioned intake question configuration, the client intake lifecycle draft to submitted to closed, client-stated jurisdiction assessments, adjustable intake operating limits and one unreviewed, unapplied migration candidate. No attorney or staff access to intake data, AI suggestion, voice memo, privacy or help surface, notice or disclosure, expiry, post-submission revision, discovery, referral, configuration publication or other persistent environment change.",
+      "decision": "D1 (approved): intake content is stored only in the immutable, append-only relation intake_revisions defined by PS-A1, each row a complete snapshot; the current content is the latest revision and is derived; prior client statements are never overwritten, deleted or reinterpreted, and current content is not duplicated in intakes, audit events or any other location. D2 (approved in principle, finalized): intake questions are database-managed configuration held in the immutable relation intake_question_sets defined by PS-A1, with stable question and choice identifiers, database validation at publication and at every save, publication only by an active staff User holding a valid manage_intake_configuration capability grant with an atomic audit event, a draft continuing under its governing version until the client explicitly moves to the current version, and no client selection of any other version. The initial version intake-questions-v1 (definition SHA-256 31a3245be9ecb6135f93e5141bd9d2314c7f30fb8cfd3389d5e8645fbfbdf395) contains four required questions (practice area or Not sure; one or more jurisdictions or Not sure; existing court case Yes/No/Not sure; kind of help sought: Understand my options/Help with a document/Someone to represent me/Not sure) and an optional free-form description; no substantive question may be added without owner authorization. Operating defaults in that version are adjustable configuration, not architectural limits: description 4,000 characters, structured answers 4,096 bytes, and proportionate rolling rate limits of 60 revision saves per client per hour and 10 Intake starts per client per 24 hours, with explicit recoverable refusal and no cap on total revisions or open Intakes; fixed technical ceilings remain security invariants. Privacy and help entry points are deferred and remain outstanding MVP obligations. The PS-A1 field-level anti-duplication record (PS-A1 section 7) is approved by this adoption (DL-ENG-1 R9).",
+      "rationale": "The applied P1-005 schema has no home for client-provided intake content or its question configuration, while the Domain Model requires that intake content is never silently overwritten, the Technical Architecture assigns intake revisions and client-provided information to Client & Intake, and the MVP Build Specification M5 requires structured answers and an optional description. Immutable snapshots and immutable published configuration versions preserve historical meaning without duplicating current-state truth, and let routine question and limit changes be published without code, migration or deployment. The existing policy relations were not reused because they hold jurisdictional policy with authority provenance, not ordinary product content; the existing capability model and catalogs are reused. The Physical Specification lock rule (section 53) and DL-ENG-1 R9 require a Decision Log entry and a bounded amendment for new relations before persistent application.",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A1-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-P5-001-CLIENT-INTAKE-FOUNDATION"],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-15T04:30:26Z",
+      "updated_at": "2026-11-15T04:30:26Z",
+      "supersedes": [],
+      "impact": "One forward-only migration candidate (unreviewed, unapplied) adding two relations, client and configuration functions, one capability-catalog code and narrowed direct privileges on intakes and jurisdiction_assessments; new authenticated client workspace routes. Security and integrity obligations: own-client access only, actor from the authenticated session, fixed search_path and restricted function execution, immutable revisions and configuration versions, serialized lifecycle with stale-write rejection, atomic audit evidence without intake content, and no direct writes by API roles or service credentials. Persistent application requires completion of the PS-A1 Lock Condition and a separate owner database authorization; publishing any configuration version on a persistent environment is a separate owner-authorized, audited operation. Production intake collection is not enabled while the counsel-gated RMS REG-CA-035 determination (pre-collection notices, minimum information, pre-acceptance disclosure) remains unresolved. P5-001 acceptance is not M5 completion: AI Suggestions, voice memos and Storage, privacy and help surfaces, counsel-gated intake notices and disclosures, attorney-decline and referral retry verification, and the remaining M5 criteria stay outstanding.",
+      "evidence": [
+        "Owner decisions D1 and D2 and the Privacy/Help deferral: P5-001 owner directions in the Builder session (the messages carry no timestamps)",
+        "Owner exact-text approval of PS-A1 (SHA-256 1612e751d6d94ffdf4c7c13f168d9e97bd85f793b03ccc5aa41e3d48eb1e803e, 21,425 bytes): express owner adoption authorization in the Builder session, received at about 2026-11-14T19:55:55Z by the session clock; the authority-manifest record is owner-held and is not evidenced in this repository",
+        "Owner adoption: P5-001 Packet commit bc35cb7c691ad6ecdd1eea6ae596dd95678ba591 on owner branch wi/P5-001-client-intake-foundation (2026-11-15T04:30:26Z), Packet blob 3480108a8a95bc25cc9a65f7fd92d3661b21d5f5",
+        "Optional independent review: not performed"
+      ],
+      "expiry": null
     }
   ]
 }

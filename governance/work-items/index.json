@@ -1828,7 +1828,6 @@
       "created_at": "2026-10-10T06:24:07Z",
       "updated_at": "2026-10-11T01:12:36Z"
     },
-
     {
       "work_item_id": "WI-P2-900-CLOUD-BUILDER-KIT-REV5-1-INSTALL",
       "title": "Install reviewed Cloud Builder revision 5.1 PROCESS controls",
@@ -1940,7 +1939,6 @@
       "created_at": "2026-10-13T08:04:39Z",
       "updated_at": "2026-10-13T08:04:39Z"
     },
-
     {
       "work_item_id": "WI-P2-903-FORWARD-MIGRATION-FAST-CONTROL-COMPATIBILITY",
       "title": "Forward Migration Fast-Control Compatibility",
@@ -2354,6 +2352,68 @@
       "rollback_reference": "Applied to Rosuno Staging only. A verified defect requires a separately authorized, reviewed forward-only corrective migration that restores the prior function definitions and grants; this migration, every earlier migration and the migration history stay byte-identical, and no evidence, evaluation or audit row is removed.",
       "created_at": "2026-11-13T12:02:23Z",
       "updated_at": "2026-11-14T14:51:22Z"
+    },
+    {
+      "work_item_id": "WI-P2-P5-001-CLIENT-INTAKE-FOUNDATION",
+      "title": "P5-001 Client Intake Foundation (M5 first slice): append-only intake revisions and database-managed, versioned intake questions",
+      "objective": "Under the owner-adopted P5-001 Packet (blob 3480108a8a95bc25cc9a65f7fd92d3661b21d5f5) and Physical Specification amendment PS-A1, let an authenticated client create, edit, submit and close Intakes whose content is kept as immutable revisions validated against immutable, published question-set versions, with client-stated jurisdictions recorded as unreviewed suggestions. P5-001 is the first M5 slice and does not complete M5.",
+      "in_scope": [
+        "One forward-only migration, 20261115140653_p5_001_client_intake_foundation: intake_revisions and intake_question_sets (PS-A1), client and configuration-publication database functions, the manage_intake_configuration capability code, and narrowed direct privileges on intakes and jurisdiction_assessments.",
+        "The client workspace routes, the generic question-set model, the client intake use cases and request-scoped adapter, application tests and the disposable PostgreSQL proofs within the P5-001 Packet ALLOWED_SCOPE."
+      ],
+      "out_of_scope": [
+        "Application to Staging, Production or any persistent database, publication of any question-set version to a persistent environment, and any release or deployment.",
+        "AI Suggestions, voice memos and Storage, privacy and help surfaces, intake notices and disclosures (RMS REG-CA-035), intake expiry, post-submission revision, discovery and referral, and attorney or staff access to intake data."
+      ],
+      "status": "in_progress",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A1-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "decision_refs": ["DEC-20261115-P5-001-CLIENT-INTAKE-FOUNDATION"],
+      "dependencies": [
+        "WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION",
+        "WI-P1-004-ATTORNEY-VERIFICATION-ELIGIBILITY-FOUNDATION",
+        "WI-P1-005-CLIENT-INTAKE-AI-FOUNDATION",
+        "WI-P1-011-COMPLIANCE-FOUNDATION",
+        "WI-P2-P3-904-P3-003-SECURITY-CORRECTION"
+      ],
+      "acceptance_criteria": [
+        "The P5-001 disposable PostgreSQL proof passes on the final head, including isolation, immutability, publication authority and digest, version selection, the practice-area Not sure contract, concurrency, rate limits, atomic audit, historical meaning, rollback and catalog reconciliation, and the application end-to-end flow.",
+        "The re-pinned M4, P3-904 and registration abuse-control proofs, p0:validate, the P0 suite, typecheck and build pass on the final head, and the guard self-check prints ROSUNO-GUARD PASS.",
+        "Designated human review approves the exact head before merge."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "node apps/web/tests/p5-001-db-proof.mjs",
+        "node apps/web/tests/p3-904-db-proof.mjs",
+        "node apps/web/tests/m4-db-proof.mjs",
+        "node apps/web/tests/registration-abuse-db-proof.mjs"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": ["20261115140653_p5_001_client_intake_foundation"],
+      "rollback_reference": "Before merge: forward-only correction commits on the work-item branch. After merge: a separately reviewed forward corrective migration; no destructive rollback, and no intake revision, question-set version, jurisdiction assessment or audit row is removed.",
+      "created_at": "2026-11-15T04:30:26Z",
+      "updated_at": "2026-11-15T04:30:26Z"
     }
   ]
 }
