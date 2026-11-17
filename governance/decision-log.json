@@ -1810,6 +1810,7 @@
       "evidence": [
         "Express owner adoption statement (approver NatthanPrevot) naming SHA-256 56dd6903f0b539edd26419324aab08e38a59da3a79e36ac0ea056921a892d886, received in the Builder session and processed at 2026-11-16T23:29:31Z (session clock)",
         "Exact rulings text, byte-identical to the adopted file dl-eng-3-program-packets.md: governance/dl-eng-3-program-packets.txt, 8,022 bytes, SHA-256 56dd6903f0b539edd26419324aab08e38a59da3a79e36ac0ea056921a892d886 (plain-text extension so the Markdown formatter cannot alter the adopted bytes)",
+        "Location accepted by the owner: express owner decision (approver NatthanPrevot, 'S1 C1 resolution, Option B') retaining DL-ENG-3 at governance/dl-eng-3-program-packets.txt with its exact adopted bytes and SHA-256, received in the Builder session and processed at 2026-11-17T05:42:10Z (session clock); the governance/dl-eng-3-program-packets.md path was a planning expectation only, required by no locked authority, adopted Packet, DL-ENG text, validator or guard",
         "Optional independent review: not performed"
       ]
     },
