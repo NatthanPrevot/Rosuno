@@ -401,7 +401,7 @@
       "applied_environment": "none",
       "non_production_validation": true,
       "drift_check": "clean",
-      "rollback_plan": "Before merge: forward-only correction commits on the work-item branch. After merge: a separately reviewed forward corrective migration; no destructive rollback, and no intake revision, question-set version, jurisdiction assessment or audit row is removed.",
+      "rollback_plan": "Merged to owner main (91af560f2654f63ea20b19da75a166ca274d0ddf); historical (DL-ENG-1 R8) and not applied to any persistent environment. A defect is corrected only by a separately reviewed forward corrective migration; no destructive rollback, and no intake revision, question-set version, jurisdiction assessment or audit row is removed.",
       "depends_on": ["20261106090000_p3_904_professional_write_boundary"]
     },
     {

@@ -1842,7 +1842,7 @@
         "Supabase, OLD, Production, migration/history/authority changes, real-fork synchronization and any Claude Code session.",
         "Any repository path outside the five reviewed files and two existing governance registries."
       ],
-      "status": "approved",
+      "status": "in_progress",
       "owner": "NatthanPrevot",
       "reviewer": {
         "identity": "Rosuno",
@@ -1860,7 +1860,8 @@
         "Exactly the two additive registry records exist; no earlier entry or unrelated path changes.",
         "Existing full Fast-Control, protected required CI and clean staged/tree binding pass without weakening checks.",
         "Exact-head independent Backup PR PASS and designated Rosuno reviewer approval precede separately owner-authorized merge-commit.",
-        "No database, product, authority, policy, fork or Claude session mutation is performed by this work item."
+        "No database, product, authority, policy, fork or Claude session mutation is performed by this work item.",
+        "Post-merge record (MVP-001 S1 records, Packet REC-1): implemented and merged to owner main together with P2-901 through PR #69, two-parent merge commit 572bc7127a741d30c9245ca6ae04c0da014eee08 (committed 2026-10-14T07:51:55Z; merge tree equals the head tree; nine paths changed). The designated approval, required-check and independent audit facts of PR #69 are not evidenced in this repository and are not claimed; closure (DL-ENG-2 G4) waits for the owner-supplied approval facts."
       ],
       "validation_commands": [
         "bash -n .github/scripts/rosuno-guard.sh .github/scripts/rosuno-guard-trust.sh",
@@ -1881,7 +1882,7 @@
       "migration_refs": [],
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-10-13T04:21:28Z",
-      "updated_at": "2026-10-13T06:20:08Z"
+      "updated_at": "2026-11-17T01:40:55Z"
     },
     {
       "work_item_id": "WI-P2-901-P2900-CONTROLS-COMPATIBILITY",
@@ -1899,7 +1900,7 @@
         "P2-005, C1, Claude/local Builder or cloud sessions, fork synchronization, Supabase/OLD/Production changes or unapproved later-phase capabilities.",
         "Any repository path outside tools/p0/lib/controls.mjs, tools/p0/tests/p0-controls.test.mjs and the two shared additive governance registries for this corrective work item."
       ],
-      "status": "proposed",
+      "status": "in_progress",
       "owner": "NatthanPrevot",
       "reviewer": {
         "identity": "Rosuno",
@@ -1917,7 +1918,8 @@
         "Exact positive and negative regression tests pass in both pre-application and web-application surface states without disabling the live validateRepository test.",
         "Both original P2-900 registrations and 24 earlier work items plus 35 earlier decisions retain exactly their approved values, identities, and ordering; only two new P2-901 records are appended.",
         "The single final nine-path candidate retains all five reviewed kit SHA-256s/modes, passes complete Fast-Control on unstaged bytes, preserves three existing required CI checks, and passes exact-head Backup PR audit and designated human review before separately authorized merge.",
-        "No new migration, policy, database, application, fork, remote Cloud execution, unrelated file, or unapproved Git change occurs."
+        "No new migration, policy, database, application, fork, remote Cloud execution, unrelated file, or unapproved Git change occurs.",
+        "Post-merge record (MVP-001 S1 records, Packet REC-1): the combined nine-path candidate was merged to owner main through PR #69, two-parent merge commit 572bc7127a741d30c9245ca6ae04c0da014eee08 (committed 2026-10-14T07:51:55Z; merge tree equals the head tree), with the compatibility change in tools/p0/lib/controls.mjs and tools/p0/tests/p0-controls.test.mjs. The designated approval, required-check and independent audit facts of PR #69 are not evidenced in this repository and are not claimed; closure (DL-ENG-2 G4) waits for the owner-supplied approval facts."
       ],
       "validation_commands": [
         "node --test --test-name-pattern='^(?:P2-900 exact Cloud Builder paths reject near-misses|neutral P0 control foundation validates successfully)$' tools/p0/tests/p0-controls.test.mjs (separately authorized targeted two-test check; full P0 suite only through Fast-Control)",
@@ -1937,7 +1939,7 @@
       "migration_refs": [],
       "rollback_reference": "governance/rollback-recovery.md",
       "created_at": "2026-10-13T08:04:39Z",
-      "updated_at": "2026-10-13T08:04:39Z"
+      "updated_at": "2026-11-17T01:40:55Z"
     },
     {
       "work_item_id": "WI-P2-903-FORWARD-MIGRATION-FAST-CONTROL-COMPATIBILITY",
@@ -2272,7 +2274,8 @@
         "Three retained P3-002 limitations are recorded, not resolved: (1) a User-state race between the active-User eligibility read and the applicant insert, where P3-001 access checks active state again and an initial applicant profile confers no attorney privileges; (2) generic presentation of failed-start and unconfirmed errors, with a safe fresh read and retry; (3) the entry may present the start form when privileged provisioning is unconfigured, while submission fails closed. They are not production-readiness proof, and any established defect needs separately authorized forward-only correction.",
         "Attorney professional verification, license and evidence review, eligibility, bookability, marketplace activation, consultation, scheduling and payment workflows, and the deployment HOLD remain open without separate owner authorization; the owner-accepted Independent Backup A1-A15 PASS covers the exact source head and final PR verification, relying on accepted Builder validation, not live operation.",
         "Dependency WI-P2-912-P3-001-GOVERNANCE-CLOSURE records the protected-merged P3-001 repository implementation whose attorney-principal resolution and restricted /attorney workspace P3-002 links to and preserves; no operational gate is recorded as closed.",
-        "The P2-913 closure candidate appends only one work-item and one reciprocal decision record, preserving all 31 previous work items and 42 previous decisions in original order with original values (32 and 43 records after the append); reviewer Rosuno/approved records the completed PR #86 exact-head review only, and the P2-913 closure PR, its independent Backup audit, its Rosuno review and its protected merge remain separately gated."
+        "The P2-913 closure candidate appends only one work-item and one reciprocal decision record, preserving all 31 previous work items and 42 previous decisions in original order with original values (32 and 43 records after the append); reviewer Rosuno/approved records the completed PR #86 exact-head review only, and the P2-913 closure PR, its independent Backup audit, its Rosuno review and its protected merge remain separately gated.",
+        "Limitation closure (MVP-001 S1 records, Packet REC-1): limitations (2) and (3) were corrected by P3-003 commit 4425c5f5f3be59bdb08b14c20eb4afa5f6701893; limitation (1) was closed by P3-904 migration 20261106090000_p3_904_professional_write_boundary, whose attorney_start_application() locks the caller's User FOR SHARE, requires account_state active and inserts the applicant profile in the same transaction, with service-role writes to attorney_profiles revoked. Both were merged to owner main through PR #93 (fc31ed34763c44d5ada0c0d749e0a3e901e96519) and the migration was applied to Rosuno Staging (release REL-20261114-P3-904-STAGING-APPLICATION)."
       ],
       "validation_commands": [
         "pnpm install --frozen-lockfile",
@@ -2293,7 +2296,7 @@
       "migration_refs": [],
       "rollback_reference": "Repository-only closure. Before protected acceptance, discard only the authorized unmerged P2-913 closure candidate under separate authorization if needed; after acceptance, make forward-only corrections under a separately authorized work item. This closure does not revert the merged P3-002 implementation. Never rewrite accepted records, Git history or migration history. No database rollback applies.",
       "created_at": "2026-11-04T06:12:13Z",
-      "updated_at": "2026-11-04T06:12:13Z"
+      "updated_at": "2026-11-17T01:40:55Z"
     },
     {
       "work_item_id": "WI-P2-P3-904-P3-003-SECURITY-CORRECTION",
@@ -2392,7 +2395,8 @@
       "acceptance_criteria": [
         "The P5-001 disposable PostgreSQL proof passes on the final head, including isolation, immutability, publication authority and digest, version selection, the practice-area Not sure contract, concurrency, rate limits, atomic audit, historical meaning, rollback and catalog reconciliation, and the application end-to-end flow.",
         "The re-pinned M4, P3-904 and registration abuse-control proofs, p0:validate, the P0 suite, typecheck and build pass on the final head, and the guard self-check prints ROSUNO-GUARD PASS.",
-        "Designated human review approves the exact head before merge."
+        "Designated human review approves the exact head before merge.",
+        "Post-merge record (MVP-001 S1 records, Packet REC-1): merged to owner main through PR #95, two-parent merge commit 91af560f2654f63ea20b19da75a166ca274d0ddf (committed 2026-11-15T17:25:23Z; merge tree equals the head tree). The PR #95 designated approval facts have not been supplied by the owner and are not recorded; the migration is not applied to any persistent environment. The PS-A1 Lock Condition is complete and its register status is active. Closure (DL-ENG-2 G4) waits for the approval facts and for Staging application or an owner decision not to apply yet."
       ],
       "validation_commands": [
         "pnpm install --frozen-lockfile",
@@ -2411,9 +2415,9 @@
       "environment": "none",
       "release_refs": [],
       "migration_refs": ["20261115140653_p5_001_client_intake_foundation"],
-      "rollback_reference": "Before merge: forward-only correction commits on the work-item branch. After merge: a separately reviewed forward corrective migration; no destructive rollback, and no intake revision, question-set version, jurisdiction assessment or audit row is removed.",
+      "rollback_reference": "Merged to owner main (91af560f2654f63ea20b19da75a166ca274d0ddf); the migration is historical (DL-ENG-1 R8) and not applied to any persistent environment. A defect is corrected only by a separately reviewed forward corrective migration; no destructive rollback, and no intake revision, question-set version, jurisdiction assessment or audit row is removed.",
       "created_at": "2026-11-15T04:30:26Z",
-      "updated_at": "2026-11-15T04:30:26Z"
+      "updated_at": "2026-11-17T01:40:55Z"
     },
     {
       "work_item_id": "WI-P2-MVP-001-TECHNICAL-COMPLETION",
@@ -2485,6 +2489,121 @@
       "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",
       "updated_at": "2026-11-17T00:50:55Z"
+    },
+    {
+      "work_item_id": "WI-P2-005-EXISTING-ACCOUNT-AUTHENTICATION-ENTRY",
+      "title": "P2-005 Existing-Account Authentication Entry (V3): sign-in and current-session sign-out",
+      "objective": "Register entry of the P2-005 V3 Packet (docs/work-items/P2-005/PACKET.md, Git blob 84934698fbcefb192f60089d5123e37b919e7708, SHA-256 5a87a160f9d1eb802aa3239aa0060f403dc5044fe0c2e73ae3f0bc4445438cbe), recorded from repository evidence in the MVP-001 S1 records (Packet REC-1) because no register entry was made when it merged. Existing Supabase Auth accounts sign in through a server-owned Server Action and sign out of the current browser session only; authentication grants no application principal, role, capability, eligibility or business authorization.",
+      "in_scope": [
+        "The seven Packet ALLOWED_SCOPE paths: apps/web/app/page.tsx, apps/web/app/sign-in/page.tsx, apps/web/app/sign-in/actions.ts, apps/web/src/application/authentication-entry.ts, apps/web/tests/authentication-entry.test.mjs, apps/web/tests/application-shell.test.mjs and apps/web/tests/design-system.test.mjs.",
+        "Packet commit e7247123b89f3b6e0d4a9db1a266fe226fce5f0c and implementation commits 763e8bb2342acdc82606e407b128228155745795 and acc42aba7f7b268f1af822c62bb8f84b4ae6d21c on branch wi/P2-005-authentication-entry-v3, base ccffac6246c0550f39d0dcf41e00381f4c760f28."
+      ],
+      "out_of_scope": [
+        "Registration, recovery, onboarding, profile creation, roles, capabilities, attorney verification, jurisdiction policy, payments and full P3 or Milestone 2 completion.",
+        "Migrations, database or provider contact, Staging, Production, OLD Supabase, deployment and any path outside the seven ALLOWED_SCOPE paths (Packet MIGRATIONS: none; REAL_DATABASE_CONTACT: NO; PRODUCTION: NO)."
+      ],
+      "status": "in_progress",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED"
+      ],
+      "decision_refs": [],
+      "dependencies": [
+        "WI-P2-002-DESIGN-SYSTEM",
+        "WI-P2-003-SECURITY-SHELL",
+        "WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION"
+      ],
+      "acceptance_criteria": [
+        "Sign-in accepts only a validated email and password through the request-scoped server client, ignores client-supplied identity, role, capability and redirect, redirects only to / after verified success and returns generic non-disclosing errors; unconfigured, malformed, rejected, unavailable and uncertain cases fail closed.",
+        "Sign-out is a deliberate POST that ends the current browser session only (scope local); partial-session cleanup distinguishes success, failure and an unverifiable state, and a verification failure is never reported as a verified sign-out.",
+        "Tests use deterministic in-memory fixtures only, with no provider account, credential, network identity call or database access, and existing application-shell and design-system invariants are preserved.",
+        "Merged to owner main through PR #72, two-parent merge commit 5245fc23a1975ef8b468a9636d66f6768d7c70b4 (committed 2026-10-16T08:16:36Z; parents ccffac6246c0550f39d0dcf41e00381f4c760f28 and acc42aba7f7b268f1af822c62bb8f84b4ae6d21c; merge tree equals the head tree). The designated approval and required-check facts of PR #72 are not evidenced in this repository and are not claimed; closure (DL-ENG-2 G4) waits for the owner-supplied approval facts."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run p2:application-shell:test",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "bash .github/scripts/rosuno-guard.sh ccffac6246c0550f39d0dcf41e00381f4c760f28 HEAD wi/P2-005-authentication-entry-v3 refs/rosuno/approved"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository code only; no migration or database effect. A defect is corrected by forward commits under a separately authorized work item; merged history is never rewritten.",
+      "created_at": "2026-11-17T01:40:55Z",
+      "updated_at": "2026-11-17T01:40:55Z"
+    },
+    {
+      "work_item_id": "WI-P2-006-CLIENT-REGISTRATION",
+      "title": "P2-006 Client Registration and email confirmation (Option A, v2)",
+      "objective": "Register entry of the P2-006 v2 Packet (docs/work-items/P2-006/PACKET.md, Git blob 59d9ddb156573cf41cf442e0b4edc20b20ce4abf, SHA-256 dcb454d8fe1cc277a1a8b9084a9faa16070cba50db977fec9af2779e162d2d98), recorded from repository evidence in the MVP-001 S1 records (Packet REC-1) because no register entry was made when it merged. Client-first registration only: server-side D-01 validation, isolated privileged Admin account creation with a pending User and Client Profile pair, token-hash email confirmation by deliberate POST, conditional activation and a trusted Client-principal source; a missing, unavailable or denying abuse-control decision refuses registration before any privileged write.",
+      "in_scope": [
+        "The thirteen Packet ALLOWED_SCOPE paths: apps/web/app/sign-up/page.tsx, apps/web/app/sign-up/actions.ts, apps/web/app/auth/confirm/route.ts, apps/web/src/application/client-registration.ts, apps/web/src/infrastructure/identity/registration-provisioning.ts, apps/web/src/infrastructure/identity/client-principal-source.ts, apps/web/app/sign-in/page.tsx, apps/web/app/page.tsx, apps/web/tests/client-registration.test.mjs, apps/web/tests/client-principal-source.test.mjs, apps/web/tests/authentication-entry.test.mjs, apps/web/tests/application-shell.test.mjs and apps/web/tests/design-system.test.mjs.",
+        "Packet commit 0709fb3cd0a1ccec2813e80ff40e5dfc847bcff8 and implementation commit 35b36dca872212b54dba2873265c461410578b1f on branch wi/P2-006-client-registration-v2, base 5245fc23a1975ef8b468a9636d66f6768d7c70b4."
+      ],
+      "out_of_scope": [
+        "Attorney or Staff profiles, roles and capability grants; Supabase Auth settings, confirmation template, redirect or SMTP configuration; the later Staging live gate; registration activation and the trusted-ingress contract.",
+        "Migrations, schema, RLS, database or provider contact, Production, OLD Supabase, deployment and every FORBIDDEN_SCOPE path (Packet MIGRATIONS: none; REAL_DATABASE_CONTACT: NO; PRODUCTION: NO)."
+      ],
+      "status": "in_progress",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "MASTER-BLUEPRINT-V1-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED"
+      ],
+      "decision_refs": [],
+      "dependencies": [
+        "WI-P2-002-DESIGN-SYSTEM",
+        "WI-P2-003-SECURITY-SHELL",
+        "WI-P2-004-AUTHENTICATION-SESSION-FOUNDATION",
+        "WI-P2-005-EXISTING-ACCOUNT-AUTHENTICATION-ENTRY"
+      ],
+      "acceptance_criteria": [
+        "The owner-adopted D-01 rule (at least 15 Unicode code points, no emoji, exact Confirm Password match) is enforced server-side before an isolated auth.admin.createUser call with email_confirm false; no public auth.signUp is used.",
+        "GET /auth/confirm performs no confirmation work; a deliberate same-origin POST calls verifyOtp once with token_hash and type email and then requires fresh same-subject, email-confirmed Auth evidence; missing, mismatched or uncertain evidence grants nothing.",
+        "The pending User and Client Profile pair is created only by the validated flow and is never reconstructed on confirmation or resume; activation is a conditional update from pending_verification, and suspended, closed or unknown states are never activated.",
+        "Client context requires a confirmed Auth subject, an active User and its Client Profile through the trusted principal source; tests are deterministic and offline, with no real Auth, email, database or credential.",
+        "Merged to owner main through PR #73, two-parent merge commit cddb59e19a6cc69d1f9c4ee590698509bbadbe98 (committed 2026-10-17T11:26:11Z; parents 5245fc23a1975ef8b468a9636d66f6768d7c70b4 and 35b36dca872212b54dba2873265c461410578b1f; merge tree equals the head tree). The designated approval and required-check facts of PR #73 are not evidenced in this repository and are not claimed; closure (DL-ENG-2 G4) waits for the owner-supplied approval facts."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run p2:application-shell:test",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Repository code only; no migration or database effect. A defect is corrected by forward commits under a separately authorized work item; merged history is never rewritten.",
+      "created_at": "2026-11-17T01:40:55Z",
+      "updated_at": "2026-11-17T01:40:55Z"
     }
   ]
 }
