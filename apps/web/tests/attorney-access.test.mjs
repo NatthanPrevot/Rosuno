@@ -1141,11 +1141,20 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
   // Fixed destinations only: the P3-003 professional setup, linked once,
   // from the granted state, the home page, the existing sign-in, and the
   // P3-002 attorney application entry, linked once, from the refusal state.
+  // MVP-001 S4 admits exactly one more: the attorney's schedule, linked once,
+  // from the granted state (that page decides its own access).
   assert.deepEqual(
     [...new Set([...code.matchAll(/href="([^"]*)"/g)].map((m) => m[1]))],
-    ["/attorney/professional", "/", "/sign-in", "/attorney/apply"],
+    [
+      "/attorney/professional",
+      "/attorney/schedule",
+      "/",
+      "/sign-in",
+      "/attorney/apply",
+    ],
   );
   assert.equal(code.match(/href="\/attorney\/professional"/g).length, 1);
+  assert.equal(code.match(/href="\/attorney\/schedule"/g).length, 1);
   assert.equal(code.match(/href="\/attorney\/apply"/g).length, 1);
   assert.doesNotMatch(code, /href=\{/);
   // Design-system primitives and native table structure only.
@@ -1368,13 +1377,28 @@ const APPLICATION_ENTRY_LINK =
   '<a class="rs-button" data-variant="secondary" href="/attorney/apply">Attorney application</a>';
 const REFUSAL_TITLE = "Attorney workspace not available";
 
+// MVP-001 S4: the one fixed link the granted page offers to the attorney's
+// schedule (which decides its own access), in exactly this form. It is the
+// only scheduling wording the workspace route admits, and only on its granted
+// page; every other state still advertises no scheduling.
+const SCHEDULE_LINK =
+  '<a class="rs-button" data-variant="secondary" href="/attorney/schedule">Schedule</a>';
+const GRANTED_TITLE = "Restricted attorney workspace";
+
 function assertFrame(html, title, name) {
   if (title === REFUSAL_TITLE) {
+    assert.equal(html.includes("/attorney/schedule"), false, name);
     assert.equal(html.split(APPLICATION_ENTRY_LINK).length, 2, name);
     assertFrameOf(html.replace(APPLICATION_ENTRY_LINK, ""), title, name);
     return;
   }
   assert.equal(html.includes("/attorney/apply"), false, name);
+  if (title === GRANTED_TITLE) {
+    assert.equal(html.split(SCHEDULE_LINK).length, 2, name);
+    assertFrameOf(html.replace(SCHEDULE_LINK, ""), title, name);
+    return;
+  }
+  assert.equal(html.includes("/attorney/schedule"), false, name);
   assertFrameOf(html, title, name);
 }
 
@@ -1443,7 +1467,11 @@ test("14. the route renders a restricted entry for each admitted stage that keep
     );
     assert.equal(html.match(/data-tone="success"/g).length, 2, stage);
     assert.ok(text.includes("Access is not verification"), stage);
-    assert.deepEqual(hrefsOf(html), ["/attorney/professional", "/"], stage);
+    assert.deepEqual(
+      hrefsOf(html),
+      ["/attorney/professional", "/attorney/schedule", "/"],
+      stage,
+    );
   }
 });
 

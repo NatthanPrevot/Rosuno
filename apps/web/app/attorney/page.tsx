@@ -12,7 +12,8 @@
 // Profile lifecycle stage, professional verification, and current eligibility
 // apart: this page establishes no verification and determines no
 // eligibility, and points to the professional setup (P3-003), which shows
-// claims, evidence status, and recorded determinations separately. Refused
+// claims, evidence status, and recorded determinations separately, and to
+// the schedule (MVP-001 S4), which decides its own access. Refused
 // and unavailable requests each see one fixed message and no profile data;
 // every refusal also offers the same fixed link to the attorney application
 // entry (P3-002), which decides afresh on its own.
@@ -142,6 +143,9 @@ export default async function AttorneyWorkspacePage() {
         <Cluster>
           <ButtonLink variant="primary" href="/attorney/professional">
             Professional setup
+          </ButtonLink>
+          <ButtonLink variant="secondary" href="/attorney/schedule">
+            Schedule
           </ButtonLink>
           <ButtonLink variant="tertiary" href="/">
             Return to the home page
