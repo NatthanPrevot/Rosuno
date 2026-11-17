@@ -2806,13 +2806,31 @@ const JOB_WORKER_RPCS = Object.freeze({
   job_fail:
     'await admin\n          .rpc("job_fail", {\n            p_job_id: jobId,\n            p_worker: workerId,\n            p_error_code: errorCode,\n            p_error_message: errorMessage,\n          })\n          .abortSignal(AbortSignal.timeout(JOB_CALL_DEADLINE_MS));',
 });
+// MVP-001 S2 (PS-A4): the privileged module's only further calls are the
+// four fixed authentication-abuse decision functions, each exactly once, as a
+// literal call on its own privileged client, with exactly its named arguments
+// and a deadline; no other file names them.
+const AUTHENTICATION_ABUSE_RPCS = Object.freeze({
+  authentication_abuse_reserve:
+    'await admin\n          .rpc("authentication_abuse_reserve", {\n            p_purpose: purpose,\n            p_identity_digest: digests.identity,\n            p_identity_max: limits.identityMax,\n            p_identity_window_seconds: limits.identityWindowSeconds,\n            p_global_digest: digests.global,\n            p_global_max: limits.globalMax,\n            p_global_window_seconds: limits.globalWindowSeconds,\n          })\n          .abortSignal(AbortSignal.timeout(ABUSE_CALL_DEADLINE_MS));',
+  authentication_abuse_record_failure:
+    'await admin\n          .rpc("authentication_abuse_record_failure", {\n            p_identity_digest: digests.identity,\n            p_identity_window_seconds: limits.identityWindowSeconds,\n            p_global_digest: digests.global,\n            p_global_window_seconds: limits.globalWindowSeconds,\n            p_suspicious_threshold: threshold,\n          })\n          .abortSignal(AbortSignal.timeout(ABUSE_CALL_DEADLINE_MS));',
+  authentication_abuse_record_success:
+    'await admin\n          .rpc("authentication_abuse_record_success", {\n            p_identity_digest: identityDigest,\n            p_identity_window_seconds: identityWindowSeconds,\n            p_suspicious_threshold: threshold,\n            p_auth_user_id: accountId,\n          })\n          .abortSignal(AbortSignal.timeout(ABUSE_CALL_DEADLINE_MS));',
+  authentication_abuse_report_unavailable:
+    'await admin\n          .rpc("authentication_abuse_report_unavailable", {\n            p_purpose: purpose,\n            p_failure_kind: failure,\n          })\n          .abortSignal(AbortSignal.timeout(ABUSE_CALL_DEADLINE_MS));',
+});
 const CAPABILITY_PREDICATE_RPC =
   'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';
 const CONFIGURATION_REQUEST_CLIENT =
   "const client: RequestClient | null = await withinDeadline(\n      clientSource,\n      null,\n      deadlineMs,\n    );";
 const RPC_OCCURRENCES = Object.freeze({
-  // The quota decision and (MVP-001 S2) the three job worker calls.
-  [PRIVILEGED_MODULE]: 1 + Object.keys(JOB_WORKER_RPCS).length,
+  // The quota decision and (MVP-001 S2) the three job worker calls and the
+  // four authentication-abuse decision calls.
+  [PRIVILEGED_MODULE]:
+    1 +
+    Object.keys(JOB_WORKER_RPCS).length +
+    Object.keys(AUTHENTICATION_ABUSE_RPCS).length,
   // MVP-001 S1: the staff adapter's second RPC is exactly the PS-A2
   // environment accessor, pinned by name below.
   [STAFF_ADAPTER]: 2,
@@ -2866,7 +2884,10 @@ function assertQuotaRpcContract(codes) {
       file === PRIVILEGED_MODULE ? 1 : 0,
       file,
     );
-    for (const [name, call] of Object.entries(JOB_WORKER_RPCS)) {
+    for (const [name, call] of [
+      ...Object.entries(JOB_WORKER_RPCS),
+      ...Object.entries(AUTHENTICATION_ABUSE_RPCS),
+    ]) {
       assert.equal(
         code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
         file === PRIVILEGED_MODULE ? 1 : 0,
@@ -2936,20 +2957,21 @@ function assertQuotaRpcContract(codes) {
     provisioning,
     /\nconst DIGEST = \/\^\[0-9a-f\]\{64\}\$\/;\n\nfunction isDigest\(value: unknown\): value is string \{\n {2}return typeof value === "string" && DIGEST\.test\(value\);\n\}\n\nfunction isMaximum\(value: unknown\): value is number \{\n {2}return Number\.isSafeInteger\(value\) && \(value as number\) >= 1;\n\}\n/,
   );
-  // Six privileged clients (Admin provisioning, the P3-002
+  // Seven privileged clients (Admin provisioning, the P3-002
   // attorney-applicant provisioning, the P3-003 professional and staff
-  // verification provisioning, the quota decision, and the MVP-001 S2
-  // operational job worker) and one publishable client (the confirmation
-  // request), each built only from the verified binding.
+  // verification provisioning, the quota decision, the MVP-001 S2
+  // operational job worker, and the MVP-001 S2 authentication-abuse
+  // decisions) and one publishable client (the confirmation request), each
+  // built only from the verified binding.
   assert.equal(
     provisioning.match(
       /\bcreate\(binding\.url, binding\.adminKey, clientOptions\(\)\)/g,
     ).length,
-    6,
+    7,
   );
-  assert.equal(provisioning.match(/\bcreate\(/g).length, 7);
+  assert.equal(provisioning.match(/\bcreate\(/g).length, 8);
   assert.equal(provisioning.match(/\bbinding\.publishableKey\b/g).length, 1);
-  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 6);
+  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 7);
   // The worker port is built exactly like the other ports: the verified
   // binding first, then its one cookie-free privileged client, never
   // returned; it offers exactly the three worker calls and nothing else.
@@ -2972,6 +2994,35 @@ function assertQuotaRpcContract(codes) {
     worker,
     /\.from\(|\.insert\(|\.update\(|\.upsert\(|\.delete\(|auth\.admin|job_enqueue|job_cancel_for_subject|operational_jobs|return admin\b|admin[,;)]|process\.env|\.\.\./,
   );
+  // MVP-001 S2 (PS-A4): the authentication-abuse port is built the same
+  // way, sits in its own section before the worker port, offers exactly its
+  // four decision calls, and never reads or writes a table, an Auth
+  // account, or the counters directly.
+  const abuseStart = provisioning.indexOf(
+    "export async function createAuthenticationAbusePort(",
+  );
+  assert.ok(abuseStart > 0 && abuseStart < workerStart);
+  const abuse = provisioning.slice(abuseStart, workerStart);
+  assert.match(
+    abuse,
+    /\): Promise<AuthenticationAbusePort \| null> \{\n {2}const binding = readProjectBinding\(environment\);\n {2}if \(binding === null\) \{\n {4}return null;\n {2}\}\n {2}const admin = create\(binding\.url, binding\.adminKey, clientOptions\(\)\);\n {2}return Object\.freeze\(\{\n {4}reserve: async /,
+  );
+  assert.deepEqual(
+    [...abuse.matchAll(/^ {4}(\w+): async /gm)].map((match) => match[1]),
+    ["reserve", "recordFailure", "recordSuccess", "reportUnavailable"],
+  );
+  assert.equal(abuse.match(/\.rpc\(/g).length, 4);
+  assert.equal(
+    abuse.match(
+      /\.abortSignal\(AbortSignal\.timeout\(ABUSE_CALL_DEADLINE_MS\)\)/g,
+    ).length,
+    4,
+  );
+  assert.match(provisioning, /^const ABUSE_CALL_DEADLINE_MS = 2000;$/m);
+  assert.doesNotMatch(
+    abuse,
+    /\.from\(|\.insert\(|\.update\(|\.upsert\(|\.delete\(|auth\.admin|authentication_abuse_counters|audit_events|return admin\b|admin[,;)]|process\.env|\.\.\./,
+  );
 }
 
 // The exact export list: the original three, the one narrow quota
@@ -2992,6 +3043,8 @@ function assertPrivilegedExports(provisioning) {
       "createRegistrationProvisioning",
       "createConfirmationDispatch",
       "hasPrivilegedProjectBinding",
+      // MVP-001 S2: the one narrow authentication-abuse decision capability.
+      "createAuthenticationAbusePort",
       "createJobWorkerPort",
       "createAttorneyProfessionalProvisioning",
       "createStaffVerificationProvisioning",
@@ -2999,7 +3052,7 @@ function assertPrivilegedExports(provisioning) {
       "decideQuotaRpc",
     ],
   );
-  assert.equal(provisioning.match(/\bexport\b/g).length, 9);
+  assert.equal(provisioning.match(/\bexport\b/g).length, 10);
   // The binding check returns only whether a binding exists.
   assert.match(
     provisioning,
@@ -3066,6 +3119,8 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
           "src/infrastructure/professional/attorney-professional-adapter.ts",
           "src/infrastructure/staff/staff-verification-adapter.ts",
           "src/infrastructure/jobs/job-worker-adapter.ts",
+          // MVP-001 S2: the server-only authentication-abuse control.
+          "src/infrastructure/identity/authentication-abuse-control.ts",
         ].includes(file),
         file,
       );
@@ -3094,6 +3149,9 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
       "@supabase/supabase-js",
       "../../application/attorney-application.ts",
       "../../application/attorney-professional.ts",
+      // MVP-001 S2: the authentication-abuse port's type, its argument
+      // checks, and its strict answer readers.
+      "../../application/authentication-abuse-control.ts",
       "../../application/client-registration.ts",
       // MVP-001 S2: the worker port's type and its strict answer readers.
       "../../application/job-worker.ts",
@@ -3152,6 +3210,27 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
       code.replace(
         "return error === null ? data : undefined;\n}\n",
         "return admin;\n}\n",
+      ),
+    ),
+    // MVP-001 S2 (PS-A4): the abuse decision calls are pinned the same way.
+    "abuse call in the control adapter": variant(
+      "src/infrastructure/identity/authentication-abuse-control.ts",
+      (code) =>
+        `${code}\nconst again = (admin) => admin.rpc("authentication_abuse_reserve", {});\n`,
+    ),
+    "dynamic abuse rpc target": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace('.rpc("authentication_abuse_reserve", {', ".rpc(target, {"),
+    ),
+    "extra abuse argument": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "            p_failure_kind: failure,\n",
+        "            p_failure_kind: failure,\n            p_window_seconds: 900,\n",
+      ),
+    ),
+    "abuse call without a deadline": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "            p_auth_user_id: accountId,\n          })\n          .abortSignal(AbortSignal.timeout(ABUSE_CALL_DEADLINE_MS));",
+        "            p_auth_user_id: accountId,\n          });",
       ),
     ),
   };

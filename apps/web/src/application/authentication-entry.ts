@@ -8,7 +8,25 @@
 // result code. It keeps no credential beyond the call, holds no module-level
 // mutable state, and never decides a profile, role, capability, or any
 // business question: an authenticated session is only that.
+//
+// MVP-001 S2 (PS-A4 sections 3 and 4): every submission that passes
+// validation is reserved through the request's authentication-abuse control
+// before the provider is asked, whether or not the account exists. A
+// throttled attempt gets one fixed result and reaches no provider. An
+// unavailable protection follows the owner's recorded sign-in policy
+// (configuration: refused; runtime: permitted, and reported). After a
+// protected attempt, a rejection is counted, and a confirmed sign-in is
+// judged; a suspicious sign-in ends the account's other sessions, keeping
+// only the new one, and is reported. Neither changes the result.
 
+import {
+  abuseControlOf,
+  protectAttempt,
+  reportProtectionUnavailable,
+  reportSuspiciousLogin,
+  SIGN_IN_UNAVAILABLE_POLICY,
+  type AuthenticationAbuseControl,
+} from "./authentication-abuse-control.ts";
 import {
   readFormFields,
   type FieldErrors,
@@ -51,14 +69,21 @@ export type SessionRead =
 // deny and never enough to prove that a session ended. Neither proves that
 // the response carrying those updates reached the browser: the next request
 // shows what it did receive.
+//
+// abuseControl is the request's authentication-abuse control for sign-in.
+// signOutOtherSessions resolves true only when the provider reports that it
+// ended every other session of the signed-in account, keeping the current
+// one; it is asked only after a confirmed sign-in judged suspicious.
 export type AuthenticationProvider = {
   readonly signInWithPassword: (
     submitted: SignInCredentials,
   ) => Promise<PasswordSignInOutcome>;
   readonly signOut: () => Promise<boolean>;
+  readonly signOutOtherSessions: () => Promise<boolean>;
   readonly issuedSession: () => Promise<SessionRead>;
   readonly storedSession: () => Promise<SessionRead>;
   readonly session: ServerSessionSource;
+  readonly abuseControl: AuthenticationAbuseControl;
 };
 
 // Builds the provider for the current request, or reports null when the
@@ -69,11 +94,14 @@ export type AuthenticationProviderSource =
 // "signed-in" and "signed-out" mean the request's stored session state was
 // verified, read afresh, to hold exactly the issued session or none at all.
 // They do not mean the browser received the response; the next request reads
-// whatever it did receive through the trusted boundary.
+// whatever it did receive through the trusted boundary. "throttled" means too
+// many attempts were made for this address or in total; nothing was asked of
+// the provider, and the result is the same whether or not an account exists.
 export type SignInState =
   | { readonly status: "idle" }
   | { readonly status: "invalid"; readonly fieldErrors: FieldErrors }
   | { readonly status: "rejected" }
+  | { readonly status: "throttled" }
   | { readonly status: "unavailable" }
   | { readonly status: "uncertain" }
   | { readonly status: "signed-in" };
@@ -86,6 +114,7 @@ export const INITIAL_SIGN_IN_STATE: SignInState = Object.freeze({
 });
 
 const REJECTED: SignInState = Object.freeze({ status: "rejected" });
+const THROTTLED: SignInState = Object.freeze({ status: "throttled" });
 const UNAVAILABLE: SignInState = Object.freeze({ status: "unavailable" });
 // Sign-in failed, and a session it may have started could not be shown to be
 // gone: this browser may still be signed in.
@@ -252,6 +281,95 @@ async function discardSession(
   return (await isConfirmedAnonymous(provider)) ? "cleared" : "unverified";
 }
 
+// The request's abuse control as handed in; a read that throws gives nothing.
+function abuseControlIn(provider: AuthenticationProvider): unknown {
+  try {
+    return provider.abuseControl;
+  } catch {
+    return null;
+  }
+}
+
+// The opaque account id the trusted server boundary reports for the stored
+// state, or null when the read fails or finds no authenticated request.
+async function signedInAccountOf(
+  provider: AuthenticationProvider,
+): Promise<string | null> {
+  try {
+    const session = await resolveSession(provider.session);
+    return session.status === "authenticated" ? session.subject : null;
+  } catch {
+    return null;
+  }
+}
+
+// Whether the provider reports that it ended the account's other sessions.
+async function endOtherSessions(
+  provider: AuthenticationProvider,
+): Promise<boolean> {
+  try {
+    return (await provider.signOutOtherSessions()) === true;
+  } catch {
+    return false;
+  }
+}
+
+// Counts a protected attempt the provider rejected. A count that fails is a
+// runtime protection failure: the attempt stays rejected, and it is reported.
+async function recordRejection(
+  provider: AuthenticationProvider,
+  email: string,
+): Promise<void> {
+  const control = abuseControlOf(abuseControlIn(provider));
+  if (control === null) {
+    return;
+  }
+  let signal: unknown;
+  try {
+    signal = await control.recordFailure(email);
+  } catch {
+    signal = undefined;
+  }
+  if (signal === "suspicious") {
+    await reportSuspiciousLogin(control, "failed_attempt");
+  } else if (signal !== "recorded") {
+    await reportProtectionUnavailable(control, "runtime", "permitted");
+  }
+}
+
+// Judges a protected, confirmed sign-in. A suspicious one ends the account's
+// other sessions, keeping the one just issued, and is reported. A judgement
+// that cannot be made is a runtime protection failure, and it is reported.
+// The sign-in stands either way.
+async function judgeSignIn(
+  provider: AuthenticationProvider,
+  email: string,
+): Promise<void> {
+  const control = abuseControlOf(abuseControlIn(provider));
+  if (control === null) {
+    return;
+  }
+  const account = await signedInAccountOf(provider);
+  let signal: unknown;
+  if (account !== null) {
+    try {
+      signal = await control.recordSuccess(email, account);
+    } catch {
+      signal = undefined;
+    }
+  }
+  if (signal === "suspicious") {
+    await reportSuspiciousLogin(
+      control,
+      (await endOtherSessions(provider))
+        ? "other_sessions_ended"
+        : "other_sessions_not_ended",
+    );
+  } else if (signal !== "recorded") {
+    await reportProtectionUnavailable(control, "runtime", "permitted");
+  }
+}
+
 // The failure result after an attempt that may have started a session: plain
 // unavailability only when that session is confirmed gone.
 async function failAfterPossibleSession(
@@ -277,6 +395,18 @@ export async function signInExistingAccount(
   if (provider === null) {
     return UNAVAILABLE;
   }
+  const { email } = validation.value;
+  const protection = await protectAttempt(
+    abuseControlIn(provider),
+    email,
+    SIGN_IN_UNAVAILABLE_POLICY,
+  );
+  if (protection === "throttle") {
+    return THROTTLED;
+  }
+  if (protection === "refused") {
+    return UNAVAILABLE;
+  }
   let outcome: unknown;
   try {
     outcome = await provider.signInWithPassword(validation.value);
@@ -285,6 +415,9 @@ export async function signInExistingAccount(
     return failAfterPossibleSession(provider);
   }
   if (outcome === "rejected") {
+    if (protection === "allow") {
+      await recordRejection(provider, email);
+    }
     return REJECTED;
   }
   if (outcome === "unavailable") {
@@ -293,6 +426,9 @@ export async function signInExistingAccount(
   // Acceptance is reported only once the stored state is verified to hold
   // the session the provider issued.
   if (outcome === "accepted" && (await isConfirmedSignIn(provider))) {
+    if (protection === "allow") {
+      await judgeSignIn(provider, email);
+    }
     return SIGNED_IN;
   }
   return failAfterPossibleSession(provider);

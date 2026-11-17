@@ -41,6 +41,12 @@ export type LogFields = {
   readonly escalated?: number;
   readonly superseded?: number;
   readonly unconfirmed?: number;
+  // MVP-001 S2 (PS-A4 section 4): the purpose of an authentication-abuse
+  // protection, the kind of its failure, and whether the database confirmed
+  // the audit write of an unavailable report. Each is one fixed word.
+  readonly purpose?: "sign_in" | "recovery";
+  readonly failureKind?: "configuration" | "runtime";
+  readonly auditPersistence?: "persisted" | "not_persisted";
 };
 
 export type LogSink = (level: LogLevel, line: string) => void;
@@ -84,6 +90,12 @@ const FIELD_SHAPES: ReadonlyArray<
   ["escalated", isCount],
   ["superseded", isCount],
   ["unconfirmed", isCount],
+  ["purpose", (value) => value === "sign_in" || value === "recovery"],
+  ["failureKind", (value) => value === "configuration" || value === "runtime"],
+  [
+    "auditPersistence",
+    (value) => value === "persisted" || value === "not_persisted",
+  ],
 ]);
 
 // A count of jobs in one worker batch: a whole number from 0 to 1000.

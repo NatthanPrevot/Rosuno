@@ -1395,6 +1395,13 @@ function probes() {
           "attorney_save_profile_details:v",
           "attorney_start_application:v",
           "attorney_submit_application:v",
+          // MVP-001 S2 re-pin (20261118040000, PS-A4): the authentication-
+          // abuse decision functions (service_role only), which write only
+          // their own counters and security audit events, no M4 relation.
+          "authentication_abuse_record_failure:v",
+          "authentication_abuse_record_success:v",
+          "authentication_abuse_report_unavailable:v",
+          "authentication_abuse_reserve:v",
           // MVP-001 S1 re-pin (20261117030000): the staff read predicates for
           // the configuration row policies, which write nothing.
           "capability_admin_may_read_user:s",

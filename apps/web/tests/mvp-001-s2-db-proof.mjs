@@ -13,7 +13,7 @@
 // auth.uid() that reads request.jwt.claim.sub), the hosted platform's default
 // privileges, and a no-op public.rls_auto_enable() are synthetic objects of
 // this cluster only. Every migration is applied unmodified, in order, each in
-// one transaction; the three S2 migrations must be registered in the
+// one transaction; the four S2 migrations must be registered in the
 // migration register. This cluster has no pg_cron, so the scheduler
 // migration must apply as a no-op.
 //
@@ -29,15 +29,18 @@
 // pending jobs surviving a restart, the sweeper, staff administration
 // (capability, aal2, audit), privileges, and session assurance for every
 // staff and attorney authority helper (aal1 and claim-less sessions are
-// refused as unauthorized callers; client functions are unaffected). No
-// Supabase project, network service, or pre-existing cluster is contacted,
+// refused as unauthorized callers; client functions are unaffected), and the
+// PS-A4 authentication-abuse counters (ABUSE-*: privileges, constraints,
+// concurrent reservations that never overspend, identity and global
+// dimensions, aligned windows, security events, pruning, and bypass
+// attempts). No Supabase project, network service, or pre-existing cluster is contacted,
 // nothing persists after the run, and every value is synthetic test data.
 // The JSON report goes to stdout; exit 0 means PASS, 1 FAIL, 2 cleanup
 // failure.
 
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -60,6 +63,8 @@ const S2_MIGRATIONS = Object.freeze([
   "20261118010000_mvp_001_s2_operational_jobs.sql",
   "20261118020000_mvp_001_s2_job_scheduler.sql",
   "20261118030000_mvp_001_s2_session_assurance.sql",
+  // PS-A4: the authentication-abuse counters and decision functions.
+  "20261118040000_mvp_001_s2_authentication_abuse_control.sql",
 ]);
 const CAPABILITIES = Object.freeze([
   "authorize_jurisdiction_launch",
@@ -371,7 +376,9 @@ function applyMigrations() {
   assert.deepEqual(files.slice(s1, s1 + 4), [...S1_MIGRATIONS]);
   const s2 = files.indexOf(S2_MIGRATIONS[0]);
   assert.equal(s2, s1 + 4, "S2 migrations follow S1");
-  assert.deepEqual(files.slice(s2, s2 + 3), [...S2_MIGRATIONS]);
+  assert.deepEqual(files.slice(s2, s2 + S2_MIGRATIONS.length), [
+    ...S2_MIGRATIONS,
+  ]);
   for (const file of files.slice(s1)) {
     assert.ok(
       registered.has(`supabase/migrations/${file}`),
@@ -778,7 +785,7 @@ async function check(name, body) {
 
 async function migrationChecks() {
   await check(
-    "MIG-1 the three S2 migrations apply after S1 and are registered; without pg_cron the scheduler migration applies cleanly as a no-op (no extension, no cron schema, no schedule)",
+    "MIG-1 the four S2 migrations apply after S1, in order, and are registered; without pg_cron the scheduler migration applies cleanly as a no-op (no extension, no cron schema, no schedule)",
     () => {
       assert.equal(
         sql("select count(*) from pg_extension where extname = 'pg_cron';"),
@@ -2168,6 +2175,1234 @@ async function assuranceChecks() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// PS-A4 authentication-abuse counters (ABUSE-*)
+// ---------------------------------------------------------------------------
+
+const ABUSE_TABLE = "public.authentication_abuse_counters";
+const ABUSE_DECISIONS = Object.freeze([
+  "authentication_abuse_reserve(text, text, integer, integer, text, integer, integer)",
+  "authentication_abuse_record_failure(text, integer, text, integer, integer)",
+  "authentication_abuse_record_success(text, integer, integer, uuid)",
+  "authentication_abuse_report_unavailable(text, text)",
+]);
+const ABUSE_HELPERS = Object.freeze([
+  "authentication_abuse_window_start(timestamp with time zone, integer)",
+  "authentication_abuse_audit(text, text, uuid, jsonb, text, timestamp with time zone)",
+  "authentication_abuse_current_attempts(text, text, text, timestamp with time zone, timestamp with time zone, timestamp with time zone)",
+  "authentication_abuse_mark_throttled(text, text, text, timestamp with time zone, integer, timestamp with time zone)",
+]);
+const DECISION_CONFIG =
+  "true|search_path=pg_catalog, pg_temp;lock_timeout=1s;statement_timeout=1500ms|postgres";
+
+// A fresh opaque digest: 64 lowercase hexadecimal characters.
+const digest = () => randomBytes(32).toString("hex");
+
+function reserveStatement(
+  purpose,
+  identity,
+  identityMax,
+  identityWindow,
+  global,
+  globalMax,
+  globalWindow,
+) {
+  return `select public.authentication_abuse_reserve(${lit(purpose)}, ${lit(identity)}, ${identityMax}, ${identityWindow}, ${lit(global)}, ${globalMax}, ${globalWindow});`;
+}
+
+// One reservation by the server-only credential: its answer or "ERROR <state>".
+function reserveAs(role, ...args) {
+  return as(
+    role,
+    role === "authenticated" ? world.client.auth : null,
+    reserveStatement(...args),
+  );
+}
+
+function reserve(...args) {
+  return reserveAs("service_role", ...args);
+}
+
+function recordFailure(
+  identity,
+  identityWindow,
+  global,
+  globalWindow,
+  threshold,
+) {
+  return as(
+    "service_role",
+    null,
+    `select public.authentication_abuse_record_failure(${lit(identity)}, ${identityWindow}, ${lit(global)}, ${globalWindow}, ${threshold});`,
+  );
+}
+
+function recordSuccess(identity, identityWindow, threshold, authUser) {
+  return as(
+    "service_role",
+    null,
+    `select public.authentication_abuse_record_success(${lit(identity)}, ${identityWindow}, ${threshold}, ${lit(authUser)}::uuid);`,
+  );
+}
+
+function reportUnavailable(purpose, kind) {
+  return as(
+    "service_role",
+    null,
+    `select public.authentication_abuse_report_unavailable(${lit(purpose)}, ${lit(kind)});`,
+  );
+}
+
+function counterRows(purpose, dimension, digestValue) {
+  return JSON.parse(
+    sql(
+      `select coalesce(jsonb_agg(to_jsonb(c) order by c.window_start), '[]'::jsonb) from ${ABUSE_TABLE} as c where c.purpose = ${lit(purpose)} and c.dimension = ${lit(dimension)} and c.digest = ${lit(digestValue)};`,
+    ),
+  );
+}
+
+function securityAudits(action) {
+  return JSON.parse(
+    sql(
+      `select coalesce(jsonb_agg(jsonb_build_object('actor_user_id', a.actor_user_id, 'actor_type', a.actor_type, 'resource_type', a.resource_type, 'resource_id', a.resource_id, 'reason_code', a.reason_code, 'before', a.before_snapshot, 'after', a.after_snapshot, 'policy_references', a.policy_references, 'jurisdiction_id', a.jurisdiction_id) order by a.occurred_at, a.id), '[]'::jsonb) from public.audit_events as a where a.action_code = ${lit(action)};`,
+    ),
+  );
+}
+
+function windowStartNow(seconds) {
+  return sql(
+    `select public.authentication_abuse_window_start(clock_timestamp(), ${seconds})::text;`,
+  );
+}
+
+// Runs a body whose counts must all fall in one window of the given length;
+// a body that straddles a window boundary is run again with fresh digests.
+async function inOneWindow(seconds, body) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const before = windowStartNow(seconds);
+    const result = await body();
+    if (windowStartNow(seconds) === before) {
+      return result;
+    }
+  }
+  throw new Error(`three runs straddled a ${seconds} s window boundary`);
+}
+
+// Parallel reservations, each its own psql process and transaction.
+async function parallelReserves(count, argsFor) {
+  const results = await Promise.all(
+    Array.from({ length: count }, (_, index) =>
+      runAsync(
+        [
+          "begin;",
+          "set local role service_role;",
+          reserveStatement(...argsFor(index)),
+          "commit;",
+          "",
+        ].join("\n"),
+      ),
+    ),
+  );
+  return results.map((result) =>
+    result.status === 0
+      ? result.out.trim().split("\n").at(-1)
+      : `ERROR ${sqlstateOf(result.err)}`,
+  );
+}
+
+const tally = (answers) =>
+  answers.reduce((counts, answer) => {
+    counts[answer] = (counts[answer] ?? 0) + 1;
+    return counts;
+  }, {});
+
+async function abuseChecks() {
+  await check(
+    "ABUSE-1 authentication_abuse_counters has exactly the PS-A4 columns, primary key, checks and no foreign key; row level security with no policy; no privilege for anon, authenticated, service_role or PUBLIC, so every direct read or write is refused",
+    () => {
+      assert.equal(
+        sql(
+          `select string_agg(column_name || ':' || data_type || ':' || is_nullable || ':' || coalesce(column_default, ''), ',' order by ordinal_position) from information_schema.columns where table_schema = 'public' and table_name = 'authentication_abuse_counters';`,
+        ),
+        [
+          "purpose:text:NO:",
+          "dimension:text:NO:",
+          "digest:text:NO:",
+          "window_start:timestamp with time zone:NO:",
+          "window_end:timestamp with time zone:NO:",
+          "expires_at:timestamp with time zone:NO:",
+          "attempt_count:integer:NO:",
+          "failure_count:integer:NO:",
+          "created_at:timestamp with time zone:NO:statement_timestamp()",
+          "updated_at:timestamp with time zone:NO:statement_timestamp()",
+        ].join(","),
+      );
+      assert.equal(
+        sql(
+          `select string_agg(conname || ':' || contype::text, ',' order by conname) from pg_constraint where conrelid = '${ABUSE_TABLE}'::regclass;`,
+        ),
+        [
+          "authentication_abuse_counters_count_check:c",
+          "authentication_abuse_counters_digest_check:c",
+          "authentication_abuse_counters_dimension_check:c",
+          "authentication_abuse_counters_expiry_check:c",
+          "authentication_abuse_counters_pkey:p",
+          "authentication_abuse_counters_purpose_check:c",
+          "authentication_abuse_counters_window_check:c",
+        ].join(","),
+      );
+      assert.equal(
+        sql(
+          `select pg_get_constraintdef(oid) from pg_constraint where conname = 'authentication_abuse_counters_pkey';`,
+        ),
+        "PRIMARY KEY (purpose, dimension, digest, window_start)",
+      );
+      assert.equal(
+        sql(
+          `select count(*) from pg_constraint where contype = 'f' and (conrelid = '${ABUSE_TABLE}'::regclass or confrelid = '${ABUSE_TABLE}'::regclass);`,
+        ),
+        "0",
+      );
+      assert.equal(
+        sql(
+          `select relrowsecurity::text || relforcerowsecurity::text from pg_class where oid = '${ABUSE_TABLE}'::regclass;`,
+        ),
+        "truefalse",
+      );
+      assert.equal(
+        sql(
+          `select count(*) from pg_policy where polrelid = '${ABUSE_TABLE}'::regclass;`,
+        ),
+        "0",
+      );
+      for (const role of ["anon", "authenticated", "service_role", "public"]) {
+        for (const privilege of [
+          "SELECT",
+          "INSERT",
+          "UPDATE",
+          "DELETE",
+          "TRUNCATE",
+          "REFERENCES",
+          "TRIGGER",
+        ]) {
+          assert.equal(
+            sql(
+              `select has_table_privilege('${role}', '${ABUSE_TABLE}', '${privilege}');`,
+            ),
+            "f",
+            `${role} ${privilege}`,
+          );
+        }
+      }
+      assert.equal(
+        sql(
+          "select count(*) from information_schema.column_privileges where table_schema = 'public' and table_name = 'authentication_abuse_counters' and grantee in ('anon', 'authenticated', 'service_role', 'PUBLIC');",
+        ),
+        "0",
+      );
+      const row = `('sign_in', 'identity', '${digest()}', date_trunc('hour', now()), date_trunc('hour', now()) + interval '1 hour', date_trunc('hour', now()) + interval '25 hours', 1, 0)`;
+      for (const role of ["anon", "authenticated", "service_role"]) {
+        const sub = role === "authenticated" ? world.client.auth : null;
+        for (const statement of [
+          `select count(*) from ${ABUSE_TABLE};`,
+          `insert into ${ABUSE_TABLE} (purpose, dimension, digest, window_start, window_end, expires_at, attempt_count, failure_count) values ${row};`,
+          `update ${ABUSE_TABLE} set attempt_count = 0;`,
+          `delete from ${ABUSE_TABLE};`,
+          `truncate ${ABUSE_TABLE};`,
+        ]) {
+          assert.equal(
+            as(role, sub, statement),
+            "ERROR 42501",
+            `${role}: ${statement}`,
+          );
+        }
+      }
+      assert.equal(
+        sql(
+          `select string_agg(indexrelid::regclass::text, ',' order by indexrelid::regclass::text) from pg_index where indrelid = '${ABUSE_TABLE}'::regclass;`,
+        ),
+        "authentication_abuse_counters_expiry_idx,authentication_abuse_counters_pkey",
+      );
+      assert.equal(
+        sql(
+          `select count(*) from pg_trigger where tgrelid = '${ABUSE_TABLE}'::regclass;`,
+        ),
+        "0",
+      );
+      return { columns: 10, policies: 0, api_role_privileges: 0 };
+    },
+  );
+
+  await check(
+    "ABUSE-2 only service_role executes the four decision functions (SECURITY DEFINER, fixed search_path, lock and statement timeouts); no API role or PUBLIC executes them otherwise, and no API role executes any helper",
+    () => {
+      const exec = (role, signature) =>
+        sql(
+          `select has_function_privilege('${role}', 'public.${signature}', 'EXECUTE');`,
+        ) === "t";
+      const config = (signature) =>
+        sql(
+          `select prosecdef::text || '|' || array_to_string(proconfig, ';') || '|' || pg_get_userbyid(proowner) from pg_proc where oid = 'public.${signature}'::regprocedure;`,
+        );
+      for (const signature of ABUSE_DECISIONS) {
+        for (const role of ["anon", "authenticated", "public"]) {
+          assert.equal(exec(role, signature), false, `${role} ${signature}`);
+        }
+        assert.equal(exec("service_role", signature), true, signature);
+        assert.equal(config(signature), DECISION_CONFIG, signature);
+      }
+      for (const signature of ABUSE_HELPERS) {
+        for (const role of [
+          "anon",
+          "authenticated",
+          "service_role",
+          "public",
+        ]) {
+          assert.equal(exec(role, signature), false, `${role} ${signature}`);
+        }
+        assert.equal(
+          config(signature),
+          "false|search_path=pg_catalog|postgres",
+          signature,
+        );
+      }
+      assert.equal(
+        sql(
+          "select string_agg(proname, ',' order by proname) from pg_proc where pronamespace = 'public'::regnamespace and proname like 'authentication_abuse%';",
+        ),
+        [
+          "authentication_abuse_audit",
+          "authentication_abuse_current_attempts",
+          "authentication_abuse_mark_throttled",
+          "authentication_abuse_record_failure",
+          "authentication_abuse_record_success",
+          "authentication_abuse_report_unavailable",
+          "authentication_abuse_reserve",
+          "authentication_abuse_window_start",
+        ].join(","),
+      );
+      const id = digest();
+      const global = digest();
+      for (const role of ["anon", "authenticated"]) {
+        assert.equal(
+          reserveAs(role, "sign_in", id, 5, 900, global, 100, 3600),
+          "ERROR 42501",
+          role,
+        );
+        const sub = role === "authenticated" ? world.client.auth : null;
+        for (const statement of [
+          `select public.authentication_abuse_record_failure(${lit(id)}, 900, ${lit(global)}, 3600, 3);`,
+          `select public.authentication_abuse_record_success(${lit(id)}, 900, 3, ${lit(world.client.auth)}::uuid);`,
+          "select public.authentication_abuse_report_unavailable('sign_in', 'runtime');",
+        ]) {
+          assert.equal(
+            as(role, sub, statement),
+            "ERROR 42501",
+            `${role}: ${statement}`,
+          );
+        }
+      }
+      for (const role of ["anon", "authenticated", "service_role"]) {
+        const sub = role === "authenticated" ? world.client.auth : null;
+        for (const statement of [
+          "select public.authentication_abuse_window_start(now(), 900);",
+          `select public.authentication_abuse_mark_throttled('sign_in', 'identity', ${lit(id)}, date_trunc('hour', now()), 1, now());`,
+          `select public.authentication_abuse_current_attempts('sign_in', 'identity', ${lit(id)}, date_trunc('hour', now()), date_trunc('hour', now()) + interval '1 hour', now());`,
+          "select public.authentication_abuse_audit('security.rate_limited', 'authentication_abuse_counter', null, '{}'::jsonb, 'forged', now());",
+        ]) {
+          assert.equal(
+            as(role, sub, statement),
+            "ERROR 42501",
+            `${role}: ${statement}`,
+          );
+        }
+      }
+      assert.equal(count("authentication_abuse_counters"), 0);
+      return {
+        decisions: ABUSE_DECISIONS.length,
+        helpers: ABUSE_HELPERS.length,
+      };
+    },
+  );
+
+  await check(
+    "ABUSE-3 constraints reject a bad purpose, dimension, digest, window length or alignment, expiry, or count, and a duplicate key",
+    () => {
+      const hour = "date_trunc('hour', now())";
+      const insert = (overrides = {}) => {
+        const values = {
+          purpose: "'sign_in'",
+          dimension: "'identity'",
+          digest: lit(digest()),
+          window_start: hour,
+          window_end: `${hour} + interval '1 hour'`,
+          expires_at: `${hour} + interval '25 hours'`,
+          attempt_count: "1",
+          failure_count: "0",
+          ...overrides,
+        };
+        return `insert into ${ABUSE_TABLE} (${Object.keys(values).join(", ")}) values (${Object.values(values).join(", ")});`;
+      };
+      const rejections = [
+        [{ purpose: "'registration'" }, "23514"],
+        [{ purpose: "'SIGN_IN'" }, "23514"],
+        [{ dimension: "'ip'" }, "23514"],
+        [{ digest: lit(digest().toUpperCase()) }, "23514"],
+        [{ digest: lit(digest().slice(1)) }, "23514"],
+        [{ digest: lit(`${digest().slice(1)}g`) }, "23514"],
+        [{ digest: lit("member@synthetic.invalid") }, "23514"],
+        [
+          {
+            window_end: `${hour} + interval '10 minutes'`,
+            expires_at: `${hour} + interval '24 hours 10 minutes'`,
+          },
+          "23514",
+        ],
+        [
+          {
+            window_start: `${hour} + interval '30 minutes'`,
+            window_end: `${hour} + interval '90 minutes'`,
+            expires_at: `${hour} + interval '25 hours 30 minutes'`,
+          },
+          "23514",
+        ],
+        [
+          {
+            window_start: `${hour} + interval '1 second'`,
+            window_end: `${hour} + interval '15 minutes 1 second'`,
+            expires_at: `${hour} + interval '24 hours 15 minutes 1 second'`,
+          },
+          "23514",
+        ],
+        [
+          {
+            window_start: `${hour} + interval '1 hour'`,
+            window_end: `${hour} + interval '25 hours'`,
+            expires_at: `${hour} + interval '49 hours'`,
+          },
+          "23514",
+        ],
+        [
+          {
+            window_end: `${hour}`,
+            expires_at: `${hour} + interval '24 hours'`,
+          },
+          "23514",
+        ],
+        [{ expires_at: `${hour} + interval '24 hours'` }, "23514"],
+        [{ attempt_count: "-1", failure_count: "-1" }, "23514"],
+        [{ failure_count: "-1" }, "23514"],
+        [{ failure_count: "2" }, "23514"],
+        [{ attempt_count: "1000001" }, "23514"],
+        [{ purpose: "null" }, "23502"],
+        [{ digest: "null" }, "23502"],
+        [{ attempt_count: "null" }, "23502"],
+      ];
+      for (const [overrides, state] of rejections) {
+        assert.equal(
+          refused(insert(overrides)),
+          state,
+          JSON.stringify(overrides),
+        );
+      }
+      // The owner can write a well-formed row (the fixture path only); the
+      // same key again is a duplicate.
+      const key = lit(digest());
+      sql(
+        `begin; ${insert({ digest: key })} ${insert({ digest: key, purpose: "'recovery'" })} rollback;`,
+      );
+      assert.equal(
+        refused(`${insert({ digest: key })}\n${insert({ digest: key })}`),
+        "23505",
+      );
+      // Every allowed length at its alignment is accepted.
+      sql(
+        `begin;
+         ${insert({ window_start: "date_trunc('day', now())", window_end: "date_trunc('day', now()) + interval '24 hours'", expires_at: "date_trunc('day', now()) + interval '48 hours'" })}
+         ${insert({ window_end: `${hour} + interval '15 minutes'`, expires_at: `${hour} + interval '24 hours 15 minutes'` })}
+         ${insert({ attempt_count: "1000000", failure_count: "1000000" })}
+         rollback;`,
+      );
+      assert.equal(count("authentication_abuse_counters"), 0);
+      return { rejections: rejections.length + 1 };
+    },
+  );
+
+  await check(
+    "ABUSE-4 malformed decision input raises 22023 and changes nothing: purpose, digest form, equal digests, maxima outside 1..1000 (identity) and 1..100000 (global), windows other than 900/3600/86400, threshold outside 1..1000, null Auth id, failure kind",
+    () => {
+      const id = digest();
+      const global = digest();
+      const invalid = [
+        reserveStatement("registration", id, 5, 900, global, 100, 3600),
+        reserveStatement(
+          "sign_in'; delete from public.audit_events; --",
+          id,
+          5,
+          900,
+          global,
+          100,
+          3600,
+        ),
+        reserveStatement(null, id, 5, 900, global, 100, 3600),
+        reserveStatement(
+          "sign_in",
+          id.toUpperCase(),
+          5,
+          900,
+          global,
+          100,
+          3600,
+        ),
+        reserveStatement("sign_in", id, 5, 900, id, 100, 3600),
+        reserveStatement("sign_in", null, 5, 900, global, 100, 3600),
+        reserveStatement("sign_in", id, 0, 900, global, 100, 3600),
+        reserveStatement("sign_in", id, 1001, 900, global, 100, 3600),
+        reserveStatement("sign_in", id, 5, 900, global, 0, 3600),
+        reserveStatement("sign_in", id, 5, 900, global, 100001, 3600),
+        reserveStatement("sign_in", id, 5, 600, global, 100, 3600),
+        reserveStatement("sign_in", id, 5, 900, global, 100, 7200),
+        reserveStatement("sign_in", id, "null", 900, global, 100, 3600),
+        `select public.authentication_abuse_record_failure(${lit(id)}, 900, ${lit(global)}, 3600, 0);`,
+        `select public.authentication_abuse_record_failure(${lit(id)}, 900, ${lit(global)}, 3600, 1001);`,
+        `select public.authentication_abuse_record_failure(${lit(id)}, 900, ${lit(id)}, 3600, 3);`,
+        `select public.authentication_abuse_record_failure(${lit(id)}, 1800, ${lit(global)}, 3600, 3);`,
+        `select public.authentication_abuse_record_success(${lit(id)}, 900, 3, null);`,
+        `select public.authentication_abuse_record_success(${lit(id)}, 900, 0, ${lit(world.client.auth)}::uuid);`,
+        `select public.authentication_abuse_record_success('${"0".repeat(63)}', 900, 3, ${lit(world.client.auth)}::uuid);`,
+        "select public.authentication_abuse_report_unavailable('sign_in', 'network');",
+        "select public.authentication_abuse_report_unavailable('registration', 'runtime');",
+        "select public.authentication_abuse_report_unavailable(null, 'runtime');",
+      ];
+      const audits = count("audit_events");
+      for (const statement of invalid) {
+        assert.equal(
+          as("service_role", null, statement),
+          "ERROR 22023",
+          statement,
+        );
+      }
+      assert.equal(count("authentication_abuse_counters"), 0);
+      assert.equal(count("audit_events"), audits);
+      return { refused: invalid.length };
+    },
+  );
+
+  await check(
+    "ABUSE-5 real concurrency never overspends: 40 parallel reservations of one identity with maximum 10 allow exactly 10 and throttle 30; 40 parallel reservations of distinct identities with global maximum 10 allow exactly 10; each throttled counter row writes exactly one security.rate_limited event",
+    async () => {
+      const identityRun = await inOneWindow(3600, async () => {
+        const id = digest();
+        const global = digest();
+        const before = securityAudits("security.rate_limited").length;
+        const answers = await parallelReserves(40, () => [
+          "sign_in",
+          id,
+          10,
+          3600,
+          global,
+          1000,
+          3600,
+        ]);
+        return { id, global, answers, before };
+      });
+      assert.deepEqual(tally(identityRun.answers), { allow: 10, throttle: 30 });
+      const [identityRow] = counterRows("sign_in", "identity", identityRun.id);
+      const [globalRow] = counterRows("sign_in", "global", identityRun.global);
+      // Ten reserved attempts plus the one saturating throttle mark; the
+      // global window counts only the ten reserved attempts.
+      assert.equal(identityRow.attempt_count, 11);
+      assert.equal(globalRow.attempt_count, 10);
+      assert.equal(identityRow.failure_count, 0);
+      const identityAudits = securityAudits("security.rate_limited").slice(
+        identityRun.before,
+      );
+      assert.equal(identityAudits.length, 1);
+      assert.equal(identityAudits[0].after.dimension, "identity");
+      assert.equal(identityAudits[0].after.maximum, 10);
+
+      const globalRun = await inOneWindow(900, async () => {
+        const global = digest();
+        const ids = Array.from({ length: 40 }, () => digest());
+        const before = securityAudits("security.rate_limited").length;
+        const answers = await parallelReserves(40, (index) => [
+          "recovery",
+          ids[index],
+          5,
+          900,
+          global,
+          10,
+          900,
+        ]);
+        return { global, ids, answers, before };
+      });
+      assert.deepEqual(tally(globalRun.answers), { allow: 10, throttle: 30 });
+      const [recoveryGlobal] = counterRows(
+        "recovery",
+        "global",
+        globalRun.global,
+      );
+      assert.equal(recoveryGlobal.attempt_count, 11);
+      const allowedIdentities = globalRun.ids.filter(
+        (id) => counterRows("recovery", "identity", id).length === 1,
+      );
+      // A throttle reserves nothing in the dimension under its maximum.
+      assert.equal(allowedIdentities.length, 10);
+      for (const id of allowedIdentities) {
+        assert.equal(
+          counterRows("recovery", "identity", id)[0].attempt_count,
+          1,
+        );
+      }
+      const globalAudits = securityAudits("security.rate_limited").slice(
+        globalRun.before,
+      );
+      assert.equal(globalAudits.length, 1);
+      assert.equal(globalAudits[0].after.dimension, "global");
+      assert.equal(globalAudits[0].after.purpose, "recovery");
+      return {
+        identity: tally(identityRun.answers),
+        global: tally(globalRun.answers),
+      };
+    },
+  );
+
+  await check(
+    "ABUSE-6 identity and global dimensions are independent per purpose: an identity at its maximum throttles only itself; a global window at its maximum throttles every identity; a purpose never consumes the other's counts",
+    async () => {
+      await inOneWindow(86400, async () => {
+        const global = digest();
+        const a = digest();
+        const b = digest();
+        assert.equal(
+          reserve("sign_in", a, 2, 86400, global, 5, 86400),
+          "allow",
+        );
+        assert.equal(
+          reserve("sign_in", a, 2, 86400, global, 5, 86400),
+          "allow",
+        );
+        assert.equal(
+          reserve("sign_in", a, 2, 86400, global, 5, 86400),
+          "throttle",
+        );
+        assert.equal(
+          reserve("sign_in", b, 2, 86400, global, 5, 86400),
+          "allow",
+        );
+        // The same digests under recovery are another purpose's rows.
+        assert.equal(
+          reserve("recovery", a, 2, 86400, global, 5, 86400),
+          "allow",
+        );
+        assert.equal(
+          counterRows("recovery", "identity", a)[0].attempt_count,
+          1,
+        );
+        assert.equal(
+          counterRows("sign_in", "global", global)[0].attempt_count,
+          3,
+        );
+        assert.equal(
+          reserve("sign_in", b, 2, 86400, global, 5, 86400),
+          "allow",
+        );
+        assert.equal(
+          counterRows("sign_in", "global", global)[0].attempt_count,
+          4,
+        );
+        const c = digest();
+        assert.equal(
+          reserve("sign_in", c, 2, 86400, global, 5, 86400),
+          "allow",
+        );
+        // Global is now at 5: a fresh identity is throttled and gets no row.
+        const d = digest();
+        assert.equal(
+          reserve("sign_in", d, 2, 86400, global, 5, 86400),
+          "throttle",
+        );
+        assert.deepEqual(counterRows("sign_in", "identity", d), []);
+        assert.equal(
+          counterRows("sign_in", "global", global)[0].attempt_count,
+          6,
+        );
+      });
+      return { dimensions: "independent" };
+    },
+  );
+
+  await check(
+    "ABUSE-7 windows are aligned UTC intervals of the configured length, decided by the database clock, with exact edges; a row re-windowed after a length change keeps its counts",
+    async () => {
+      const at = (instant, seconds) =>
+        sql(
+          `select to_char(public.authentication_abuse_window_start(${lit(instant)}::timestamptz, ${seconds}) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS');`,
+        );
+      const edges = [
+        ["2026-11-18T10:14:59.999999Z", 900, "2026-11-18T10:00:00"],
+        ["2026-11-18T10:15:00Z", 900, "2026-11-18T10:15:00"],
+        ["2026-11-18T10:59:59.999999Z", 3600, "2026-11-18T10:00:00"],
+        ["2026-11-18T11:00:00Z", 3600, "2026-11-18T11:00:00"],
+        ["2026-11-18T23:59:59.999999Z", 86400, "2026-11-18T00:00:00"],
+        ["2026-11-19T00:00:00Z", 86400, "2026-11-19T00:00:00"],
+        ["2026-11-19T01:30:00+05:00", 86400, "2026-11-18T00:00:00"],
+        ["2026-03-29T01:30:00Z", 3600, "2026-03-29T01:00:00"],
+      ];
+      for (const [instant, seconds, expected] of edges) {
+        assert.equal(at(instant, seconds), expected, `${instant} ${seconds}`);
+      }
+      for (const seconds of [900, 3600, 86400]) {
+        await inOneWindow(seconds, async () => {
+          const id = digest();
+          const global = digest();
+          assert.equal(
+            reserve("sign_in", id, 5, seconds, global, 100, seconds),
+            "allow",
+          );
+          const facts = sql(
+            `select (extract(epoch from c.window_start)::numeric % ${seconds} = 0)::text || '|' || (extract(epoch from c.window_end - c.window_start))::integer::text || '|' || (c.expires_at = c.window_end + interval '24 hours')::text || '|' || (c.window_start <= clock_timestamp() and clock_timestamp() < c.window_end)::text from ${ABUSE_TABLE} as c where c.digest = ${lit(id)};`,
+          );
+          assert.equal(facts, `true|${seconds}|true|true`, String(seconds));
+        });
+      }
+      // The re-windowing helper (owner only): a current 1-hour row whose start
+      // is also the start of a 15-minute window keeps its counts.
+      const id = digest();
+      const hour = "date_trunc('hour', now())";
+      sql(
+        `insert into ${ABUSE_TABLE} (purpose, dimension, digest, window_start, window_end, expires_at, attempt_count, failure_count) values ('sign_in', 'identity', ${lit(id)}, ${hour}, ${hour} + interval '1 hour', ${hour} + interval '25 hours', 4, 2);`,
+      );
+      assert.equal(
+        sql(
+          `select public.authentication_abuse_current_attempts('sign_in', 'identity', ${lit(id)}, ${hour}, ${hour} + interval '15 minutes', now());`,
+        ),
+        "4",
+      );
+      const [row] = counterRows("sign_in", "identity", id);
+      assert.equal(row.attempt_count, 4);
+      assert.equal(row.failure_count, 2);
+      assert.equal(
+        sql(
+          `select (window_end = ${hour} + interval '15 minutes')::text || '|' || (expires_at = ${hour} + interval '24 hours 15 minutes')::text from ${ABUSE_TABLE} where digest = ${lit(id)};`,
+        ),
+        "true|true",
+      );
+      // A missing row answers null and creates nothing.
+      const missing = digest();
+      assert.equal(
+        sql(
+          `select coalesce(public.authentication_abuse_current_attempts('sign_in', 'identity', ${lit(missing)}, ${hour}, ${hour} + interval '1 hour', now())::text, 'none');`,
+        ),
+        "none",
+      );
+      assert.deepEqual(counterRows("sign_in", "identity", missing), []);
+      return { edges: edges.length };
+    },
+  );
+
+  await check(
+    "ABUSE-8 security.rate_limited is written exactly once per counter row and window, by the system actor, with no digest, address, email or User: further throttles, and a later lower maximum, write nothing",
+    async () => {
+      await inOneWindow(3600, async () => {
+        const id = digest();
+        const global = digest();
+        const before = securityAudits("security.rate_limited").length;
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+          assert.equal(
+            reserve("sign_in", id, 3, 3600, global, 1000, 3600),
+            "allow",
+          );
+        }
+        for (let attempt = 1; attempt <= 5; attempt += 1) {
+          assert.equal(
+            reserve("sign_in", id, 3, 3600, global, 1000, 3600),
+            "throttle",
+          );
+        }
+        assert.equal(
+          reserve("sign_in", id, 2, 3600, global, 1000, 3600),
+          "throttle",
+        );
+        const [row] = counterRows("sign_in", "identity", id);
+        assert.equal(row.attempt_count, 4);
+        const audits = securityAudits("security.rate_limited").slice(before);
+        assert.equal(audits.length, 1);
+        const [audit] = audits;
+        assert.equal(audit.actor_user_id, null);
+        assert.equal(audit.actor_type, "system");
+        assert.equal(audit.resource_type, "authentication_abuse_counter");
+        assert.equal(audit.resource_id, null);
+        assert.equal(audit.reason_code, "maximum_reached");
+        assert.equal(audit.before, null);
+        assert.equal(audit.policy_references, null);
+        assert.equal(audit.jurisdiction_id, null);
+        assert.deepEqual(Object.keys(audit.after).sort(), [
+          "dimension",
+          "maximum",
+          "purpose",
+          "window_end",
+          "window_start",
+        ]);
+        assert.deepEqual(
+          [audit.after.purpose, audit.after.dimension, audit.after.maximum],
+          ["sign_in", "identity", 3],
+        );
+        assert.equal(JSON.stringify(audit).includes(id), false);
+        assert.equal(JSON.stringify(audit).includes(global), false);
+      });
+      return { rate_limited_per_row: 1 };
+    },
+  );
+
+  await check(
+    "ABUSE-9 a failed sign-in is counted in both current windows; exactly the failure that reaches the threshold is suspicious (one security.suspicious_login event, no User id); a window without a reservation counts nothing",
+    async () => {
+      await inOneWindow(3600, async () => {
+        const id = digest();
+        const global = digest();
+        const before = securityAudits("security.suspicious_login").length;
+        const answers = [];
+        for (let attempt = 1; attempt <= 5; attempt += 1) {
+          assert.equal(
+            reserve("sign_in", id, 10, 3600, global, 1000, 3600),
+            "allow",
+          );
+          answers.push(recordFailure(id, 3600, global, 3600, 3));
+        }
+        assert.deepEqual(answers, [
+          "recorded",
+          "recorded",
+          "suspicious",
+          "recorded",
+          "recorded",
+        ]);
+        const [identityRow] = counterRows("sign_in", "identity", id);
+        const [globalRow] = counterRows("sign_in", "global", global);
+        assert.deepEqual(
+          [identityRow.attempt_count, identityRow.failure_count],
+          [5, 5],
+        );
+        assert.deepEqual(
+          [globalRow.attempt_count, globalRow.failure_count],
+          [5, 5],
+        );
+        // A failure beyond the reserved attempts is never counted.
+        assert.equal(recordFailure(id, 3600, global, 3600, 3), "recorded");
+        assert.equal(
+          counterRows("sign_in", "identity", id)[0].failure_count,
+          5,
+        );
+        const audits = securityAudits("security.suspicious_login").slice(
+          before,
+        );
+        assert.equal(audits.length, 1);
+        const [audit] = audits;
+        assert.deepEqual(
+          [
+            audit.actor_user_id,
+            audit.actor_type,
+            audit.resource_type,
+            audit.resource_id,
+            audit.reason_code,
+          ],
+          [
+            null,
+            "system",
+            "authentication_abuse_counter",
+            null,
+            "failure_threshold_reached",
+          ],
+        );
+        assert.deepEqual(Object.keys(audit.after).sort(), [
+          "dimension",
+          "failure_count",
+          "purpose",
+          "signal",
+          "threshold",
+          "window_end",
+          "window_start",
+        ]);
+        assert.equal(audit.after.signal, "failure_threshold_reached");
+        assert.equal(JSON.stringify(audit).includes(id), false);
+        // No reservation in the window: nothing to count, no event.
+        const unseen = digest();
+        assert.equal(
+          recordFailure(unseen, 3600, digest(), 3600, 1),
+          "recorded",
+        );
+        assert.deepEqual(counterRows("sign_in", "identity", unseen), []);
+        assert.equal(
+          securityAudits("security.suspicious_login").length,
+          before + 1,
+        );
+        // Recovery rows are never counted as sign-in failures.
+        const recoveryId = digest();
+        const recoveryGlobal = digest();
+        assert.equal(
+          reserve("recovery", recoveryId, 5, 3600, recoveryGlobal, 100, 3600),
+          "allow",
+        );
+        assert.equal(
+          recordFailure(recoveryId, 3600, recoveryGlobal, 3600, 1),
+          "recorded",
+        );
+        assert.equal(
+          counterRows("recovery", "identity", recoveryId)[0].failure_count,
+          0,
+        );
+      });
+      return { suspicious_failures: 1 };
+    },
+  );
+
+  await check(
+    "ABUSE-10 a successful sign-in into an identity whose window reached the threshold is suspicious, once per report, naming the User of the Auth id (none for an Auth id without a User); below the threshold it is recorded and nothing changes",
+    async () => {
+      await inOneWindow(3600, async () => {
+        const id = digest();
+        const global = digest();
+        assert.equal(
+          reserve("sign_in", id, 10, 3600, global, 1000, 3600),
+          "allow",
+        );
+        assert.equal(recordFailure(id, 3600, global, 3600, 2), "recorded");
+        const before = securityAudits("security.suspicious_login").length;
+        assert.equal(recordSuccess(id, 3600, 2, world.client.auth), "recorded");
+        assert.equal(
+          securityAudits("security.suspicious_login").length,
+          before,
+        );
+        assert.equal(
+          reserve("sign_in", id, 10, 3600, global, 1000, 3600),
+          "allow",
+        );
+        assert.equal(recordFailure(id, 3600, global, 3600, 2), "suspicious");
+        const counted = counterRows("sign_in", "identity", id)[0];
+        assert.equal(
+          recordSuccess(id, 3600, 2, world.client.auth),
+          "suspicious",
+        );
+        assert.equal(
+          recordSuccess(id, 3600, 2, world.client.auth),
+          "suspicious",
+        );
+        const orphanAuth = uid();
+        sql(`insert into auth.users (id) values ('${orphanAuth}');`);
+        assert.equal(recordSuccess(id, 3600, 2, orphanAuth), "suspicious");
+        // Success changes no count.
+        assert.deepEqual(counterRows("sign_in", "identity", id)[0], counted);
+        const audits = securityAudits("security.suspicious_login").slice(
+          before,
+        );
+        assert.equal(audits.length, 4);
+        assert.equal(audits[0].after.signal, "failure_threshold_reached");
+        assert.equal(audits[0].resource_id, null);
+        for (const audit of audits.slice(1, 3)) {
+          assert.deepEqual(
+            [
+              audit.actor_user_id,
+              audit.actor_type,
+              audit.resource_type,
+              audit.resource_id,
+              audit.reason_code,
+            ],
+            [
+              null,
+              "system",
+              "user",
+              world.client.user,
+              "success_after_failure_threshold",
+            ],
+          );
+          assert.equal(audit.after.signal, "success_after_failure_threshold");
+          assert.equal(audit.after.failure_count, 2);
+          assert.equal(JSON.stringify(audit).includes(id), false);
+          assert.equal(
+            JSON.stringify(audit).includes(world.client.auth),
+            false,
+          );
+        }
+        assert.deepEqual(
+          [audits[3].resource_type, audits[3].resource_id],
+          ["user", null],
+        );
+        // A User id appears only in success events.
+        assert.equal(
+          sql(
+            `select count(*) from public.audit_events where action_code in ('security.rate_limited', 'security.protection_unavailable') and (resource_id is not null or actor_user_id is not null);`,
+          ),
+          "0",
+        );
+        assert.equal(
+          sql(
+            `select count(*) from public.audit_events where action_code = 'security.suspicious_login' and after_snapshot ->> 'signal' = 'failure_threshold_reached' and (resource_id is not null or actor_user_id is not null);`,
+          ),
+          "0",
+        );
+      });
+      return { suspicious_successes: 3 };
+    },
+  );
+
+  await check(
+    "ABUSE-11 security.protection_unavailable is written at most once per purpose, failure kind and aligned 15-minute window, also under concurrency; the answer says whether it is recorded",
+    async () => {
+      await inOneWindow(900, async () => {
+        const before = securityAudits("security.protection_unavailable").length;
+        const parallel = await Promise.all(
+          Array.from({ length: 10 }, () =>
+            runAsync(
+              [
+                "begin;",
+                "set local role service_role;",
+                "select public.authentication_abuse_report_unavailable('sign_in', 'runtime');",
+                "commit;",
+                "",
+              ].join("\n"),
+            ),
+          ),
+        );
+        assert.deepEqual(
+          tally(parallel.map((result) => result.out.trim().split("\n").at(-1))),
+          { recorded: 1, already_recorded: 9 },
+        );
+        assert.equal(
+          reportUnavailable("sign_in", "runtime"),
+          "already_recorded",
+        );
+        assert.equal(reportUnavailable("sign_in", "configuration"), "recorded");
+        assert.equal(
+          reportUnavailable("sign_in", "configuration"),
+          "already_recorded",
+        );
+        assert.equal(reportUnavailable("recovery", "runtime"), "recorded");
+        assert.equal(
+          reportUnavailable("recovery", "configuration"),
+          "recorded",
+        );
+        assert.equal(
+          reportUnavailable("recovery", "configuration"),
+          "already_recorded",
+        );
+        const audits = securityAudits("security.protection_unavailable").slice(
+          before,
+        );
+        assert.deepEqual(
+          audits.map((audit) => [
+            audit.after.purpose,
+            audit.after.failure_kind,
+            audit.reason_code,
+          ]),
+          [
+            ["sign_in", "runtime", "runtime"],
+            ["sign_in", "configuration", "configuration"],
+            ["recovery", "runtime", "runtime"],
+            ["recovery", "configuration", "configuration"],
+          ],
+        );
+        for (const audit of audits) {
+          assert.deepEqual(
+            [
+              audit.actor_user_id,
+              audit.actor_type,
+              audit.resource_type,
+              audit.resource_id,
+            ],
+            [null, "system", "authentication_protection", null],
+          );
+          assert.deepEqual(Object.keys(audit.after).sort(), [
+            "failure_kind",
+            "purpose",
+            "window_end",
+            "window_start",
+          ]);
+          assert.equal(
+            (Date.parse(audit.after.window_end) -
+              Date.parse(audit.after.window_start)) /
+              1000,
+            900,
+          );
+          assert.equal((Date.parse(audit.after.window_start) / 1000) % 900, 0);
+        }
+      });
+      return { per_window: 1 };
+    },
+  );
+
+  await check(
+    "ABUSE-12 pruning deletes only expired rows of the reserving purpose, at most 100 per call, in expiry order; current rows and the other purpose are untouched",
+    () => {
+      sql(
+        `insert into ${ABUSE_TABLE} (purpose, dimension, digest, window_start, window_end, expires_at, attempt_count, failure_count)
+         select p.purpose, 'identity', encode(sha256(convert_to(p.purpose || g::text, 'UTF8')), 'hex'),
+                date_trunc('hour', now()) - interval '4 days' + (g * interval '15 minutes'),
+                date_trunc('hour', now()) - interval '4 days' + (g * interval '15 minutes') + interval '15 minutes',
+                date_trunc('hour', now()) - interval '3 days' + (g * interval '15 minutes') + interval '15 minutes',
+                1, 0
+         from (values ('recovery', 150), ('sign_in', 5)) as p(purpose, n), generate_series(1, p.n) as g;`,
+      );
+      const expired = (purpose) =>
+        Number(
+          sql(
+            `select count(*) from ${ABUSE_TABLE} where purpose = '${purpose}' and expires_at <= clock_timestamp();`,
+          ),
+        );
+      const live = Number(
+        sql(
+          `select count(*) from ${ABUSE_TABLE} where expires_at > clock_timestamp();`,
+        ),
+      );
+      assert.equal(expired("recovery"), 150);
+      assert.equal(expired("sign_in"), 5);
+      const oldest = sql(
+        `select string_agg(digest, ',' order by expires_at, dimension, digest, window_start) from (select * from ${ABUSE_TABLE} where purpose = 'recovery' and expires_at <= clock_timestamp() order by expires_at, dimension, digest, window_start limit 100) as e;`,
+      );
+      assert.equal(
+        reserve("recovery", digest(), 5, 900, digest(), 1000, 900),
+        "allow",
+      );
+      assert.equal(expired("recovery"), 50);
+      assert.equal(expired("sign_in"), 5);
+      assert.equal(
+        sql(
+          `select count(*) from ${ABUSE_TABLE} where digest = any(string_to_array(${lit(oldest)}, ','));`,
+        ),
+        "0",
+      );
+      assert.equal(
+        reserve("recovery", digest(), 5, 900, digest(), 1000, 900),
+        "allow",
+      );
+      assert.equal(expired("recovery"), 0);
+      assert.equal(
+        Number(
+          sql(
+            `select count(*) from ${ABUSE_TABLE} where expires_at > clock_timestamp();`,
+          ),
+        ),
+        live + 4,
+      );
+      // A sign-in reservation clears the expired sign-in rows.
+      assert.equal(
+        reserve("sign_in", digest(), 5, 900, digest(), 1000, 900),
+        "allow",
+      );
+      assert.equal(expired("sign_in"), 0);
+      return { first_call: 100, second_call: 50 };
+    },
+  );
+
+  await check(
+    "ABUSE-13 no identifier is stored: every counter digest is 64 lowercase hex, purposes and dimensions are the fixed words, and no security event carries a counter digest, an email address, or an Auth id",
+    () => {
+      assert.equal(
+        sql(
+          `select count(*) from ${ABUSE_TABLE} where digest collate "C" !~ '^[0-9a-f]{64}$' or purpose not in ('sign_in', 'recovery') or dimension not in ('identity', 'global');`,
+        ),
+        "0",
+      );
+      assert.ok(count("authentication_abuse_counters") > 0);
+      assert.equal(
+        sql(
+          `select count(*) from public.audit_events as a where a.action_code like 'security.%' and (a.after_snapshot::text like '%@%' or exists (select 1 from ${ABUSE_TABLE} as c where strpos(to_jsonb(a)::text, c.digest) > 0) or exists (select 1 from auth.users as u where strpos(a.after_snapshot::text, u.id::text) > 0));`,
+        ),
+        "0",
+      );
+      assert.ok(
+        Number(
+          sql(
+            "select count(*) from public.audit_events where action_code like 'security.%';",
+          ),
+        ) >= 4,
+      );
+      return { digests: "opaque" };
+    },
+  );
+
+  await check(
+    "ABUSE-14 bypass attempts fail: API roles reach neither the table nor the functions; the server credential reaches the table only through the functions; an unanswerable reservation (purpose lock held past lock_timeout) raises and reserves nothing; a success never resets a throttle",
+    async () => {
+      // A held purpose lock makes the reservation time out (55P03) with no
+      // change, so the application reads "unavailable".
+      const holder = await session("abuse-lock");
+      try {
+        await holder.ok("begin;");
+        await holder.ok("select pg_advisory_xact_lock(2026111804000001);");
+        const id = digest();
+        const started = Date.now();
+        assert.equal(
+          reserve("sign_in", id, 5, 900, digest(), 100, 900),
+          "ERROR 55P03",
+        );
+        assert.ok(Date.now() - started >= 900);
+        assert.deepEqual(counterRows("sign_in", "identity", id), []);
+        // The other purpose is not blocked.
+        assert.equal(
+          reserve("recovery", digest(), 5, 900, digest(), 100, 900),
+          "allow",
+        );
+        await holder.ok("rollback;");
+      } finally {
+        holder.close();
+      }
+      // A success never resets a throttled identity.
+      await inOneWindow(3600, async () => {
+        const id = digest();
+        const global = digest();
+        assert.equal(
+          reserve("sign_in", id, 1, 3600, global, 100, 3600),
+          "allow",
+        );
+        assert.equal(recordSuccess(id, 3600, 1, world.client.auth), "recorded");
+        assert.equal(
+          reserve("sign_in", id, 1, 3600, global, 100, 3600),
+          "throttle",
+        );
+        assert.equal(recordSuccess(id, 3600, 1, world.client.auth), "recorded");
+        assert.equal(
+          reserve("sign_in", id, 1, 3600, global, 100, 3600),
+          "throttle",
+        );
+      });
+      // The server credential cannot write the counters or forge a decision
+      // through a helper; API roles cannot call anything.
+      for (const statement of [
+        `update ${ABUSE_TABLE} set attempt_count = 0, failure_count = 0;`,
+        `delete from ${ABUSE_TABLE} where purpose = 'sign_in';`,
+        `insert into ${ABUSE_TABLE} select * from ${ABUSE_TABLE} limit 1;`,
+        "select public.authentication_abuse_window_start(now(), 900);",
+      ]) {
+        assert.equal(
+          as("service_role", null, statement),
+          "ERROR 42501",
+          statement,
+        );
+      }
+      assert.equal(
+        reserveAs(
+          "anon",
+          "sign_in",
+          digest(),
+          1000,
+          86400,
+          digest(),
+          100000,
+          86400,
+        ),
+        "ERROR 42501",
+      );
+      // An oversized maximum or an alternate digest form is refused, never
+      // clamped or folded into another key.
+      assert.equal(
+        reserve("sign_in", digest(), 1000000, 86400, digest(), 100, 86400),
+        "ERROR 22023",
+      );
+      return { bypass: "refused" };
+    },
+  );
+}
+
 async function main() {
   try {
     startCluster();
@@ -2181,6 +3416,7 @@ async function main() {
     await staffChecks();
     await privilegeChecks();
     await assuranceChecks();
+    await abuseChecks();
   } catch (error) {
     report.error = String(error?.stack ?? error);
     failed = true;

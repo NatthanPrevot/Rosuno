@@ -2422,7 +2422,7 @@
     {
       "work_item_id": "WI-P2-MVP-001-TECHNICAL-COMPLETION",
       "title": "MVP-001 Technical Completion Program (S1 to S11); slice S1 platform controls (merged), slice S2 durable jobs and session assurance",
-      "objective": "Register entry of the MVP-001 Program Packet (register name recorded under this priority-prefixed identifier because the register format requires WI-P0, WI-P1 or WI-P2). Under the owner-adopted Packet (blob 8117636923918a482ed580ef0408ae72bc2f9e96), DL-ENG-3 and PS-A2, reach the technical-complete MVP through eleven bounded slices delivered one PR at a time. Slice S1 (merged in PR #96 at b7dc44758db05f4492a7d87d17448fcd062e853c): environment identity (PS-A2), immutable policy history, the policy-type catalog, the environment-anchored policy resolver, configuration administration, and conformance corrections of earlier work. Slice S2: the durable job protocol on operational_jobs (claim, lease, bounded retry, escalation, cancellation), the pg_cron sweeper, the server-only worker with its protected route and the staff job view, system-actor recording, and MFA step-up (aal2) for attorney and staff sessions enforced in the application and the database; sign-in and recovery rate limits and suspicious-login handling await an owner-adopted physical amendment, and break-glass moves to S11 (PS-A3 not adopted).",
+      "objective": "Register entry of the MVP-001 Program Packet (register name recorded under this priority-prefixed identifier because the register format requires WI-P0, WI-P1 or WI-P2). Under the owner-adopted Packet (blob 8117636923918a482ed580ef0408ae72bc2f9e96), DL-ENG-3 and PS-A2, reach the technical-complete MVP through eleven bounded slices delivered one PR at a time. Slice S1 (merged in PR #96 at b7dc44758db05f4492a7d87d17448fcd062e853c): environment identity (PS-A2), immutable policy history, the policy-type catalog, the environment-anchored policy resolver, configuration administration, and conformance corrections of earlier work. Slice S2: the durable job protocol on operational_jobs (claim, lease, bounded retry, escalation, cancellation), the pg_cron sweeper, the server-only worker with its protected route and the staff job view, system-actor recording, and MFA step-up (aal2) for attorney and staff sessions enforced in the application and the database; sign-in and recovery rate limits and suspicious-login detection and handling under PS-A4 revision 2 (owner-adopted; one private counter relation) with the owner's recorded unavailable-protection behaviour; break-glass moves to S11 (PS-A3 not adopted).",
       "in_scope": [
         "S1 forward-only migrations: environment identity and development-configuration designation (PS-A2); professional write-boundary conformance (server-generated keys, eligibility type code); configuration administration; availability checks.",
         "S1 application changes, tests, disposable PostgreSQL proofs and records within the Packet ALLOWED_SCOPE."
@@ -2466,6 +2466,7 @@
         "The P5-001, P3-904, M4 and registration abuse-control proofs, p0:validate, the P0 suite, typecheck and build pass on the final head, and the guard self-check prints ROSUNO-GUARD PASS.",
         "Designated human review approves the exact head before merge.",
         "S2: the MVP-001 S2 disposable PostgreSQL proof passes on the final head: pending jobs survive restart, attempts are bounded and exhaustion escalates visibly with a system-actor audit row, duplicate execution has no duplicate effect, expired leases are reclaimed without the sweeper, and aal1 or claim-less sessions are refused staff operations and attorney professional writes.",
+        "S2 (PS-A4): sign-in and recovery reserve before the provider call; concurrent attempts never overspend a maximum; throttled answers do not reveal whether an account exists; suspicious sign-ins are audited and end the account's other sessions; missing or invalid configuration refuses sign-in and recovery, a runtime failure permits sign-in temporarily and refuses recovery, and every unavailable outcome is audited when the database accepts it and always logged with its audit persistence.",
         "S2: the earlier proofs, the application tests (worker runner, worker route, staff job view, MFA enrollment and step-up gating), p0:validate, the P0 suite, typecheck and build pass on the final head, and the guard self-check prints ROSUNO-GUARD PASS."
       ],
       "validation_commands": [
@@ -2493,7 +2494,8 @@
         "20261117040000_mvp_001_s1_availability_checks",
         "20261118010000_mvp_001_s2_operational_jobs",
         "20261118020000_mvp_001_s2_job_scheduler",
-        "20261118030000_mvp_001_s2_session_assurance"
+        "20261118030000_mvp_001_s2_session_assurance",
+        "20261118040000_mvp_001_s2_authentication_abuse_control"
       ],
       "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",

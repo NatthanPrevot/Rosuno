@@ -336,7 +336,10 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // staff configuration adapter (a failed call) also write lines. MVP-001
   // S2: the Auth MFA adapter (a failed or refused call) does too, and so
   // does the operational job worker adapter (a refused worker request, each
-  // worker batch's counts, and each failed attempt's job type and code).
+  // worker batch's counts, and each failed attempt's job type and code), and
+  // the authentication-abuse control (PS-A4 section 4: each unavailable
+  // protection's purpose, failure kind, outcome, and audit persistence; each
+  // suspicious sign-in's handling).
   assert.deepEqual(callers, [
     "app/client/actions.ts",
     "app/client/intakes/[intake]/page.tsx",
@@ -345,6 +348,7 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/staff/actions.ts",
     "app/staff/frame.tsx",
     "src/infrastructure/client/client-intake-adapter.ts",
+    "src/infrastructure/identity/authentication-abuse-control.ts",
     "src/infrastructure/identity/authenticator-provider.ts",
     "src/infrastructure/jobs/job-worker-adapter.ts",
     "src/infrastructure/staff/staff-configuration-adapter.ts",
@@ -399,4 +403,59 @@ test("7. a module that logs loads in plain Node.js, and outside a request a line
   const adapter =
     await import("../src/infrastructure/client/client-intake-adapter.ts");
   assert.equal(typeof adapter.createClientIntakeReads, "function");
+});
+
+test("8. MVP-001 S2 (PS-A4 section 4): the protection report fields keep only their fixed words", () => {
+  const { log, parsed } = capture();
+  log(
+    "error",
+    "security.protection_unavailable",
+    {
+      purpose: "sign_in",
+      failureKind: "runtime",
+      outcome: "permitted",
+      auditPersistence: "not_persisted",
+    },
+    ID,
+  );
+  assert.deepEqual(parsed()[0], {
+    timestamp: "2026-11-17T09:30:00.000Z",
+    level: "error",
+    event: "security.protection_unavailable",
+    correlationId: ID,
+    outcome: "permitted",
+    purpose: "sign_in",
+    failureKind: "runtime",
+    auditPersistence: "not_persisted",
+  });
+  for (const [field, kept, dropped] of [
+    ["purpose", ["sign_in", "recovery"], ["signin", "Sign_in", "registration"]],
+    [
+      "failureKind",
+      ["configuration", "runtime"],
+      ["config", "Runtime", "database"],
+    ],
+    [
+      "auditPersistence",
+      ["persisted", "not_persisted"],
+      ["unknown", "Persisted", "true"],
+    ],
+  ]) {
+    for (const value of kept) {
+      assert.deepEqual(allowedFields({ [field]: value }), { [field]: value });
+    }
+    for (const value of [
+      ...dropped,
+      ...SECRETS,
+      "a".repeat(64),
+      "",
+      null,
+      true,
+      1,
+      [kept[0]],
+      { value: kept[0] },
+    ]) {
+      assert.deepEqual(allowedFields({ [field]: value }), {}, String(value));
+    }
+  }
 });

@@ -11,6 +11,13 @@
 // nothing the caller sends chooses where to go. When sign-in cannot be
 // attempted or the provider answers with anything but a rejection, one log
 // line records only that fact and the provider's HTTP status.
+//
+// MVP-001 S2 (PS-A4): the provider port also carries the request's
+// server-only authentication-abuse control for sign-in, which the
+// application asks before the provider, and a sign-out of the account's
+// other sessions, used only after a confirmed sign-in judged suspicious. That
+// sign-out goes through the same request-scoped client, which holds the new
+// session and keeps it.
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -22,6 +29,7 @@ import {
   type SessionRead,
   type SignInState,
 } from "../../src/application/authentication-entry.ts";
+import { createAuthenticationAbuseControl } from "../../src/infrastructure/identity/authentication-abuse-control.ts";
 import { SUPABASE_SERVER_SESSION_SOURCE } from "../../src/infrastructure/identity/server-session-source.ts";
 import { createSupabaseServerClient } from "../../src/infrastructure/identity/supabase-server.ts";
 import { logRequestEvent } from "../../src/infrastructure/observability/request-log.ts";
@@ -76,6 +84,12 @@ async function requestProvider(): Promise<AuthenticationProvider | null> {
       const { error } = await client.auth.signOut({ scope: "local" });
       return error === null;
     },
+    // Ends every other session of the account this client is signed in to,
+    // keeping this browser's new session.
+    signOutOtherSessions: async () => {
+      const { error } = await client.auth.signOut({ scope: "others" });
+      return error === null;
+    },
     // What this client itself holds. Its storage answers from its own memory
     // ahead of the request's cookies, and a failed cookie write is swallowed,
     // so this names the session it issued and proves nothing about storage.
@@ -88,6 +102,7 @@ async function requestProvider(): Promise<AuthenticationProvider | null> {
     // The trusted claims boundary over a fresh client on every read: the same
     // boundary, over the same updated cookie state, that the next page reads.
     session: SUPABASE_SERVER_SESSION_SOURCE,
+    abuseControl: createAuthenticationAbuseControl("sign_in"),
   } satisfies AuthenticationProvider);
 }
 

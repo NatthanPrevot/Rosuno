@@ -18,7 +18,10 @@
 // an attorney's or a reviewer's current authority.
 // Another makes only the one fixed registration quota decision call, and
 // another only the three fixed operational job worker calls (MVP-001 S2:
-// claim, complete, and fail; no enqueue, read, or other write). A further
+// claim, complete, and fail; no enqueue, read, or other write). Another makes
+// only the four fixed authentication-abuse decision calls (MVP-001 S2,
+// PS-A4: reserve, record a failure, record a success, and report an
+// unavailable protection; no table read or write). A further
 // client, built from
 // the publishable key alone and never given the privileged credential, only
 // requests signup confirmation emails. No client receives a request cookie or
@@ -32,6 +35,20 @@ import { createClient } from "@supabase/supabase-js";
 
 import type { AttorneyApplicationRecords } from "../../application/attorney-application.ts";
 import type { AttorneyProfessionalProvisioning } from "../../application/attorney-professional.ts";
+import {
+  areAbuseDigests,
+  areAbuseLimits,
+  isAbuseDigest,
+  isAbusePurpose,
+  isAccountId,
+  isProtectionFailureKind,
+  isSuspiciousThreshold,
+  isWindowSeconds,
+  reportAnswerOf,
+  reserveAnswerOf,
+  signalAnswerOf,
+  type AuthenticationAbusePort,
+} from "../../application/authentication-abuse-control.ts";
 import type {
   AccountCreation,
   AccountRead,
@@ -413,6 +430,124 @@ export function hasPrivilegedProjectBinding(
   environment: RegistrationEnvironment = runtimeEnvironment(),
 ): boolean {
   return readProjectBinding(environment) !== null;
+}
+
+// MVP-001 S2 (PS-A4 section 3): the authentication-abuse decision port,
+// through its own cookie-free privileged client. It makes only the four
+// fixed decision calls, each a literal call of one database function with
+// exactly its named arguments, after checking every argument against the
+// database's own bounds, under a deadline. Each answer is read strictly
+// against that function's own outcomes; anything else, including a failed,
+// refused, aborted, or thrown call, is "unknown", so nothing is ever taken
+// as decided or persisted that the database did not answer. Only opaque
+// digests, validated operational settings, a purpose, a failure kind, and a
+// signed-in account's Auth id are sent; the database owns the clock, the
+// windows, the counts, and the audit events.
+const ABUSE_CALL_DEADLINE_MS = 2000;
+
+export async function createAuthenticationAbusePort(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<AuthenticationAbusePort | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    reserve: async (purpose, digests, limits) => {
+      try {
+        if (
+          !isAbusePurpose(purpose) ||
+          !areAbuseDigests(digests) ||
+          !areAbuseLimits(limits)
+        ) {
+          return "unknown";
+        }
+        const { data, error } = await admin
+          .rpc("authentication_abuse_reserve", {
+            p_purpose: purpose,
+            p_identity_digest: digests.identity,
+            p_identity_max: limits.identityMax,
+            p_identity_window_seconds: limits.identityWindowSeconds,
+            p_global_digest: digests.global,
+            p_global_max: limits.globalMax,
+            p_global_window_seconds: limits.globalWindowSeconds,
+          })
+          .abortSignal(AbortSignal.timeout(ABUSE_CALL_DEADLINE_MS));
+        return error === null ? reserveAnswerOf(data) : "unknown";
+      } catch {
+        return "unknown";
+      }
+    },
+    recordFailure: async (digests, limits, threshold) => {
+      try {
+        if (
+          !areAbuseDigests(digests) ||
+          !areAbuseLimits(limits) ||
+          !isSuspiciousThreshold(threshold)
+        ) {
+          return "unknown";
+        }
+        const { data, error } = await admin
+          .rpc("authentication_abuse_record_failure", {
+            p_identity_digest: digests.identity,
+            p_identity_window_seconds: limits.identityWindowSeconds,
+            p_global_digest: digests.global,
+            p_global_window_seconds: limits.globalWindowSeconds,
+            p_suspicious_threshold: threshold,
+          })
+          .abortSignal(AbortSignal.timeout(ABUSE_CALL_DEADLINE_MS));
+        return error === null ? signalAnswerOf(data) : "unknown";
+      } catch {
+        return "unknown";
+      }
+    },
+    recordSuccess: async (
+      identityDigest,
+      identityWindowSeconds,
+      threshold,
+      accountId,
+    ) => {
+      try {
+        if (
+          !isAbuseDigest(identityDigest) ||
+          !isWindowSeconds(identityWindowSeconds) ||
+          !isSuspiciousThreshold(threshold) ||
+          !isAccountId(accountId)
+        ) {
+          return "unknown";
+        }
+        const { data, error } = await admin
+          .rpc("authentication_abuse_record_success", {
+            p_identity_digest: identityDigest,
+            p_identity_window_seconds: identityWindowSeconds,
+            p_suspicious_threshold: threshold,
+            p_auth_user_id: accountId,
+          })
+          .abortSignal(AbortSignal.timeout(ABUSE_CALL_DEADLINE_MS));
+        return error === null ? signalAnswerOf(data) : "unknown";
+      } catch {
+        return "unknown";
+      }
+    },
+    reportUnavailable: async (purpose, failure) => {
+      try {
+        if (!isAbusePurpose(purpose) || !isProtectionFailureKind(failure)) {
+          return "unknown";
+        }
+        const { data, error } = await admin
+          .rpc("authentication_abuse_report_unavailable", {
+            p_purpose: purpose,
+            p_failure_kind: failure,
+          })
+          .abortSignal(AbortSignal.timeout(ABUSE_CALL_DEADLINE_MS));
+        return error === null ? reportAnswerOf(data) : "unknown";
+      } catch {
+        return "unknown";
+      }
+    },
+  } satisfies AuthenticationAbusePort);
 }
 
 // MVP-001 S2: the operational job worker port (Packet S2 job architecture

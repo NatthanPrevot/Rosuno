@@ -13,7 +13,20 @@
 // Nothing here holds a credential beyond the call, keeps module-level mutable
 // state, or grants authority: recovery signs no one in and decides no
 // profile, role, capability, or any business question.
+//
+// MVP-001 S2 (PS-A4 sections 3 and 4): every request that passes validation
+// is reserved through the request's authentication-abuse control before the
+// provider is asked, whether or not an account exists. A throttled request
+// gets the same neutral result without asking the provider. An unavailable
+// protection, by configuration or at run time, refuses the request with the
+// fixed unavailable result (the owner's recorded recovery policy) and is
+// reported.
 
+import {
+  protectAttempt,
+  RECOVERY_UNAVAILABLE_POLICY,
+  type AuthenticationAbuseControl,
+} from "./authentication-abuse-control.ts";
 import type { FieldErrors, Validation } from "./form-operation.ts";
 import { resolveSession, type ServerSessionSource } from "./session.ts";
 
@@ -21,9 +34,11 @@ import { resolveSession, type ServerSessionSource } from "./session.ts";
 // email a recovery link for this address, returning to the fixed recovery
 // address. Its answer is never read: acceptance proves neither that an
 // account exists nor that an email was delivered, and a refusal can reveal
-// that one does.
+// that one does. abuseControl is the request's authentication-abuse control
+// for recovery.
 export type RecoveryRequestProvider = {
   readonly requestRecoveryEmail: (email: string) => Promise<void>;
+  readonly abuseControl: AuthenticationAbuseControl;
 };
 
 // Builds the provider for the current request, or reports null when the
@@ -32,7 +47,8 @@ export type RecoveryRequestProviderSource =
   () => Promise<RecoveryRequestProvider | null>;
 
 // "submitted" is deliberately neutral: it is the result of every attempt
-// that reached the provider, whatever the provider answered.
+// that reached the provider, whatever the provider answered, and of every
+// throttled attempt, which does not reach it.
 export type RecoveryRequestState =
   | { readonly status: "idle" }
   | { readonly status: "invalid"; readonly fieldErrors: FieldErrors }
@@ -307,6 +323,15 @@ async function providerFrom<Provider>(
   }
 }
 
+// The request's abuse control as handed in; a read that throws gives nothing.
+function abuseControlIn(provider: RecoveryRequestProvider): unknown {
+  try {
+    return provider.abuseControl;
+  } catch {
+    return null;
+  }
+}
+
 export async function requestAccountRecovery(
   source: RecoveryRequestProviderSource,
   payload: unknown,
@@ -320,6 +345,17 @@ export async function requestAccountRecovery(
   }
   const provider = await providerFrom(source);
   if (provider === null) {
+    return REQUEST_UNAVAILABLE;
+  }
+  const protection = await protectAttempt(
+    abuseControlIn(provider),
+    validation.value.email,
+    RECOVERY_UNAVAILABLE_POLICY,
+  );
+  if (protection === "throttle") {
+    return SUBMITTED;
+  }
+  if (protection !== "allow") {
     return REQUEST_UNAVAILABLE;
   }
   try {

@@ -12,6 +12,10 @@
 // the one server-configured origin; no request header, cookie, or form field
 // chooses a destination. Next.js accepts this only as a POST request and
 // applies its Server Action origin checks.
+//
+// MVP-001 S2 (PS-A4): the port also carries the request's server-only
+// authentication-abuse control for recovery, which the application asks
+// before the provider.
 
 import {
   recoveryRedirectFor,
@@ -19,6 +23,7 @@ import {
   type RecoveryRequestProvider,
   type RecoveryRequestState,
 } from "../../src/application/account-recovery.ts";
+import { createAuthenticationAbuseControl } from "../../src/infrastructure/identity/authentication-abuse-control.ts";
 import { createSupabaseServerClient } from "../../src/infrastructure/identity/supabase-server.ts";
 
 async function requestProvider(): Promise<RecoveryRequestProvider | null> {
@@ -35,6 +40,7 @@ async function requestProvider(): Promise<RecoveryRequestProvider | null> {
     requestRecoveryEmail: async (email) => {
       await client.auth.resetPasswordForEmail(email, { redirectTo });
     },
+    abuseControl: createAuthenticationAbuseControl("recovery"),
   } satisfies RecoveryRequestProvider);
 }
 
