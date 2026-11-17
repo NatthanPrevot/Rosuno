@@ -3071,6 +3071,8 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
     [
       "process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       "process.env.NEXT_PUBLIC_SUPABASE_URL",
+      // MVP-001 D-9: the server environment class setting (PS-A2).
+      "process.env.ROSUNO_ENVIRONMENT_CLASS",
       "process.env.ROSUNO_SUPABASE_ADMIN_KEY",
       "process.env.ROSUNO_SUPABASE_EXPECTED_PROJECT_REF",
     ],
