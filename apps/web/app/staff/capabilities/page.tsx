@@ -18,6 +18,7 @@ import {
   Table,
   Text,
 } from "../../../src/presentation/design-system.tsx";
+import { requireSteppedUp } from "../../account/gate.ts";
 import { BackLink, PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
 
 export const metadata: Metadata = {
@@ -32,6 +33,7 @@ export default async function CapabilitiesPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const { page } = await searchParams;
   const view = await resolveCapabilityAdministration(
     STAFF_CONFIGURATION_SOURCES,

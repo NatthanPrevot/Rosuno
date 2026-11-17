@@ -276,6 +276,12 @@ export function outcomeMessage(
         title: "Unavailable",
         body: "This could not be completed right now. Please try again later.",
       };
+    case "step-up-required":
+      return {
+        tone: "warning",
+        title: "Confirm your sign-in",
+        body: "Nothing was sent. This change needs a sign-in confirmed with a code from your authenticator app. Reload this page to confirm it, then try again.",
+      };
   }
 }
 

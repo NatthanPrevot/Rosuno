@@ -75,6 +75,14 @@ export const STAFF_VERIFICATION_SOURCES = delegate;
 const NEXT_SERVER = `import { wiring } from "./wiring.mjs";
 export async function connection() { wiring.log.push("connection"); }
 `;
+// MVP-001 S2: the step-up gate, replaced by stand-ins that let the request
+// through and refuse any principal kind but the route's own.
+const gateFor = (kind) => `export async function requireSteppedUp(kind) {
+  if (kind !== "${kind}") {
+    throw new Error("unexpected principal kind");
+  }
+}
+`;
 const ACTIONS = `const action = async (state) => state;
 export const saveDetails = action, saveLicense = action, saveInsurance = action, requestArea = action, changeAreaRequest = action, submitForReview = action;
 export const recordFinding = action, recordUnavailableSource = action, recordDiscipline = action, decideArea = action, changeStage = action, recordDetermination = action;
@@ -90,6 +98,8 @@ const react = import.meta.resolve("react");
 write("wiring.mjs", WIRING);
 write("next-server.mjs", NEXT_SERVER);
 write("actions.mjs", ACTIONS);
+write("attorney-gate.mjs", gateFor("attorney"));
+write("staff-gate.mjs", gateFor("staff"));
 write(
   "design-system.mjs",
   relink(transpile(read("src/presentation/design-system.tsx"), "design.tsx"), {
@@ -119,6 +129,7 @@ write(
     "../../../src/infrastructure/professional/attorney-professional-adapter.ts":
       target("wiring.mjs"),
     "../../../src/presentation/design-system.tsx": target("design-system.mjs"),
+    "../../account/gate.ts": target("attorney-gate.mjs"),
     "./forms.tsx": target("attorney-forms.mjs"),
   }),
 );
@@ -145,6 +156,7 @@ write(
     "../../../src/infrastructure/staff/staff-verification-adapter.ts":
       target("wiring.mjs"),
     "../../../src/presentation/design-system.tsx": target("design-system.mjs"),
+    "../../account/gate.ts": target("staff-gate.mjs"),
   }),
 );
 write(
@@ -170,6 +182,7 @@ write(
         target("design-system.mjs"),
       "../../../../src/presentation/professional-labels.ts":
         target("labels.mjs"),
+      "../../../account/gate.ts": target("staff-gate.mjs"),
       "../forms.tsx": target("staff-forms.mjs"),
     },
   ),

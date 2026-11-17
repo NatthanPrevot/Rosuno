@@ -1093,9 +1093,15 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
     "../../src/infrastructure/identity/attorney-principal-source.ts",
     "../../src/infrastructure/identity/server-session-source.ts",
     "../../src/presentation/design-system.tsx",
+    // MVP-001 S2: the step-up gate, and nothing else, is added.
+    "../account/gate.ts",
   ]);
   assert.match(code, /^import type \{ Metadata \} from "next";$/m);
   assert.match(code, /^import \{ connection \} from "next\/server";$/m);
+  assert.match(
+    code,
+    /^import \{ requireSteppedUp \} from "\.\.\/account\/gate\.ts";$/m,
+  );
   assert.match(code, /^import type \{ ReactNode \} from "react";$/m);
   // A server component: no client or server-action directive.
   assert.doesNotMatch(source, /["']use (?:client|server)["']/);
@@ -1122,6 +1128,12 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
   assert.equal(code.split(resolve).length, 2);
   assert.ok(code.indexOf("await connection();") < code.indexOf(resolve));
   assert.equal(code.match(/resolveAttorneyWorkspaceAccess\(/g).length, 1);
+  // MVP-001 S2: the attorney step-up gate runs once, right after the
+  // prerendering opt-out and before access is read.
+  const gate = 'await connection();\n  await requireSteppedUp("attorney");\n';
+  assert.equal(code.split(gate).length, 2);
+  assert.ok(code.indexOf(gate) < code.indexOf(resolve));
+  assert.equal(code.match(/requireSteppedUp\(/g).length, 1);
   assert.doesNotMatch(
     code,
     /searchParams|\bparams\b|headers\(|cookies\(|redirect|notFound|next\/navigation|useActionState|useState|useEffect|<form|\baction=|TextField|TextAreaField|SelectField|Choice|<Button\b|<Dialog|dangerouslySetInnerHTML|process\.env|\bconsole\b|createSupabaseServerClient|\.from\(|getUser|getClaims|\.insert\(|\.update\(|\.upsert\(|\.delete\(|localStorage|sessionStorage|window\.|document\.|\bfetch\s*\(/,
@@ -1185,6 +1197,15 @@ export async function connection() {
 }
 `;
 
+// MVP-001 S2: the step-up gate, replaced by a stand-in that lets the
+// request through and refuses any principal kind but the route's own.
+const GATE_STUB = `export async function requireSteppedUp(kind) {
+  if (kind !== "attorney") {
+    throw new Error("unexpected principal kind");
+  }
+}
+`;
+
 function transpile(source, fileName) {
   const output = ts.transpileModule(source, {
     fileName,
@@ -1223,6 +1244,7 @@ async function buildPageHarness() {
   const jsxRuntime = import.meta.resolve("react/jsx-runtime");
   write("wiring.mjs", WIRING_STUB);
   write("next-server.mjs", NEXT_SERVER_STUB);
+  write("gate.mjs", GATE_STUB);
   write(
     "design-system.mjs",
     relink(
@@ -1244,6 +1266,7 @@ async function buildPageHarness() {
       "../../src/infrastructure/identity/server-session-source.ts":
         target("wiring.mjs"),
       "../../src/presentation/design-system.tsx": target("design-system.mjs"),
+      "../account/gate.ts": target("gate.mjs"),
     }),
   );
   const { wiring } = await import(target("wiring.mjs"));

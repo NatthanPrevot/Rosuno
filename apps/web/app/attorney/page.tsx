@@ -5,7 +5,9 @@
 // Security Shell, and the page shows only the fixed state that results.
 // Direct entry and every repeated request are decided the same way. The page
 // reads no route parameter, query, header, cookie, or form field of its own,
-// offers no form or mutation, and redirects nowhere. An admitted attorney sees
+// offers no form or mutation, and redirects nowhere of its own (MVP-001 S2:
+// the step-up gate first sends an attorney whose session is not stepped up
+// to a fixed account page). An admitted attorney sees
 // a restricted entry that keeps active User account access, the Attorney
 // Profile lifecycle stage, professional verification, and current eligibility
 // apart: this page establishes no verification and determines no
@@ -38,6 +40,7 @@ import {
   Table,
   Text,
 } from "../../src/presentation/design-system.tsx";
+import { requireSteppedUp } from "../account/gate.ts";
 
 export const metadata: Metadata = {
   title: "Attorney workspace",
@@ -75,6 +78,7 @@ function WorkspaceFrame({ title, children }: WorkspaceFrameProps) {
 export default async function AttorneyWorkspacePage() {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("attorney");
   const access = await resolveAttorneyWorkspaceAccess({
     session: SUPABASE_SERVER_SESSION_SOURCE,
     attorney: ATTORNEY_PRINCIPAL_SOURCE,

@@ -67,6 +67,7 @@ import {
   type ProfileState,
   type SubjectKind,
 } from "./professional-records.ts";
+import type { StepUpRequired } from "./session-assurance.ts";
 import type { ServerSessionSource } from "./session.ts";
 
 // Request-scoped, unprivileged reads under the database's own-row policies,
@@ -729,7 +730,8 @@ export type FieldErrors = Readonly<Record<string, readonly string[]>>;
 // "saved": a fresh read shows the change. "locked": the profile stage or
 // the record's review status no longer allows it. "not-saved": nothing was
 // changed. "unconfirmed": a write was attempted and could not be shown
-// complete, so nothing is claimed.
+// complete, so nothing is claimed. "step-up-required" (MVP-001 S2): the
+// session is not stepped up, so nothing was sent.
 export type ProfessionalActionState =
   | { readonly status: "idle" }
   | { readonly status: "saved" }
@@ -739,7 +741,8 @@ export type ProfessionalActionState =
   | { readonly status: "unconfirmed" }
   | typeof SIGN_IN_REQUIRED
   | typeof DENIED
-  | typeof UNAVAILABLE;
+  | typeof UNAVAILABLE
+  | StepUpRequired;
 
 export const INITIAL_PROFESSIONAL_STATE: ProfessionalActionState =
   Object.freeze({ status: "idle" });

@@ -25,6 +25,7 @@ import {
   LIFECYCLE_LABELS,
   periodLabel,
 } from "../../../../src/presentation/staff-configuration-labels.ts";
+import { requireSteppedUp } from "../../../account/gate.ts";
 import {
   BackLink,
   BoundNotice,
@@ -45,6 +46,7 @@ export default async function JurisdictionPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const { jurisdiction } = await params;
   const view = await resolveJurisdiction(
     STAFF_CONFIGURATION_SOURCES,

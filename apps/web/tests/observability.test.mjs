@@ -333,7 +333,8 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   );
   // MVP-001 S1: the staff configuration actions (an action not completed),
   // the shared staff configuration page frame (a view unavailable), and the
-  // staff configuration adapter (a failed call) also write lines.
+  // staff configuration adapter (a failed call) also write lines. MVP-001
+  // S2: the Auth MFA adapter (a failed or refused call) does too.
   assert.deepEqual(callers, [
     "app/client/actions.ts",
     "app/client/intakes/[intake]/page.tsx",
@@ -342,6 +343,7 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/staff/actions.ts",
     "app/staff/frame.tsx",
     "src/infrastructure/client/client-intake-adapter.ts",
+    "src/infrastructure/identity/authenticator-provider.ts",
     "src/infrastructure/staff/staff-configuration-adapter.ts",
   ]);
   for (const file of callers) {

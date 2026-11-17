@@ -131,6 +131,9 @@ test("3. every route gets the full set, and the confirmation handler gets only t
     "/attorney/professional",
     "/staff/verification",
     "/staff/verification/00000000-0000-4000-8000-000000000001",
+    // MVP-001 S2: the authenticator setup and step-up pages.
+    "/account/security",
+    "/account/step-up",
     "/_next/static/chunks/synthetic.js",
     "/no-such-page",
     "/auth",

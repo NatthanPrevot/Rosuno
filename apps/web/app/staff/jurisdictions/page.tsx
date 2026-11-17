@@ -21,6 +21,7 @@ import {
   Text,
 } from "../../../src/presentation/design-system.tsx";
 import { LIFECYCLE_LABELS } from "../../../src/presentation/staff-configuration-labels.ts";
+import { requireSteppedUp } from "../../account/gate.ts";
 import { BackLink, PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
 import { CreateJurisdictionForm } from "./forms.tsx";
 
@@ -36,6 +37,7 @@ export default async function JurisdictionsPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const { page } = await searchParams;
   const view = await resolveJurisdictionList(STAFF_CONFIGURATION_SOURCES, page);
   if (view.status !== "ready") {

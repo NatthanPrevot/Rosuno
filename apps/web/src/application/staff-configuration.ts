@@ -61,6 +61,7 @@ import {
   type AccountState,
   type StaffState,
 } from "./professional-records.ts";
+import type { StepUpRequired } from "./session-assurance.ts";
 import type { ServerSessionSource } from "./session.ts";
 import { STAFF_PROFILE_COLUMNS } from "./staff-verification.ts";
 
@@ -2285,7 +2286,8 @@ export type FieldErrors = Readonly<Record<string, readonly string[]>>;
 // database (or the same rule applied before sending) refused with the given
 // reason; nothing was written. "not-saved": the database reported an error
 // inside the call, which rolled back. "unconfirmed": the answer was lost,
-// late, or malformed; nothing is claimed either way.
+// late, or malformed; nothing is claimed either way. "step-up-required"
+// (MVP-001 S2): the session is not stepped up, so nothing was sent.
 export type ConfigurationActionState =
   | { readonly status: "idle" }
   | { readonly status: "recorded" }
@@ -2294,7 +2296,8 @@ export type ConfigurationActionState =
   | { readonly status: "refused"; readonly reason: RefusalReason }
   | { readonly status: "not-saved" }
   | { readonly status: "unconfirmed" }
-  | Refusal;
+  | Refusal
+  | StepUpRequired;
 
 export const INITIAL_CONFIGURATION_STATE: ConfigurationActionState =
   Object.freeze({ status: "idle" });

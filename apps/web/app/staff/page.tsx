@@ -22,6 +22,7 @@ import {
   Text,
 } from "../../src/presentation/design-system.tsx";
 import { SURFACE_LINKS } from "../../src/presentation/staff-configuration-labels.ts";
+import { requireSteppedUp } from "../account/gate.ts";
 import { refusalPage, StaffFrame } from "./frame.tsx";
 
 export const metadata: Metadata = {
@@ -32,6 +33,7 @@ export const metadata: Metadata = {
 export default async function StaffHomePage() {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const view = await resolveStaffHome(STAFF_CONFIGURATION_SOURCES);
   if (view.status !== "ready") {
     return refusalPage(view, "/staff", "Staff tools");

@@ -298,6 +298,17 @@ write(
 export async function logRequestEvent(level, event, fields) { wiring.log.push({ level, event, fields }); }
 `,
 );
+// MVP-001 S2: the step-up gate, replaced by a stand-in that lets the request
+// through and refuses any principal kind but staff.
+write(
+  "gate.mjs",
+  `export async function requireSteppedUp(kind) {
+  if (kind !== "staff") {
+    throw new Error("unexpected principal kind");
+  }
+}
+`,
+);
 const ACTION_NAMES = [
   ...codeOf(read("app/staff/actions.ts")).matchAll(
     /^export async function (\w+)\(/gm,
@@ -356,6 +367,9 @@ function targetOf(from, specifier) {
     path === "app/staff/verification/actions.ts"
   ) {
     return target("actions.mjs");
+  }
+  if (path === "app/account/gate.ts") {
+    return target("gate.mjs");
   }
   assert.ok(!path.startsWith("src/infrastructure/"), `${from}: ${path}`);
   return path.startsWith("src/application/") ? real(path) : build(path);

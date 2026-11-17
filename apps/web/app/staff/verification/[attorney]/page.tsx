@@ -35,6 +35,7 @@ import {
   RESULT_LABELS,
   reasonLabel,
 } from "../../../../src/presentation/professional-labels.ts";
+import { requireSteppedUp } from "../../../account/gate.ts";
 import {
   DecisionForm,
   DeterminationForm,
@@ -150,6 +151,7 @@ export default async function StaffReviewPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const { attorney } = await params;
   const view = await resolveStaffReview(STAFF_VERIFICATION_SOURCES, attorney);
   if (view.status === "sign-in-required") {
