@@ -173,6 +173,12 @@ export default async function ClientWorkspacePage({
           <ButtonLink variant="tertiary" href="/">
             Return to the home page
           </ButtonLink>
+          <ButtonLink variant="tertiary" href="/help">
+            Help
+          </ButtonLink>
+          <ButtonLink variant="tertiary" href="/privacy">
+            Privacy
+          </ButtonLink>
         </Cluster>
       </WorkspaceFrame>
     );

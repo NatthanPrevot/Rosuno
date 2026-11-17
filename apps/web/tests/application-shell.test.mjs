@@ -142,9 +142,12 @@ const trustedSourceVocabulary = new Map([
 // link shown whatever the session. MVP-001 D-1 withdrew the account-creation
 // link beside it: account creation is refused by design until a client
 // address can be trusted. This exact markup is the only further addition
-// admitted to the historical page contract.
+// admitted to the historical page contract. MVP-001 S3 part 2 (MBS section
+// 18; Packet rule 11): the same fixed cluster also offers the two fixed
+// first-party entry points to the help and privacy pages, which say only
+// that the information is not yet available; nothing else is admitted.
 const registrationEntry =
-  '<Cluster> <ButtonLink variant="tertiary" href="/auth/confirm"> Finish account confirmation </ButtonLink> </Cluster>';
+  '<Cluster> <ButtonLink variant="tertiary" href="/auth/confirm"> Finish account confirmation </ButtonLink> <ButtonLink variant="tertiary" href="/help"> Help </ButtonLink> <ButtonLink variant="tertiary" href="/privacy"> Privacy </ButtonLink> </Cluster>';
 
 // Import or export syntax without the spacing Prettier writes, or with a
 // comment inside it, would hide its specifier from importsOf.
@@ -1031,6 +1034,8 @@ test("12. presentation reaches application state only through application module
       "Status",
       "Cluster",
       "ButtonLink",
+      "ButtonLink",
+      "ButtonLink",
       "Columns",
       "Stack",
       "Heading",
@@ -1116,6 +1121,10 @@ test("12. presentation reaches application state only through application module
       "tone",
       "variant",
       "href",
+      "variant",
+      "href",
+      "variant",
+      "href",
       "columns",
       "size",
       "tone",
@@ -1192,6 +1201,8 @@ test("12. presentation reaches application state only through application module
       "Session: {}",
       "{}",
       "Finish account confirmation",
+      "Help",
+      "Privacy",
       "Actions and status",
       "Three levels of emphasis, each with hover, focus, pressed, and disabled states.",
       "Primary action",
@@ -1264,6 +1275,11 @@ test("12. presentation reaches application state only through application module
       "type=submit",
       "variant=tertiary",
       "href=/auth/confirm",
+      // MVP-001 S3 part 2: the help and privacy entry points.
+      "variant=tertiary",
+      "href=/help",
+      "variant=tertiary",
+      "href=/privacy",
       "columns=split",
       "size=lg",
       "tone=muted",
@@ -1469,12 +1485,20 @@ test("14. generated Next.js state stays in ignored app-local locations", async (
   assert.equal((await nextConfig.headers()).length, 2);
   // Next.js copies every own key of the config, enumerable or not, and runs it
   // in its own process, so the file itself is exactly these three directives
-  // and their fixed header values: nothing hidden, computed from the
-  // environment, or conditional on how it is run.
+  // and their fixed header values: nothing hidden or conditional on how it is
+  // run. MVP-001 S3 admits exactly one value read when the configuration
+  // loads: the CSP media-src origin, taken only from the public project URL
+  // (the value the build already inlines) when it is exactly a hosted
+  // project origin or the local stack loopback origin, and none otherwise
+  // (every case pinned in tests/security-headers.test.mjs). No other
+  // environment value is read.
   assert.equal(
     codeOf(read("next.config.ts")),
-    'import type { NextConfig } from "next";\nconst CONTENT_SECURITY_POLICY = [\n  "default-src \'self\'",\n  "script-src \'self\' \'unsafe-inline\'",\n  "style-src \'self\'",\n  "img-src \'self\'",\n  "font-src \'self\'",\n  "connect-src \'self\'",\n  "object-src \'none\'",\n  "base-uri \'none\'",\n  "form-action \'self\'",\n  "frame-ancestors \'none\'",\n].join("; ");\n\nconst TRANSPORT_SECURITY = {\n  key: "Strict-Transport-Security",\n  value: "max-age=31536000; includeSubDomains",\n};\n\nconst SECURITY_HEADERS = [\n  { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },\n  { key: "X-Frame-Options", value: "DENY" },\n  { key: "Referrer-Policy", value: "same-origin" },\n  { key: "X-Content-Type-Options", value: "nosniff" },\n  TRANSPORT_SECURITY,\n];\n\nconst nextConfig: NextConfig = {\n  agentRules: false,\n  distDir: "dist",\n  async headers() {\n    return [\n      { source: "/((?!auth/confirm$).*)", headers: SECURITY_HEADERS },\n      { source: "/auth/confirm", headers: [TRANSPORT_SECURITY] },\n    ];\n  },\n};\n\nexport default nextConfig;\n',
+    'import type { NextConfig } from "next";\nconst SUPABASE_ORIGIN =\n  /^(?:https:\\/\\/[a-z]{20}\\.supabase\\.co|http:\\/\\/(?:127\\.0\\.0\\.1|localhost):54321)$/;\n\nfunction mediaSource(url: string | undefined): string {\n  const origin = typeof url === "string" ? url.replace(/\\/$/, "") : "";\n  return SUPABASE_ORIGIN.test(origin) ? origin : "\'none\'";\n}\n\nconst CONTENT_SECURITY_POLICY = [\n  "default-src \'self\'",\n  "script-src \'self\' \'unsafe-inline\'",\n  "style-src \'self\'",\n  "img-src \'self\'",\n  "font-src \'self\'",\n  "connect-src \'self\'",\n  `media-src ${mediaSource(process.env.NEXT_PUBLIC_SUPABASE_URL)}`,\n  "object-src \'none\'",\n  "base-uri \'none\'",\n  "form-action \'self\'",\n  "frame-ancestors \'none\'",\n].join("; ");\n\nconst TRANSPORT_SECURITY = {\n  key: "Strict-Transport-Security",\n  value: "max-age=31536000; includeSubDomains",\n};\n\nconst SECURITY_HEADERS = [\n  { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },\n  { key: "X-Frame-Options", value: "DENY" },\n  { key: "Referrer-Policy", value: "same-origin" },\n  { key: "X-Content-Type-Options", value: "nosniff" },\n  TRANSPORT_SECURITY,\n];\n\nconst nextConfig: NextConfig = {\n  agentRules: false,\n  distDir: "dist",\n  async headers() {\n    return [\n      { source: "/((?!auth/confirm$).*)", headers: SECURITY_HEADERS },\n      { source: "/auth/confirm", headers: [TRANSPORT_SECURITY] },\n    ];\n  },\n};\n\nexport default nextConfig;\n',
   );
+  assert.deepEqual(read("next.config.ts").match(/process\.env\.\w+/g), [
+    "process.env.NEXT_PUBLIC_SUPABASE_URL",
+  ]);
   // Next.js loads next.config.js or next.config.mjs ahead of next.config.ts,
   // so no other config file may exist beside it.
   assert.deepEqual(

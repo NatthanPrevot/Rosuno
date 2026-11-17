@@ -61,6 +61,9 @@ import {
   PUBLISH_QUESTION_SET_OUTCOMES,
   QUESTION_SET_COLUMNS,
   RETRY_JOB_OUTCOMES,
+  REVIEW_ASSESSMENT_OUTCOMES,
+  REVIEW_DECISIONS,
+  REVIEW_GROUPS,
   REVISE_POLICY_OUTCOMES,
   REVOKE_CAPABILITY_OUTCOMES,
   REVOKE_LAUNCH_OUTCOMES,
@@ -73,6 +76,8 @@ import {
   type ConfigurationSources,
   type ConfigurationWrites,
   type JobGroup,
+  type ReviewDecision,
+  type ReviewGroup,
 } from "../../application/staff-configuration.ts";
 import { STAFF_PROFILE_COLUMNS } from "../../application/staff-verification.ts";
 import { readEnvironmentConfiguration } from "../environment/environment-configuration.ts";
@@ -607,6 +612,28 @@ export function createConfigurationReads(
             return pageQuery(ordered, offset, count);
           });
         },
+        // MVP-001 S3 part 2: the database's own review read functions, which
+        // decide the caller's capability, scope and aal2 themselves.
+        reviewIntakes: async (
+          group: ReviewGroup,
+          offset: number,
+          count: number,
+        ) =>
+          isPage(offset, count) && REVIEW_GROUPS.includes(group)
+            ? observedRead("reviewIntakes", deadlineMs, () =>
+                client.rpc("staff_jurisdiction_review_intakes", {
+                  p_group: group,
+                  p_offset: offset,
+                  p_count: count,
+                }),
+              )
+            : UNREADABLE_ROWS,
+        reviewAssessmentsOf: (intakeId: string) =>
+          observedRead("reviewAssessmentsOf", deadlineMs, () =>
+            client.rpc("staff_jurisdiction_review_assessments", {
+              p_intake_id: intakeId,
+            }),
+          ),
       } satisfies ConfigurationReads,
       deadlineMs,
     );
@@ -908,6 +935,23 @@ export function createConfigurationWrites(
             }),
           (result) => textAnswerOf(result, CANCEL_JOB_OUTCOMES),
         ),
+      // MVP-001 S3 part 2.
+      reviewJurisdictionAssessment: async (
+        assessmentId: string,
+        decision: ReviewDecision,
+      ) =>
+        REVIEW_DECISIONS.includes(decision)
+          ? observedWrite(
+              "staff_review_jurisdiction_assessment",
+              deadlineMs,
+              () =>
+                client.rpc("staff_review_jurisdiction_assessment", {
+                  p_assessment_id: assessmentId,
+                  p_decision: decision,
+                }),
+              (result) => textAnswerOf(result, REVIEW_ASSESSMENT_OUTCOMES),
+            )
+          : UNREADABLE,
     } satisfies ConfigurationWrites);
   };
 }

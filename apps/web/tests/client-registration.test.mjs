@@ -2752,7 +2752,10 @@ const APPLICANT_ADAPTER =
 // P5-001: the client intake adapter calls the database's own client intake
 // functions (two catalog reads and four writes), each exactly once, through
 // the request's own unprivileged session; it builds or receives no
-// privileged client.
+// privileged client. MVP-001 S3 part 2 adds exactly three more writes, each
+// once and through the same session: the client's confirmation and
+// rejection of a presented AI suggestion, and the post-submission change
+// request.
 const CLIENT_INTAKE_ADAPTER =
   "src/infrastructure/client/client-intake-adapter.ts";
 const CLIENT_INTAKE_RPCS = Object.freeze([
@@ -2762,6 +2765,9 @@ const CLIENT_INTAKE_RPCS = Object.freeze([
   "client_save_intake_revision",
   "client_submit_intake",
   "client_close_intake",
+  "client_confirm_ai_suggestion",
+  "client_reject_ai_suggestion",
+  "client_request_intake_change",
 ]);
 // MVP-001 S1: the staff configuration adapter calls the database's own
 // has_staff_capability predicate, the PS-A2 environment accessor, and the
@@ -2792,6 +2798,11 @@ const CONFIGURATION_RPCS = Object.freeze([
   // MVP-001 S2: the two audited staff operational job functions.
   "staff_retry_job",
   "staff_cancel_job",
+  // MVP-001 S3 part 2: the audited jurisdiction assessment review and its two
+  // read functions.
+  "staff_review_jurisdiction_assessment",
+  "staff_jurisdiction_review_intakes",
+  "staff_jurisdiction_review_assessments",
   "has_staff_capability",
 ]);
 // MVP-001 S2: the privileged module's only other calls are the three fixed
@@ -2820,17 +2831,42 @@ const AUTHENTICATION_ABUSE_RPCS = Object.freeze({
   authentication_abuse_report_unavailable:
     'await admin\n          .rpc("authentication_abuse_report_unavailable", {\n            p_purpose: purpose,\n            p_failure_kind: failure,\n          })\n          .abortSignal(AbortSignal.timeout(ABUSE_CALL_DEADLINE_MS));',
 });
+// MVP-001 S3 part 2 (PS section 13): the privileged module's only further
+// call is the one fixed AI suggestion recording function, exactly once, as a
+// literal call on its own privileged client, with exactly its named
+// arguments and a deadline; no other file names it, so no request-scoped or
+// browser path can record a suggestion.
+const AI_SUGGESTION_RPCS = Object.freeze({
+  ai_record_intake_suggestion:
+    'await admin\n          .rpc("ai_record_intake_suggestion", {\n            p_user_id: input.userId,\n            p_intake_id: input.intakeId,\n            p_revision_number: input.revisionNumber,\n            p_suggestion_type: input.type,\n            p_suggestion_value: input.value,\n            p_model_reference: input.modelReference,\n            p_generated_at: input.generatedAt,\n          })\n          .abortSignal(AbortSignal.timeout(AI_RECORD_DEADLINE_MS));',
+});
+// MVP-001 S3: the protected resource adapter calls the database's own five
+// resource functions (voice memo and verification artifact start,
+// completion, abandonment, and access authorization), each exactly once and
+// each as a literal call through the request's own unprivileged session; it
+// builds or receives no privileged client and never names the credential.
+const PROTECTED_RESOURCE_ADAPTER =
+  "src/infrastructure/resources/protected-resource-adapter.ts";
+const PROTECTED_RESOURCE_RPCS = Object.freeze([
+  "resource_begin_voice_memo",
+  "resource_begin_verification_artifact",
+  "resource_finalize_upload",
+  "resource_abandon_upload",
+  "resource_authorize_access",
+]);
 const CAPABILITY_PREDICATE_RPC =
   'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';
 const CONFIGURATION_REQUEST_CLIENT =
   "const client: RequestClient | null = await withinDeadline(\n      clientSource,\n      null,\n      deadlineMs,\n    );";
 const RPC_OCCURRENCES = Object.freeze({
   // The quota decision and (MVP-001 S2) the three job worker calls and the
-  // four authentication-abuse decision calls.
+  // four authentication-abuse decision calls, and (MVP-001 S3 part 2) the
+  // one AI suggestion recording call.
   [PRIVILEGED_MODULE]:
     1 +
     Object.keys(JOB_WORKER_RPCS).length +
-    Object.keys(AUTHENTICATION_ABUSE_RPCS).length,
+    Object.keys(AUTHENTICATION_ABUSE_RPCS).length +
+    Object.keys(AI_SUGGESTION_RPCS).length,
   // MVP-001 S1: the staff adapter's second RPC is exactly the PS-A2
   // environment accessor, pinned by name below.
   [STAFF_ADAPTER]: 2,
@@ -2839,6 +2875,8 @@ const RPC_OCCURRENCES = Object.freeze({
   [CLIENT_INTAKE_ADAPTER]: CLIENT_INTAKE_RPCS.length,
   // The configuration functions and predicate, plus the environment accessor.
   [CONFIGURATION_ADAPTER]: CONFIGURATION_RPCS.length + 1,
+  // MVP-001 S3: the five resource functions.
+  [PROTECTED_RESOURCE_ADAPTER]: PROTECTED_RESOURCE_RPCS.length,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -2860,6 +2898,19 @@ function assertQuotaRpcContract(codes) {
         code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
           0,
         file === CONFIGURATION_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+    }
+    for (const name of PROTECTED_RESOURCE_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+        file === PROTECTED_RESOURCE_ADAPTER ? 2 : 0,
+        `${file}: ${name}`,
+      );
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\("${name}", \\{`, "g"))?.length ??
+          0,
+        file === PROTECTED_RESOURCE_ADAPTER ? 1 : 0,
         `${file}: ${name}`,
       );
     }
@@ -2887,6 +2938,7 @@ function assertQuotaRpcContract(codes) {
     for (const [name, call] of [
       ...Object.entries(JOB_WORKER_RPCS),
       ...Object.entries(AUTHENTICATION_ABUSE_RPCS),
+      ...Object.entries(AI_SUGGESTION_RPCS),
     ]) {
       assert.equal(
         code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
@@ -2957,21 +3009,22 @@ function assertQuotaRpcContract(codes) {
     provisioning,
     /\nconst DIGEST = \/\^\[0-9a-f\]\{64\}\$\/;\n\nfunction isDigest\(value: unknown\): value is string \{\n {2}return typeof value === "string" && DIGEST\.test\(value\);\n\}\n\nfunction isMaximum\(value: unknown\): value is number \{\n {2}return Number\.isSafeInteger\(value\) && \(value as number\) >= 1;\n\}\n/,
   );
-  // Seven privileged clients (Admin provisioning, the P3-002
+  // Nine privileged clients (Admin provisioning, the P3-002
   // attorney-applicant provisioning, the P3-003 professional and staff
   // verification provisioning, the quota decision, the MVP-001 S2
-  // operational job worker, and the MVP-001 S2 authentication-abuse
-  // decisions) and one publishable client (the confirmation request), each
-  // built only from the verified binding.
+  // operational job worker, the MVP-001 S2 authentication-abuse decisions,
+  // the MVP-001 S3 protected storage port, and the MVP-001 S3 part 2 AI
+  // suggestion recording port) and one publishable client (the confirmation
+  // request), each built only from the verified binding.
   assert.equal(
     provisioning.match(
       /\bcreate\(binding\.url, binding\.adminKey, clientOptions\(\)\)/g,
     ).length,
-    7,
+    9,
   );
-  assert.equal(provisioning.match(/\bcreate\(/g).length, 8);
+  assert.equal(provisioning.match(/\bcreate\(/g).length, 10);
   assert.equal(provisioning.match(/\bbinding\.publishableKey\b/g).length, 1);
-  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 7);
+  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 9);
   // The worker port is built exactly like the other ports: the verified
   // binding first, then its one cookie-free privileged client, never
   // returned; it offers exactly the three worker calls and nothing else.
@@ -3023,6 +3076,97 @@ function assertQuotaRpcContract(codes) {
     abuse,
     /\.from\(|\.insert\(|\.update\(|\.upsert\(|\.delete\(|auth\.admin|authentication_abuse_counters|audit_events|return admin\b|admin[,;)]|process\.env|\.\.\./,
   );
+  // MVP-001 S3: the protected storage port is built the same way, sits in
+  // its own section before the authentication-abuse port, offers exactly its
+  // two operations, works only in the one private bucket at the path it
+  // derives from a resource id, never replaces an object, signs for the fixed
+  // short lifetime only, and offers no listing, reading, moving, copying,
+  // replacing, public URL, removal, table access, or database call.
+  const storageStart = provisioning.indexOf(
+    "export async function createProtectedStoragePort(",
+  );
+  assert.ok(storageStart > 0 && storageStart < abuseStart);
+  const storage = provisioning.slice(storageStart, abuseStart);
+  assert.match(
+    storage,
+    /\): Promise<ProtectedStorage \| null> \{\n {2}const binding = readProjectBinding\(environment\);\n {2}if \(binding === null\) \{\n {4}return null;\n {2}\}\n {2}const admin = create\(binding\.url, binding\.adminKey, clientOptions\(\)\);\n {2}return Object\.freeze\(\{\n {4}store: async /,
+  );
+  assert.deepEqual(
+    [...storage.matchAll(/^ {4}(\w+): async /gm)].map((match) => match[1]),
+    ["store", "signedUrl"],
+  );
+  assert.equal(
+    storage.match(/await admin\.storage\n\s+\.from\(PROTECTED_BUCKET\)\n/g)
+      ?.length,
+    2,
+  );
+  assert.equal(storage.match(/\.from\(/g).length, 2);
+  // The two storage client calls and the signed-object URL prefix.
+  assert.equal(storage.match(/\bstorage\b/g).length, 3);
+  assert.equal(
+    storage.split(
+      "const prefix = `${binding.url}/storage/v1/object/sign/${PROTECTED_BUCKET}/${path}?token=`;",
+    ).length,
+    2,
+  );
+  assert.equal(
+    storage.match(
+      /\.upload\(path, bytes, \{\n\s+contentType: type,\n\s+upsert: false,\n\s+cacheControl: "0",\n\s+\}\);/g,
+    )?.length,
+    1,
+  );
+  assert.equal(
+    storage.match(/\.createSignedUrl\(\n\s+path,\n\s+SIGNED_URL_SECONDS,\n/g)
+      ?.length,
+    1,
+  );
+  assert.equal(
+    storage.match(/const path = objectPathOf\(resourceId\);/g).length,
+    2,
+  );
+  assert.equal(storage.match(/\bpath\b/g).length, 9);
+  assert.doesNotMatch(
+    storage,
+    /\.rpc\(|\.from\("|\.insert\(|\.update\(|\.upsert\(|\.delete\(|\.remove\(|\.list\(|\.download\(|\.move\(|\.copy\(|getPublicUrl|createSignedUrls|createSignedUploadUrl|uploadToSignedUrl|upsert: true|auth\.admin|return admin\b|admin[,;)]|process\.env|\.\.\./,
+  );
+  assert.match(
+    provisioning,
+    /^const SIGNED_SUFFIX = \/\^\[A-Za-z0-9\._-\]\+\(\?:&download=\)\?\$\/;$/m,
+  );
+  // MVP-001 S3 part 2: the AI suggestion recording port is built the same
+  // way, sits in its own section before the storage port, offers exactly its
+  // one operation, checks every argument before the one literal call under a
+  // deadline, reads the answer strictly, and reads or writes no table and
+  // calls nothing else.
+  const recorderStart = provisioning.indexOf(
+    "export async function createAiSuggestionRecorder(",
+  );
+  assert.ok(recorderStart > 0 && recorderStart < storageStart);
+  const recorder = provisioning.slice(recorderStart, storageStart);
+  assert.match(
+    recorder,
+    /\): Promise<SuggestionRecorder \| null> \{\n {2}const binding = readProjectBinding\(environment\);\n {2}if \(binding === null\) \{\n {4}return null;\n {2}\}\n {2}const admin = create\(binding\.url, binding\.adminKey, clientOptions\(\)\);\n {2}return Object\.freeze\(\{\n {4}record: async \(input\) => \{\n {6}try \{\n {8}if \(!isRecordInput\(input\)\) \{\n {10}return UNKNOWN_RECORD;\n {8}\}\n/,
+  );
+  assert.deepEqual(
+    [...recorder.matchAll(/^ {4}(\w+): async /gm)].map((match) => match[1]),
+    ["record"],
+  );
+  assert.equal(recorder.match(/\.rpc\(/g).length, 1);
+  assert.equal(
+    recorder.match(
+      /\.abortSignal\(AbortSignal\.timeout\(AI_RECORD_DEADLINE_MS\)\)/g,
+    ).length,
+    1,
+  );
+  assert.match(
+    recorder,
+    /return error === null \? recordAnswerOf\(data\) : UNKNOWN_RECORD;/,
+  );
+  assert.match(provisioning, /^const AI_RECORD_DEADLINE_MS = 5000;$/m);
+  assert.doesNotMatch(
+    recorder,
+    /\.from\(|\.storage\b|\.insert\(|\.update\(|\.upsert\(|\.delete\(|auth\.admin|ai_suggestions|jurisdiction_assessments|audit_events|intakes|return admin\b|admin[,;)]|process\.env|\.\.\./,
+  );
 }
 
 // The exact export list: the original three, the one narrow quota
@@ -3043,6 +3187,10 @@ function assertPrivilegedExports(provisioning) {
       "createRegistrationProvisioning",
       "createConfirmationDispatch",
       "hasPrivilegedProjectBinding",
+      // MVP-001 S3 part 2: the one narrow AI suggestion recording capability.
+      "createAiSuggestionRecorder",
+      // MVP-001 S3: the one narrow protected storage capability.
+      "createProtectedStoragePort",
       // MVP-001 S2: the one narrow authentication-abuse decision capability.
       "createAuthenticationAbusePort",
       "createJobWorkerPort",
@@ -3052,7 +3200,7 @@ function assertPrivilegedExports(provisioning) {
       "decideQuotaRpc",
     ],
   );
-  assert.equal(provisioning.match(/\bexport\b/g).length, 10);
+  assert.equal(provisioning.match(/\bexport\b/g).length, 12);
   // The binding check returns only whether a binding exists.
   assert.match(
     provisioning,
@@ -3121,6 +3269,12 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
           "src/infrastructure/jobs/job-worker-adapter.ts",
           // MVP-001 S2: the server-only authentication-abuse control.
           "src/infrastructure/identity/authentication-abuse-control.ts",
+          // MVP-001 S3: the server-only protected resource adapter, which
+          // only bounds the storage port in time.
+          "src/infrastructure/resources/protected-resource-adapter.ts",
+          // MVP-001 S3 part 2: the server-only AI suggestion sources, which
+          // only bound the recording port in time.
+          "src/infrastructure/client/intake-suggestion-adapter.ts",
         ].includes(file),
         file,
       );
@@ -3147,6 +3301,9 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
     importsOf(read("src/infrastructure/identity/registration-provisioning.ts")),
     [
       "@supabase/supabase-js",
+      // MVP-001 S3 part 2: the recording port's type, its argument check,
+      // and its strict answer reader.
+      "../../application/ai-suggestion.ts",
       "../../application/attorney-application.ts",
       "../../application/attorney-professional.ts",
       // MVP-001 S2: the authentication-abuse port's type, its argument
@@ -3157,6 +3314,9 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
       "../../application/job-worker.ts",
       "../../application/policy-selection.ts",
       "../../application/professional-records.ts",
+      // MVP-001 S3: the storage port's type, its path derivation, the bucket,
+      // the byte ceiling, the content-type check, and the URL lifetime.
+      "../../application/protected-resources.ts",
       "../../application/staff-verification.ts",
     ],
   );
@@ -3233,6 +3393,94 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
         "            p_auth_user_id: accountId,\n          });",
       ),
     ),
+    // MVP-001 S3: the storage port and the resource functions.
+    "storage replacing an object": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace("upsert: false,", "upsert: true,"),
+    ),
+    "storage removal": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "        return error === null && data?.path === path;",
+        "        await admin.storage.from(PROTECTED_BUCKET).remove([path]);\n        return error === null && data?.path === path;",
+      ),
+    ),
+    "storage listing": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "        const url = data?.signedUrl;",
+        "        await admin.storage.from(PROTECTED_BUCKET).list();\n        const url = data?.signedUrl;",
+      ),
+    ),
+    "caller-chosen object path": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "        const path = objectPathOf(resourceId);",
+        "        const path = resourceId;",
+      ),
+    ),
+    "longer signed lifetime": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace("            SIGNED_URL_SECONDS,\n", "            3600,\n"),
+    ),
+    "another bucket": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "        const { data, error } = await admin.storage\n          .from(PROTECTED_BUCKET)\n          .upload(",
+        '        const { data, error } = await admin.storage\n          .from("public-files")\n          .upload(',
+      ),
+    ),
+    "resource function through a privileged client": variant(
+      PRIVILEGED_MODULE,
+      (code) =>
+        `${code}\nconst again = (admin) => admin.rpc("resource_authorize_access", {});\n`,
+    ),
+    "second resource call in the adapter": variant(
+      PROTECTED_RESOURCE_ADAPTER,
+      (code) =>
+        `${code}\nconst again = (client) => client.rpc("resource_finalize_upload", {});\n`,
+    ),
+    "resource call in an action": variant(
+      "app/client/actions.ts",
+      (code) =>
+        `${code}\nconst again = (client) => client.rpc("resource_begin_voice_memo", {});\n`,
+    ),
+    // MVP-001 S3 part 2: the AI suggestion recording call is pinned the same
+    // way, and the client's decision calls stay in the client adapter.
+    "AI recording through the request client": variant(
+      CLIENT_INTAKE_ADAPTER,
+      (code) =>
+        `${code}\nconst again = (client) => client.rpc("ai_record_intake_suggestion", {});\n`,
+    ),
+    "AI recording in the suggestion sources": variant(
+      "src/infrastructure/client/intake-suggestion-adapter.ts",
+      (code) =>
+        `${code}\nconst again = (admin) => admin.rpc("ai_record_intake_suggestion", {});\n`,
+    ),
+    "AI recording in an action": variant(
+      "app/client/actions.ts",
+      (code) =>
+        `${code}\nconst again = (admin) => admin.rpc("ai_record_intake_suggestion", {});\n`,
+    ),
+    "dynamic AI recording target": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace('.rpc("ai_record_intake_suggestion", {', ".rpc(target, {"),
+    ),
+    "extra AI recording argument": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "            p_generated_at: input.generatedAt,\n",
+        "            p_generated_at: input.generatedAt,\n            p_presented_at: input.generatedAt,\n",
+      ),
+    ),
+    "AI recording without a deadline": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "          })\n          .abortSignal(AbortSignal.timeout(AI_RECORD_DEADLINE_MS));",
+        "          });",
+      ),
+    ),
+    "second confirmation call elsewhere": variant(
+      "app/client/actions.ts",
+      (code) =>
+        `${code}\nconst again = (client) => client.rpc("client_confirm_ai_suggestion", {});\n`,
+    ),
+    "review call outside the staff adapter": variant(
+      "app/staff/actions.ts",
+      (code) =>
+        `${code}\nconst again = (client) => client.rpc("staff_review_jurisdiction_assessment", {});\n`,
+    ),
   };
   for (const [name, codesVariant] of Object.entries(forbiddenRpc)) {
     assert.notDeepEqual(codesVariant, codes, name);
@@ -3253,6 +3501,11 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
     "generic attorney capability name": provisioning.replace(
       "export async function createAttorneyApplicantProvisioning(",
       "export async function createAdminClient(",
+    ),
+    // MVP-001 S3 part 2.
+    "generic AI capability name": provisioning.replace(
+      "export async function createAiSuggestionRecorder(",
+      "export async function createAiClient(",
     ),
   };
   for (const [name, code] of Object.entries(forbiddenExports)) {
@@ -3425,9 +3678,11 @@ test("38. registration navigation is fixed first-party links on the sign-in and 
   // call to action at all. It keeps only the fixed confirmation-resume link.
   const home = codeOf(read("app/page.tsx"));
   assert.doesNotMatch(home, /\/sign-up|Create an account/);
+  // MVP-001 S3 part 2: beside it, exactly the fixed help and privacy entry
+  // points, and nothing else in that cluster.
   assert.match(
     home,
-    /<Cluster>\n\s+<ButtonLink variant="tertiary" href="\/auth\/confirm">\n\s+Finish account confirmation\n\s+<\/ButtonLink>\n\s+<\/Cluster>/,
+    /<Cluster>\n\s+<ButtonLink variant="tertiary" href="\/auth\/confirm">\n\s+Finish account confirmation\n\s+<\/ButtonLink>\n\s+<ButtonLink variant="tertiary" href="\/help">\n\s+Help\n\s+<\/ButtonLink>\n\s+<ButtonLink variant="tertiary" href="\/privacy">\n\s+Privacy\n\s+<\/ButtonLink>\n\s+<\/Cluster>/,
   );
   // Links only: the home page still has just the one sign-out form.
   assert.equal(home.match(/<form\b/g).length, 1);

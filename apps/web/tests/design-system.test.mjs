@@ -252,10 +252,19 @@ const sessionEntry = `{view.session === "anonymous" ? (
 // the session, directly after the session entry. MVP-001 D-1 withdrew the
 // account-creation link beside it: account creation is refused by design
 // until a client address can be trusted. This exact markup is the only
-// further addition to the historical page contract.
+// further addition to the historical page contract. MVP-001 S3 part 2 (MBS
+// section 18; Packet rule 11): the same fixed cluster also holds the two
+// fixed first-party entry points to the help and privacy pages, and nothing
+// else.
 const registrationEntry = `<Cluster>
             <ButtonLink variant="tertiary" href="/auth/confirm">
               Finish account confirmation
+            </ButtonLink>
+            <ButtonLink variant="tertiary" href="/help">
+              Help
+            </ButtonLink>
+            <ButtonLink variant="tertiary" href="/privacy">
+              Privacy
             </ButtonLink>
           </Cluster>`;
 const pageSessionLines = [
@@ -2672,15 +2681,17 @@ test("22. the page shows the foundation through the design system and the server
   // The confirmation-resume navigation is one design-system link to a fixed
   // first-party path: no condition, expression, form, native element, style,
   // or behavior, and copy without digits. No account-creation link remains.
+  // MVP-001 S3 part 2: beside it, exactly the two fixed design-system links
+  // to the help and privacy entry points, under the same rules.
   assert.deepEqual(
     [...registrationEntry.matchAll(/<([A-Za-z]\w*)/g)].map((match) => match[1]),
-    ["Cluster", "ButtonLink"],
+    ["Cluster", "ButtonLink", "ButtonLink", "ButtonLink"],
   );
   assert.deepEqual(
     [...registrationEntry.matchAll(/\bhref="([^"]*)"/g)].map(
       (match) => match[1],
     ),
-    ["/auth/confirm"],
+    ["/auth/confirm", "/help", "/privacy"],
   );
   assert.doesNotMatch(pageCode, /\/sign-up|Create an account/);
   // The session entry's links are fixed first-party paths, offered only in

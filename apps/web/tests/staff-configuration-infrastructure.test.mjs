@@ -306,6 +306,13 @@ const WRITES = [
     { p_job_id: ID(10) },
     null,
   ],
+  // MVP-001 S3 part 2: the audited jurisdiction assessment review.
+  [
+    (w) => w.reviewJurisdictionAssessment(ID(11), "confirmed"),
+    "staff_review_jurisdiction_assessment",
+    { p_assessment_id: ID(11), p_decision: "confirmed" },
+    null,
+  ],
 ];
 
 test("SC-I1. each write calls exactly one fixed staff function with only its named arguments, never an actor, staff User, grant, or scope", async () => {

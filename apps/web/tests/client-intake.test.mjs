@@ -133,11 +133,16 @@ function harness(overrides = {}) {
         created_at: T(20),
       },
     ],
+    // MVP-001 S3 part 2: the Intake's presented AI suggestions (none by
+    // default) and the decision and change answers.
+    suggestions: [],
     answers: {
       create: answer("created", id(499)),
       save: answer("saved", 2),
       submit: answer("submitted"),
       close: answer("closed"),
+      decide: answer("confirmed"),
+      change: answer("not_configured"),
     },
     readsAvailable: true,
     readLog: [],
@@ -212,6 +217,10 @@ function harness(overrides = {}) {
             assessmentsOf: async () => rows(state.assessments),
             practiceAreas: async () => rows(state.areas),
             jurisdictions: async () => rows(state.jurisdictions),
+            suggestionsOf: async (intake) => {
+              state.readLog.push(["suggestionsOf", intake]);
+              return rows(state.suggestions);
+            },
           }
         : null,
     writes: async () => ({
@@ -230,6 +239,14 @@ function harness(overrides = {}) {
       closeIntake: async (intake) => {
         calls.push(["close", intake]);
         return state.answers.close;
+      },
+      decideSuggestion: async (suggestion, decision) => {
+        calls.push(["decide", suggestion, decision]);
+        return state.answers.decide;
+      },
+      requestChange: async (intake, change) => {
+        calls.push(["change", intake, change]);
+        return state.answers.change;
       },
     }),
   };

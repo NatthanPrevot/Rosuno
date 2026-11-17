@@ -21,7 +21,12 @@
 // claim, complete, and fail; no enqueue, read, or other write). Another makes
 // only the four fixed authentication-abuse decision calls (MVP-001 S2,
 // PS-A4: reserve, record a failure, record a success, and report an
-// unavailable protection; no table read or write). A further
+// unavailable protection; no table read or write). Another (MVP-001 S3)
+// only stores new bytes at, and signs, the one opaque path it derives from a
+// resource id in the one private bucket. Another (MVP-001 S3 part 2) makes
+// only the one fixed AI suggestion recording call for the verified client's
+// own Intake (PS section 13), so no browser can forge a suggestion; it reads
+// and writes no table. A further
 // client, built from
 // the publishable key alone and never given the privileged credential, only
 // requests signup confirmation emails. No client receives a request cookie or
@@ -33,6 +38,12 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+import {
+  isRecordInput,
+  recordAnswerOf,
+  UNKNOWN_RECORD,
+  type SuggestionRecorder,
+} from "../../application/ai-suggestion.ts";
 import type { AttorneyApplicationRecords } from "../../application/attorney-application.ts";
 import type { AttorneyProfessionalProvisioning } from "../../application/attorney-professional.ts";
 import {
@@ -86,6 +97,14 @@ import {
   subjectColumnOf,
   type SubjectKind,
 } from "../../application/professional-records.ts";
+import {
+  isStoredType,
+  objectPathOf,
+  PROTECTED_BUCKET,
+  RESOURCE_BYTE_CEILING,
+  SIGNED_URL_SECONDS,
+  type ProtectedStorage,
+} from "../../application/protected-resources.ts";
 import type { StaffProvisioning } from "../../application/staff-verification.ts";
 
 // The five server runtime inputs this module reads, and nothing else. The URL
@@ -430,6 +449,135 @@ export function hasPrivilegedProjectBinding(
   environment: RegistrationEnvironment = runtimeEnvironment(),
 ): boolean {
   return readProjectBinding(environment) !== null;
+}
+
+// MVP-001 S3 part 2 (PS section 13; TA section 30): the AI suggestion
+// recording port, through its own cookie-free privileged client. It makes
+// only the one fixed call of ai_record_intake_suggestion (service_role
+// only), a literal call with exactly its named arguments, after checking
+// every argument against the database's own bounds, under a deadline. The
+// caller passes the verified client's User id and Intake, the revision the
+// suggestion was generated from, one permitted suggestion, the model
+// reference and the server's time of the provider answer; the database
+// decides again and stores the suggestion as presented, with its audit
+// event. Its answer is read strictly; anything else, including a failed,
+// refused, aborted, or thrown call, is unknown, so nothing is presented that
+// the database did not record.
+const AI_RECORD_DEADLINE_MS = 5000;
+
+export async function createAiSuggestionRecorder(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<SuggestionRecorder | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    record: async (input) => {
+      try {
+        if (!isRecordInput(input)) {
+          return UNKNOWN_RECORD;
+        }
+        const { data, error } = await admin
+          .rpc("ai_record_intake_suggestion", {
+            p_user_id: input.userId,
+            p_intake_id: input.intakeId,
+            p_revision_number: input.revisionNumber,
+            p_suggestion_type: input.type,
+            p_suggestion_value: input.value,
+            p_model_reference: input.modelReference,
+            p_generated_at: input.generatedAt,
+          })
+          .abortSignal(AbortSignal.timeout(AI_RECORD_DEADLINE_MS));
+        return error === null ? recordAnswerOf(data) : UNKNOWN_RECORD;
+      } catch {
+        return UNKNOWN_RECORD;
+      }
+    },
+  } satisfies SuggestionRecorder);
+}
+
+// MVP-001 S3 (IMP section 13; PS section 29): the protected storage port,
+// through its own cookie-free privileged client. It works only in the one
+// private bucket and only at the one path it derives itself from a canonical
+// resource id; it never receives a path, a bucket, or a file name:
+// - store: new bytes of an allowed content type within the byte ceiling,
+//   never replacing an existing object (no upsert);
+// - signedUrl: one URL for that path, valid for SIGNED_URL_SECONDS, served
+//   inline or as an attachment, returned only when it is exactly this
+//   project's signed-object URL for that path.
+// It offers no listing, reading, moving, copying, replacing, public URL, or
+// removal. Authorization is never decided here: the database starts the
+// resource first, and authorizes the caller before anything is signed
+// (resource_authorize_access). The caller bounds each call in time.
+const SIGNED_SUFFIX = /^[A-Za-z0-9._-]+(?:&download=)?$/;
+
+export async function createProtectedStoragePort(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<ProtectedStorage | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    store: async (resourceId, bytes, type) => {
+      try {
+        const path = objectPathOf(resourceId);
+        if (
+          path === null ||
+          !isStoredType(type) ||
+          !(bytes instanceof Uint8Array) ||
+          bytes.length < 1 ||
+          bytes.length > RESOURCE_BYTE_CEILING
+        ) {
+          return false;
+        }
+        const { data, error } = await admin.storage
+          .from(PROTECTED_BUCKET)
+          .upload(path, bytes, {
+            contentType: type,
+            upsert: false,
+            cacheControl: "0",
+          });
+        return error === null && data?.path === path;
+      } catch {
+        return false;
+      }
+    },
+    signedUrl: async (resourceId, disposition) => {
+      try {
+        const path = objectPathOf(resourceId);
+        if (
+          path === null ||
+          (disposition !== "inline" && disposition !== "attachment")
+        ) {
+          return null;
+        }
+        const { data, error } = await admin.storage
+          .from(PROTECTED_BUCKET)
+          .createSignedUrl(
+            path,
+            SIGNED_URL_SECONDS,
+            disposition === "attachment" ? { download: true } : undefined,
+          );
+        const url = data?.signedUrl;
+        const prefix = `${binding.url}/storage/v1/object/sign/${PROTECTED_BUCKET}/${path}?token=`;
+        return error === null &&
+          typeof url === "string" &&
+          url.startsWith(prefix) &&
+          SIGNED_SUFFIX.test(url.slice(prefix.length)) &&
+          (disposition === "attachment") === url.endsWith("&download=")
+          ? url
+          : null;
+      } catch {
+        return null;
+      }
+    },
+  } satisfies ProtectedStorage);
 }
 
 // MVP-001 S2 (PS-A4 section 3): the authentication-abuse decision port,

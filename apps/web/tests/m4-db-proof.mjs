@@ -1388,6 +1388,10 @@ function probes() {
       assert.equal(
         definers,
         [
+          // MVP-001 S3 part 2 re-pin (20261119050000): the AI suggestion
+          // recording function (service_role only), which writes only
+          // ai_suggestions and audit events; no M4 relation.
+          "ai_record_intake_suggestion:v",
           "attorney_change_practice_area_request:v",
           "attorney_request_practice_area:v",
           "attorney_save_insurance_claim:v",
@@ -1408,9 +1412,18 @@ function probes() {
           // P5-001 re-pin: the client intake and configuration-publication
           // functions, which write no M4 relation.
           "client_close_intake:v",
+          // MVP-001 S3 part 2 re-pin (20261119050000): the client's AI
+          // suggestion decision, which writes only ai_suggestions,
+          // unreviewed jurisdiction assessments and audit events.
+          "client_confirm_ai_suggestion:v",
           "client_create_intake:v",
           "client_intake_jurisdictions:s",
           "client_intake_practice_areas:s",
+          // MVP-001 S3 part 2 re-pin (20261119050000, 20261119040000): the
+          // rejection, and the post-submission change seam, which writes
+          // nothing but an expiry transition; no M4 relation.
+          "client_reject_ai_suggestion:v",
+          "client_request_intake_change:v",
           "client_save_intake_revision:v",
           "client_submit_intake:v",
           // MVP-001 S1 re-pin (20261117010000): the environment identity
@@ -1429,6 +1442,15 @@ function probes() {
           // definers executable by no API role.
           "policy_select_version:s",
           "production_financial_gate:s",
+          // MVP-001 S3 re-pin (20261119010000-030000): the protected resource
+          // functions (authenticated only), which write only resources, voice
+          // memos and audit events; no M4 relation (an evidence row refers to
+          // an artifact only through the M4 finding functions).
+          "resource_abandon_upload:v",
+          "resource_authorize_access:v",
+          "resource_begin_verification_artifact:v",
+          "resource_begin_voice_memo:v",
+          "resource_finalize_upload:v",
           "rosuno_environment_class:s",
           "rosuno_environment_status:s",
           // MVP-001 S1 re-pin (20261117030000): the configuration
@@ -1449,6 +1471,10 @@ function probes() {
           "staff_end_policy_version:v",
           "staff_grant_capability:v",
           "staff_grant_launch_authorization:v",
+          // MVP-001 S3 part 2 re-pin (20261119060000): the jurisdiction
+          // assessment review reads, which write nothing.
+          "staff_jurisdiction_review_assessments:s",
+          "staff_jurisdiction_review_intakes:s",
           "staff_publish_intake_question_set:v",
           "staff_record_discipline_finding:v",
           "staff_record_eligibility_evaluation:v",
@@ -1456,6 +1482,10 @@ function probes() {
           "staff_record_source_unavailable:v",
           "staff_record_verification_finding:v",
           "staff_retry_job:v",
+          // MVP-001 S3 part 2 re-pin (20261119060000): the review, which
+          // writes only a jurisdiction assessment's review and its audit
+          // event; no M4 relation.
+          "staff_review_jurisdiction_assessment:v",
           "staff_revise_policy_draft:v",
           "staff_revoke_capability:v",
           "staff_revoke_launch_authorization:v",
@@ -1489,11 +1519,20 @@ function probes() {
         ),
         "0",
       );
+      // MVP-001 S3 admits exactly one more trigger on an M4 relation: the
+      // check of an evidence row's reference to an uploaded artifact, which
+      // only refuses (it writes nothing), on verification_evidence only.
       assert.equal(
         sql(
-          `select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in (${m4}, 'audit_events') and not t.tgisinternal and t.tgname not like '%set_updated_at' and t.tgname <> 'audit_events_immutable';`,
+          `select coalesce(string_agg(c.relname || ':' || t.tgname, ','), '') from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in (${m4}, 'audit_events') and not t.tgisinternal and t.tgname not like '%set_updated_at' and t.tgname <> 'audit_events_immutable';`,
         ),
-        "0",
+        "verification_evidence:verification_evidence_artifact_guard",
+      );
+      assert.equal(
+        sql(
+          "select p.prosecdef::text || '|' || p.provolatile::text from pg_trigger t join pg_proc p on p.oid = t.tgfoid where t.tgname = 'verification_evidence_artifact_guard';",
+        ),
+        "false|v",
       );
       assert.equal(
         sql(

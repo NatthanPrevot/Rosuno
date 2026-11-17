@@ -21,6 +21,20 @@ import type { NextConfig } from "next";
 // email confirmation handler sends its own stricter policy, framing,
 // referrer and sniffing headers on every response, so it receives only the
 // transport security header from here and keeps its own.
+//
+// MVP-001 S3: a voice memo plays through a short-lived signed URL that the
+// server issues on the configured Supabase origin, so media loads only on
+// exactly that origin: the public project URL the build already inlines,
+// when it is a hosted project's HTTPS origin or the local stack's loopback
+// origin. Any other value, or none, admits no media source at all.
+const SUPABASE_ORIGIN =
+  /^(?:https:\/\/[a-z]{20}\.supabase\.co|http:\/\/(?:127\.0\.0\.1|localhost):54321)$/;
+
+function mediaSource(url: string | undefined): string {
+  const origin = typeof url === "string" ? url.replace(/\/$/, "") : "";
+  return SUPABASE_ORIGIN.test(origin) ? origin : "'none'";
+}
+
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
@@ -28,6 +42,7 @@ const CONTENT_SECURITY_POLICY = [
   "img-src 'self'",
   "font-src 'self'",
   "connect-src 'self'",
+  `media-src ${mediaSource(process.env.NEXT_PUBLIC_SUPABASE_URL)}`,
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'self'",

@@ -31,6 +31,19 @@
 // data or an error message) under the table's row policy, and retry an
 // escalated job or cancel an unfinished one through the database's own
 // audited staff functions.
+//
+// MVP-001 S3 part 2 adds the jurisdiction assessment review: staff holding
+// manage_intake_configuration at aal2 (a global grant for every
+// jurisdiction, a scoped grant for its own) see the submitted or active
+// Intakes that hold an unreviewed assessment in their scope, and (global
+// grants only) those that name no candidate jurisdiction, through the
+// database's own read functions, which disclose the Intake's opaque id,
+// state, creation time and counts, and each in-scope assessment's
+// jurisdiction, source, basis and status, never a client or the Intake's
+// content. A review records only "confirmed" (the jurisdiction may be
+// relevant) or "not confirmed" on one assessment, once; it never asserts
+// governing law and never chooses a jurisdiction. An Intake naming several
+// candidate jurisdictions is shown as such, never resolved to one.
 
 import {
   bindEnvironment,
@@ -97,6 +110,8 @@ export const STAFF_SURFACES = Object.freeze([
   "catalog",
   "capabilities",
   "intake",
+  // MVP-001 S3 part 2.
+  "jurisdiction-review",
   "jobs",
 ] as const);
 export type StaffSurface = (typeof STAFF_SURFACES)[number];
@@ -156,6 +171,37 @@ export const JOB_GROUP_STATES: Readonly<Record<JobGroup, readonly JobState[]>> =
 export function jobGroupOf(value: unknown): JobGroup {
   return isOneOf(JOB_GROUPS, value) ? value : "escalated";
 }
+
+// MVP-001 S3 part 2: the review lists one group at a time: Intakes holding
+// an unreviewed assessment in the caller's scope, then (global grants only)
+// Intakes that name no candidate jurisdiction.
+export const REVIEW_GROUPS = Object.freeze(["unreviewed", "unnamed"] as const);
+export type ReviewGroup = (typeof REVIEW_GROUPS)[number];
+export function reviewGroupOf(value: unknown): ReviewGroup {
+  return isOneOf(REVIEW_GROUPS, value) ? value : "unreviewed";
+}
+// The two review decisions: the jurisdiction may be relevant, or not
+// confirmed. Neither asserts governing law.
+export const REVIEW_DECISIONS = Object.freeze([
+  "confirmed",
+  "not_confirmed",
+] as const);
+export type ReviewDecision = (typeof REVIEW_DECISIONS)[number];
+export const ASSESSMENT_REVIEW_STATUSES = Object.freeze([
+  "unreviewed",
+  ...REVIEW_DECISIONS,
+] as const);
+export type AssessmentReviewStatus =
+  (typeof ASSESSMENT_REVIEW_STATUSES)[number];
+export const ASSESSMENT_SOURCES = Object.freeze([
+  "client_statement",
+  "ai_suggestion",
+] as const);
+export type AssessmentSource = (typeof ASSESSMENT_SOURCES)[number];
+export const REVIEW_INTAKE_STATES = Object.freeze([
+  "submitted",
+  "active",
+] as const);
 
 // The lifecycle moves staff are offered, mirroring the database's own
 // transition rule. The database decides again on every call.
@@ -366,6 +412,15 @@ export const CANCEL_JOB_OUTCOMES = Object.freeze([
   "not_found",
   "invalid_transition",
 ]);
+// MVP-001 S3 part 2: staff_review_jurisdiction_assessment.
+export const REVIEW_ASSESSMENT_OUTCOMES = Object.freeze([
+  "applied",
+  "invalid",
+  "denied",
+  "not_found",
+  "already_reviewed",
+  "not_reviewable",
+]);
 
 // The refusals staff are told about, each with its own fixed message. Every
 // one means nothing was changed.
@@ -389,6 +444,9 @@ export const REFUSAL_REASONS = Object.freeze([
   "self_grant_refused",
   "target_not_active_staff",
   "duplicate_version",
+  // MVP-001 S3 part 2.
+  "already_reviewed",
+  "not_reviewable",
 ] as const);
 export type RefusalReason = (typeof REFUSAL_REASONS)[number];
 
@@ -478,6 +536,14 @@ export type ConfigurationReads = {
     offset: number,
     count: number,
   ) => Promise<RowsResult>;
+  // MVP-001 S3 part 2: one page of reviewable Intakes in one group, and the
+  // in-scope assessments of one Intake (the database's own read functions).
+  readonly reviewIntakes: (
+    group: ReviewGroup,
+    offset: number,
+    count: number,
+  ) => Promise<RowsResult>;
+  readonly reviewAssessmentsOf: (intakeId: string) => Promise<RowsResult>;
 };
 
 export type PolicyVersionInput = {
@@ -599,6 +665,11 @@ export type ConfigurationWrites = {
   // MVP-001 S2: the audited staff job functions.
   readonly retryOperationalJob: (jobId: string) => Promise<CallAnswer>;
   readonly cancelOperationalJob: (jobId: string) => Promise<CallAnswer>;
+  // MVP-001 S3 part 2: the audited review of one assessment.
+  readonly reviewJurisdictionAssessment: (
+    assessmentId: string,
+    decision: ReviewDecision,
+  ) => Promise<CallAnswer>;
 };
 
 export type ConfigurationSources = {
@@ -639,6 +710,11 @@ export { QUESTION_SET_COLUMNS };
 // MVP-001 S2: never last_error_message or locked_by.
 export const OPERATIONAL_JOB_COLUMNS =
   "id, job_type, subject_type, subject_id, state, available_at, locked_at, attempt_count, max_attempts, last_error_code, completed_at, failed_at, created_at";
+// MVP-001 S3 part 2: the result columns of the two review read functions.
+export const REVIEW_INTAKE_COLUMNS =
+  "intake_id, intake_state, intake_created_at, candidate_count, unreviewed_count";
+export const REVIEW_ASSESSMENT_COLUMNS =
+  "assessment_id, jurisdiction_id, jurisdiction_code, jurisdiction_name, source_type, assessment_basis, review_status, created_at, reviewed_at, reviewed_by_user_id";
 
 type Check = (value: unknown) => boolean;
 
@@ -1058,6 +1134,84 @@ const readOperationalJobFields = reader<OperationalJobRecord>(
   }),
 );
 
+// MVP-001 S3 part 2: one reviewable Intake and one in-scope assessment, as
+// the database's own review read functions answer them.
+type ReviewIntakeRecord = {
+  readonly intakeId: string;
+  readonly state: (typeof REVIEW_INTAKE_STATES)[number];
+  readonly createdAt: string;
+  readonly candidates: number;
+  readonly unreviewed: number;
+};
+const readReviewIntake = reader<ReviewIntakeRecord>(
+  REVIEW_INTAKE_COLUMNS,
+  {
+    intake_id: uuid,
+    intake_state: (value) => isOneOf(REVIEW_INTAKE_STATES, value),
+    intake_created_at: timestamp,
+    candidate_count: count,
+    unreviewed_count: count,
+  },
+  (get) => ({
+    intakeId: str(get("intake_id")),
+    state: get("intake_state") as ReviewIntakeRecord["state"],
+    createdAt: str(get("intake_created_at")),
+    candidates: get("candidate_count") as number,
+    unreviewed: get("unreviewed_count") as number,
+  }),
+);
+
+type ReviewAssessmentRecord = {
+  readonly id: string;
+  readonly jurisdictionId: string;
+  readonly jurisdictionCode: string;
+  readonly jurisdictionName: string;
+  readonly source: AssessmentSource;
+  readonly basis: string;
+  readonly status: AssessmentReviewStatus;
+  readonly createdAt: string;
+  readonly reviewedAt: string | null;
+  readonly reviewedBy: string | null;
+};
+const readReviewAssessmentFields = reader<ReviewAssessmentRecord>(
+  REVIEW_ASSESSMENT_COLUMNS,
+  {
+    assessment_id: uuid,
+    jurisdiction_id: uuid,
+    jurisdiction_code: text,
+    jurisdiction_name: text,
+    source_type: (value) => isOneOf(ASSESSMENT_SOURCES, value),
+    assessment_basis: text,
+    review_status: (value) => isOneOf(ASSESSMENT_REVIEW_STATUSES, value),
+    created_at: timestamp,
+    reviewed_at: nullable(timestamp),
+    reviewed_by_user_id: nullable(uuid),
+  },
+  (get) => ({
+    id: str(get("assessment_id")),
+    jurisdictionId: str(get("jurisdiction_id")),
+    jurisdictionCode: str(get("jurisdiction_code")),
+    jurisdictionName: str(get("jurisdiction_name")),
+    source: get("source_type") as AssessmentSource,
+    basis: str(get("assessment_basis")),
+    status: get("review_status") as AssessmentReviewStatus,
+    createdAt: str(get("created_at")),
+    reviewedAt: strOrNull(get("reviewed_at")),
+    reviewedBy: strOrNull(get("reviewed_by_user_id")),
+  }),
+);
+
+// An assessment as the database's own constraints allow it: reviewed
+// exactly when it carries a review time and reviewer.
+function readReviewAssessment(row: unknown): ReviewAssessmentRecord | null {
+  const assessment = readReviewAssessmentFields(row);
+  return assessment !== null &&
+    (assessment.status === "unreviewed") === (assessment.reviewedAt === null) &&
+    (assessment.reviewedAt === null) === (assessment.reviewedBy === null)
+    ? assessment
+    : null;
+}
+
 // A job row as the database's own constraints allow it: a subject type
 // exactly when a subject id, at least one attempt allowed, a completion time
 // exactly when completed, and an escalation time exactly when escalated.
@@ -1348,6 +1502,8 @@ export async function resolveStaffHome(
       ["manage_staff_capabilities", false],
       ["manage_intake_configuration", false],
       ["manage_operational_jobs", false],
+      // MVP-001 S3 part 2: the review, in any scope.
+      ["manage_intake_configuration", true],
     ];
     const answers: boolean[] = [];
     for (const [capability, anyJurisdiction] of asked) {
@@ -1366,6 +1522,7 @@ export async function resolveStaffHome(
       staffAdmin,
       intake,
       jobs,
+      review,
     ] = answers;
     const held: Readonly<Record<StaffSurface, boolean>> = {
       verification: verify,
@@ -1375,6 +1532,7 @@ export async function resolveStaffHome(
       catalog: jurisdictionAll,
       capabilities: staffAdmin,
       intake,
+      "jurisdiction-review": review,
       jobs,
     };
     return Object.freeze({
@@ -2365,6 +2523,10 @@ export type IntakeConfigurationView =
       // the next version, or null when none is published.
       readonly currentVersionKey: string | null;
       readonly currentDefinitionText: string | null;
+      // MVP-001 S3 part 2: whether the current version asks for the
+      // category that routes an Intake (a practice-area question), so staff
+      // can see that routing is possible; null when none is published.
+      readonly currentAsksCategory: boolean | null;
     };
 
 // Publishing intake configuration needs the global
@@ -2412,6 +2574,12 @@ export async function resolveIntakeConfiguration(
       currentDefinitionText:
         current.length === 1
           ? JSON.stringify(current[0].definition, null, 2)
+          : null,
+      currentAsksCategory:
+        current.length === 1
+          ? (parseDefinition(current[0].definition)?.questions.some(
+              (q) => q.kind === "practice_area",
+            ) ?? false)
           : null,
     });
   } catch {
@@ -2513,6 +2681,149 @@ export async function resolveOperationalJobs(
       status: "ready",
       group,
       jobs: Object.freeze(list.items.map((job) => jobRowOf(job, nowMs))),
+      pager: list.pager,
+    });
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Jurisdiction assessment review (MVP-001 S3 part 2)
+// ---------------------------------------------------------------------------
+
+// How many candidate jurisdictions an Intake's assessments name: none, one,
+// or several. Several is shown as such and never resolved to one.
+export type Ambiguity = "none" | "one" | "several";
+
+export type ReviewAssessmentRow = {
+  readonly id: string;
+  readonly jurisdiction: string;
+  readonly source: AssessmentSource;
+  readonly basis: string;
+  readonly status: AssessmentReviewStatus;
+  readonly reviewedAt: string | null;
+  readonly reviewedBy: Who | null;
+  readonly reviewable: boolean;
+};
+
+export type ReviewIntakeRow = {
+  readonly intakeId: string;
+  readonly state: (typeof REVIEW_INTAKE_STATES)[number];
+  readonly createdAt: string;
+  readonly candidates: number;
+  readonly ambiguity: Ambiguity;
+  readonly unreviewed: number;
+  readonly assessments: readonly ReviewAssessmentRow[];
+};
+
+export type JurisdictionReviewView =
+  | Refusal
+  | {
+      readonly status: "ready";
+      readonly group: ReviewGroup;
+      // The caller holds a global grant (the unnamed group is theirs).
+      readonly global: boolean;
+      readonly intakes: readonly ReviewIntakeRow[];
+      readonly pager: Pager;
+    };
+
+function ambiguityOf(candidates: number): Ambiguity {
+  return candidates === 0 ? "none" : candidates === 1 ? "one" : "several";
+}
+
+// The review needs manage_intake_configuration in some scope at aal2,
+// exactly as the database's own read functions and review function do; the
+// unnamed group needs a global grant. One group is listed at a time, one
+// page at a time; each listed Intake's in-scope assessments are read on
+// their own, and a row the database's rules do not allow makes the page
+// unavailable.
+export async function resolveJurisdictionReview(
+  sources: ConfigurationSources,
+  requestedGroup?: unknown,
+  requestedPage?: unknown,
+): Promise<JurisdictionReviewView> {
+  try {
+    const group = reviewGroupOf(requestedGroup);
+    const page = configurationPageOf(requestedPage);
+    const context = await contextOf(sources);
+    if (!("userId" in context)) {
+      return context;
+    }
+    const { reads, userId } = context;
+    const any = await holds(reads, "manage_intake_configuration", null, true);
+    const global = await holds(
+      reads,
+      "manage_intake_configuration",
+      null,
+      false,
+    );
+    if (any === null || global === null) {
+      return UNAVAILABLE;
+    }
+    if (!any || (group === "unnamed" && !global)) {
+      return DENIED;
+    }
+    const list = await pageOf(
+      (offset, count) => reads.reviewIntakes(group, offset, count),
+      page,
+      readReviewIntake,
+    );
+    if (
+      list === null ||
+      list.items.some((intake) =>
+        group === "unreviewed"
+          ? intake.unreviewed < 1
+          : intake.candidates !== 0 || intake.unreviewed !== 0,
+      )
+    ) {
+      return UNAVAILABLE;
+    }
+    const rows: ReviewIntakeRow[] = [];
+    for (const intake of list.items) {
+      const assessments =
+        group === "unnamed"
+          ? []
+          : listOf(
+              await attempt(() => reads.reviewAssessmentsOf(intake.intakeId)),
+              readReviewAssessment,
+            );
+      if (assessments === null) {
+        return UNAVAILABLE;
+      }
+      rows.push(
+        Object.freeze({
+          intakeId: intake.intakeId,
+          state: intake.state,
+          createdAt: intake.createdAt,
+          candidates: intake.candidates,
+          ambiguity: ambiguityOf(intake.candidates),
+          unreviewed: intake.unreviewed,
+          assessments: Object.freeze(
+            assessments.map((a) =>
+              Object.freeze({
+                id: a.id,
+                jurisdiction: jurisdictionLabel({
+                  name: a.jurisdictionName,
+                  code: a.jurisdictionCode,
+                }),
+                source: a.source,
+                basis: a.basis,
+                status: a.status,
+                reviewedAt: a.reviewedAt,
+                reviewedBy: whoOf(a.reviewedBy, userId),
+                reviewable: a.status === "unreviewed",
+              }),
+            ),
+          ),
+        }),
+      );
+    }
+    return Object.freeze({
+      status: "ready",
+      group,
+      global,
+      intakes: Object.freeze(rows),
       pager: list.pager,
     });
   } catch {
@@ -4001,4 +4312,47 @@ export async function cancelOperationalJob(
     (writes, jobId) => writes.cancelOperationalJob(jobId),
     CANCEL_JOB_OUTCOMES,
   );
+}
+
+// --- Jurisdiction assessment review (MVP-001 S3 part 2) --------------------
+
+// Records "confirmed" (the jurisdiction may be relevant) or "not confirmed"
+// on one unreviewed assessment. The caller must hold the capability in some
+// scope at aal2 before anything is sent; the database decides the exact
+// scope of the assessment's jurisdiction again, locks, records the review
+// once and audits it. Nothing about the Intake changes.
+export async function reviewJurisdictionAssessment(
+  sources: ConfigurationSources,
+  formData: unknown,
+): Promise<ConfigurationActionState> {
+  return guarded(formData, async (form) => {
+    const assessmentId = idField(form, "assessment");
+    const decision = single(form, "decision");
+    if (assessmentId === null) {
+      return UNAVAILABLE;
+    }
+    if (!isOneOf(REVIEW_DECISIONS, decision)) {
+      return invalid({ decision: ["Choose one of the two review decisions."] });
+    }
+    const context = await contextOf(sources);
+    if (!("userId" in context)) {
+      return context;
+    }
+    const granted = await holds(
+      context.reads,
+      "manage_intake_configuration",
+      null,
+      true,
+    );
+    if (granted === null) {
+      return UNAVAILABLE;
+    }
+    if (!granted) {
+      return DENIED;
+    }
+    return sent(
+      () => context.writes.reviewJurisdictionAssessment(assessmentId, decision),
+      REVIEW_ASSESSMENT_OUTCOMES,
+    );
+  });
 }

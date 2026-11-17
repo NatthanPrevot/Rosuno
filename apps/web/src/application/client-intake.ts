@@ -21,6 +21,16 @@
 // the session's own identity, and only its own answer is reported. Category
 // and jurisdiction answers are the client's statements: nothing here
 // classifies, routes, decides eligibility, or decides which law applies.
+//
+// MVP-001 S3 part 2. The Intake view also shows the AI suggestions presented
+// on the Intake (PS section 13; read under the own-row policy), lets the
+// client confirm or reject each one once, and pre-fills the form with a
+// confirmed suggestion of the current revision: canonical content changes
+// only when the client saves (MB section 102). The routing category is the
+// practice area the client saved, shown as theirs; a missing or "not sure"
+// category is shown as unresolved, never guessed, and no attorney is named.
+// Post-submission changes go to the database's change seam, which answers
+// that they are not yet available while gate D-3 is open.
 
 import {
   activeUserOf,
@@ -72,6 +82,24 @@ export const REVISION_COLUMNS =
   "intake_id, revision_number, question_set_id, practice_area_id, description, structured_answers, created_at";
 export const ASSESSMENT_COLUMNS =
   "jurisdiction_id, source_type, review_status, created_at";
+// MVP-001 S3 part 2: the presented AI suggestions of an Intake.
+export const SUGGESTION_COLUMNS =
+  "id, suggestion_type, suggestion_value, model_reference, generated_at, presented_at, confirmed_at, rejected_at";
+// The two TA section 30 permitted classes this slice suggests.
+export const SUGGESTION_TYPES = Object.freeze([
+  "practice_category",
+  "potentially_relevant_jurisdictions",
+] as const);
+export type SuggestionType = (typeof SUGGESTION_TYPES)[number];
+// The most jurisdictions one suggestion names (the database's own bound).
+export const MAX_SUGGESTED_JURISDICTIONS = 10;
+// The post-submission changes a client may ask for (gate D-3).
+export const INTAKE_CHANGES = Object.freeze([
+  "revise",
+  "replace",
+  "resume",
+] as const);
+export type IntakeChange = (typeof INTAKE_CHANGES)[number];
 
 export const INTAKE_STATES = Object.freeze([
   "draft",
@@ -108,6 +136,8 @@ export type ClientIntakeReads = {
   readonly assessmentsOf: (intakeId: string) => Promise<RowsResult>;
   readonly practiceAreas: () => Promise<RowsResult>;
   readonly jurisdictions: () => Promise<RowsResult>;
+  // MVP-001 S3 part 2: the Intake's presented AI suggestions, newest first.
+  readonly suggestionsOf: (intakeId: string) => Promise<RowsResult>;
 };
 
 export type RevisionInput = {
@@ -164,6 +194,29 @@ export const CLOSE_OUTCOMES = Object.freeze([
   "not_found",
   "unavailable",
 ] as const);
+// MVP-001 S3 part 2: client_confirm_ai_suggestion, client_reject_ai_suggestion
+// and client_request_intake_change.
+export const CONFIRM_SUGGESTION_OUTCOMES = Object.freeze([
+  "confirmed",
+  "already_confirmed",
+  "already_rejected",
+  "not_found",
+  "not_editable",
+] as const);
+export const REJECT_SUGGESTION_OUTCOMES = Object.freeze([
+  "rejected",
+  "already_rejected",
+  "already_confirmed",
+  "not_found",
+  "not_editable",
+] as const);
+export const CHANGE_OUTCOMES = Object.freeze([
+  "not_configured",
+  "not_applicable",
+  "expired",
+  "not_found",
+  "invalid",
+] as const);
 
 // Request-scoped write port: each call is one client database function run
 // for the request's own authenticated session. None takes an actor, User, or
@@ -176,6 +229,16 @@ export type ClientIntakeWrites = {
     expectedRevision: number | null,
   ) => Promise<CallAnswer>;
   readonly closeIntake: (intakeId: string) => Promise<CallAnswer>;
+  // MVP-001 S3 part 2: one decision on a presented suggestion, and one
+  // post-submission change request.
+  readonly decideSuggestion: (
+    suggestionId: string,
+    decision: "confirm" | "reject",
+  ) => Promise<CallAnswer>;
+  readonly requestChange: (
+    intakeId: string,
+    change: IntakeChange,
+  ) => Promise<CallAnswer>;
 };
 
 export type ClientIntakeSources = {
@@ -379,7 +442,7 @@ function readRevision(row: unknown): RevisionRecord | null {
   });
 }
 
-type CatalogEntry = {
+export type CatalogEntry = {
   readonly id: string;
   readonly code: string;
   readonly name: string;
@@ -434,6 +497,100 @@ function readAssessment(row: unknown): Assessment | null {
         jurisdictionId,
         sourceType,
         reviewStatus: reviewStatus as string | null,
+      })
+    : null;
+}
+
+// MVP-001 S3 part 2: one presented AI suggestion, read strictly against the
+// database's own value shape. Its status is derived from its one decision.
+export type SuggestionStatus = "pending" | "confirmed" | "rejected";
+
+type SuggestionRecord = {
+  readonly id: string;
+  readonly type: SuggestionType;
+  readonly practiceAreaId: string | null;
+  readonly jurisdictionIds: readonly string[];
+  readonly revisionNumber: number;
+  readonly status: SuggestionStatus;
+};
+
+export function isRevisionNumber(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 1;
+}
+
+export function readSuggestedJurisdictions(
+  value: unknown,
+): readonly string[] | null {
+  if (
+    !Array.isArray(value) ||
+    value.length < 1 ||
+    value.length > MAX_SUGGESTED_JURISDICTIONS ||
+    !value.every(isUuid) ||
+    new Set(value).size !== value.length
+  ) {
+    return null;
+  }
+  return Object.freeze([...value]);
+}
+
+function readSuggestion(row: unknown): SuggestionRecord | null {
+  const fields = readExact(row, SUGGESTION_COLUMNS.split(", "));
+  if (fields === null) {
+    return null;
+  }
+  const id = fields.get("id");
+  const type = fields.get("suggestion_type");
+  const model = fields.get("model_reference");
+  const confirmed = fields.get("confirmed_at");
+  const rejected = fields.get("rejected_at");
+  if (
+    !isUuid(id) ||
+    !isOneOf(SUGGESTION_TYPES, type) ||
+    typeof model !== "string" ||
+    model === "" ||
+    !isTimestamp(fields.get("generated_at")) ||
+    !isTimestamp(fields.get("presented_at")) ||
+    (confirmed !== null && !isTimestamp(confirmed)) ||
+    (rejected !== null && !isTimestamp(rejected)) ||
+    (confirmed !== null && rejected !== null)
+  ) {
+    return null;
+  }
+  const status: SuggestionStatus =
+    confirmed !== null
+      ? "confirmed"
+      : rejected !== null
+        ? "rejected"
+        : "pending";
+  const value = fields.get("suggestion_value");
+  if (type === "practice_category") {
+    const shape = readExact(value, ["practice_area_id", "revision_number"]);
+    const area = shape?.get("practice_area_id");
+    const revisionNumber = shape?.get("revision_number");
+    return isUuid(area) && isRevisionNumber(revisionNumber)
+      ? Object.freeze({
+          id,
+          type,
+          practiceAreaId: area,
+          jurisdictionIds: Object.freeze([]),
+          revisionNumber,
+          status,
+        })
+      : null;
+  }
+  const shape = readExact(value, ["jurisdiction_ids", "revision_number"]);
+  const jurisdictionIds = readSuggestedJurisdictions(
+    shape?.get("jurisdiction_ids"),
+  );
+  const revisionNumber = shape?.get("revision_number");
+  return jurisdictionIds !== null && isRevisionNumber(revisionNumber)
+    ? Object.freeze({
+        id,
+        type,
+        practiceAreaId: null,
+        jurisdictionIds,
+        revisionNumber,
+        status,
       })
     : null;
 }
@@ -678,6 +835,29 @@ export type JurisdictionStatement =
   | { readonly kind: "not_sure" }
   | { readonly kind: "stated"; readonly names: readonly string[] };
 
+// MVP-001 S3 part 2: one presented AI suggestion as the client sees it: what
+// it suggests (catalog names only), whether it was decided, and whether it
+// was made from the revision now saved.
+export type SuggestionView = {
+  readonly id: string;
+  readonly type: SuggestionType;
+  readonly names: readonly string[];
+  readonly status: SuggestionStatus;
+  readonly current: boolean;
+  // The client may still confirm or reject it.
+  readonly decidable: boolean;
+};
+
+// The routing category is the practice area the client saved: a client
+// statement, never a classification. "not_sure" and "unanswered" are shown
+// as unresolved, and nothing is chosen for the client; "none" means the
+// questions ask for no category.
+export type RoutingCategory =
+  | { readonly kind: "category"; readonly name: string }
+  | { readonly kind: "not_sure" }
+  | { readonly kind: "unanswered" }
+  | { readonly kind: "none" };
+
 export type IntakeView =
   | Refusal
   | { readonly status: "not-found" }
@@ -705,8 +885,19 @@ export type IntakeView =
       };
       readonly practiceArea: "selected" | "not_sure" | "unanswered";
       readonly jurisdiction: JurisdictionStatement;
-      // Unreviewed client-statement suggestions recorded at submission.
+      // The jurisdictions recorded as assessments (the client's statements
+      // at submission, and suggestions the client confirmed), each once.
       readonly suggestedJurisdictions: readonly string[];
+      // MVP-001 S3 part 2.
+      readonly routing: RoutingCategory;
+      readonly suggestions: readonly SuggestionView[];
+      // A draft with saved content may ask for suggestions.
+      readonly canRequestSuggestions: boolean;
+      // The form fields filled in from a confirmed suggestion of the saved
+      // revision; nothing is saved until the client saves.
+      readonly prefilled: readonly ("practice_area" | "jurisdictions")[];
+      // The post-submission changes the client may ask about (gate D-3).
+      readonly changes: readonly IntakeChange[];
     };
 
 export const QUESTION_FIELD_PREFIX = "q:";
@@ -884,15 +1075,44 @@ export async function resolveIntake(
     ) {
       practiceAreaId = null;
     }
-    const questions = questionViews(
+    const savedQuestions = questionViews(
       shown.definition,
       answers,
       practiceAreaId,
       catalogs.areas,
       catalogs.jurisdictions,
     );
-    const areaQuestion = questions.find((q) => q.kind === "practice_area");
-    const jurisdictionQuestion = questions.find(
+    const suggestionRecords = listOf(
+      await attempt(() => reads.suggestionsOf(intakeId)),
+      readSuggestion,
+    );
+    if (suggestionRecords === null) {
+      return UNAVAILABLE;
+    }
+    // A confirmed suggestion of the saved revision fills in the form; the
+    // client's saved content is unchanged until the client saves.
+    const prefill = editable
+      ? prefillOf(
+          shown.definition,
+          answers,
+          practiceAreaId,
+          suggestionRecords,
+          latest?.revisionNumber ?? null,
+          catalogs,
+        )
+      : null;
+    const questions =
+      prefill === null
+        ? savedQuestions
+        : questionViews(
+            shown.definition,
+            prefill.answers,
+            prefill.practiceAreaId,
+            catalogs.areas,
+            catalogs.jurisdictions,
+          );
+    const areaQuestion = savedQuestions.find((q) => q.kind === "practice_area");
+    const jurisdictionQuestion = savedQuestions.find(
       (q) => q.kind === "jurisdictions",
     );
     let suggested: readonly string[] = [];
@@ -904,15 +1124,21 @@ export async function resolveIntake(
       if (assessments === null) {
         return UNAVAILABLE;
       }
-      suggested = Object.freeze(
-        assessments
-          .filter((a) => a.sourceType === "client_statement")
-          .map(
-            (a) =>
-              catalogs.jurisdictions.find((j) => j.id === a.jurisdictionId)
-                ?.name ?? "Unknown",
-          ),
-      );
+      suggested = Object.freeze([
+        ...new Set(
+          assessments
+            .filter(
+              (a) =>
+                a.sourceType === "client_statement" ||
+                a.sourceType === "ai_suggestion",
+            )
+            .map(
+              (a) =>
+                catalogs.jurisdictions.find((j) => j.id === a.jurisdictionId)
+                  ?.name ?? "Unknown",
+            ),
+        ),
+      ]);
     }
     const jurisdictionStatement: JurisdictionStatement =
       jurisdictionQuestion?.kind !== "jurisdictions" ||
@@ -951,10 +1177,157 @@ export async function resolveIntake(
             : "selected",
       jurisdiction: jurisdictionStatement,
       suggestedJurisdictions: suggested,
+      routing: routingOf(governing ?? shown, latest, catalogs.areas),
+      suggestions: Object.freeze(
+        suggestionRecords.map((record) =>
+          suggestionViewOf(
+            record,
+            latest?.revisionNumber ?? null,
+            editable,
+            catalogs,
+          ),
+        ),
+      ),
+      canRequestSuggestions: editable && latest !== null,
+      prefilled: prefill === null ? Object.freeze([]) : prefill.fields,
+      changes: changesOf(intake.state),
     });
   } catch {
     return UNAVAILABLE;
   }
+}
+
+// --- MVP-001 S3 part 2: suggestions, routing, and post-submission changes --
+
+type Catalogs = {
+  readonly areas: readonly CatalogEntry[];
+  readonly jurisdictions: readonly CatalogEntry[];
+};
+
+function suggestionViewOf(
+  record: SuggestionRecord,
+  latestRevision: number | null,
+  editable: boolean,
+  catalogs: Catalogs,
+): SuggestionView {
+  const names =
+    record.type === "practice_category"
+      ? [
+          catalogs.areas.find((area) => area.id === record.practiceAreaId)
+            ?.name ?? "Unknown",
+        ]
+      : record.jurisdictionIds.map(
+          (id) =>
+            catalogs.jurisdictions.find((j) => j.id === id)?.name ?? "Unknown",
+        );
+  return Object.freeze({
+    id: record.id,
+    type: record.type,
+    names: Object.freeze(names),
+    status: record.status,
+    current: record.revisionNumber === latestRevision,
+    decidable: editable && record.status === "pending",
+  });
+}
+
+// The form content with the newest confirmed suggestion of each type made
+// from the saved revision filled in, or null when none applies. A suggested
+// category replaces the category answer only while it is still offered;
+// suggested jurisdictions are added to the stated ones (replacing "not
+// sure"). Each applies only where the shown questions ask for it.
+function prefillOf(
+  definition: Definition,
+  answers: Answers,
+  practiceAreaId: string | null,
+  records: readonly SuggestionRecord[],
+  latestRevision: number | null,
+  catalogs: Catalogs,
+): {
+  readonly answers: Answers;
+  readonly practiceAreaId: string | null;
+  readonly fields: readonly ("practice_area" | "jurisdictions")[];
+} | null {
+  if (latestRevision === null) {
+    return null;
+  }
+  const confirmed = records.filter(
+    (r) => r.status === "confirmed" && r.revisionNumber === latestRevision,
+  );
+  const fields: ("practice_area" | "jurisdictions")[] = [];
+  const next: Record<string, AnswerValue> = { ...answers };
+  let area = practiceAreaId;
+  const areaQuestion = definition.questions.find(
+    (q) => q.kind === "practice_area",
+  );
+  const category = confirmed.find((r) => r.type === "practice_category");
+  if (
+    areaQuestion !== undefined &&
+    category?.practiceAreaId != null &&
+    catalogs.areas.some((a) => a.id === category.practiceAreaId && a.active) &&
+    category.practiceAreaId !== practiceAreaId
+  ) {
+    area = category.practiceAreaId;
+    delete next[areaQuestion.id];
+    fields.push("practice_area");
+  }
+  const placeQuestion = definition.questions.find(
+    (q) => q.kind === "jurisdictions",
+  );
+  const places = confirmed.find(
+    (r) => r.type === "potentially_relevant_jurisdictions",
+  );
+  if (
+    placeQuestion !== undefined &&
+    places !== undefined &&
+    places.jurisdictionIds.every((id) =>
+      catalogs.jurisdictions.some((j) => j.id === id),
+    )
+  ) {
+    const stated = answers[placeQuestion.id];
+    const current = Array.isArray(stated) ? [...stated] : [];
+    const merged = [...new Set([...current, ...places.jurisdictionIds])];
+    if (merged.length !== current.length || !Array.isArray(stated)) {
+      next[placeQuestion.id] = Object.freeze(merged);
+      fields.push("jurisdictions");
+    }
+  }
+  return fields.length === 0
+    ? null
+    : {
+        answers: Object.freeze(next),
+        practiceAreaId: area,
+        fields: Object.freeze(fields),
+      };
+}
+
+// The routing category of the saved revision, under its governing version.
+function routingOf(
+  set: QuestionSet,
+  latest: RevisionRecord | null,
+  areas: readonly CatalogEntry[],
+): RoutingCategory {
+  const question = set.definition.questions.find(
+    (q) => q.kind === "practice_area",
+  );
+  if (question === undefined) {
+    return Object.freeze({ kind: "none" });
+  }
+  if (latest?.practiceAreaId != null) {
+    const area = areas.find((a) => a.id === latest.practiceAreaId);
+    return Object.freeze({ kind: "category", name: area?.name ?? "Unknown" });
+  }
+  return latest?.answers[question.id] === NOT_SURE
+    ? Object.freeze({ kind: "not_sure" })
+    : Object.freeze({ kind: "unanswered" });
+}
+
+function changesOf(state: IntakeState): readonly IntakeChange[] {
+  if (state === "submitted" || state === "active") {
+    return Object.freeze(["revise", "replace"] as const);
+  }
+  return state === "expired"
+    ? Object.freeze(["resume"] as const)
+    : Object.freeze([]);
 }
 
 // ---------------------------------------------------------------------------
@@ -981,6 +1354,14 @@ export type ClientIntakeActionState =
   | { readonly status: "already-closed" }
   | { readonly status: "not-found" }
   | { readonly status: "outcome-unknown" }
+  // MVP-001 S3 part 2: a decision on a presented suggestion, and a
+  // post-submission change request.
+  | { readonly status: "suggestion-confirmed" }
+  | { readonly status: "suggestion-rejected" }
+  | { readonly status: "already-decided" }
+  | { readonly status: "change-not-configured" }
+  | { readonly status: "change-not-applicable" }
+  | { readonly status: "expired" }
   | Refusal;
 
 export const INITIAL_CLIENT_INTAKE_STATE: ClientIntakeActionState =
@@ -1003,6 +1384,12 @@ const STATES = Object.freeze({
   alreadyClosed: fixed("already-closed"),
   notFound: fixed("not-found"),
   outcomeUnknown: fixed("outcome-unknown"),
+  suggestionConfirmed: fixed("suggestion-confirmed"),
+  suggestionRejected: fixed("suggestion-rejected"),
+  alreadyDecided: fixed("already-decided"),
+  changeNotConfigured: fixed("change-not-configured"),
+  changeNotApplicable: fixed("change-not-applicable"),
+  expired: fixed("expired"),
 });
 
 function invalid(
@@ -1481,6 +1868,273 @@ export async function closeIntake(
       default:
         return UNAVAILABLE;
     }
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+// MVP-001 S3 part 2: confirms or rejects one suggestion presented on the
+// client's own draft Intake. The suggestion must be one the page's Intake
+// shows; the database decides again, records the decision once, and writes
+// no Intake content: a confirmed category or place is applied only when the
+// client saves the pre-filled form.
+export async function decideSuggestion(
+  sources: ClientIntakeSources,
+  formData: unknown,
+): Promise<ClientIntakeActionState> {
+  try {
+    if (!(formData instanceof FormData)) {
+      return UNAVAILABLE;
+    }
+    const intakeId = intakeIdOf(formData);
+    const suggestionId = singleValue(formData, "suggestion");
+    const decision = singleValue(formData, "decision");
+    if (
+      intakeId === null ||
+      !isUuid(suggestionId) ||
+      (decision !== "confirm" && decision !== "reject")
+    ) {
+      return STATES.notFound;
+    }
+    const writable = await writableContext(sources);
+    if (!("context" in writable)) {
+      return writable;
+    }
+    const { reads, writes, context } = writable;
+    const intake = await ownIntakeOf(reads, context, intakeId);
+    if (intake === "unreadable") {
+      return UNAVAILABLE;
+    }
+    if (intake === null) {
+      return STATES.notFound;
+    }
+    if (intake.state !== "draft") {
+      return STATES.notEditable;
+    }
+    const shown = listOf(
+      await attempt(() => reads.suggestionsOf(intakeId)),
+      readSuggestion,
+    );
+    if (shown === null) {
+      return UNAVAILABLE;
+    }
+    if (!shown.some((record) => record.id === suggestionId)) {
+      return STATES.notFound;
+    }
+    const answer = answerOf(
+      await attempt(() => writes.decideSuggestion(suggestionId, decision)),
+      decision === "confirm"
+        ? CONFIRM_SUGGESTION_OUTCOMES
+        : REJECT_SUGGESTION_OUTCOMES,
+    );
+    if (answer === "rejected") {
+      return UNAVAILABLE;
+    }
+    if (answer === "unknown") {
+      return STATES.outcomeUnknown;
+    }
+    switch (answer.outcome) {
+      case "confirmed":
+        return STATES.suggestionConfirmed;
+      case "rejected":
+        return STATES.suggestionRejected;
+      case "already_confirmed":
+      case "already_rejected":
+        return STATES.alreadyDecided;
+      case "not_editable":
+        return STATES.notEditable;
+      default:
+        return STATES.notFound;
+    }
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+// MVP-001 S3 part 2: asks the database about one post-submission change to
+// the client's own Intake (a revision after submission, a replacement for a
+// different legal need, or continuing an expired Intake). While gate D-3 has
+// no configuration the database answers that the change is not yet
+// available, and nothing is written; it also evaluates the Intake's expiry.
+export async function requestIntakeChange(
+  sources: ClientIntakeSources,
+  formData: unknown,
+): Promise<ClientIntakeActionState> {
+  try {
+    if (!(formData instanceof FormData)) {
+      return UNAVAILABLE;
+    }
+    const intakeId = intakeIdOf(formData);
+    const change = singleValue(formData, "change");
+    if (intakeId === null || !isOneOf(INTAKE_CHANGES, change)) {
+      return STATES.notFound;
+    }
+    const writable = await writableContext(sources);
+    if (!("context" in writable)) {
+      return writable;
+    }
+    const answer = answerOf(
+      await attempt(() => writable.writes.requestChange(intakeId, change)),
+      CHANGE_OUTCOMES,
+    );
+    if (answer === "rejected") {
+      return UNAVAILABLE;
+    }
+    if (answer === "unknown") {
+      return STATES.outcomeUnknown;
+    }
+    switch (answer.outcome) {
+      case "not_configured":
+        return STATES.changeNotConfigured;
+      case "not_applicable":
+        return STATES.changeNotApplicable;
+      case "expired":
+        return STATES.expired;
+      case "not_found":
+        return STATES.notFound;
+      default:
+        return UNAVAILABLE;
+    }
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+// MVP-001 S3 part 2: the verified client's own Intake with what a
+// suggestion request needs: its state, its saved revision, the version that
+// governs it, and the current catalogs; a fixed refusal; or not-found.
+export type IntakeContent = {
+  readonly client: VerifiedClient;
+  readonly intakeId: string;
+  readonly state: IntakeState;
+  readonly latest: {
+    readonly revisionNumber: number;
+    readonly practiceAreaId: string | null;
+    readonly description: string | null;
+    readonly answers: Answers;
+  } | null;
+  readonly definition: Definition | null;
+  readonly areas: readonly CatalogEntry[];
+  readonly jurisdictions: readonly CatalogEntry[];
+};
+
+export async function intakeContentOf(
+  sources: ClientIntakeSources,
+  intakeId: unknown,
+): Promise<IntakeContent | Refusal | typeof NOT_FOUND> {
+  try {
+    if (!isUuid(intakeId)) {
+      return NOT_FOUND;
+    }
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE;
+    }
+    const client = await clientContextOf(sources, reads);
+    if (!("clientId" in client)) {
+      return client;
+    }
+    const intake = await ownIntakeOf(reads, client, intakeId);
+    if (intake === "unreadable") {
+      return UNAVAILABLE;
+    }
+    if (intake === null) {
+      return NOT_FOUND;
+    }
+    const latest = await latestRevisionOf(reads, intakeId);
+    const sets = await questionSetsOf(reads);
+    const catalogs = await catalogsOf(reads);
+    if (latest === "unreadable" || sets === null || catalogs === null) {
+      return UNAVAILABLE;
+    }
+    const governing =
+      latest === null
+        ? null
+        : (sets.find((set) => set.id === latest.questionSetId) ?? null);
+    if (latest !== null && governing === null) {
+      return UNAVAILABLE;
+    }
+    return Object.freeze({
+      client,
+      intakeId,
+      state: intake.state,
+      latest:
+        latest === null
+          ? null
+          : Object.freeze({
+              revisionNumber: latest.revisionNumber,
+              practiceAreaId: latest.practiceAreaId,
+              description: latest.description,
+              answers: latest.answers,
+            }),
+      definition: governing?.definition ?? null,
+      areas: catalogs.areas,
+      jurisdictions: catalogs.jurisdictions,
+    });
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MVP-001 S3: the verified client, for the voice memo use cases
+// ---------------------------------------------------------------------------
+
+export type VerifiedClient = {
+  readonly userId: string;
+  readonly clientId: string;
+};
+
+// The verified client of the request, decided exactly as for every client
+// intake operation, or a fixed refusal.
+export async function verifiedClientOf(
+  sources: ClientIntakeSources,
+): Promise<VerifiedClient | Refusal> {
+  try {
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE;
+    }
+    return await clientContextOf(sources, reads);
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+// The verified client and one of its own Intakes with its current state, a
+// fixed refusal, or not-found when the Intake is not the client's own.
+export async function verifiedClientIntakeOf(
+  sources: ClientIntakeSources,
+  intakeId: unknown,
+): Promise<
+  | {
+      readonly client: VerifiedClient;
+      readonly intakeId: string;
+      readonly state: IntakeState;
+    }
+  | Refusal
+  | typeof NOT_FOUND
+> {
+  try {
+    if (!isUuid(intakeId)) {
+      return NOT_FOUND;
+    }
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE;
+    }
+    const client = await clientContextOf(sources, reads);
+    if (!("clientId" in client)) {
+      return client;
+    }
+    const intake = await ownIntakeOf(reads, client, intakeId);
+    if (intake === "unreadable") {
+      return UNAVAILABLE;
+    }
+    if (intake === null) {
+      return NOT_FOUND;
+    }
+    return Object.freeze({ client, intakeId, state: intake.state });
   } catch {
     return UNAVAILABLE;
   }

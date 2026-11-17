@@ -12,7 +12,11 @@
 // boundary can see them: it records each call with its exact arguments and
 // answers what the test configures, so every outcome can be driven. MVP-001
 // S2: operational jobs are readable exactly as their row policy says (the
-// global manage_operational_jobs grant). Every id, account, and value is
+// global manage_operational_jobs grant). MVP-001 S3 part 2: reviewable
+// Intakes and their jurisdiction assessments are read exactly as the two
+// review read functions answer them (manage_intake_configuration at aal2,
+// scoped by the assessment's jurisdiction; the unnamed group for a global
+// grant only), and never their client or content. Every id, account, and value is
 // synthetic test data; nothing here contacts a provider, network, or
 // database.
 
@@ -32,6 +36,8 @@ import {
   OPERATIONAL_JOB_COLUMNS,
   POLICY_TYPE_COLUMNS,
   QUESTION_SET_COLUMNS,
+  REVIEW_ASSESSMENT_COLUMNS,
+  REVIEW_INTAKE_COLUMNS,
   SERVICE_AREA_COLUMNS,
 } from "../src/application/staff-configuration.ts";
 import { STAFF_PROFILE_COLUMNS } from "../src/application/staff-verification.ts";
@@ -97,6 +103,10 @@ export function createWorld() {
     practice_areas: [],
     intake_question_sets: [],
     operational_jobs: [],
+    // MVP-001 S3 part 2: Intakes (id, state, created_at only) and their
+    // jurisdiction assessments, as the review functions read them.
+    intakes: [],
+    jurisdiction_assessments: [],
     // PS-A2: the one recorded deployment environment (null = unrecorded).
     deployment_environment: {
       environment_class: "development",
@@ -270,6 +280,35 @@ export function addPracticeArea(world, n, active = true) {
     active,
   });
   return id;
+}
+
+// MVP-001 S3 part 2: one synthetic Intake (state and time only) and one
+// jurisdiction assessment of it.
+export function addReviewIntake(world, state = "submitted") {
+  const row = {
+    id: world.nextId(),
+    state,
+    created_at: stamp(world.now - 300_000 + world.intakes.length),
+  };
+  world.intakes.push(row);
+  return row;
+}
+
+export function addAssessment(world, intakeId, jurisdictionId, overrides = {}) {
+  const row = {
+    id: world.nextId(),
+    intake_id: intakeId,
+    jurisdiction_id: jurisdictionId,
+    source_type: "client_statement",
+    assessment_basis: "client_statement:intake_revision:1:question_set:synthetic-v1",
+    review_status: "unreviewed",
+    created_at: stamp(world.now - 200_000 + world.jurisdiction_assessments.length),
+    reviewed_at: null,
+    reviewed_by_user_id: null,
+    ...overrides,
+  };
+  world.jurisdiction_assessments.push(row);
+  return row;
 }
 
 // One synthetic operational job in a consistent state (MVP-001 S2).
@@ -583,6 +622,101 @@ export function configurationReadsFor(world, authId) {
           .map((j) => pick(j, OPERATIONAL_JOB_COLUMNS)),
       ),
     ),
+    // MVP-001 S3 part 2: the review read functions, as the database answers
+    // them for this caller.
+    reviewIntakes: call("reviewIntakes", async (group, offset, count) => {
+      const inScope = (a) =>
+        holdsFor(
+          world,
+          authId,
+          "manage_intake_configuration",
+          a.jurisdiction_id,
+          false,
+        );
+      const global = holdsFor(
+        world,
+        authId,
+        "manage_intake_configuration",
+        null,
+        false,
+      );
+      return rows(
+        world.intakes
+          .filter((i) => i.state === "submitted" || i.state === "active")
+          .map((i) => {
+            const of = world.jurisdiction_assessments.filter(
+              (a) => a.intake_id === i.id,
+            );
+            return {
+              intake_id: i.id,
+              intake_state: i.state,
+              intake_created_at: i.created_at,
+              candidate_count: new Set(of.map((a) => a.jurisdiction_id)).size,
+              unreviewed_count: of.filter(
+                (a) => a.review_status === "unreviewed" && inScope(a),
+              ).length,
+            };
+          })
+          .filter((r) =>
+            group === "unreviewed"
+              ? r.unreviewed_count > 0
+              : group === "unnamed" && r.candidate_count === 0 && global,
+          )
+          .sort(
+            (a, b) =>
+              compare(a.intake_created_at, b.intake_created_at) ||
+              compare(a.intake_id, b.intake_id),
+          )
+          .slice(offset, offset + count)
+          .map((r) => pick(r, REVIEW_INTAKE_COLUMNS)),
+      );
+    }),
+    reviewAssessmentsOf: call("reviewAssessmentsOf", async (intakeId) => {
+      const intake = world.intakes.find((i) => i.id === intakeId);
+      if (
+        intake === undefined ||
+        (intake.state !== "submitted" && intake.state !== "active")
+      ) {
+        return rows([]);
+      }
+      return rows(
+        world.jurisdiction_assessments
+          .filter(
+            (a) =>
+              a.intake_id === intakeId &&
+              holdsFor(
+                world,
+                authId,
+                "manage_intake_configuration",
+                a.jurisdiction_id,
+                false,
+              ),
+          )
+          .sort(
+            (a, b) => compare(a.created_at, b.created_at) || compare(a.id, b.id),
+          )
+          .map((a) => {
+            const j = world.jurisdictions.find(
+              (x) => x.id === a.jurisdiction_id,
+            );
+            return pick(
+              {
+                assessment_id: a.id,
+                jurisdiction_id: a.jurisdiction_id,
+                jurisdiction_code: j?.code ?? "SYN_UNKNOWN",
+                jurisdiction_name: j?.name ?? "Synthetic unknown",
+                source_type: a.source_type,
+                assessment_basis: a.assessment_basis,
+                review_status: a.review_status,
+                created_at: a.created_at,
+                reviewed_at: a.reviewed_at,
+                reviewed_by_user_id: a.reviewed_by_user_id,
+              },
+              REVIEW_ASSESSMENT_COLUMNS,
+            );
+          }),
+      );
+    }),
   };
 }
 
@@ -622,6 +756,8 @@ export const WRITE_NAMES = Object.freeze([
   "publishQuestionSet",
   "retryOperationalJob",
   "cancelOperationalJob",
+  // MVP-001 S3 part 2.
+  "reviewJurisdictionAssessment",
 ]);
 
 export const answer = (outcome, value = null) =>

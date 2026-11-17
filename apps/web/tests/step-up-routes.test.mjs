@@ -165,8 +165,10 @@ test("S2-R2. no setup picture, embedded markup, or image is ever rendered, and t
 });
 
 test("S2-R3. every attorney page and every staff page asks the step-up gate first, right after opting out of prerendering", () => {
-  // MVP-001 S2: sixteen pages, and the operational job view.
-  assert.equal(GATED_PAGES.length, 17);
+  // MVP-001 S2: sixteen pages, and the operational job view. MVP-001 S3
+  // part 2: and the jurisdiction assessment review.
+  assert.equal(GATED_PAGES.length, 18);
+  assert.ok(GATED_PAGES.includes("app/staff/jurisdiction-review/page.tsx"));
   for (const file of GATED_PAGES) {
     const kind = file.startsWith("app/staff/") ? "staff" : "attorney";
     const code = codeOf(read(file));
@@ -214,10 +216,23 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
       continue;
     }
     assert.ok(after.startsWith("  const state = await operation();"), file);
-    // Every exported action goes through the one guarded helper.
+    // Every exported action goes through the one guarded helper: the six
+    // verification changes and (MVP-001 S3) opening an uploaded document.
+    const verification = file === "app/staff/verification/actions.ts";
     const exported = [...code.matchAll(/^export async function (\w+)\(/gm)];
-    assert.equal(exported.length, 6, file);
-    assert.equal(code.match(/return gated\(\(\) =>/g).length, 6, file);
+    assert.equal(exported.length, verification ? 7 : 6, file);
+    assert.equal(
+      code.match(/return gated\(\(\) =>/g).length,
+      verification ? 7 : 6,
+      file,
+    );
+    assert.equal(
+      code.includes(
+        "export async function openArtifact(\n  _previous: ArtifactAccessState,\n  formData: FormData,\n): Promise<ArtifactAccessState> {\n  return gated(() => observedArtifact(formData));\n}",
+      ),
+      verification,
+      file,
+    );
     assert.doesNotMatch(code, /return (?!gated|refusal|state)\w/, file);
   }
   // The one attorney or staff action left outside the gate is the

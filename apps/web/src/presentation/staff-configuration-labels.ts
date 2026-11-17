@@ -7,6 +7,9 @@
 // configuration read from the database.
 
 import type {
+  Ambiguity,
+  AssessmentReviewStatus,
+  AssessmentSource,
   ConfigurationActionState,
   GrantState,
   JobGroup,
@@ -14,6 +17,8 @@ import type {
   LifecycleState,
   PolicyStatus,
   RefusalReason,
+  ReviewDecision,
+  ReviewGroup,
   StaffSurface,
 } from "../application/staff-configuration.ts";
 import type { EnvironmentBinding } from "../application/environment-binding.ts";
@@ -69,6 +74,13 @@ export const SURFACE_LINKS: Readonly<
     title: "Intake configuration",
     summary: "Publish new intake question-set versions.",
   },
+  // MVP-001 S3 part 2.
+  "jurisdiction-review": {
+    href: "/staff/jurisdiction-review",
+    title: "Jurisdiction assessment review",
+    summary:
+      "Review the jurisdictions submitted Intakes name, as suggestions that may be relevant, never as governing law.",
+  },
   jobs: {
     href: "/staff/jobs",
     title: "Operational jobs",
@@ -94,6 +106,53 @@ export const JOB_GROUP_LINKS: Readonly<
   open: { href: "/staff/jobs?state=open", title: "Waiting or running" },
   finished: { href: "/staff/jobs?state=finished", title: "Finished" },
 });
+
+// MVP-001 S3 part 2: the jurisdiction assessment review. A review records
+// whether a named jurisdiction may be relevant; it never asserts governing
+// law, and several named jurisdictions stay several.
+export const REVIEW_GROUP_LINKS: Readonly<
+  Record<ReviewGroup, { readonly href: string; readonly title: string }>
+> = Object.freeze({
+  unreviewed: { href: "/staff/jurisdiction-review", title: "Needs review" },
+  unnamed: {
+    href: "/staff/jurisdiction-review?group=unnamed",
+    title: "No jurisdiction named",
+  },
+});
+
+export const ASSESSMENT_SOURCE_LABELS: Readonly<
+  Record<AssessmentSource, string>
+> = Object.freeze({
+  client_statement: "Stated by the client at submission",
+  ai_suggestion: "A suggestion the client confirmed",
+});
+
+export const ASSESSMENT_STATUS_LABELS: Readonly<
+  Record<AssessmentReviewStatus, Label>
+> = Object.freeze({
+  unreviewed: { label: "Not reviewed", tone: "information" },
+  confirmed: { label: "Confirmed: may be relevant", tone: "success" },
+  not_confirmed: { label: "Not confirmed", tone: "neutral" },
+});
+
+export const AMBIGUITY_LABELS: Readonly<Record<Ambiguity, Label>> =
+  Object.freeze({
+    none: { label: "No jurisdiction named", tone: "warning" },
+    one: { label: "One jurisdiction named", tone: "neutral" },
+    several: {
+      label: "Several jurisdictions named; none is chosen",
+      tone: "warning",
+    },
+  });
+
+export const REVIEW_DECISION_LABELS: Readonly<Record<ReviewDecision, string>> =
+  Object.freeze({
+    confirmed: "Confirm: may be relevant",
+    not_confirmed: "Mark as not confirmed",
+  });
+
+export const REVIEW_NOTE =
+  "A review records whether a jurisdiction an Intake names may be relevant. It never decides which law applies, never chooses a jurisdiction, and never changes what the client submitted. Client identity and Intake content are not shown here.";
 
 export const POLICY_STATUS_LABELS: Readonly<Record<PolicyStatus, Label>> =
   Object.freeze({
@@ -236,6 +295,15 @@ const REASON_MESSAGES: Readonly<
   duplicate_version: {
     title: "Version key already used",
     body: "A question-set version with this key is already published. Choose a new key. Nothing was saved.",
+  },
+  // MVP-001 S3 part 2.
+  already_reviewed: {
+    title: "Already reviewed",
+    body: "This assessment was already reviewed. A review is recorded once. Nothing was saved.",
+  },
+  not_reviewable: {
+    title: "Not open for review",
+    body: "Only assessments of submitted or active Intakes that have not expired are reviewed. Nothing was saved.",
   },
 });
 
