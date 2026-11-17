@@ -214,10 +214,23 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
       continue;
     }
     assert.ok(after.startsWith("  const state = await operation();"), file);
-    // Every exported action goes through the one guarded helper.
+    // Every exported action goes through the one guarded helper: the six
+    // verification changes and (MVP-001 S3) opening an uploaded document.
+    const verification = file === "app/staff/verification/actions.ts";
     const exported = [...code.matchAll(/^export async function (\w+)\(/gm)];
-    assert.equal(exported.length, 6, file);
-    assert.equal(code.match(/return gated\(\(\) =>/g).length, 6, file);
+    assert.equal(exported.length, verification ? 7 : 6, file);
+    assert.equal(
+      code.match(/return gated\(\(\) =>/g).length,
+      verification ? 7 : 6,
+      file,
+    );
+    assert.equal(
+      code.includes(
+        "export async function openArtifact(\n  _previous: ArtifactAccessState,\n  formData: FormData,\n): Promise<ArtifactAccessState> {\n  return gated(() => observedArtifact(formData));\n}",
+      ),
+      verification,
+      file,
+    );
     assert.doesNotMatch(code, /return (?!gated|refusal|state)\w/, file);
   }
   // The one attorney or staff action left outside the gate is the

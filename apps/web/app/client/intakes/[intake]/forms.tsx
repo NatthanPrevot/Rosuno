@@ -9,8 +9,21 @@
 // client's own Intakes a form concerns, the revision the page showed (so a
 // stale page cannot displace newer content), and which of the two allowed
 // versions the client is answering; the server checks all of them itself.
+//
+// MVP-001 S3: the voice memo recorder records in the browser and sends the
+// recording's bytes to the server, which recognizes the format, measures the
+// duration from the bytes, enforces the configured limit, and stores it; the
+// browser's timer and its automatic stop only help the client stay within
+// the limit and decide nothing. Playback asks the server for a short-lived
+// link to the one authorized voice memo each time.
 
-import { useActionState } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
   INITIAL_CLIENT_INTAKE_STATE,
@@ -19,20 +32,33 @@ import {
 } from "../../../../src/application/client-intake.ts";
 import { NOT_SURE } from "../../../../src/application/intake-question-set.ts";
 import {
+  INITIAL_PLAYBACK_STATE,
+  INITIAL_VOICE_MEMO_STATE,
+} from "../../../../src/application/voice-memo.ts";
+import {
   Alert,
   Button,
   Choice,
+  Cluster,
   FieldGroup,
   SelectField,
   Stack,
+  Text,
   TextAreaField,
 } from "../../../../src/presentation/design-system.tsx";
 import { outcomeMessage } from "../../../../src/presentation/client-intake-labels.ts";
 import { keepEntries } from "../../../../src/presentation/form-entries.ts";
 import {
+  playbackMessage,
+  voiceMemoMessage,
+  type VoiceMemoMessage,
+} from "../../../../src/presentation/voice-memo-labels.ts";
+import {
   closeIntakeAction,
+  playVoiceMemoAction,
   saveIntakeAction,
   submitIntakeAction,
+  uploadVoiceMemoAction,
 } from "../../actions.ts";
 
 function Outcome({ state }: { readonly state: ClientIntakeActionState }) {
@@ -246,6 +272,211 @@ export function CloseIntakeForm({ intakeId }: { readonly intakeId: string }) {
         <Button variant="tertiary" type="submit" disabled={pending}>
           Close this Intake
         </Button>
+      </Stack>
+    </form>
+  );
+}
+
+function Message({ message }: { readonly message: VoiceMemoMessage | null }) {
+  if (message === null) {
+    return null;
+  }
+  return (
+    <Alert
+      tone={message.tone}
+      title={message.title}
+      role={message.tone === "error" ? "alert" : "status"}
+    >
+      {message.body}
+    </Alert>
+  );
+}
+
+// The recording formats a browser may offer, in order of preference.
+const RECORDING_FORMATS = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/mp4",
+] as const;
+
+type RecorderPhase =
+  "idle" | "recording" | "recorded" | "unsupported" | "blocked";
+
+export function VoiceMemoRecorder({
+  intakeId,
+  maxSeconds,
+}: {
+  readonly intakeId: string;
+  readonly maxSeconds: number;
+}) {
+  const [state, dispatch, pending] = useActionState(
+    uploadVoiceMemoAction,
+    INITIAL_VOICE_MEMO_STATE,
+  );
+  const [phase, setPhase] = useState<RecorderPhase>("idle");
+  const [elapsed, setElapsed] = useState(0);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const recording = useRef<Blob | null>(null);
+  const timers = useRef<ReturnType<typeof setInterval>[]>([]);
+
+  function clearTimers() {
+    for (const timer of timers.current) {
+      clearInterval(timer);
+    }
+    timers.current = [];
+  }
+
+  useEffect(
+    () => () => {
+      clearTimers();
+      recorder.current?.stream.getTracks().forEach((track) => track.stop());
+    },
+    [],
+  );
+
+  function stop() {
+    clearTimers();
+    if (recorder.current?.state === "recording") {
+      recorder.current.stop();
+    }
+  }
+
+  async function start() {
+    if (
+      typeof MediaRecorder === "undefined" ||
+      navigator.mediaDevices?.getUserMedia === undefined
+    ) {
+      setPhase("unsupported");
+      return;
+    }
+    const format = RECORDING_FORMATS.find((type) =>
+      MediaRecorder.isTypeSupported(type),
+    );
+    if (format === undefined) {
+      setPhase("unsupported");
+      return;
+    }
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setPhase("blocked");
+      return;
+    }
+    const chunks: Blob[] = [];
+    const next = new MediaRecorder(stream, {
+      mimeType: format,
+      audioBitsPerSecond: 48000,
+    });
+    next.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        chunks.push(event.data);
+      }
+    };
+    next.onstop = () => {
+      stream.getTracks().forEach((track) => track.stop());
+      recording.current = new Blob(chunks, { type: next.mimeType });
+      setPhase("recorded");
+    };
+    recorder.current = next;
+    recording.current = null;
+    setElapsed(0);
+    next.start();
+    setPhase("recording");
+    const began = performance.now();
+    timers.current.push(
+      setInterval(() => {
+        const seconds = (performance.now() - began) / 1000;
+        setElapsed(Math.floor(seconds));
+        // Stop just before the limit; the server still decides.
+        if (seconds >= maxSeconds - 0.5) {
+          stop();
+        }
+      }, 100),
+    );
+  }
+
+  function save() {
+    const blob = recording.current;
+    if (blob === null) {
+      return;
+    }
+    const formData = new FormData();
+    formData.set("intake", intakeId);
+    formData.set("recording", blob, "voice-memo");
+    startTransition(() => dispatch(formData));
+  }
+
+  return (
+    <Stack>
+      <Message message={voiceMemoMessage(state)} />
+      <Text tone="muted">
+        {`You can record one voice memo of up to ${maxSeconds} seconds. It is kept with this Intake.`}
+      </Text>
+      {phase === "unsupported" ? (
+        <Alert tone="warning" title="Recording not supported" role="alert">
+          This browser cannot record a voice memo. You can describe your
+          situation in writing instead.
+        </Alert>
+      ) : null}
+      {phase === "blocked" ? (
+        <Alert tone="warning" title="Microphone not available" role="alert">
+          Allow this site to use your microphone, then try again.
+        </Alert>
+      ) : null}
+      {phase === "recording" ? (
+        <>
+          <Text>{`Recording: ${elapsed} of ${maxSeconds} seconds`}</Text>
+          <Button variant="primary" type="button" onClick={stop}>
+            Stop recording
+          </Button>
+        </>
+      ) : (
+        <Cluster>
+          {phase === "recorded" ? (
+            <Button
+              variant="primary"
+              type="button"
+              onClick={save}
+              disabled={pending}
+            >
+              Save voice memo
+            </Button>
+          ) : null}
+          <Button
+            variant={phase === "recorded" ? "secondary" : "primary"}
+            type="button"
+            onClick={start}
+            disabled={pending}
+          >
+            {phase === "recorded" ? "Record again" : "Record a voice memo"}
+          </Button>
+        </Cluster>
+      )}
+    </Stack>
+  );
+}
+
+export function VoiceMemoPlayer({
+  resourceId,
+}: {
+  readonly resourceId: string;
+}) {
+  const [state, action, pending] = useActionState(
+    playVoiceMemoAction,
+    INITIAL_PLAYBACK_STATE,
+  );
+  return (
+    <form action={action}>
+      <Stack>
+        <input type="hidden" name="resource" value={resourceId} />
+        <Button variant="secondary" type="submit" disabled={pending}>
+          Play voice memo
+        </Button>
+        {state.status === "ready" ? (
+          <audio key={state.url} src={state.url} controls autoPlay />
+        ) : null}
+        <Message message={playbackMessage(state)} />
       </Stack>
     </form>
   );

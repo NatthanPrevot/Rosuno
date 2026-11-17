@@ -86,6 +86,7 @@ const gateFor = (kind) => `export async function requireSteppedUp(kind) {
 const ACTIONS = `const action = async (state) => state;
 export const saveDetails = action, saveLicense = action, saveInsurance = action, requestArea = action, changeAreaRequest = action, submitForReview = action;
 export const recordFinding = action, recordUnavailableSource = action, recordDiscipline = action, decideArea = action, changeStage = action, recordDetermination = action;
+export const openArtifact = action;
 `;
 
 const directory = mkdtempSync(join(tmpdir(), "rosuno-p3-003-"));
@@ -444,4 +445,42 @@ test("M4-R5. P3-002 limitation correction: a failed or unconfirmed start shows a
     ["/"],
   );
   assert.equal(retried, 0);
+});
+
+test("M4-R6. MVP-001 S3: a finding whose source is an uploaded document shows it as such with one download form naming only that artifact; an ordinary source shows its type and reference; the finding form offers the document field", async () => {
+  const { w, a } = world();
+  const applicant = addAttorney(w, 10, "under_review", {
+    display_name: "Synthetic Applicant",
+  });
+  const license = addLicense(w, applicant.attorneyId, a);
+  const artifact = "00000000-0000-4000-8000-000000000901";
+  addEvidence(w, "license", license, {
+    source_type: "uploaded_artifact",
+    source_reference: artifact,
+  });
+  addEvidence(w, "license", license);
+  const staff = addStaff(w, 30);
+  addGrant(w, staff.userId);
+  const review = await render(staffReview, staffSources(w, staff.authId), {
+    params: Promise.resolve({ attorney: applicant.attorneyId }),
+  });
+  assert.ok(review.text.includes("Uploaded source document"));
+  assert.ok(review.text.includes("Download the source document"));
+  assert.ok(!review.text.includes(`uploaded_artifact: ${artifact}`));
+  assert.ok(review.text.includes("synthetic register: synthetic entry"));
+  assert.deepEqual(
+    [
+      ...review.html.matchAll(
+        /<input type="hidden" name="artifact" value="([^"]*)"\/>/g,
+      ),
+    ].map((m) => m[1]),
+    [artifact],
+  );
+  assert.equal(review.html.match(/<input[^>]*type="file"[^>]*>/g)?.length, 1);
+  assert.match(
+    review.html,
+    /<input accept="application\/pdf,image\/png,image\/jpeg"[^>]*type="file"[^>]*name="artifact"\/>/,
+  );
+  // The document's signed URL never appears in the page itself.
+  assert.doesNotMatch(review.html, /storage\/v1|token=/);
 });

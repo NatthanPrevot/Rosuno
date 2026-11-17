@@ -1485,3 +1485,67 @@ export async function closeIntake(
     return UNAVAILABLE;
   }
 }
+
+// ---------------------------------------------------------------------------
+// MVP-001 S3: the verified client, for the voice memo use cases
+// ---------------------------------------------------------------------------
+
+export type VerifiedClient = {
+  readonly userId: string;
+  readonly clientId: string;
+};
+
+// The verified client of the request, decided exactly as for every client
+// intake operation, or a fixed refusal.
+export async function verifiedClientOf(
+  sources: ClientIntakeSources,
+): Promise<VerifiedClient | Refusal> {
+  try {
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE;
+    }
+    return await clientContextOf(sources, reads);
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+// The verified client and one of its own Intakes with its current state, a
+// fixed refusal, or not-found when the Intake is not the client's own.
+export async function verifiedClientIntakeOf(
+  sources: ClientIntakeSources,
+  intakeId: unknown,
+): Promise<
+  | {
+      readonly client: VerifiedClient;
+      readonly intakeId: string;
+      readonly state: IntakeState;
+    }
+  | Refusal
+  | typeof NOT_FOUND
+> {
+  try {
+    if (!isUuid(intakeId)) {
+      return NOT_FOUND;
+    }
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE;
+    }
+    const client = await clientContextOf(sources, reads);
+    if (!("clientId" in client)) {
+      return client;
+    }
+    const intake = await ownIntakeOf(reads, client, intakeId);
+    if (intake === "unreadable") {
+      return UNAVAILABLE;
+    }
+    if (intake === null) {
+      return NOT_FOUND;
+    }
+    return Object.freeze({ client, intakeId, state: intake.state });
+  } catch {
+    return UNAVAILABLE;
+  }
+}

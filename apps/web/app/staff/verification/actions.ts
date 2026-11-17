@@ -10,25 +10,32 @@
 // comes back from the browser and is never read. After a recorded change the
 // review pages are read afresh. MVP-001 S2: each action first asks the
 // step-up gate; a session that is not stepped up gets one fixed refusal, and
-// nothing is handed to the use case.
+// nothing is handed to the use case. MVP-001 S3: a finding may carry a source
+// document, and opening an uploaded document asks the server for a
+// short-lived download link to that one document after the database
+// authorized the reviewer; a refused or failed opening writes one log line
+// naming only the action and its fixed outcome.
 
 import { revalidatePath } from "next/cache";
 
 import {
   changeProfileStage,
   decidePracticeArea,
+  openVerificationArtifact,
   recordDisciplineFinding,
   recordEligibilityDetermination,
   recordSourceUnavailable,
   recordVerificationFinding,
+  type ArtifactAccessState,
   type StaffActionState,
 } from "../../../src/application/staff-verification.ts";
+import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";
 import { STAFF_VERIFICATION_SOURCES } from "../../../src/infrastructure/staff/staff-verification-adapter.ts";
 import { stepUpRefusal } from "../../account/gate.ts";
 
-async function gated(
-  operation: () => Promise<StaffActionState>,
-): Promise<StaffActionState> {
+async function gated<State extends StaffActionState | ArtifactAccessState>(
+  operation: () => Promise<State>,
+): Promise<State | NonNullable<Awaited<ReturnType<typeof stepUpRefusal>>>> {
   const refusal = await stepUpRefusal("staff");
   if (refusal !== null) {
     return refusal;
@@ -89,4 +96,32 @@ export async function recordDetermination(
   return gated(() =>
     recordEligibilityDetermination(STAFF_VERIFICATION_SOURCES, formData),
   );
+}
+
+// MVP-001 S3: an opening that did not complete writes one warning line, and
+// a refused one an information line, each naming only the outcome.
+async function observedArtifact(formData: FormData) {
+  const state = await openVerificationArtifact(
+    STAFF_VERIFICATION_SOURCES,
+    formData,
+  );
+  if (state.status === "unavailable") {
+    await logRequestEvent("warn", "protected_resource.not_completed", {
+      operation: "openVerificationArtifact",
+      outcome: state.status,
+    });
+  } else if (state.status !== "ready") {
+    await logRequestEvent("info", "protected_resource.refused", {
+      operation: "openVerificationArtifact",
+      outcome: state.status,
+    });
+  }
+  return state;
+}
+
+export async function openArtifact(
+  _previous: ArtifactAccessState,
+  formData: FormData,
+): Promise<ArtifactAccessState> {
+  return gated(() => observedArtifact(formData));
 }

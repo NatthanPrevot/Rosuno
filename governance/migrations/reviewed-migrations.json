@@ -614,6 +614,81 @@
       "drift_check": "clean",
       "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration; the counters hold no evidence and are emptied only by pruning, and no audit row is removed.",
       "depends_on": ["20261118030000_mvp_001_s2_session_assurance"]
+    },
+    {
+      "migration_id": "20261119010000_mvp_001_s3_protected_storage",
+      "migration_kind": "product",
+      "sequence": 25,
+      "artifact_path": "supabase/migrations/20261119010000_mvp_001_s3_protected_storage.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration; no resource, stored object, Legal Hold or audit row is removed, and the private bucket stays private.",
+      "depends_on": ["20261118040000_mvp_001_s2_authentication_abuse_control"]
+    },
+    {
+      "migration_id": "20261119020000_mvp_001_s3_voice_memo_intake",
+      "migration_kind": "product",
+      "sequence": 26,
+      "artifact_path": "supabase/migrations/20261119020000_mvp_001_s3_voice_memo_intake.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the function; no resource, voice memo, Intake or audit row is removed.",
+      "depends_on": ["20261119010000_mvp_001_s3_protected_storage"]
+    },
+    {
+      "migration_id": "20261119030000_mvp_001_s3_verification_artifacts",
+      "migration_kind": "product",
+      "sequence": 27,
+      "artifact_path": "supabase/migrations/20261119030000_mvp_001_s3_verification_artifacts.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the function, guard or index; no resource, evidence or audit row is removed.",
+      "depends_on": ["20261119020000_mvp_001_s3_voice_memo_intake"]
     }
   ]
 }

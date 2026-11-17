@@ -2495,7 +2495,10 @@
         "20261118010000_mvp_001_s2_operational_jobs",
         "20261118020000_mvp_001_s2_job_scheduler",
         "20261118030000_mvp_001_s2_session_assurance",
-        "20261118040000_mvp_001_s2_authentication_abuse_control"
+        "20261118040000_mvp_001_s2_authentication_abuse_control",
+        "20261119010000_mvp_001_s3_protected_storage",
+        "20261119020000_mvp_001_s3_voice_memo_intake",
+        "20261119030000_mvp_001_s3_verification_artifacts"
       ],
       "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",

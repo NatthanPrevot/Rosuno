@@ -89,9 +89,26 @@ test("2. pages decide access on the server for every request through the client 
     "saveIntakeRevision(CLIENT_INTAKE_SOURCES, formData)",
     "submitIntake(CLIENT_INTAKE_SOURCES, formData)",
     "closeIntake(CLIENT_INTAKE_SOURCES, formData)",
+    // MVP-001 S3: the voice memo upload and playback use cases, with their
+    // own production sources.
+    "uploadVoiceMemo(VOICE_MEMO_SOURCES, formData)",
+    "voiceMemoPlayback(VOICE_MEMO_SOURCES, formData)",
   ]) {
     assert.ok(actions.replace(/\s+/g, " ").includes(call), call);
   }
+  // MVP-001 S3: the Intake page decides the voice memo section on the server
+  // for the same route segment, after the Intake itself is ready, and only
+  // the use case reads it.
+  assert.match(
+    intake,
+    /const memo = await resolveVoiceMemo\(VOICE_MEMO_SOURCES, intake\);/,
+  );
+  assert.equal(intake.match(/resolveVoiceMemo\(/g).length, 1);
+  assert.ok(
+    intake.indexOf('if (view.status === "ready") {') <
+      intake.indexOf("await resolveVoiceMemo("),
+  );
+  assert.equal(actions.match(/export async function \w+\(/g).length, 6);
 });
 
 test("3. no client intake module reaches a privileged credential, client or provisioning module", () => {

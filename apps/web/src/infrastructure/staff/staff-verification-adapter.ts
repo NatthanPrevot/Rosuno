@@ -16,7 +16,9 @@
 // MVP-001 D-4: the review queue is read one page at a time, filtered and
 // ordered in the database, and the records counted for a page's attorneys
 // are read within the count the application asks for, so nothing is ever
-// silently cut.
+// silently cut. MVP-001 S3: verification artifacts are started, completed,
+// and authorized through the shared protected resource adapter, and stored
+// and signed through its bounded storage port.
 
 import {
   rowsResultOf,
@@ -48,6 +50,11 @@ import {
 import { SUPABASE_SERVER_SESSION_SOURCE } from "../identity/server-session-source.ts";
 import { readEnvironmentConfiguration } from "../environment/environment-configuration.ts";
 import { createStaffVerificationProvisioning } from "../identity/registration-provisioning.ts";
+import {
+  PROTECTED_RESOURCE_CALLS,
+  PROTECTED_STORAGE,
+  sha256ContentDigest,
+} from "../resources/protected-resource-adapter.ts";
 import {
   boundedPort,
   boundedSource,
@@ -524,4 +531,8 @@ export const STAFF_VERIFICATION_SOURCES: StaffSources = Object.freeze({
   writes: createStaffWrites(),
   clock: () => Date.now(),
   environment: () => readEnvironmentConfiguration(),
+  // MVP-001 S3: verification artifact upload and access.
+  resources: PROTECTED_RESOURCE_CALLS,
+  storage: PROTECTED_STORAGE,
+  digest: sha256ContentDigest,
 });

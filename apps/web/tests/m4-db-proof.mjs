@@ -1429,6 +1429,15 @@ function probes() {
           // definers executable by no API role.
           "policy_select_version:s",
           "production_financial_gate:s",
+          // MVP-001 S3 re-pin (20261119010000-030000): the protected resource
+          // functions (authenticated only), which write only resources, voice
+          // memos and audit events; no M4 relation (an evidence row refers to
+          // an artifact only through the M4 finding functions).
+          "resource_abandon_upload:v",
+          "resource_authorize_access:v",
+          "resource_begin_verification_artifact:v",
+          "resource_begin_voice_memo:v",
+          "resource_finalize_upload:v",
           "rosuno_environment_class:s",
           "rosuno_environment_status:s",
           // MVP-001 S1 re-pin (20261117030000): the configuration
@@ -1489,11 +1498,20 @@ function probes() {
         ),
         "0",
       );
+      // MVP-001 S3 admits exactly one more trigger on an M4 relation: the
+      // check of an evidence row's reference to an uploaded artifact, which
+      // only refuses (it writes nothing), on verification_evidence only.
       assert.equal(
         sql(
-          `select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in (${m4}, 'audit_events') and not t.tgisinternal and t.tgname not like '%set_updated_at' and t.tgname <> 'audit_events_immutable';`,
+          `select coalesce(string_agg(c.relname || ':' || t.tgname, ','), '') from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in (${m4}, 'audit_events') and not t.tgisinternal and t.tgname not like '%set_updated_at' and t.tgname <> 'audit_events_immutable';`,
         ),
-        "0",
+        "verification_evidence:verification_evidence_artifact_guard",
+      );
+      assert.equal(
+        sql(
+          "select p.prosecdef::text || '|' || p.provolatile::text from pg_trigger t join pg_proc p on p.oid = t.tgfoid where t.tgname = 'verification_evidence_artifact_guard';",
+        ),
+        "false|v",
       );
       assert.equal(
         sql(

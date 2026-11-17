@@ -7,6 +7,8 @@
 // attorney outside that scope looks exactly like one that does not exist.
 // Current assessments are computed for display and never persisted; a
 // determination is recorded only when a reviewer explicitly asks for one.
+// MVP-001 S3: a finding whose source is an uploaded document offers its
+// download, which the server authorizes again for each request.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -37,6 +39,7 @@ import {
 } from "../../../../src/presentation/professional-labels.ts";
 import { requireSteppedUp } from "../../../account/gate.ts";
 import {
+  ArtifactDownload,
   DecisionForm,
   DeterminationForm,
   DisciplineForm,
@@ -297,7 +300,18 @@ export default async function StaffReviewPage({
                     {record.evidence.map((evidence) => (
                       <tr key={evidence.id}>
                         <td>{evidence.retrievedAt}</td>
-                        <td>{`${evidence.sourceType}: ${evidence.sourceReference}`}</td>
+                        <td>
+                          {evidence.artifactId === null ? (
+                            `${evidence.sourceType}: ${evidence.sourceReference}`
+                          ) : (
+                            <>
+                              <Text size="small">Uploaded source document</Text>
+                              <ArtifactDownload
+                                artifact={evidence.artifactId}
+                              />
+                            </>
+                          )}
+                        </td>
                         <td>{evidence.method}</td>
                         <td>
                           <Status

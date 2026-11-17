@@ -5,12 +5,17 @@
 // Each form posts to its server action and shows only the fixed message for
 // the state that action returns. Hidden fields only name the record or
 // attorney a form concerns; the server re-checks the reviewer's identity,
-// scope, and the record's current state before writing anything.
+// scope, and the record's current state before writing anything. MVP-001 S3:
+// a finding may attach its source document, which the server checks and
+// stores before the finding refers to it; opening an uploaded document asks
+// the server for a short-lived download link each time.
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 
 import {
+  INITIAL_ARTIFACT_ACCESS,
   INITIAL_STAFF_STATE,
+  type ArtifactAccessState,
   type ReviewIntent,
   type StaffActionState,
 } from "../../../src/application/staff-verification.ts";
@@ -29,6 +34,7 @@ import {
 import {
   changeStage,
   decideArea,
+  openArtifact,
   recordDetermination,
   recordDiscipline,
   recordFinding,
@@ -119,30 +125,52 @@ function useForm(action: Action) {
 function EvidenceFields({
   prefix,
   state,
+  document = false,
 }: {
   readonly prefix: string;
   readonly state: StaffActionState;
+  // MVP-001 S3: the form can attach the source document instead.
+  readonly document?: boolean;
 }) {
   return (
     <>
       <TextField
         id={`${prefix}-source-type`}
         name="source_type"
-        label="Source type"
+        label={
+          document
+            ? "Source type (unless you attach the document)"
+            : "Source type"
+        }
         hint="For example, the licensing authority's public register."
         maxLength={80}
-        required
+        required={!document}
         errors={errorsOf(state, "source_type")}
       />
       <TextField
         id={`${prefix}-source-reference`}
         name="source_reference"
-        label="Source reference"
+        label={
+          document
+            ? "Source reference (unless you attach the document)"
+            : "Source reference"
+        }
         hint="The record, entry, or document consulted at that source."
         maxLength={200}
-        required
+        required={!document}
         errors={errorsOf(state, "source_reference")}
       />
+      {document ? (
+        <TextField
+          id={`${prefix}-artifact`}
+          name="artifact"
+          type="file"
+          accept="application/pdf,image/png,image/jpeg"
+          label="Source document (optional)"
+          hint="A PDF, PNG, or JPEG of at most 1 MB. When you attach it, leave the source type and reference empty: the document is the source."
+          errors={errorsOf(state, "artifact")}
+        />
+      ) : null}
       <TextField
         id={`${prefix}-source-uri`}
         name="source_uri"
@@ -223,7 +251,7 @@ export function FindingForm({ kind, record }: RecordFormProps) {
         <Outcome state={state} />
         <input type="hidden" name="subject_kind" value={kind} />
         <input type="hidden" name="record" value={record} />
-        <EvidenceFields prefix={prefix} state={state} />
+        <EvidenceFields prefix={prefix} state={state} document />
         {kind === "license" ? (
           <TextField
             id={`${prefix}-observed`}
@@ -515,6 +543,82 @@ export function DeterminationForm({
             Record eligibility determination
           </Button>
         </Cluster>
+      </Stack>
+    </form>
+  );
+}
+
+function ArtifactMessage({ state }: { readonly state: ArtifactAccessState }) {
+  switch (state.status) {
+    case "ready":
+      return (
+        <Alert tone="information" title="Download started" role="status">
+          The download link works for one minute. To download the document again
+          later, press the button again.
+        </Alert>
+      );
+    case "not-found":
+      return (
+        <Alert tone="warning" title="Not available" role="alert">
+          This document is not available within your current verification
+          access.
+        </Alert>
+      );
+    case "not-available":
+    case "held":
+      return (
+        <Alert tone="warning" title="Not available" role="alert">
+          This document cannot be opened at the moment.
+        </Alert>
+      );
+    case "sign-in-required":
+      return (
+        <Alert tone="warning" title="Sign in again" role="alert">
+          Your session has ended. Sign in again to continue.
+        </Alert>
+      );
+    case "denied":
+      return (
+        <Alert tone="warning" title="Not authorized" role="alert">
+          Your current staff access does not cover this document.
+        </Alert>
+      );
+    case "step-up-required":
+      return (
+        <Alert tone="warning" title="Confirm your sign-in" role="alert">
+          Opening this document needs a sign-in confirmed with a code from your
+          authenticator app. Reload this page to confirm it, then try again.
+        </Alert>
+      );
+    case "unavailable":
+      return (
+        <Alert tone="error" title="Unavailable" role="alert">
+          The document could not be opened right now. Please try again later.
+        </Alert>
+      );
+    default:
+      return null;
+  }
+}
+
+export function ArtifactDownload({ artifact }: { readonly artifact: string }) {
+  const [state, formAction, pending] = useActionState(
+    openArtifact,
+    INITIAL_ARTIFACT_ACCESS,
+  );
+  useEffect(() => {
+    if (state.status === "ready") {
+      window.location.assign(state.url);
+    }
+  }, [state]);
+  return (
+    <form action={formAction}>
+      <Stack>
+        <input type="hidden" name="artifact" value={artifact} />
+        <Button variant="tertiary" type="submit" disabled={pending}>
+          Download the source document
+        </Button>
+        <ArtifactMessage state={state} />
       </Stack>
     </form>
   );

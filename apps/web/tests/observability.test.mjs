@@ -339,7 +339,11 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // worker batch's counts, and each failed attempt's job type and code), and
   // the authentication-abuse control (PS-A4 section 4: each unavailable
   // protection's purpose, failure kind, outcome, and audit persistence; each
-  // suspicious sign-in's handling).
+  // suspicious sign-in's handling). MVP-001 S3: the staff verification
+  // actions (an uploaded document's opening not completed or refused, with
+  // its fixed outcome only) and the protected resource adapter (a failed
+  // resource call, storage call, or read, with no bytes, digest, path, or
+  // URL) write lines too; the client actions and Intake page already did.
   assert.deepEqual(callers, [
     "app/client/actions.ts",
     "app/client/intakes/[intake]/page.tsx",
@@ -347,10 +351,12 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/sign-in/actions.ts",
     "app/staff/actions.ts",
     "app/staff/frame.tsx",
+    "app/staff/verification/actions.ts",
     "src/infrastructure/client/client-intake-adapter.ts",
     "src/infrastructure/identity/authentication-abuse-control.ts",
     "src/infrastructure/identity/authenticator-provider.ts",
     "src/infrastructure/jobs/job-worker-adapter.ts",
+    "src/infrastructure/resources/protected-resource-adapter.ts",
     "src/infrastructure/staff/staff-configuration-adapter.ts",
   ]);
   for (const file of callers) {
@@ -367,10 +373,11 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     }
     // Nothing a person submitted or a provider returned is passed to a log
     // line: no form data, description, email, password, token, or message.
+    // MVP-001 S3: nor any bytes, recording, digest, object path, or URL.
     for (const [call] of code.matchAll(/logRequestEvent\([^;]*;/g)) {
       assert.doesNotMatch(
         call,
-        /formData|description|email|password|token|cookie|message|\.data\b|answers|input\./i,
+        /formData|description|email|password|token|cookie|message|\.data\b|answers|input\.|bytes|recording|digest|path|url|resourceId/i,
         `${file}: ${call}`,
       );
     }

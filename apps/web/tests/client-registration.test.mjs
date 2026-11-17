@@ -2820,6 +2820,20 @@ const AUTHENTICATION_ABUSE_RPCS = Object.freeze({
   authentication_abuse_report_unavailable:
     'await admin\n          .rpc("authentication_abuse_report_unavailable", {\n            p_purpose: purpose,\n            p_failure_kind: failure,\n          })\n          .abortSignal(AbortSignal.timeout(ABUSE_CALL_DEADLINE_MS));',
 });
+// MVP-001 S3: the protected resource adapter calls the database's own five
+// resource functions (voice memo and verification artifact start,
+// completion, abandonment, and access authorization), each exactly once and
+// each as a literal call through the request's own unprivileged session; it
+// builds or receives no privileged client and never names the credential.
+const PROTECTED_RESOURCE_ADAPTER =
+  "src/infrastructure/resources/protected-resource-adapter.ts";
+const PROTECTED_RESOURCE_RPCS = Object.freeze([
+  "resource_begin_voice_memo",
+  "resource_begin_verification_artifact",
+  "resource_finalize_upload",
+  "resource_abandon_upload",
+  "resource_authorize_access",
+]);
 const CAPABILITY_PREDICATE_RPC =
   'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';
 const CONFIGURATION_REQUEST_CLIENT =
@@ -2839,6 +2853,8 @@ const RPC_OCCURRENCES = Object.freeze({
   [CLIENT_INTAKE_ADAPTER]: CLIENT_INTAKE_RPCS.length,
   // The configuration functions and predicate, plus the environment accessor.
   [CONFIGURATION_ADAPTER]: CONFIGURATION_RPCS.length + 1,
+  // MVP-001 S3: the five resource functions.
+  [PROTECTED_RESOURCE_ADAPTER]: PROTECTED_RESOURCE_RPCS.length,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -2860,6 +2876,19 @@ function assertQuotaRpcContract(codes) {
         code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
           0,
         file === CONFIGURATION_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+    }
+    for (const name of PROTECTED_RESOURCE_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+        file === PROTECTED_RESOURCE_ADAPTER ? 2 : 0,
+        `${file}: ${name}`,
+      );
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\("${name}", \\{`, "g"))?.length ??
+          0,
+        file === PROTECTED_RESOURCE_ADAPTER ? 1 : 0,
         `${file}: ${name}`,
       );
     }
@@ -2957,21 +2986,21 @@ function assertQuotaRpcContract(codes) {
     provisioning,
     /\nconst DIGEST = \/\^\[0-9a-f\]\{64\}\$\/;\n\nfunction isDigest\(value: unknown\): value is string \{\n {2}return typeof value === "string" && DIGEST\.test\(value\);\n\}\n\nfunction isMaximum\(value: unknown\): value is number \{\n {2}return Number\.isSafeInteger\(value\) && \(value as number\) >= 1;\n\}\n/,
   );
-  // Seven privileged clients (Admin provisioning, the P3-002
+  // Eight privileged clients (Admin provisioning, the P3-002
   // attorney-applicant provisioning, the P3-003 professional and staff
   // verification provisioning, the quota decision, the MVP-001 S2
-  // operational job worker, and the MVP-001 S2 authentication-abuse
-  // decisions) and one publishable client (the confirmation request), each
-  // built only from the verified binding.
+  // operational job worker, the MVP-001 S2 authentication-abuse decisions,
+  // and the MVP-001 S3 protected storage port) and one publishable client
+  // (the confirmation request), each built only from the verified binding.
   assert.equal(
     provisioning.match(
       /\bcreate\(binding\.url, binding\.adminKey, clientOptions\(\)\)/g,
     ).length,
-    7,
+    8,
   );
-  assert.equal(provisioning.match(/\bcreate\(/g).length, 8);
+  assert.equal(provisioning.match(/\bcreate\(/g).length, 9);
   assert.equal(provisioning.match(/\bbinding\.publishableKey\b/g).length, 1);
-  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 7);
+  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 8);
   // The worker port is built exactly like the other ports: the verified
   // binding first, then its one cookie-free privileged client, never
   // returned; it offers exactly the three worker calls and nothing else.
@@ -3023,6 +3052,63 @@ function assertQuotaRpcContract(codes) {
     abuse,
     /\.from\(|\.insert\(|\.update\(|\.upsert\(|\.delete\(|auth\.admin|authentication_abuse_counters|audit_events|return admin\b|admin[,;)]|process\.env|\.\.\./,
   );
+  // MVP-001 S3: the protected storage port is built the same way, sits in
+  // its own section before the authentication-abuse port, offers exactly its
+  // two operations, works only in the one private bucket at the path it
+  // derives from a resource id, never replaces an object, signs for the fixed
+  // short lifetime only, and offers no listing, reading, moving, copying,
+  // replacing, public URL, removal, table access, or database call.
+  const storageStart = provisioning.indexOf(
+    "export async function createProtectedStoragePort(",
+  );
+  assert.ok(storageStart > 0 && storageStart < abuseStart);
+  const storage = provisioning.slice(storageStart, abuseStart);
+  assert.match(
+    storage,
+    /\): Promise<ProtectedStorage \| null> \{\n {2}const binding = readProjectBinding\(environment\);\n {2}if \(binding === null\) \{\n {4}return null;\n {2}\}\n {2}const admin = create\(binding\.url, binding\.adminKey, clientOptions\(\)\);\n {2}return Object\.freeze\(\{\n {4}store: async /,
+  );
+  assert.deepEqual(
+    [...storage.matchAll(/^ {4}(\w+): async /gm)].map((match) => match[1]),
+    ["store", "signedUrl"],
+  );
+  assert.equal(
+    storage.match(/await admin\.storage\n\s+\.from\(PROTECTED_BUCKET\)\n/g)
+      ?.length,
+    2,
+  );
+  assert.equal(storage.match(/\.from\(/g).length, 2);
+  // The two storage client calls and the signed-object URL prefix.
+  assert.equal(storage.match(/\bstorage\b/g).length, 3);
+  assert.equal(
+    storage.split(
+      "const prefix = `${binding.url}/storage/v1/object/sign/${PROTECTED_BUCKET}/${path}?token=`;",
+    ).length,
+    2,
+  );
+  assert.equal(
+    storage.match(
+      /\.upload\(path, bytes, \{\n\s+contentType: type,\n\s+upsert: false,\n\s+cacheControl: "0",\n\s+\}\);/g,
+    )?.length,
+    1,
+  );
+  assert.equal(
+    storage.match(/\.createSignedUrl\(\n\s+path,\n\s+SIGNED_URL_SECONDS,\n/g)
+      ?.length,
+    1,
+  );
+  assert.equal(
+    storage.match(/const path = objectPathOf\(resourceId\);/g).length,
+    2,
+  );
+  assert.equal(storage.match(/\bpath\b/g).length, 9);
+  assert.doesNotMatch(
+    storage,
+    /\.rpc\(|\.from\("|\.insert\(|\.update\(|\.upsert\(|\.delete\(|\.remove\(|\.list\(|\.download\(|\.move\(|\.copy\(|getPublicUrl|createSignedUrls|createSignedUploadUrl|uploadToSignedUrl|upsert: true|auth\.admin|return admin\b|admin[,;)]|process\.env|\.\.\./,
+  );
+  assert.match(
+    provisioning,
+    /^const SIGNED_SUFFIX = \/\^\[A-Za-z0-9\._-\]\+\(\?:&download=\)\?\$\/;$/m,
+  );
 }
 
 // The exact export list: the original three, the one narrow quota
@@ -3043,6 +3129,8 @@ function assertPrivilegedExports(provisioning) {
       "createRegistrationProvisioning",
       "createConfirmationDispatch",
       "hasPrivilegedProjectBinding",
+      // MVP-001 S3: the one narrow protected storage capability.
+      "createProtectedStoragePort",
       // MVP-001 S2: the one narrow authentication-abuse decision capability.
       "createAuthenticationAbusePort",
       "createJobWorkerPort",
@@ -3052,7 +3140,7 @@ function assertPrivilegedExports(provisioning) {
       "decideQuotaRpc",
     ],
   );
-  assert.equal(provisioning.match(/\bexport\b/g).length, 10);
+  assert.equal(provisioning.match(/\bexport\b/g).length, 11);
   // The binding check returns only whether a binding exists.
   assert.match(
     provisioning,
@@ -3121,6 +3209,9 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
           "src/infrastructure/jobs/job-worker-adapter.ts",
           // MVP-001 S2: the server-only authentication-abuse control.
           "src/infrastructure/identity/authentication-abuse-control.ts",
+          // MVP-001 S3: the server-only protected resource adapter, which
+          // only bounds the storage port in time.
+          "src/infrastructure/resources/protected-resource-adapter.ts",
         ].includes(file),
         file,
       );
@@ -3157,6 +3248,9 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
       "../../application/job-worker.ts",
       "../../application/policy-selection.ts",
       "../../application/professional-records.ts",
+      // MVP-001 S3: the storage port's type, its path derivation, the bucket,
+      // the byte ceiling, the content-type check, and the URL lifetime.
+      "../../application/protected-resources.ts",
       "../../application/staff-verification.ts",
     ],
   );
@@ -3232,6 +3326,52 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
         "            p_auth_user_id: accountId,\n          })\n          .abortSignal(AbortSignal.timeout(ABUSE_CALL_DEADLINE_MS));",
         "            p_auth_user_id: accountId,\n          });",
       ),
+    ),
+    // MVP-001 S3: the storage port and the resource functions.
+    "storage replacing an object": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace("upsert: false,", "upsert: true,"),
+    ),
+    "storage removal": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "        return error === null && data?.path === path;",
+        "        await admin.storage.from(PROTECTED_BUCKET).remove([path]);\n        return error === null && data?.path === path;",
+      ),
+    ),
+    "storage listing": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "        const url = data?.signedUrl;",
+        "        await admin.storage.from(PROTECTED_BUCKET).list();\n        const url = data?.signedUrl;",
+      ),
+    ),
+    "caller-chosen object path": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "        const path = objectPathOf(resourceId);",
+        "        const path = resourceId;",
+      ),
+    ),
+    "longer signed lifetime": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace("            SIGNED_URL_SECONDS,\n", "            3600,\n"),
+    ),
+    "another bucket": variant(PRIVILEGED_MODULE, (code) =>
+      code.replace(
+        "        const { data, error } = await admin.storage\n          .from(PROTECTED_BUCKET)\n          .upload(",
+        '        const { data, error } = await admin.storage\n          .from("public-files")\n          .upload(',
+      ),
+    ),
+    "resource function through a privileged client": variant(
+      PRIVILEGED_MODULE,
+      (code) =>
+        `${code}\nconst again = (admin) => admin.rpc("resource_authorize_access", {});\n`,
+    ),
+    "second resource call in the adapter": variant(
+      PROTECTED_RESOURCE_ADAPTER,
+      (code) =>
+        `${code}\nconst again = (client) => client.rpc("resource_finalize_upload", {});\n`,
+    ),
+    "resource call in an action": variant(
+      "app/client/actions.ts",
+      (code) =>
+        `${code}\nconst again = (client) => client.rpc("resource_begin_voice_memo", {});\n`,
     ),
   };
   for (const [name, codesVariant] of Object.entries(forbiddenRpc)) {

@@ -4,13 +4,45 @@
 // rules are matched with the same path matcher Next.js uses for them. The
 // email confirmation handler is run from its own source to show that it keeps
 // its own, stricter headers, which a matching rule here would replace.
+//
+// MVP-001 S3: the one value read when the configuration loads is the public
+// project URL, for the CSP media-src origin. The configuration is therefore
+// loaded afresh for each URL case below, with exactly that variable set or
+// removed, and the fixed rules are checked with it removed.
 
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 
-import nextConfig from "../next.config.ts";
 import * as confirmRoute from "../app/auth/confirm/route.ts";
+
+let loads = 0;
+
+// next.config.ts as Next.js would load it with this public project URL (or
+// none), in a fresh module instance; the variable is restored afterwards.
+async function configWith(url) {
+  const previous = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (url === undefined) {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  } else {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = url;
+  }
+  try {
+    loads += 1;
+    const module = await import(
+      new URL(`../next.config.ts?load=${loads}`, import.meta.url).href
+    );
+    return module.default;
+  } finally {
+    if (previous === undefined) {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    } else {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = previous;
+    }
+  }
+}
+
+const nextConfig = await configWith(undefined);
 
 const requireHere = createRequire(import.meta.url);
 const { getPathMatch } = requireHere(
@@ -18,8 +50,10 @@ const { getPathMatch } = requireHere(
 );
 const { modifyRouteRegex } = requireHere("next/dist/lib/redirect-status.js");
 
-const EXPECTED_POLICY =
-  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+const policyWithMedia = (media) =>
+  `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; media-src ${media}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`;
+// Without a configured project URL no media source is admitted at all.
+const EXPECTED_POLICY = policyWithMedia("'none'");
 const TRANSPORT = {
   key: "Strict-Transport-Security",
   value: "max-age=31536000; includeSubDomains",
@@ -83,6 +117,7 @@ test("2. the policy allows only this origin, no eval, no inline style, no plugin
       "img-src",
       "font-src",
       "connect-src",
+      "media-src",
       "object-src",
       "base-uri",
       "form-action",
@@ -101,6 +136,7 @@ test("2. the policy allows only this origin, no eval, no inline style, no plugin
   assert.deepEqual(policy.get("script-src"), ["'self'", "'unsafe-inline'"]);
   assert.deepEqual(policy.get("style-src"), ["'self'"]);
   assert.deepEqual(policy.get("connect-src"), ["'self'"]);
+  assert.deepEqual(policy.get("media-src"), ["'none'"]);
   assert.deepEqual(policy.get("object-src"), ["'none'"]);
   assert.deepEqual(policy.get("base-uri"), ["'none'"]);
   assert.deepEqual(policy.get("form-action"), ["'self'"]);
@@ -179,5 +215,66 @@ test("4. the confirmation handler still sends its own stricter headers on every 
     } else {
       process.env.ROSUNO_AUTH_PUBLIC_ORIGIN = previous;
     }
+  }
+});
+
+test("5. MVP-001 S3: media-src admits exactly the configured Supabase origin (a hosted project or the local stack) and nothing for any other value; every other header and directive stays fixed", async () => {
+  const PROJECT = "https://abcdefghijklmnopqrst.supabase.co";
+  const admitted = [
+    [PROJECT, PROJECT],
+    [`${PROJECT}/`, PROJECT],
+    ["http://127.0.0.1:54321", "http://127.0.0.1:54321"],
+    ["http://localhost:54321/", "http://localhost:54321"],
+  ];
+  const refused = [
+    undefined,
+    "",
+    "*",
+    "'self'",
+    "https:",
+    "https://abc.supabase.co",
+    "https://ABCDEFGHIJKLMNOPQRST.supabase.co",
+    "http://abcdefghijklmnopqrst.supabase.co",
+    `${PROJECT}.evil.test`,
+    `${PROJECT}:443`,
+    `${PROJECT}/storage/v1`,
+    `${PROJECT}//`,
+    `${PROJECT} https://evil.test`,
+    `${PROJECT};script-src *`,
+    "https://evil.test",
+    "http://127.0.0.1:54322",
+    "https://127.0.0.1:54321",
+    "http://0.0.0.0:54321",
+    "data:",
+    "blob:",
+  ];
+  for (const [url, origin] of admitted) {
+    const config = await configWith(url);
+    const rules = await config.headers();
+    assert.deepEqual(
+      rules,
+      [
+        {
+          ...EXPECTED_RULES[0],
+          headers: [
+            { key: "Content-Security-Policy", value: policyWithMedia(origin) },
+            ...EXPECTED_RULES[0].headers.slice(1),
+          ],
+        },
+        EXPECTED_RULES[1],
+      ],
+      url,
+    );
+    const policy = directives(policyWithMedia(origin));
+    assert.deepEqual(policy.get("media-src"), [origin], url);
+    for (const [name, values] of policy) {
+      if (name !== "media-src") {
+        assert.deepEqual(values, directives(EXPECTED_POLICY).get(name), name);
+      }
+    }
+  }
+  for (const url of refused) {
+    const config = await configWith(url);
+    assert.deepEqual(await config.headers(), EXPECTED_RULES, String(url));
   }
 });

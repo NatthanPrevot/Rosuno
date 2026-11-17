@@ -92,6 +92,21 @@ import {
   type EnvironmentBinding,
   type EnvironmentConfiguration,
 } from "./environment-binding.ts";
+import {
+  artifactTypeOf,
+  BEGIN_ARTIFACT_OUTCOMES,
+  bytesOf,
+  digestOf,
+  RESOURCE_BYTE_CEILING,
+  resourceOutcomeOf,
+  signedAccess,
+  storeAndComplete,
+  uploadFieldOf,
+  type ArtifactType,
+  type ContentDigest,
+  type ProtectedStorage,
+  type ResourceCalls,
+} from "./protected-resources.ts";
 import type { StepUpRequired } from "./session-assurance.ts";
 import type { ServerSessionSource } from "./session.ts";
 
@@ -295,6 +310,12 @@ export type StaffSources = {
   // The server-side environment configuration compared with the database's
   // own environment record before any policy-driven step (PS-A2 section 6).
   readonly environment: () => EnvironmentConfiguration;
+  // MVP-001 S3: the request-scoped resource functions (verification artifact
+  // start, completion, and access authorization), the server-only storage
+  // port, and the content digest.
+  readonly resources: () => Promise<ResourceCalls | null>;
+  readonly storage: () => Promise<ProtectedStorage | null>;
+  readonly digest: ContentDigest;
 };
 
 // ---------------------------------------------------------------------------
@@ -684,6 +705,8 @@ export type EvidenceView = {
   readonly id: string;
   readonly sourceType: string;
   readonly sourceReference: string;
+  // MVP-001 S3: the uploaded artifact the finding refers to, if any.
+  readonly artifactId: string | null;
   readonly sourceUri: string;
   readonly method: string;
   readonly retrievedAt: string;
@@ -1256,6 +1279,10 @@ export async function resolveStaffReview(
               id: e.id,
               sourceType: e.sourceType ?? "Not recorded",
               sourceReference: e.sourceReference ?? "Not recorded",
+              artifactId:
+                e.sourceType === UPLOADED_ARTIFACT && isUuid(e.sourceReference)
+                  ? e.sourceReference
+                  : null,
               sourceUri: e.sourceUri ?? "",
               method: e.method ?? "Not recorded",
               retrievedAt: e.retrievedAt,
@@ -1509,6 +1536,54 @@ function optionalDay(
   return value;
 }
 
+// MVP-001 S3: the source type of a finding whose source is a document the
+// reviewer uploaded; its source reference is that document's resource id.
+// It is never typed by a reviewer.
+export const UPLOADED_ARTIFACT = "uploaded_artifact";
+
+const ATTACHED_SOURCE =
+  "Leave this empty when you attach the source document; the document is the source.";
+
+// The source type and reference a reviewer typed: both required, the
+// uploaded-document type reserved; or, when a document is attached, both
+// left empty (the database fills them from the document).
+function sourceFieldsOf(
+  collected: Collected,
+  formData: FormData,
+  artifactAttached: boolean,
+): { readonly type: string; readonly reference: string } | null {
+  if (artifactAttached) {
+    for (const field of ["source_type", "source_reference"]) {
+      if (single(formData, field) !== "") {
+        fail(collected, field, ATTACHED_SOURCE);
+      }
+    }
+    return { type: UPLOADED_ARTIFACT, reference: "" };
+  }
+  const type = requiredText(
+    collected,
+    formData,
+    "source_type",
+    "Source type",
+    80,
+  );
+  const reference = requiredText(
+    collected,
+    formData,
+    "source_reference",
+    "Source reference",
+    200,
+  );
+  if (type === UPLOADED_ARTIFACT) {
+    return fail(
+      collected,
+      "source_type",
+      "Attach the document instead of naming this source type.",
+    );
+  }
+  return type === null || reference === null ? null : { type, reference };
+}
+
 // The source-grounded evidence a reviewer submits: what source, which
 // record at that source, when it was retrieved, how, what it showed, and
 // whether it contradicts the claim.
@@ -1516,21 +1591,9 @@ function evidenceFieldsOf(
   collected: Collected,
   formData: FormData,
   nowMs: number,
+  artifactAttached = false,
 ): EvidenceFields | null {
-  const sourceType = requiredText(
-    collected,
-    formData,
-    "source_type",
-    "Source type",
-    80,
-  );
-  const sourceReference = requiredText(
-    collected,
-    formData,
-    "source_reference",
-    "Source reference",
-    200,
-  );
+  const source = sourceFieldsOf(collected, formData, artifactAttached);
   const sourceUri = optionalText(
     collected,
     formData,
@@ -1574,8 +1637,7 @@ function evidenceFieldsOf(
     fail(collected, "outcome", "Choose whether the source matches the claim.");
   }
   if (
-    sourceType === null ||
-    sourceReference === null ||
+    source === null ||
     sourceUri === undefined ||
     retrieved === null ||
     method === null ||
@@ -1586,9 +1648,9 @@ function evidenceFieldsOf(
     return null;
   }
   return {
-    source_type: sourceType,
+    source_type: source.type,
     source_uri: sourceUri,
-    source_reference: sourceReference,
+    source_reference: source.reference,
     retrieved_at: new Date(retrieved).toISOString(),
     evidence_summary: summary,
     evidence_digest: digest,
@@ -1754,11 +1816,104 @@ function stateOf(result: WriteResult): StaffActionState {
   }
 }
 
+const ARTIFACT_LIMIT_MESSAGE = `Attach a PDF, PNG, or JPEG file of at most ${RESOURCE_BYTE_CEILING / 1_000_000} MB.`;
+
+// MVP-001 S3: the source document attached to a finding, read and checked on
+// the server: none, its bytes and recognized type, or a field error.
+async function artifactOf(
+  collected: Collected,
+  formData: FormData,
+): Promise<
+  | { readonly kind: "none" }
+  | {
+      readonly kind: "file";
+      readonly bytes: Uint8Array;
+      readonly type: ArtifactType;
+    }
+  | null
+> {
+  const field = uploadFieldOf(formData, "artifact");
+  if (field.kind === "none") {
+    return { kind: "none" };
+  }
+  if (field.kind === "invalid") {
+    return fail(collected, "artifact", ARTIFACT_LIMIT_MESSAGE);
+  }
+  const bytes = await bytesOf(field.file);
+  if (typeof bytes === "string") {
+    return fail(collected, "artifact", ARTIFACT_LIMIT_MESSAGE);
+  }
+  const type = artifactTypeOf(bytes);
+  if (type === null) {
+    return fail(collected, "artifact", ARTIFACT_LIMIT_MESSAGE);
+  }
+  return { kind: "file", bytes, type };
+}
+
+// MVP-001 S3: stores an attached source document as a verification artifact
+// of this record, for the caller's own session: the database starts it (the
+// caller's verification scope for the record's jurisdiction, the stage, and
+// that the record is not the caller's own), the bytes are stored at its own
+// opaque path, and the database completes it. Answers its resource id, or
+// the state to show when no finding may be written.
+async function storedArtifactOf(
+  sources: StaffSources,
+  kind: SubjectKind,
+  recordId: string,
+  artifact: { readonly bytes: Uint8Array; readonly type: ArtifactType },
+): Promise<string | StaffActionState> {
+  const digest = await digestOf(sources.digest, artifact.bytes);
+  const calls = await portFrom(sources.resources);
+  if (digest === null || calls === null) {
+    return UNAVAILABLE;
+  }
+  const started = resourceOutcomeOf(
+    await attempt(() =>
+      calls.beginVerificationArtifact(
+        Object.freeze({
+          subjectKind: kind,
+          subjectId: recordId,
+          mimeType: artifact.type,
+          byteSize: artifact.bytes.length,
+          contentDigest: digest,
+        }),
+      ),
+    ),
+    BEGIN_ARTIFACT_OUTCOMES,
+  );
+  if (started === "rejected" || started === "unknown") {
+    return UNAVAILABLE;
+  }
+  if (started.outcome === "denied") {
+    return DENIED;
+  }
+  if (started.outcome === "locked") {
+    return LOCKED;
+  }
+  if (started.outcome !== "created" || !isUuid(started.value)) {
+    return UNAVAILABLE;
+  }
+  const completion = await storeAndComplete(
+    calls,
+    await portFrom(sources.storage),
+    started.value,
+    artifact.bytes,
+    artifact.type,
+  );
+  if (completion === "available") {
+    return started.value;
+  }
+  return completion === "denied" ? DENIED : UNAVAILABLE;
+}
+
 // Records a source-grounded verification finding for one professional
 // record: an immutable evidence row linked to that record, and, for a
 // license, the status the source reported, or, for a discipline record, its
 // current status. Evidence is written before any status, so a status never
-// changes without the evidence that supports it.
+// changes without the evidence that supports it. MVP-001 S3: the source may
+// be a document the reviewer attaches; it is stored as a verification
+// artifact first, and the finding refers to it as its source (the database
+// checks that reference on the evidence row itself).
 export async function recordVerificationFinding(
   sources: StaffSources,
   formData: unknown,
@@ -1774,7 +1929,13 @@ export async function recordVerificationFinding(
     }
     const nowMs = sources.clock();
     const collected: Collected = { errors: {} };
-    const fields = evidenceFieldsOf(collected, formData, nowMs);
+    const artifact = await artifactOf(collected, formData);
+    const fields = evidenceFieldsOf(
+      collected,
+      formData,
+      nowMs,
+      uploadFieldOf(formData, "artifact").kind !== "none",
+    );
     const observed =
       kind === "license"
         ? optionalText(
@@ -1801,6 +1962,7 @@ export async function recordVerificationFinding(
         : null;
     if (
       fields === null ||
+      artifact === null ||
       observed === undefined ||
       disciplineStatus === undefined ||
       resolvedAt === undefined ||
@@ -1822,6 +1984,14 @@ export async function recordVerificationFinding(
       return checked;
     }
     const record = checked.record;
+    let evidence = fields;
+    if (artifact.kind === "file") {
+      const stored = await storedArtifactOf(sources, kind, recordId, artifact);
+      if (typeof stored !== "string") {
+        return stored;
+      }
+      evidence = { ...fields, source_reference: stored };
+    }
     // The evidence, its link, any status the source reported, and the audit
     // event are one database transaction: a finding is never left partial.
     return stateOf(
@@ -1830,7 +2000,7 @@ export async function recordVerificationFinding(
           subjectKind: kind,
           subjectId: recordId,
           expectedUpdatedAt: record.updatedAt,
-          evidence: fields,
+          evidence,
           observedStatus: kind === "license" ? observed : null,
           disciplineStatus: kind === "discipline" ? disciplineStatus : null,
           resolvedAt:
@@ -2299,6 +2469,80 @@ export async function recordEligibilityDetermination(
     return stateOf(
       await writeOnce(() => authorized.writes.recordEvaluation(row)),
     );
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MVP-001 S3: opening an uploaded verification artifact
+// ---------------------------------------------------------------------------
+
+// "ready": a download URL for the one authorized artifact, valid for a fixed
+// short lifetime. "not-found" covers an unknown artifact and one outside the
+// caller's verification scope alike.
+export type ArtifactAccessState =
+  | { readonly status: "idle" }
+  | { readonly status: "ready"; readonly url: string }
+  | { readonly status: "not-found" }
+  | { readonly status: "not-available" }
+  | { readonly status: "held" }
+  | typeof SIGN_IN_REQUIRED
+  | typeof DENIED
+  | typeof UNAVAILABLE
+  | StepUpRequired;
+
+export const INITIAL_ARTIFACT_ACCESS: ArtifactAccessState = Object.freeze({
+  status: "idle",
+});
+
+// A fresh Staff identity first; then the database decides, for the caller's
+// own stepped-up session, whether it holds the verification scope for the
+// jurisdiction of the finding that refers to the artifact (and is not the
+// attorney concerned), and only then is that artifact's own path signed.
+export async function openVerificationArtifact(
+  sources: StaffSources,
+  formData: unknown,
+): Promise<ArtifactAccessState> {
+  try {
+    if (!(formData instanceof FormData)) {
+      return UNAVAILABLE;
+    }
+    const resourceId = single(formData, "artifact");
+    if (!isUuid(resourceId)) {
+      return Object.freeze({ status: "not-found" });
+    }
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE;
+    }
+    const staff = await staffContextOf(sources, reads);
+    if (!("userId" in staff)) {
+      return staff;
+    }
+    const calls = await portFrom(sources.resources);
+    if (calls === null) {
+      return UNAVAILABLE;
+    }
+    const access = await signedAccess(
+      calls,
+      sources.storage,
+      resourceId,
+      "verification_artifact",
+      "attachment",
+    );
+    switch (access.kind) {
+      case "url":
+        return Object.freeze({ status: "ready", url: access.url });
+      case "not-available":
+        return Object.freeze({ status: "not-available" });
+      case "held":
+        return Object.freeze({ status: "held" });
+      case "refused":
+        return Object.freeze({ status: "not-found" });
+      default:
+        return UNAVAILABLE;
+    }
   } catch {
     return UNAVAILABLE;
   }

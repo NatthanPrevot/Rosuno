@@ -10,6 +10,10 @@
 // version is older. Questions, choices and limits come from the published
 // question-set version; earlier saved versions are never changed. An
 // unavailable Intake also writes one log line with no client or Intake data.
+// MVP-001 S3: the optional voice memo section is decided on the server for
+// the same Intake: the saved memo (played through a short-lived link the
+// server issues after authorizing it), the recorder while the Intake is a
+// draft and the configured limit is set, or why no memo can be added.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -19,8 +23,13 @@ import {
   resolveIntake,
   type QuestionView,
 } from "../../../../src/application/client-intake.ts";
+import {
+  resolveVoiceMemo,
+  type VoiceMemoView,
+} from "../../../../src/application/voice-memo.ts";
 import { CLIENT_INTAKE_SOURCES } from "../../../../src/infrastructure/client/client-intake-adapter.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
+import { VOICE_MEMO_SOURCES } from "../../../../src/infrastructure/resources/protected-resource-adapter.ts";
 import {
   Alert,
   ButtonLink,
@@ -40,7 +49,14 @@ import {
   PRACTICE_AREA_NOT_SURE_SUMMARY,
   SUGGESTION_NOTE,
 } from "../../../../src/presentation/client-intake-labels.ts";
-import { CloseIntakeForm, IntakeForm, SubmitIntakeForm } from "./forms.tsx";
+import { VOICE_MEMO_NOT_CONFIGURED } from "../../../../src/presentation/voice-memo-labels.ts";
+import {
+  CloseIntakeForm,
+  IntakeForm,
+  SubmitIntakeForm,
+  VoiceMemoPlayer,
+  VoiceMemoRecorder,
+} from "./forms.tsx";
 
 export const metadata: Metadata = {
   title: "Your Intake",
@@ -86,6 +102,47 @@ function answerText(question: QuestionView): string {
   return question.answerLabel ?? "Not answered";
 }
 
+function VoiceMemoSection({ view }: { readonly view: VoiceMemoView }) {
+  if (view.status !== "ready") {
+    return view.status === "unavailable" ? (
+      <Alert tone="error" title="Voice memo unavailable" role="alert">
+        The voice memo section could not be shown right now. Please try again
+        later.
+      </Alert>
+    ) : null;
+  }
+  const { memo, recording } = view;
+  return (
+    <Stack>
+      <Heading as="h2" size="md">
+        Voice memo (optional)
+      </Heading>
+      {memo === null ? null : (
+        <>
+          <Text>
+            {memo.durationSeconds === null
+              ? "Your voice memo is saved with this Intake."
+              : `Your voice memo of ${memo.durationSeconds} seconds is saved with this Intake.`}
+          </Text>
+          <VoiceMemoPlayer resourceId={memo.resourceId} />
+        </>
+      )}
+      {recording.kind === "open" ? (
+        <VoiceMemoRecorder
+          intakeId={view.intakeId}
+          maxSeconds={recording.maxSeconds}
+        />
+      ) : null}
+      {recording.kind === "not-configured" ? (
+        <Text tone="muted">{VOICE_MEMO_NOT_CONFIGURED}</Text>
+      ) : null}
+      {recording.kind === "not-editable" && memo === null ? (
+        <Text tone="muted">No voice memo was added to this Intake.</Text>
+      ) : null}
+    </Stack>
+  );
+}
+
 const BACK = (
   <Cluster>
     <ButtonLink variant="tertiary" href="/client">
@@ -112,6 +169,14 @@ export default async function ClientIntakePage({
   );
   if (view.status === "ready") {
     const state = INTAKE_STATE_LABELS[view.state];
+    const memo = await resolveVoiceMemo(VOICE_MEMO_SOURCES, intake);
+    if (memo.status === "unavailable") {
+      await logRequestEvent("warn", "client_intake.view_unavailable", {
+        route: "/client/intakes/[intake]",
+        operation: "resolveVoiceMemo",
+        outcome: memo.status,
+      });
+    }
     return (
       <IntakeFrame title="Your Intake">
         <Cluster>
@@ -199,6 +264,7 @@ export default async function ClientIntakePage({
             </Alert>
           </>
         )}
+        <VoiceMemoSection view={memo} />
         {view.closable ? <CloseIntakeForm intakeId={view.intakeId} /> : null}
         {BACK}
       </IntakeFrame>
