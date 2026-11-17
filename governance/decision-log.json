@@ -1842,6 +1842,7 @@
       "evidence": [
         "Express owner approval statement (approver NatthanPrevot) naming SHA-256 599c2235f540233c7475dd28799bfb2bb201c09cf88e53d2461b35099a42a1ba, received in the Builder session and processed at 2026-11-16T23:29:31Z (session clock)",
         "Amendment file: rosuno-physical-specification-amendment-ps-a2.md, 11,760 bytes, SHA-256 599c2235f540233c7475dd28799bfb2bb201c09cf88e53d2461b35099a42a1ba (owner-held; not in the repository)",
+        "Lock Condition complete: the S1 PR (#96) registering this amendment merged into owner main at merge commit b7dc44758db05f4492a7d87d17448fcd062e853c (parents 91af560f2654f63ea20b19da75a166ca274d0ddf and 8c40658cbfd89122793970c3673a280774489333; merge tree equals the reviewed S1 head tree), confirmed by the express owner statement 'S1 MERGE CONFIRMED' processed at 2026-11-17T07:02:44Z (session clock); PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED is therefore active (MVP-001 Packet section 3, step 6). The designated reviewer identity and approval time were not supplied and stay pending",
         "Optional independent review: not performed"
       ]
     },
@@ -1875,6 +1876,7 @@
       "evidence": [
         "Owner adoption commit b17aaf8a4ac03c98ea107834793d41f861072a7e on owner branch wi/MVP-001-technical-completion (2026-11-17T00:19:22Z)",
         "Owner implementation grant received in the Builder session on 2026-11-17, naming the Packet blob, the adoption commit and the approved SHA-256 values",
+        "Slice S1 merged: PR #96 into owner main at merge commit b7dc44758db05f4492a7d87d17448fcd062e853c, confirmed by the express owner statement 'S1 MERGE CONFIRMED / S2 CONTINUATION' processed at 2026-11-17T07:02:44Z (session clock); designated approval facts (reviewer, time) not supplied and recorded as pending; S1 migrations not applied to any persistent environment (Staging application awaits separate owner authorization)",
         "Optional independent review: not performed"
       ]
     }

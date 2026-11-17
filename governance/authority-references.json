@@ -153,7 +153,7 @@
       "reinterpreted": false,
       "integrity": "sha256:599c2235f540233c7475dd28799bfb2bb201c09cf88e53d2461b35099a42a1ba",
       "usage": "reference-only",
-      "status": "pending_lock_condition"
+      "status": "active"
     }
   ]
 }
