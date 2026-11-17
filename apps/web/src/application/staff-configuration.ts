@@ -24,6 +24,13 @@
 // that is lost, late, or malformed is never reported as a success. No policy
 // value, jurisdiction, launch decision, capability, or question wording is
 // defined here: all of it is configuration that staff enter.
+//
+// MVP-001 S2 adds the operational job view: staff holding the global
+// manage_operational_jobs grant see the operational jobs (type, subject type
+// and id, state, attempts, last error code, and times; never a subject's
+// data or an error message) under the table's row policy, and retry an
+// escalated job or cancel an unfinished one through the database's own
+// audited staff functions.
 
 import {
   bindEnvironment,
@@ -61,6 +68,7 @@ import {
   type AccountState,
   type StaffState,
 } from "./professional-records.ts";
+import type { StepUpRequired } from "./session-assurance.ts";
 import type { ServerSessionSource } from "./session.ts";
 import { STAFF_PROFILE_COLUMNS } from "./staff-verification.ts";
 
@@ -77,6 +85,7 @@ export const STAFF_CAPABILITIES = Object.freeze([
   "authorize_jurisdiction_launch",
   "manage_staff_capabilities",
   "manage_intake_configuration",
+  "manage_operational_jobs",
 ] as const);
 export type StaffCapability = (typeof STAFF_CAPABILITIES)[number];
 
@@ -88,6 +97,7 @@ export const STAFF_SURFACES = Object.freeze([
   "catalog",
   "capabilities",
   "intake",
+  "jobs",
 ] as const);
 export type StaffSurface = (typeof STAFF_SURFACES)[number];
 
@@ -113,6 +123,39 @@ export const LIFECYCLE_STATES = Object.freeze([
   "suspended",
 ] as const);
 export type LifecycleState = (typeof LIFECYCLE_STATES)[number];
+
+// The operational job states (MVP-001 S2), exactly as the database's
+// lifecycle constraint lists them.
+export const JOB_STATES = Object.freeze([
+  "pending",
+  "running",
+  "completed",
+  "escalated",
+  "cancelled",
+] as const);
+export type JobState = (typeof JOB_STATES)[number];
+
+// The job view lists one group of states at a time: escalated jobs first
+// (they need staff), then the jobs still waiting or running, then the
+// finished ones.
+export const JOB_GROUPS = Object.freeze([
+  "escalated",
+  "open",
+  "finished",
+] as const);
+export type JobGroup = (typeof JOB_GROUPS)[number];
+export const JOB_GROUP_STATES: Readonly<Record<JobGroup, readonly JobState[]>> =
+  Object.freeze({
+    escalated: Object.freeze(["escalated"] as const),
+    open: Object.freeze(["running", "pending"] as const),
+    finished: Object.freeze(["completed", "cancelled"] as const),
+  });
+
+// The group a request asks for: exactly one group name, or the escalated
+// group for anything else.
+export function jobGroupOf(value: unknown): JobGroup {
+  return isOneOf(JOB_GROUPS, value) ? value : "escalated";
+}
 
 // The lifecycle moves staff are offered, mirroring the database's own
 // transition rule. The database decides again on every call.
@@ -308,6 +351,21 @@ export const PUBLISH_QUESTION_SET_OUTCOMES = Object.freeze([
   "invalid",
   "duplicate_version",
 ]);
+// MVP-001 S2: staff_retry_job and staff_cancel_job.
+export const RETRY_JOB_OUTCOMES = Object.freeze([
+  "applied",
+  "invalid",
+  "denied",
+  "not_found",
+  "invalid_transition",
+]);
+export const CANCEL_JOB_OUTCOMES = Object.freeze([
+  "applied",
+  "invalid",
+  "denied",
+  "not_found",
+  "invalid_transition",
+]);
 
 // The refusals staff are told about, each with its own fixed message. Every
 // one means nothing was changed.
@@ -414,6 +472,12 @@ export type ConfigurationReads = {
   readonly grantsOf: (userId: string, count: number) => Promise<RowsResult>;
   readonly capabilityDefinitions: (count: number) => Promise<RowsResult>;
   readonly questionSets: (offset: number, count: number) => Promise<RowsResult>;
+  // MVP-001 S2: one page of the operational jobs in one group of states.
+  readonly operationalJobs: (
+    group: JobGroup,
+    offset: number,
+    count: number,
+  ) => Promise<RowsResult>;
 };
 
 export type PolicyVersionInput = {
@@ -532,6 +596,9 @@ export type ConfigurationWrites = {
     versionKey: string,
     definition: Readonly<Record<string, unknown>>,
   ) => Promise<CallAnswer>;
+  // MVP-001 S2: the audited staff job functions.
+  readonly retryOperationalJob: (jobId: string) => Promise<CallAnswer>;
+  readonly cancelOperationalJob: (jobId: string) => Promise<CallAnswer>;
 };
 
 export type ConfigurationSources = {
@@ -569,6 +636,9 @@ export const GRANT_COLUMNS =
 export const CAPABILITY_DEFINITION_COLUMNS = "capability_code";
 export const MEMBER_USER_COLUMNS = "id, display_name, account_state";
 export { QUESTION_SET_COLUMNS };
+// MVP-001 S2: never last_error_message or locked_by.
+export const OPERATIONAL_JOB_COLUMNS =
+  "id, job_type, subject_type, subject_id, state, available_at, locked_at, attempt_count, max_attempts, last_error_code, completed_at, failed_at, created_at";
 
 type Check = (value: unknown) => boolean;
 
@@ -581,6 +651,15 @@ const uuid: Check = isUuid;
 const timestamp: Check = isTimestamp;
 const flag: Check = (value) => typeof value === "boolean";
 const any: Check = () => true;
+const count: Check = (value) =>
+  Number.isSafeInteger(value) && (value as number) >= 0;
+const JOB_TYPE = /^[a-z][a-z0-9_.]{2,63}$/;
+const JOB_SUBJECT_TYPE = /^[a-z][a-z0-9_]{0,63}$/;
+const JOB_ERROR_CODE = /^[a-z][a-z0-9_]{0,63}$/;
+const shaped =
+  (shape: RegExp): Check =>
+  (value) =>
+    typeof value === "string" && shape.test(value);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return (
@@ -930,6 +1009,70 @@ const readCapabilityDefinition = reader<{ readonly code: string }>(
   (get) => ({ code: str(get("capability_code")) }),
 );
 
+type OperationalJobRecord = {
+  readonly id: string;
+  readonly jobType: string;
+  readonly subjectType: string | null;
+  readonly subjectId: string | null;
+  readonly state: JobState;
+  readonly availableAt: string;
+  readonly lockedAt: string | null;
+  readonly attemptCount: number;
+  readonly maxAttempts: number;
+  readonly lastErrorCode: string | null;
+  readonly completedAt: string | null;
+  readonly failedAt: string | null;
+  readonly createdAt: string;
+};
+const readOperationalJobFields = reader<OperationalJobRecord>(
+  OPERATIONAL_JOB_COLUMNS,
+  {
+    id: uuid,
+    job_type: shaped(JOB_TYPE),
+    subject_type: nullable(shaped(JOB_SUBJECT_TYPE)),
+    subject_id: nullable(uuid),
+    state: (value) => isOneOf(JOB_STATES, value),
+    available_at: timestamp,
+    locked_at: nullable(timestamp),
+    attempt_count: count,
+    max_attempts: count,
+    last_error_code: nullable(shaped(JOB_ERROR_CODE)),
+    completed_at: nullable(timestamp),
+    failed_at: nullable(timestamp),
+    created_at: timestamp,
+  },
+  (get) => ({
+    id: str(get("id")),
+    jobType: str(get("job_type")),
+    subjectType: strOrNull(get("subject_type")),
+    subjectId: strOrNull(get("subject_id")),
+    state: get("state") as JobState,
+    availableAt: str(get("available_at")),
+    lockedAt: strOrNull(get("locked_at")),
+    attemptCount: get("attempt_count") as number,
+    maxAttempts: get("max_attempts") as number,
+    lastErrorCode: strOrNull(get("last_error_code")),
+    completedAt: strOrNull(get("completed_at")),
+    failedAt: strOrNull(get("failed_at")),
+    createdAt: str(get("created_at")),
+  }),
+);
+
+// A job row as the database's own constraints allow it: a subject type
+// exactly when a subject id, at least one attempt allowed, a completion time
+// exactly when completed, and an escalation time exactly when escalated.
+function readOperationalJob(row: unknown): OperationalJobRecord | null {
+  const job = readOperationalJobFields(row);
+  return job !== null &&
+    (job.subjectType === null) === (job.subjectId === null) &&
+    job.maxAttempts >= 1 &&
+    (job.state === "completed") === (job.completedAt !== null) &&
+    (job.state === "escalated") === (job.failedAt !== null) &&
+    (job.state === "running") === (job.lockedAt !== null)
+    ? job
+    : null;
+}
+
 type QuestionSetRecord = {
   readonly id: string;
   readonly versionKey: string;
@@ -1204,6 +1347,7 @@ export async function resolveStaffHome(
       ["manage_jurisdiction_configuration", false],
       ["manage_staff_capabilities", false],
       ["manage_intake_configuration", false],
+      ["manage_operational_jobs", false],
     ];
     const answers: boolean[] = [];
     for (const [capability, anyJurisdiction] of asked) {
@@ -1221,6 +1365,7 @@ export async function resolveStaffHome(
       jurisdictionAll,
       staffAdmin,
       intake,
+      jobs,
     ] = answers;
     const held: Readonly<Record<StaffSurface, boolean>> = {
       verification: verify,
@@ -1230,6 +1375,7 @@ export async function resolveStaffHome(
       catalog: jurisdictionAll,
       capabilities: staffAdmin,
       intake,
+      jobs,
     };
     return Object.freeze({
       status: "ready",
@@ -2274,6 +2420,107 @@ export async function resolveIntakeConfiguration(
 }
 
 // ---------------------------------------------------------------------------
+// Operational jobs (MVP-001 S2)
+// ---------------------------------------------------------------------------
+
+export type JobRow = {
+  readonly id: string;
+  readonly jobType: string;
+  readonly subjectType: string | null;
+  readonly subjectId: string | null;
+  readonly state: JobState;
+  readonly attempts: number;
+  readonly maxAttempts: number;
+  readonly lastErrorCode: string | null;
+  readonly createdAt: string;
+  // A pending job's due time, or a running job's lease expiry.
+  readonly availableAt: string;
+  readonly lockedAt: string | null;
+  readonly completedAt: string | null;
+  readonly failedAt: string | null;
+  // A pending job past its due time, or a running job past its lease: it
+  // waits for the next worker run.
+  readonly waiting: boolean;
+  readonly canRetry: boolean;
+  readonly canCancel: boolean;
+};
+
+export type OperationalJobsView =
+  | Refusal
+  | {
+      readonly status: "ready";
+      readonly group: JobGroup;
+      readonly jobs: readonly JobRow[];
+      readonly pager: Pager;
+    };
+
+function jobRowOf(job: OperationalJobRecord, nowMs: number): JobRow {
+  const open = job.state === "pending" || job.state === "running";
+  return Object.freeze({
+    id: job.id,
+    jobType: job.jobType,
+    subjectType: job.subjectType,
+    subjectId: job.subjectId,
+    state: job.state,
+    attempts: job.attemptCount,
+    maxAttempts: job.maxAttempts,
+    lastErrorCode: job.lastErrorCode,
+    createdAt: job.createdAt,
+    availableAt: job.availableAt,
+    lockedAt: job.lockedAt,
+    completedAt: job.completedAt,
+    failedAt: job.failedAt,
+    waiting: open && Date.parse(job.availableAt) <= nowMs,
+    canRetry: job.state === "escalated",
+    canCancel: open || job.state === "escalated",
+  });
+}
+
+// The operational job view needs the global manage_operational_jobs grant,
+// exactly as the table's row policy and the staff job functions do. One
+// group of states is listed at a time, one page at a time; a row in another
+// group's state is not trusted and makes the page unavailable.
+export async function resolveOperationalJobs(
+  sources: ConfigurationSources,
+  requestedGroup?: unknown,
+  requestedPage?: unknown,
+): Promise<OperationalJobsView> {
+  try {
+    const group = jobGroupOf(requestedGroup);
+    const page = configurationPageOf(requestedPage);
+    const context = await contextOf(sources);
+    if (!("userId" in context)) {
+      return context;
+    }
+    const { reads } = context;
+    const refusal = await required(reads, "manage_operational_jobs", null);
+    if (refusal !== null) {
+      return refusal;
+    }
+    const list = await pageOf(
+      (offset, count) => reads.operationalJobs(group, offset, count),
+      page,
+      readOperationalJob,
+    );
+    if (
+      list === null ||
+      list.items.some((job) => !JOB_GROUP_STATES[group].includes(job.state))
+    ) {
+      return UNAVAILABLE;
+    }
+    const nowMs = sources.clock();
+    return Object.freeze({
+      status: "ready",
+      group,
+      jobs: Object.freeze(list.items.map((job) => jobRowOf(job, nowMs))),
+      pager: list.pager,
+    });
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Changes
 // ---------------------------------------------------------------------------
 
@@ -2285,7 +2532,8 @@ export type FieldErrors = Readonly<Record<string, readonly string[]>>;
 // database (or the same rule applied before sending) refused with the given
 // reason; nothing was written. "not-saved": the database reported an error
 // inside the call, which rolled back. "unconfirmed": the answer was lost,
-// late, or malformed; nothing is claimed either way.
+// late, or malformed; nothing is claimed either way. "step-up-required"
+// (MVP-001 S2): the session is not stepped up, so nothing was sent.
 export type ConfigurationActionState =
   | { readonly status: "idle" }
   | { readonly status: "recorded" }
@@ -2294,7 +2542,8 @@ export type ConfigurationActionState =
   | { readonly status: "refused"; readonly reason: RefusalReason }
   | { readonly status: "not-saved" }
   | { readonly status: "unconfirmed" }
-  | Refusal;
+  | Refusal
+  | StepUpRequired;
 
 export const INITIAL_CONFIGURATION_STATE: ConfigurationActionState =
   Object.freeze({ status: "idle" });
@@ -3695,4 +3944,61 @@ export async function publishQuestionSet(
       PUBLISH_QUESTION_SET_OUTCOMES,
     );
   });
+}
+
+// --- Operational jobs (MVP-001 S2) -----------------------------------------
+
+async function operationalJobChange(
+  sources: ConfigurationSources,
+  formData: unknown,
+  send: (writes: ConfigurationWrites, jobId: string) => Promise<CallAnswer>,
+  outcomes: readonly string[],
+): Promise<ConfigurationActionState> {
+  return guarded(formData, async (form) => {
+    const jobId = idField(form, "job");
+    if (jobId === null) {
+      return UNAVAILABLE;
+    }
+    const context = await contextOf(sources);
+    if (!("userId" in context)) {
+      return context;
+    }
+    const refusal = await required(
+      context.reads,
+      "manage_operational_jobs",
+      null,
+    );
+    if (refusal !== null) {
+      return refusal;
+    }
+    return sent(() => send(context.writes, jobId), outcomes);
+  });
+}
+
+// Returns an escalated job to pending, available now, with one more bounded
+// round of attempts; the database decides the state and audits the change.
+export async function retryOperationalJob(
+  sources: ConfigurationSources,
+  formData: unknown,
+): Promise<ConfigurationActionState> {
+  return operationalJobChange(
+    sources,
+    formData,
+    (writes, jobId) => writes.retryOperationalJob(jobId),
+    RETRY_JOB_OUTCOMES,
+  );
+}
+
+// Cancels a job that is pending, running, or escalated; the database decides
+// the state and audits the change.
+export async function cancelOperationalJob(
+  sources: ConfigurationSources,
+  formData: unknown,
+): Promise<ConfigurationActionState> {
+  return operationalJobChange(
+    sources,
+    formData,
+    (writes, jobId) => writes.cancelOperationalJob(jobId),
+    CANCEL_JOB_OUTCOMES,
+  );
 }

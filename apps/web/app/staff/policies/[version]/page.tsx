@@ -29,6 +29,7 @@ import {
   recordedStateLabel,
   utcDateTime,
 } from "../../../../src/presentation/staff-configuration-labels.ts";
+import { requireSteppedUp } from "../../../account/gate.ts";
 import {
   BackLink,
   BoundNotice,
@@ -56,6 +57,7 @@ export default async function PolicyVersionPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const { version } = await params;
   const view = await resolvePolicyVersion(STAFF_CONFIGURATION_SOURCES, version);
   if (view.status !== "ready") {

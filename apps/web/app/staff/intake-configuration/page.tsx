@@ -20,6 +20,7 @@ import {
   Text,
 } from "../../../src/presentation/design-system.tsx";
 import { utcDateTime } from "../../../src/presentation/staff-configuration-labels.ts";
+import { requireSteppedUp } from "../../account/gate.ts";
 import { BackLink, PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
 import { PublishQuestionSetForm } from "./forms.tsx";
 
@@ -35,6 +36,7 @@ export default async function IntakeConfigurationPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const { page } = await searchParams;
   const view = await resolveIntakeConfiguration(
     STAFF_CONFIGURATION_SOURCES,

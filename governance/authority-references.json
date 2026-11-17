@@ -153,6 +153,17 @@
       "reinterpreted": false,
       "integrity": "sha256:599c2235f540233c7475dd28799bfb2bb201c09cf88e53d2461b35099a42a1ba",
       "usage": "reference-only",
+      "status": "active"
+    },
+    {
+      "authority_id": "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A4-LOCKED",
+      "title": "Rosuno Physical Specification Bounded Amendment PS-A4, revision 2 (authentication-abuse counters for sign-in and recovery rate limiting and suspicious-login signals), rosuno-physical-specification-amendment-ps-a4.md",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "sha256:15d4b3bea4143288d9c751313d0ae9e57a999c68aaba331a6d109d59d710e44e",
+      "usage": "reference-only",
       "status": "pending_lock_condition"
     }
   ]

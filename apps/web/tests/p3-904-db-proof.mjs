@@ -44,6 +44,13 @@
 // are located by their natural attributes or by diffing id sets; and the
 // checks that relied on service-role configuration writes or on grant edits
 // other than one revocation assert the stricter S1 behaviour.
+//
+// MVP-001 S2 update: the three S2 migrations follow. Staff authority and
+// attorney professional writes need an aal2 session (20261118030000), so
+// every request and persistent session with a JWT subject also carries
+// request.jwt.claims with "aal": "aal2", as PostgREST sets it from a
+// verified, MFA-stepped-up JWT; R1-1 and R1-3 add the aal1 and claim-less
+// refusals.
 
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -331,19 +338,29 @@ function ident(name) {
   return name;
 }
 
-const JWT_SUB = (sub) =>
+// The JWT claims of a request with a subject (MVP-001 S2): "aal": "aal2"
+// after MFA step-up, "aal1" before it; aal null sends no claims.
+const JWT_CLAIMS = (sub, aal) =>
+  JSON.stringify({ sub, role: "authenticated", aal });
+
+const JWT_SUB = (sub, aal = "aal2") =>
   sub === null
     ? ""
-    : `select set_config('request.jwt.claim.sub', ${lit(sub)}, true) is not null;`;
+    : [
+        `select set_config('request.jwt.claim.sub', ${lit(sub)}, true) is not null;`,
+        aal === null
+          ? ""
+          : `select set_config('request.jwt.claims', ${lit(JWT_CLAIMS(sub, aal))}, true) is not null;`,
+      ].join("\n");
 
 // One statement as a role (and JWT subject), in its own committed (or
 // rolled-back) transaction: { ok, value } or { ok: false, sqlstate }.
-function as(role, sub, statement, { commit = true } = {}) {
+function as(role, sub, statement, { commit = true, aal = "aal2" } = {}) {
   const result = psql(
     [
       "begin;",
       `set local role ${role};`,
-      JWT_SUB(sub),
+      JWT_SUB(sub, aal),
       statement,
       commit ? "commit;" : "rollback;",
       "",
@@ -376,11 +393,12 @@ function callExpression(name, args) {
 }
 
 // A write function called as a principal (authenticated role, JWT subject).
-function fnAs(sub, name, args = {}) {
+function fnAs(sub, name, args = {}, { aal = "aal2" } = {}) {
   const result = as(
     "authenticated",
     sub,
     `select ${callExpression(name, args)};`,
+    { aal },
   );
   return result.ok ? result.value : `ERROR ${result.sqlstate}`;
 }
@@ -712,11 +730,15 @@ class Session {
     return this;
   }
 
-  // Acts as one principal: the authenticated role with that JWT subject.
+  // Acts as one principal: the authenticated role with that JWT subject and
+  // an aal2 session (MVP-001 S2).
   async as(sub) {
     await this.ok("set role authenticated;");
     await this.ok(
       `select set_config('request.jwt.claim.sub', ${lit(sub)}, false) is not null;`,
+    );
+    await this.ok(
+      `select set_config('request.jwt.claims', ${lit(JWT_CLAIMS(sub, "aal2"))}, false) is not null;`,
     );
     return this;
   }
@@ -1867,7 +1889,7 @@ async function predicateChecks() {
 
 async function authorizationMatrix() {
   await check(
-    "R1-1 staff write boundary: only an authenticated, active User with an active Staff Profile and a current grant for the record's jurisdiction is applied; every other principal is denied and nothing is written",
+    "R1-1 staff write boundary: only an authenticated, active User with an active Staff Profile and a current grant for the record's jurisdiction is applied; every other principal (MVP-001 S2: including a global grant holder in an aal1 or claim-less session) is denied and nothing is written",
     () => {
       const attorney = newAttorney("under_review");
       const principals = {
@@ -1894,6 +1916,10 @@ async function authorizationMatrix() {
           grants: [{ resourceScope: { attorney_id: attorney.profile } }],
         }),
         noGrant: newStaff({ grants: [] }),
+        // MVP-001 S2: a global grant holder before MFA step-up (aal1) and
+        // without JWT claims.
+        globalAal1: { ...newStaff(), aal: "aal1" },
+        globalClaimless: { ...newStaff(), aal: null },
         attorneyItself: attorney,
         otherAttorney: newAttorney("applicant"),
         client: newAccount(),
@@ -1912,6 +1938,7 @@ async function authorizationMatrix() {
           principal.auth,
           "staff_record_verification_finding",
           args,
+          { aal: principal.aal === undefined ? "aal2" : principal.aal },
         );
         table[label] = outcome;
         const expectedApplied = label === "global" || label === "jurisdictionA";
@@ -2131,7 +2158,7 @@ async function authorizationMatrix() {
   );
 
   await check(
-    "R1-3 attorney write boundary: only the caller's own active User and own profile, in the stage each action allows; other attorneys' records, suspended accounts or profiles, clients, and unauthenticated callers are refused",
+    "R1-3 attorney write boundary: only the caller's own active User and own profile, in the stage each action allows, in an aal2 session (MVP-001 S2); other attorneys' records, suspended accounts or profiles, clients, aal1 or claim-less sessions, and unauthenticated callers are refused",
     () => {
       const out = {};
       const owner = newAttorney("applicant");
@@ -2149,12 +2176,32 @@ async function authorizationMatrix() {
         p_effective_until: null,
         ...extra,
       });
+      // MVP-001 S2: the owner's own write before MFA step-up (aal1) or
+      // without JWT claims is denied and writes nothing.
+      const ownLicenses = () =>
+        count("licenses", `attorney_id = '${owner.profile}'`);
+      out.own_insert_aal1 = fnAs(
+        owner.auth,
+        "attorney_save_license_claim",
+        claim(null, null),
+        { aal: "aal1" },
+      );
+      assert.equal(out.own_insert_aal1, "denied");
+      out.own_insert_claimless = fnAs(
+        owner.auth,
+        "attorney_save_license_claim",
+        claim(null, null),
+        { aal: null },
+      );
+      assert.equal(out.own_insert_claimless, "denied");
+      assert.equal(ownLicenses(), 0);
       out.own_insert = fnAs(
         owner.auth,
         "attorney_save_license_claim",
         claim(null, null),
       );
       assert.equal(out.own_insert, "applied");
+      assert.equal(ownLicenses(), 1);
       out.idor_revision = fnAs(
         owner.auth,
         "attorney_save_license_claim",

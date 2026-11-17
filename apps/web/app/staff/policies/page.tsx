@@ -28,6 +28,7 @@ import {
   periodLabel,
   POLICY_STATUS_LABELS,
 } from "../../../src/presentation/staff-configuration-labels.ts";
+import { requireSteppedUp } from "../../account/gate.ts";
 import {
   BackLink,
   BoundNotice,
@@ -49,6 +50,7 @@ export default async function PolicyConfigurationPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const { page } = await searchParams;
   const view = await resolvePolicyWorkspace(STAFF_CONFIGURATION_SOURCES, page);
   if (view.status !== "ready") {

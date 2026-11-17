@@ -62,9 +62,13 @@ export function BackLink({
   );
 }
 
-// The address of one page of a list: the first page has no query.
+// The address of one page of a list: the first page adds no page number. A
+// base that already names a fixed query (MVP-001 S2: the job view's group)
+// keeps it.
 export function pageHref(base: string, page: number): string {
-  return page === 1 ? base : `${base}?page=${page}`;
+  return page === 1
+    ? base
+    : `${base}${base.includes("?") ? "&" : "?"}page=${page}`;
 }
 
 // Says which page this is and links to its neighbours, so no row of a list

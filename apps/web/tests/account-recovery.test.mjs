@@ -257,6 +257,19 @@ const malformedReads = [
 
 // A recovery request port answering one fixed way, recording what it is
 // asked and how often it is built.
+// MVP-001 S2: an authentication-abuse control stand-in that allows every
+// request, so the P2-008 behaviour is tested here unchanged. Every other
+// abuse-control branch is tested in authentication-abuse.test.mjs.
+function allowingControl() {
+  return Object.freeze({
+    reserve: async () => "allow",
+    recordFailure: async () => "recorded",
+    recordSuccess: async () => "recorded",
+    reportUnavailable: async () => {},
+    reportSuspicious: async () => {},
+  });
+}
+
 function stubRequest(answer) {
   const calls = [];
   let built = 0;
@@ -268,6 +281,7 @@ function stubRequest(answer) {
       }
       return answer;
     },
+    abuseControl: allowingControl(),
   };
   return {
     calls,
@@ -1465,7 +1479,12 @@ function serverClient(provider, request) {
 // The request port as the request action builds it over one request (test
 // 26 holds the two together), with configured standing in for the server's
 // configured origin.
-function requestSource(provider, request, configured) {
+function requestSource(
+  provider,
+  request,
+  configured,
+  control = allowingControl(),
+) {
   return async () => {
     const redirectTo = recoveryRedirectFor(configured);
     if (redirectTo === null) {
@@ -1476,6 +1495,7 @@ function requestSource(provider, request, configured) {
       requestRecoveryEmail: async (email) => {
         await client.auth.resetPasswordForEmail(email, { redirectTo });
       },
+      abuseControl: control,
     });
   };
 }
@@ -2100,11 +2120,24 @@ test("26. the model runs the real adapter's cookie methods and the actions' exac
   ]) {
     assert.ok(completion.includes(constant), constant);
   }
-  // The request port is the action's port, over the configured origin.
+  // The request port is the action's port, over the configured origin,
+  // with (MVP-001 S2) only the server-only abuse control standing in.
   const request = codeOf(read("app/forgot-password/actions.ts"));
   assert.equal(
     portIn(codeOf(requestSource.toString()), "\n    });\n  };"),
-    portIn(request, "\n  } satisfies RecoveryRequestProvider);"),
+    portIn(
+      request.replace(
+        'abuseControl: createAuthenticationAbuseControl("recovery"),',
+        "abuseControl: control,",
+      ),
+      "\n  } satisfies RecoveryRequestProvider);",
+    ),
+  );
+  assert.equal(
+    request.match(
+      /\n {4}abuseControl: createAuthenticationAbuseControl\("recovery"\),\n {2}\} satisfies RecoveryRequestProvider\);/g,
+    )?.length,
+    1,
   );
   assert.match(
     request,
@@ -2120,10 +2153,14 @@ test("27. the request action is POST-only, reads only the trusted origin, and se
   const source = read("app/forgot-password/actions.ts");
   const code = codeOf(source);
   assert.match(source, /^"use server";\n/);
+  // MVP-001 S2 adds only the server-only authentication-abuse control,
+  // built once, for the recovery purpose (pinned in test 26).
   assert.deepEqual(importsOf(source), [
     "../../src/application/account-recovery.ts",
+    "../../src/infrastructure/identity/authentication-abuse-control.ts",
     "../../src/infrastructure/identity/supabase-server.ts",
   ]);
+  assert.equal(code.match(/createAuthenticationAbuseControl\(/g)?.length, 1);
   assert.deepEqual(
     [...code.matchAll(/\bexport\b[^\n]*/g)].map((match) => match[0]),
     ["export async function requestRecovery("],
@@ -2466,9 +2503,15 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
     "app/reset-password/actions.ts",
     "app/reset-password/page.tsx",
   ]);
+  // MVP-001 S2: the protected operational job worker route is the one other
+  // route handler, admitted by its exact path; it knows nothing of recovery.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
-    ["app/auth/confirm/route.ts"],
+    ["app/api/jobs/run/route.ts", "app/auth/confirm/route.ts"],
+  );
+  assert.doesNotMatch(
+    codeOf(read("app/api/jobs/run/route.ts")),
+    /recovery|reset-password|forgot-password|exchangeCodeForSession|updateUser|verifyOtp|\.auth\./i,
   );
   // The signup confirmation handler still verifies only signup links and
   // knows nothing of recovery.
@@ -2523,7 +2566,13 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
 test("33. the application boundary is provider-neutral, holds no state, and decides no business question", () => {
   const source = read("src/application/account-recovery.ts");
   const code = codeOf(source);
-  assert.deepEqual(importsOf(source), ["./form-operation.ts", "./session.ts"]);
+  // MVP-001 S2 adds exactly the provider-neutral authentication-abuse
+  // module (held to the same bans in authentication-abuse.test.mjs).
+  assert.deepEqual(importsOf(source), [
+    "./authentication-abuse-control.ts",
+    "./form-operation.ts",
+    "./session.ts",
+  ]);
   assert.doesNotMatch(
     code,
     /\bimport\s*\(|\brequire\s*\(|next|react|supabase|postgres|\bprocess\b|\bconsole\b|\bfetch\s*\(|cookie|header|localStorage|sessionStorage|globalThis|\bwindow\b|\bdocument\b|Math\.random|\bDate\b|\bjwt\b|access_?token|refresh_?token/i,
@@ -2563,6 +2612,19 @@ test("33. the application boundary is provider-neutral, holds no state, and deci
   assert.equal(code.match(/\bexport\b/g)?.length, 18);
   // Each operation asks its provider through the port only once per attempt.
   assert.equal(code.match(/provider\.requestRecoveryEmail\(/g)?.length, 1);
+  // MVP-001 S2: a valid request is reserved exactly once, under the owner's
+  // recovery policy, before the provider is asked. A throttle gets the
+  // neutral result without asking it; anything but an allow is refused.
+  assert.equal(code.match(/\bprotectAttempt\(/g)?.length, 1);
+  assert.match(
+    code,
+    /const protection = await protectAttempt\(\n {4}abuseControlIn\(provider\),\n {4}validation\.value\.email,\n {4}RECOVERY_UNAVAILABLE_POLICY,\n {2}\);\n {2}if \(protection === "throttle"\) \{\n {4}return SUBMITTED;\n {2}\}\n {2}if \(protection !== "allow"\) \{\n {4}return REQUEST_UNAVAILABLE;\n {2}\}\n {2}try \{\n {4}await provider\.requestRecoveryEmail\(validation\.value\.email\);/,
+  );
+  assert.equal(code.match(/\bRECOVERY_UNAVAILABLE_POLICY\b/g)?.length, 2);
+  assert.doesNotMatch(
+    code,
+    /SIGN_IN_UNAVAILABLE_POLICY|recordFailure|recordSuccess/,
+  );
   assert.equal(code.match(/provider\.exchangeCode\(/g)?.length, 1);
   assert.equal(code.match(/provider\.updatePassword\(/g)?.length, 1);
 });

@@ -36,6 +36,7 @@ import {
   Text,
   type Tone,
 } from "../../../src/presentation/design-system.tsx";
+import { requireSteppedUp } from "../../account/gate.ts";
 import {
   DetailsForm,
   InsuranceForm,
@@ -115,6 +116,7 @@ function dateOf(timestamp: string): string {
 export default async function ProfessionalSetupPage() {
   // Setup belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("attorney");
   const view = await resolveProfessionalSetup(ATTORNEY_PROFESSIONAL_SOURCES);
   if (view.status === "sign-in-required") {
     return (

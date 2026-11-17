@@ -92,6 +92,7 @@ import {
   type EnvironmentBinding,
   type EnvironmentConfiguration,
 } from "./environment-binding.ts";
+import type { StepUpRequired } from "./session-assurance.ts";
 import type { ServerSessionSource } from "./session.ts";
 
 export const STAFF_PROFILE_COLUMNS = "id, user_id, staff_state";
@@ -1366,6 +1367,8 @@ export type FieldErrors = Readonly<Record<string, readonly string[]>>;
 // "locked": the profile stage or record state does not allow it now.
 // "not-saved": nothing changed (a concurrent change won). "unconfirmed": a
 // write was attempted but could not be shown complete; nothing is claimed.
+// "step-up-required" (MVP-001 S2): the session is not stepped up, so
+// nothing was sent.
 export type StaffActionState =
   | { readonly status: "idle" }
   | { readonly status: "recorded" }
@@ -1375,7 +1378,8 @@ export type StaffActionState =
   | { readonly status: "unconfirmed" }
   | typeof SIGN_IN_REQUIRED
   | typeof DENIED
-  | typeof UNAVAILABLE;
+  | typeof UNAVAILABLE
+  | StepUpRequired;
 
 export const INITIAL_STAFF_STATE: StaffActionState = Object.freeze({
   status: "idle",

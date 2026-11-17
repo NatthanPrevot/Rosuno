@@ -13,6 +13,8 @@ import { test } from "node:test";
 import {
   ADD_REFERENCE_OUTCOMES,
   addAuthorityReference,
+  CANCEL_JOB_OUTCOMES,
+  cancelOperationalJob,
   changeJurisdictionLifecycle,
   configurationPageOf,
   CREATE_JURISDICTION_OUTCOMES,
@@ -34,6 +36,8 @@ import {
   GRANT_LAUNCH_OUTCOMES,
   grantCapability,
   grantLaunchAuthorization,
+  JOB_GROUPS,
+  jobGroupOf,
   LIFECYCLE_OUTCOMES,
   PRACTICE_AREA_ACTIVITY_OUTCOMES,
   PUBLISH_QUESTION_SET_OUTCOMES,
@@ -48,9 +52,12 @@ import {
   resolveLaunch,
   resolveLaunchList,
   resolveMemberCapabilities,
+  resolveOperationalJobs,
   resolvePolicyVersion,
   resolvePolicyWorkspace,
   resolveStaffHome,
+  RETRY_JOB_OUTCOMES,
+  retryOperationalJob,
   REVISE_POLICY_OUTCOMES,
   revisePolicyDraft,
   REVOKE_CAPABILITY_OUTCOMES,
@@ -68,6 +75,7 @@ import {
   addAuthorization,
   addEvaluation,
   addGate,
+  addJob,
   addJurisdiction,
   addPolicyType,
   addPolicyVersion,
@@ -95,6 +103,8 @@ const ALL = [
   "authorize_jurisdiction_launch",
   "manage_staff_capabilities",
   "manage_intake_configuration",
+  // MVP-001 S2.
+  "manage_operational_jobs",
 ];
 
 function setup() {
@@ -131,6 +141,8 @@ function setup() {
   // A grant held by another staff member, for revocation.
   const holder = addStaff(world, 13, { name: "Synthetic Holder" });
   const someGrant = grant(world, holder.userId, "manage_intake_configuration");
+  // MVP-001 S2: one escalated operational job, for retry and cancellation.
+  const escalatedJob = addJob(world, { state: "escalated" });
   return {
     world,
     a,
@@ -146,6 +158,7 @@ function setup() {
     gate,
     authorization,
     someGrant,
+    escalatedJob,
   };
 }
 
@@ -388,6 +401,21 @@ function operations(s) {
       },
       args: ["synthetic-next", syntheticDefinition()],
     },
+    // MVP-001 S2: the staff operational job changes.
+    {
+      name: "retryOperationalJob",
+      run: retryOperationalJob,
+      outcomes: RETRY_JOB_OUTCOMES,
+      fields: { job: s.escalatedJob.id },
+      args: [s.escalatedJob.id],
+    },
+    {
+      name: "cancelOperationalJob",
+      run: cancelOperationalJob,
+      outcomes: CANCEL_JOB_OUTCOMES,
+      fields: { job: s.escalatedJob.id },
+      args: [s.escalatedJob.id],
+    },
   ];
 }
 
@@ -404,6 +432,7 @@ function views(s) {
     ["capabilities", (src) => resolveCapabilityAdministration(src)],
     ["member", (src) => resolveMemberCapabilities(src, s.scoped.userId)],
     ["intake", (src) => resolveIntakeConfiguration(src)],
+    ["jobs", (src) => resolveOperationalJobs(src)],
   ];
 }
 
@@ -477,7 +506,18 @@ test("SC-2. the staff home lists exactly the surfaces the caller holds a current
     "catalog",
     "capabilities",
     "intake",
+    "jobs",
   ]);
+  // MVP-001 S2: the job view needs the global manage_operational_jobs grant;
+  // a jurisdiction-scoped one counts for nothing.
+  const operator = addStaff(s.world, 32);
+  grant(s.world, operator.userId, "manage_operational_jobs");
+  assert.deepEqual(await home(operator), ["jobs"]);
+  const scopedOperator = addStaff(s.world, 33);
+  grant(s.world, scopedOperator.userId, "manage_operational_jobs", {
+    jurisdiction_id: s.a,
+  });
+  assert.deepEqual(await home(scopedOperator), []);
   // Jurisdiction-scoped grants: the scoped surfaces, but not the catalog,
   // which needs the global jurisdiction-configuration grant.
   assert.deepEqual(await home(s.scoped), [
@@ -880,6 +920,8 @@ test("SC-9. every refusal reason and action state has its own fixed message", ()
     GRANT_CAPABILITY_OUTCOMES,
     REVOKE_CAPABILITY_OUTCOMES,
     PUBLISH_QUESTION_SET_OUTCOMES,
+    RETRY_JOB_OUTCOMES,
+    CANCEL_JOB_OUTCOMES,
   ]) {
     for (const outcome of list) {
       const state = expectedState(outcome);
@@ -1435,4 +1477,224 @@ test("SC-17. intake configuration lists published versions newest first and star
   assert.deepEqual(await resolveIntakeConfiguration(sourcesOf(s, s.admin)), {
     status: "unavailable",
   });
+});
+
+// ---------------------------------------------------------------------------
+// MVP-001 S2: operational jobs
+// ---------------------------------------------------------------------------
+
+test("SC-18. the job view lists one group of states at a time, in its own order, one explicit page at a time, and marks work that waits for a worker run", async () => {
+  const s = setup();
+  const now = s.world.now;
+  const overdue = addJob(s.world, { available_at: stamp(now - 5_000) });
+  const later = addJob(s.world, { available_at: stamp(now + 60_000) });
+  const expired = addJob(s.world, {
+    state: "running",
+    available_at: stamp(now - 1_000),
+  });
+  const leased = addJob(s.world, {
+    state: "running",
+    available_at: stamp(now + 90_000),
+  });
+  const done = addJob(s.world, { state: "completed" });
+  const cancelled = addJob(s.world, {
+    state: "cancelled",
+    created_at: stamp(now - 1),
+  });
+  const view = async (group, page) =>
+    resolveOperationalJobs(sourcesOf(s, s.admin), group, page);
+  // Escalated first, by default and for anything but a group name.
+  for (const group of [undefined, "escalated", "", "all", ["open"], "OPEN"]) {
+    const escalated = await view(group);
+    assert.equal(escalated.group, "escalated", String(group));
+    assert.deepEqual(
+      escalated.jobs.map((j) => j.id),
+      [s.escalatedJob.id],
+    );
+  }
+  assert.deepEqual(JOB_GROUPS, ["escalated", "open", "finished"]);
+  assert.equal(jobGroupOf("finished"), "finished");
+  const [row] = (await view()).jobs;
+  assert.deepEqual(row, {
+    id: s.escalatedJob.id,
+    jobType: "synthetic.check",
+    subjectType: "synthetic",
+    subjectId: s.escalatedJob.subject_id,
+    state: "escalated",
+    attempts: 1,
+    maxAttempts: 1,
+    lastErrorCode: "unknown_job_type",
+    createdAt: s.escalatedJob.created_at,
+    availableAt: s.escalatedJob.available_at,
+    lockedAt: null,
+    completedAt: null,
+    failedAt: s.escalatedJob.failed_at,
+    waiting: false,
+    canRetry: true,
+    canCancel: true,
+  });
+  // Nothing beyond the job's own columns is read: no message, no worker.
+  assert.equal(
+    JSON.stringify(await view()).includes("Synthetic message"),
+    false,
+  );
+  assert.equal(
+    JSON.stringify(await view()).includes("synthetic-worker"),
+    false,
+  );
+  // Open jobs: soonest due first; past their due time or lease they wait.
+  const open = await view("open");
+  assert.deepEqual(
+    open.jobs.map((j) => [j.id, j.state, j.waiting, j.canRetry, j.canCancel]),
+    [
+      [overdue.id, "pending", true, false, true],
+      [expired.id, "running", true, false, true],
+      [later.id, "pending", false, false, true],
+      [leased.id, "running", false, false, true],
+    ],
+  );
+  // Finished jobs: newest first, and nothing can be changed.
+  const finished = await view("finished");
+  assert.deepEqual(
+    finished.jobs.map((j) => [j.id, j.canRetry, j.canCancel, j.waiting]),
+    [
+      [cancelled.id, false, false, false],
+      [done.id, false, false, false],
+    ],
+  );
+  // Paging: exactly one page at a time, never silently cut.
+  for (let n = 0; n < 30; n += 1) {
+    addJob(s.world, { available_at: stamp(now + 1_000_000 + n) });
+  }
+  const first = await view("open");
+  assert.equal(first.jobs.length, 25);
+  assert.deepEqual(first.pager, {
+    page: 1,
+    pageSize: 25,
+    previousPage: null,
+    nextPage: 2,
+  });
+  const second = await view("open", "2");
+  assert.equal(second.jobs.length, 9);
+  assert.equal(second.pager.nextPage, null);
+  assert.ok(
+    s.world.calls.includes("reads.operationalJobs:open:25:26"),
+    s.world.calls.join(),
+  );
+});
+
+test("SC-19. the job view needs the global manage_operational_jobs grant, and a row outside its group or its constraints is never shown", async () => {
+  const s = setup();
+  // A jurisdiction-scoped grant, or none, sees nothing and is refused.
+  const scoped = addStaff(s.world, 40);
+  grant(s.world, scoped.userId, "manage_operational_jobs", {
+    jurisdiction_id: s.a,
+  });
+  for (const who of [s.plain, scoped, s.scoped]) {
+    assert.deepEqual(await resolveOperationalJobs(sourcesOf(s, who)), {
+      status: "denied",
+    });
+  }
+  assert.ok(s.world.calls.every((c) => !c.startsWith("reads.operationalJobs")));
+  // A row in another group's state, or one its constraints do not allow,
+  // makes the page unavailable rather than shown.
+  const fresh = () => setup();
+  const cases = [
+    (w) => {
+      w.operational_jobs[0].state = "pending";
+    },
+    (w) => {
+      w.operational_jobs[0].failed_at = null;
+    },
+    (w) => {
+      w.operational_jobs[0].subject_id = null;
+    },
+    (w) => {
+      w.operational_jobs[0].max_attempts = 0;
+    },
+    (w) => {
+      w.operational_jobs[0].job_type = "Synthetic Check";
+    },
+    (w) => {
+      w.operational_jobs[0].last_error_code = "Not a code";
+    },
+    (w) => {
+      w.operational_jobs[0].attempt_count = -1;
+    },
+    (w) => {
+      w.operational_jobs[0].locked_at = stamp(w.now);
+    },
+  ];
+  for (const change of cases) {
+    const t = fresh();
+    change(t.world);
+    // The fixture filters by group; a row whose state moved still reaches
+    // the reader here because the read port is replaced to answer it.
+    const reads = async () => ({
+      ...(await sourcesOf(t, t.admin).reads()),
+      operationalJobs: async () => ({
+        kind: "rows",
+        rows: t.world.operational_jobs.map((j) => {
+          const { locked_by, last_error_message, ...rest } = j;
+          void locked_by;
+          void last_error_message;
+          return rest;
+        }),
+      }),
+    });
+    assert.deepEqual(
+      await resolveOperationalJobs(sourcesOf(t, t.admin, { reads })),
+      { status: "unavailable" },
+      change.toString(),
+    );
+  }
+  // An unreadable page is unavailable.
+  s.world.failures.add("reads.operationalJobs");
+  assert.deepEqual(await resolveOperationalJobs(sourcesOf(s, s.admin)), {
+    status: "unavailable",
+  });
+});
+
+test("SC-20. a retry or cancellation names exactly one job and sends exactly one call; a malformed form sends nothing", async () => {
+  for (const [run, name] of [
+    [retryOperationalJob, "retryOperationalJob"],
+    [cancelOperationalJob, "cancelOperationalJob"],
+  ]) {
+    const s = setup();
+    for (const fields of [
+      {},
+      { job: "not-an-id" },
+      { job: [s.escalatedJob.id, s.escalatedJob.id] },
+      { job: "ABCDEF00-0000-4000-8000-000000000001" },
+    ]) {
+      assert.deepEqual(
+        await run(sourcesOf(s, s.admin), form(fields)),
+        { status: "unavailable" },
+        `${name}: ${JSON.stringify(fields)}`,
+      );
+    }
+    assert.deepEqual(await run(sourcesOf(s, s.admin), null), {
+      status: "unavailable",
+    });
+    assert.deepEqual(s.world.writes, []);
+    assert.deepEqual(
+      await run(sourcesOf(s, s.admin), form({ job: s.escalatedJob.id })),
+      { status: "recorded" },
+    );
+    assert.deepEqual(s.world.writes, [{ name, args: [s.escalatedJob.id] }]);
+    // The database's refusals are shown with their own fixed message.
+    for (const outcome of ["invalid_transition", "not_found", "invalid"]) {
+      s.world.answers.set(name, answer(outcome));
+      const state = await run(
+        sourcesOf(s, s.admin),
+        form({ job: s.escalatedJob.id }),
+      );
+      assert.deepEqual(state, { status: "refused", reason: outcome });
+      assert.match(outcomeMessage(state).body, /nothing was saved/i);
+    }
+    assert.match(
+      outcomeMessage({ status: "refused", reason: "invalid_transition" }).body,
+      /operational job can be retried only while escalated/,
+    );
+  }
 });

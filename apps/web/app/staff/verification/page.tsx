@@ -31,6 +31,7 @@ import {
   Table,
   Text,
 } from "../../../src/presentation/design-system.tsx";
+import { requireSteppedUp } from "../../account/gate.ts";
 
 export const metadata: Metadata = {
   title: "Verification review",
@@ -80,6 +81,7 @@ export default async function StaffVerificationQueuePage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const { page } = await searchParams;
   const view = await resolveStaffQueue(STAFF_VERIFICATION_SOURCES, page);
   if (view.status === "sign-in-required") {

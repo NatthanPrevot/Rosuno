@@ -2381,10 +2381,16 @@ test("23. the entry page is a server-rendered, parameter-free page with one expl
     "../../../src/infrastructure/identity/attorney-application-provisioning.ts",
     "../../../src/infrastructure/identity/server-session-source.ts",
     "../../../src/presentation/design-system.tsx",
+    // MVP-001 S2: the step-up gate, and nothing else, is added.
+    "../../account/gate.ts",
     "./actions.ts",
   ]);
   assert.match(code, /^import type \{ Metadata \} from "next";$/m);
   assert.match(code, /^import type \{ ReactNode \} from "react";$/m);
+  assert.match(
+    code,
+    /^import \{ requireSteppedUp \} from "\.\.\/\.\.\/account\/gate\.ts";$/m,
+  );
   assert.doesNotMatch(source, /["']use (?:client|server)["']/);
   assert.deepEqual(
     [
@@ -2404,6 +2410,13 @@ test("23. the entry page is a server-rendered, parameter-free page with one expl
   assert.equal(code.split("await connection();").length, 2);
   assert.equal(code.split(resolve).length, 2);
   assert.ok(code.indexOf("await connection();") < code.indexOf(resolve));
+  // MVP-001 S2: the attorney step-up gate runs once, right after the
+  // prerendering opt-out and before the entry is read. It passes anyone who
+  // holds no attorney profile, so starting an application is unchanged.
+  const gate = 'await connection();\n  await requireSteppedUp("attorney");\n';
+  assert.equal(code.split(gate).length, 2);
+  assert.ok(code.indexOf(gate) < code.indexOf(resolve));
+  assert.equal(code.match(/requireSteppedUp\(/g).length, 1);
   // Exactly one form, posting to the one server action, with only the fixed
   // intent field; the page reads no request input and never writes.
   assert.equal(code.match(/<form\b/g).length, 1);
@@ -2506,6 +2519,15 @@ export function revalidatePath(path) {
 }
 `;
 
+// MVP-001 S2: the step-up gate, replaced by a stand-in that lets the
+// request through and refuses any principal kind but the route's own.
+const GATE_STUB = `export async function requireSteppedUp(kind) {
+  if (kind !== "attorney") {
+    throw new Error("unexpected principal kind");
+  }
+}
+`;
+
 const NEXT_NAVIGATION_STUB = `import { wiring } from "./wiring.mjs";
 export class SyntheticRedirect extends Error {}
 export function redirect(path) {
@@ -2575,6 +2597,7 @@ async function buildHarness() {
   write("next-cache.mjs", NEXT_CACHE_STUB);
   write("next-navigation.mjs", NEXT_NAVIGATION_STUB);
   write("actions-stub.mjs", ACTIONS_STUB);
+  write("gate.mjs", GATE_STUB);
   write(
     "design-system.mjs",
     relink(
@@ -2594,6 +2617,7 @@ async function buildHarness() {
         target("wiring.mjs"),
       "../../../src/presentation/design-system.tsx":
         target("design-system.mjs"),
+      "../../account/gate.ts": target("gate.mjs"),
       "./actions.ts": target("actions-stub.mjs"),
     }),
   );

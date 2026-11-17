@@ -763,6 +763,9 @@ const MVP001_STAFF_APP = [
   "app/staff/frame.tsx",
   "app/staff/intake-configuration/forms.tsx",
   "app/staff/intake-configuration/page.tsx",
+  // MVP-001 S2: the operational job view and its forms.
+  "app/staff/jobs/forms.tsx",
+  "app/staff/jobs/page.tsx",
   "app/staff/jurisdictions/[jurisdiction]/page.tsx",
   "app/staff/jurisdictions/forms.tsx",
   "app/staff/jurisdictions/page.tsx",

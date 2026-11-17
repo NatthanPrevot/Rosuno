@@ -25,6 +25,7 @@ import {
   recordedStateLabel,
   utcDateTime,
 } from "../../../../src/presentation/staff-configuration-labels.ts";
+import { requireSteppedUp } from "../../../account/gate.ts";
 import {
   BackLink,
   BoundNotice,
@@ -50,6 +51,7 @@ export default async function JurisdictionLaunchPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const { jurisdiction } = await params;
   const view = await resolveLaunch(STAFF_CONFIGURATION_SOURCES, jurisdiction);
   if (view.status !== "ready") {

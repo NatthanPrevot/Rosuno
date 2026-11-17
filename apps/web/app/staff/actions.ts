@@ -10,12 +10,16 @@
 // checks. The previous state comes back from the browser and is never read.
 // After a change the configuration pages are read afresh. An outcome that is
 // unavailable, unconfirmed, or not saved also writes one log line naming the
-// action and the outcome, with nothing the caller submitted.
+// action and the outcome, with nothing the caller submitted. MVP-001 S2:
+// each action first asks the step-up gate; a session that is not stepped up
+// gets one fixed refusal, and nothing is handed to the use case. The two
+// operational job actions (retry, cancel) follow the same rules.
 
 import { revalidatePath } from "next/cache";
 
 import {
   addAuthorityReference,
+  cancelOperationalJob,
   changeJurisdictionLifecycle,
   createJurisdiction,
   createPolicyVersion,
@@ -28,6 +32,7 @@ import {
   grantLaunchAuthorization,
   publishQuestionSet,
   recordLaunchGateEvaluation,
+  retryOperationalJob,
   revisePolicyDraft,
   revokeCapability,
   revokeLaunchAuthorization,
@@ -38,6 +43,7 @@ import {
 } from "../../src/application/staff-configuration.ts";
 import { STAFF_CONFIGURATION_SOURCES } from "../../src/infrastructure/staff/staff-configuration-adapter.ts";
 import { logRequestEvent } from "../../src/infrastructure/observability/request-log.ts";
+import { stepUpRefusal } from "../account/gate.ts";
 
 type Operation = (
   sources: ConfigurationSources,
@@ -67,6 +73,7 @@ const PAGES: Readonly<Record<string, readonly string[]>> = Object.freeze({
   catalog: ["/staff/catalog"],
   capabilities: ["/staff/capabilities", "/staff/capabilities/[member]"],
   intake: ["/staff/intake-configuration"],
+  jobs: ["/staff/jobs"],
 });
 
 async function run(
@@ -75,6 +82,10 @@ async function run(
   area: keyof typeof PAGES,
   formData: FormData,
 ): Promise<ConfigurationActionState> {
+  const refusal = await stepUpRefusal("staff");
+  if (refusal !== null) {
+    return refusal;
+  }
   const state = await operation(STAFF_CONFIGURATION_SOURCES, formData);
   if (NOT_COMPLETED.has(state.status)) {
     await logRequestEvent("warn", "staff_configuration.action_not_completed", {
@@ -263,4 +274,18 @@ export async function publishQuestionSetAction(
   formData: FormData,
 ): Promise<ConfigurationActionState> {
   return run("publishQuestionSet", publishQuestionSet, "intake", formData);
+}
+
+export async function retryOperationalJobAction(
+  _previous: ConfigurationActionState,
+  formData: FormData,
+): Promise<ConfigurationActionState> {
+  return run("retryOperationalJob", retryOperationalJob, "jobs", formData);
+}
+
+export async function cancelOperationalJobAction(
+  _previous: ConfigurationActionState,
+  formData: FormData,
+): Promise<ConfigurationActionState> {
+  return run("cancelOperationalJob", cancelOperationalJob, "jobs", formData);
 }

@@ -30,6 +30,14 @@
 // nothing persists after the run, and every value is synthetic test data.
 // The JSON report goes to stdout; exit 0 means PASS, 1 FAIL, 2 cleanup
 // failure.
+//
+// MVP-001 S2 update: the registered S2 migrations follow S1, so the S1
+// migrations are asserted contiguous, in order, directly after P5-001, with
+// every later migration registered (previously: S1 applies last). Staff
+// authority and attorney professional writes need an aal2 session
+// (20261118030000), so every request with a JWT subject also carries
+// request.jwt.claims with "aal": "aal2", as PostgREST sets it from a
+// verified, MFA-stepped-up JWT; CAP-1 adds the aal1 and claim-less refusals.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -206,7 +214,20 @@ function lit(value) {
 
 // One statement as a role and JWT subject (and optional JWT claims), in its
 // own committed transaction: the last output line, or "ERROR <sqlstate>".
-function as(db, role, sub, statement, { claims = null } = {}) {
+// MVP-001 S2: a request with a subject carries claims with "aal": "aal2"
+// (merged under any explicit claims) unless aal names another level; aal
+// null keeps only the explicit claims.
+function as(
+  db,
+  role,
+  sub,
+  statement,
+  { claims: explicit = null, aal = "aal2" } = {},
+) {
+  const claims =
+    sub !== null && aal !== null
+      ? { sub, role, aal, ...(explicit ?? {}) }
+      : explicit;
   const result = psql(
     [
       "begin;",
@@ -231,19 +252,20 @@ function as(db, role, sub, statement, { claims = null } = {}) {
 }
 
 // A staff function's first answer row, as JSON, called by a JWT subject.
-function staffRow(db, sub, call) {
+function staffRow(db, sub, call, options = {}) {
   const value = as(
     db,
     "authenticated",
     sub,
     `select to_jsonb(r) from ${call} as r;`,
+    options,
   );
   assert.ok(!value.startsWith("ERROR"), `${call}: ${value}`);
   return JSON.parse(value);
 }
 
-function staffText(db, sub, call) {
-  return as(db, "authenticated", sub, `select ${call};`);
+function staffText(db, sub, call, options = {}) {
+  return as(db, "authenticated", sub, `select ${call};`, options);
 }
 
 const uid = () => randomUUID();
@@ -380,11 +402,27 @@ function applyMigrations() {
       `${file} is registered`,
     );
   }
-  assert.deepEqual(
-    files.slice(-4),
-    [...S1_MIGRATIONS],
-    "S1 migrations apply last",
+  // MVP-001 S2 re-pin (was: S1 migrations apply last): S1 is contiguous, in
+  // order, directly after P5-001, and every later migration is registered.
+  const s1 = files.indexOf(S1_MIGRATIONS[0]);
+  assert.ok(s1 > 0, "S1 migrations are present");
+  assert.equal(
+    files[s1 - 1],
+    "20261115140653_p5_001_client_intake_foundation.sql",
+    "S1 migrations follow P5-001",
   );
+  assert.deepEqual(
+    files.slice(s1, s1 + 4),
+    [...S1_MIGRATIONS],
+    "S1 migrations apply in order",
+  );
+  for (const file of files.slice(s1 + 4)) {
+    assert.ok(
+      registered.has(`supabase/migrations/${file}`),
+      `${file} is a registered later migration`,
+    );
+  }
+  report.migrations.later_registered = files.slice(s1 + 4);
   sql("postgres", FIXTURE);
   for (const file of files) {
     const result = run(
@@ -1764,10 +1802,28 @@ async function launchChecks() {
 
 async function capabilityChecks() {
   await check(
-    "CAP-1 capability administration: grant, expiry, and revocation are audited; no self-grant; only active staff may receive a grant; an expired or revoked grant is denied",
+    "CAP-1 capability administration: grant, expiry, and revocation are audited; no self-grant; only active staff may receive a grant; an expired or revoked grant is denied; (MVP-001 S2) an aal1 or claim-less session is denied",
     () => {
       const w = worlds[D.production];
       const target = newStaff(D.production, [], { grantor: w.grantor.user });
+      // MVP-001 S2: the same administrator before MFA step-up (aal1) or
+      // without JWT claims is denied and grants nothing.
+      for (const aal of ["aal1", null]) {
+        assert.equal(
+          staffRow(
+            D.production,
+            w.admin.auth,
+            `public.staff_grant_capability('${target.user}', 'manage_policy_configuration', null, null)`,
+            { aal },
+          ).outcome,
+          "denied",
+          String(aal),
+        );
+      }
+      assert.equal(
+        count(D.production, "capability_grants", `user_id = '${target.user}'`),
+        0,
+      );
       assert.equal(
         staffRow(
           D.production,

@@ -18,6 +18,7 @@ import {
   Table,
   Text,
 } from "../../../src/presentation/design-system.tsx";
+import { requireSteppedUp } from "../../account/gate.ts";
 import { BackLink, PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
 import { CreatePracticeAreaForm, PracticeAreaActivityForm } from "./forms.tsx";
 
@@ -33,6 +34,7 @@ export default async function CatalogPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const { page } = await searchParams;
   const view = await resolveCatalog(STAFF_CONFIGURATION_SOURCES, page);
   if (view.status !== "ready") {

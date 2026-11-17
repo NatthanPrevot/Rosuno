@@ -152,6 +152,20 @@ function freshRequestSource(jar) {
   return createSupabaseServerSessionSource(async () => claimsClient(jar));
 }
 
+// MVP-001 S2: an authentication-abuse control stand-in that allows every
+// attempt and records every result without a signal, so the P2-005
+// behaviour is tested here unchanged. Every other abuse-control branch is
+// tested in authentication-abuse.test.mjs.
+function allowingControl() {
+  return Object.freeze({
+    reserve: async () => "allow",
+    recordFailure: async () => "recorded",
+    recordSuccess: async () => "recorded",
+    reportUnavailable: async () => {},
+    reportSuspicious: async () => {},
+  });
+}
+
 // In-memory provider stand-in for one request. Like the real server client,
 // it keeps its own copy of what it holds apart from the browser's jar, which
 // is what the request stores for the browser. It accepts only the synthetic
@@ -178,9 +192,15 @@ function stubProvider(jar, overrides = {}) {
       jar.session = null;
       return true;
     },
+    signOutOtherSessions: async () => {
+      throw new Error(
+        "other sessions are ended only after a suspicious sign-in",
+      );
+    },
     issuedSession: sessionReadOver(claimsClient(held)),
     storedSession: sessionReadOver(claimsClient(jar)),
     session: freshRequestSource(jar),
+    abuseControl: allowingControl(),
     ...(typeof overrides === "function" ? overrides(held) : overrides),
   };
   // Every read of the stored state is counted, whichever one the provider
@@ -906,7 +926,13 @@ test("8. the application boundary is provider-neutral and holds no credential", 
   const file = "src/application/authentication-entry.ts";
   const source = read(file);
   const code = codeOf(source);
-  assert.deepEqual(importsOf(source), ["./form-operation.ts", "./session.ts"]);
+  // MVP-001 S2 adds exactly the provider-neutral authentication-abuse
+  // module (held to the same bans in authentication-abuse.test.mjs).
+  assert.deepEqual(importsOf(source), [
+    "./authentication-abuse-control.ts",
+    "./form-operation.ts",
+    "./session.ts",
+  ]);
   assert.doesNotMatch(source, /["']use (?:client|server)["']/);
   assert.doesNotMatch(
     code,
@@ -925,6 +951,8 @@ test("8. the application boundary is provider-neutral and holds no credential", 
     [
       "INITIAL_SIGN_IN_STATE",
       "REJECTED",
+      // MVP-001 S2: the one fixed throttled result.
+      "THROTTLED",
       "UNAVAILABLE",
       "UNCERTAIN",
       "SIGNED_IN",
@@ -942,6 +970,7 @@ test("8. the application boundary is provider-neutral and holds no credential", 
       "idle",
       "invalid",
       "rejected",
+      "throttled",
       "unavailable",
       "uncertain",
       "signed-in",
@@ -959,7 +988,9 @@ test("8. the application boundary is provider-neutral and holds no credential", 
     code,
     /return \(await discardSession\(provider\)\) === "cleared"\n {4}\? UNAVAILABLE\n {4}: UNCERTAIN;/,
   );
-  assert.equal(code.match(/\bUNAVAILABLE\b/g)?.length, 4);
+  // MVP-001 S2: the fifth is the refusal of an attempt whose protection is
+  // unavailable and refused, pinned below.
+  assert.equal(code.match(/\bUNAVAILABLE\b/g)?.length, 5);
   // Absence is confirmed only by a well-formed "none" from a fresh read of
   // the stored state and an anonymous trusted read together. A sign-in is
   // confirmed only when that fresh read holds the very session the provider
@@ -975,11 +1006,40 @@ test("8. the application boundary is provider-neutral and holds no credential", 
   );
   assert.equal(code.match(/provider\.issuedSession\(\)/g)?.length, 1);
   assert.equal(code.match(/provider\.storedSession\(\)/g)?.length, 2);
+  // MVP-001 S2: a protected, confirmed sign-in is judged before its result
+  // is returned; the judgement never changes that result.
   assert.match(
     code,
-    /if \(outcome === "accepted" && \(await isConfirmedSignIn\(provider\)\)\) \{\n {4}return SIGNED_IN;/,
+    /if \(outcome === "accepted" && \(await isConfirmedSignIn\(provider\)\)\) \{\n {4}if \(protection === "allow"\) \{\n {6}await judgeSignIn\(provider, email\);\n {4}\}\n {4}return SIGNED_IN;/,
   );
   assert.equal(code.match(/\bSIGNED_IN\b/g)?.length, 2);
+  // MVP-001 S2: every validated submission is reserved exactly once, under
+  // the owner's sign-in policy, before the provider is asked; a throttled
+  // or refused attempt never reaches it; only a protected rejection is
+  // counted.
+  assert.equal(code.match(/\bprotectAttempt\(/g)?.length, 1);
+  assert.match(
+    code,
+    /const protection = await protectAttempt\(\n {4}abuseControlIn\(provider\),\n {4}email,\n {4}SIGN_IN_UNAVAILABLE_POLICY,\n {2}\);/,
+  );
+  // Its import and that one use.
+  assert.equal(code.match(/\bSIGN_IN_UNAVAILABLE_POLICY\b/g)?.length, 2);
+  assert.doesNotMatch(code, /RECOVERY_UNAVAILABLE_POLICY/);
+  assert.equal(code.match(/provider\.signInWithPassword\(/g)?.length, 1);
+  assert.ok(
+    code.indexOf("protectAttempt(") <
+      code.indexOf("provider.signInWithPassword("),
+  );
+  assert.match(
+    code,
+    /if \(protection === "throttle"\) \{\n {4}return THROTTLED;\n {2}\}\n {2}if \(protection === "refused"\) \{\n {4}return UNAVAILABLE;\n {2}\}\n {2}let outcome: unknown;/,
+  );
+  assert.match(
+    code,
+    /if \(outcome === "rejected"\) \{\n {4}if \(protection === "allow"\) \{\n {6}await recordRejection\(provider, email\);\n {4}\}\n {4}return REJECTED;/,
+  );
+  assert.equal(code.match(/\bTHROTTLED\b/g)?.length, 2);
+  assert.equal(code.match(/provider\.signOutOtherSessions\(/g)?.length, 1);
 });
 
 test("9. the server actions are POST-only, fixed-destination, and request-scoped", () => {
@@ -989,10 +1049,12 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
   assert.match(source, /^"use server";\n/);
   // MVP-001 D-8 adds only the request-scoped logger, which records that the
   // provider is unconfigured or the provider's HTTP status, nothing else.
+  // MVP-001 S2 adds only the server-only authentication-abuse control.
   assert.deepEqual(importsOf(source), [
     "next/cache",
     "next/navigation",
     "../../src/application/authentication-entry.ts",
+    "../../src/infrastructure/identity/authentication-abuse-control.ts",
     "../../src/infrastructure/identity/server-session-source.ts",
     "../../src/infrastructure/identity/supabase-server.ts",
     "../../src/infrastructure/observability/request-log.ts",
@@ -1037,7 +1099,20 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
   );
   assert.equal(code.match(/\.signInWithPassword\(/g)?.length, 1);
   assert.match(code, /client\.auth\.signOut\(\{ scope: "local" \}\)/);
-  assert.equal(code.match(/\.signOut\(/g)?.length, 1);
+  // MVP-001 S2: the second sign-out is exactly the one of the account's
+  // other sessions, offered only as its own port member, on the same
+  // request-scoped client; the abuse control is the sign-in purpose's.
+  assert.match(
+    code,
+    /\n {4}signOutOtherSessions: async \(\) => \{\n {6}const \{ error \} = await client\.auth\.signOut\(\{ scope: "others" \}\);\n {6}return error === null;\n {4}\},\n/,
+  );
+  assert.equal(code.match(/\.signOut\(/g)?.length, 2);
+  assert.equal(code.match(/scope: "/g)?.length, 2);
+  assert.match(
+    code,
+    /\n {4}abuseControl: createAuthenticationAbuseControl\("sign_in"\),\n {2}\} satisfies AuthenticationProvider\);/,
+  );
+  assert.equal(code.match(/createAuthenticationAbuseControl\(/g)?.length, 1);
   // That client is read only to name the session it issued. The stored state
   // is read through a freshly initialized client, and the trusted boundary
   // through a fresh client on every read, so no verification sees the
@@ -1068,12 +1143,31 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
     code.replace(sessionRead, " "),
     /\bconsole\b|\bprocess\b|getSession|getUser|access_?token|refresh_?token|error\.message|\bdata\b|\.session\b(?!:)|session_id/,
   );
-  // GET cannot sign out. The only route handler is the P2-006 email
-  // confirmation handler, admitted by its exact path and nothing broader, and
+  // GET cannot sign out. The only route handlers are the P2-006 email
+  // confirmation handler and (MVP-001 S2) the protected operational job
+  // worker route, each admitted by its exact path and nothing broader, and
   // the sign-out form is a POST server action on the home page.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
-    ["app/auth/confirm/route.ts"],
+    ["app/api/jobs/run/route.ts", "app/auth/confirm/route.ts"],
+  );
+  // The job worker route has no sign-out or session capability: it imports
+  // only the server-only worker adapter, reads no cookie or session, never
+  // ends one, and its only non-405 method is POST.
+  const workerSource = read("app/api/jobs/run/route.ts");
+  const worker = codeOf(workerSource);
+  assert.deepEqual(importsOf(workerSource), [
+    "../../../../src/infrastructure/jobs/job-worker-adapter.ts",
+  ]);
+  assert.doesNotMatch(
+    worker,
+    /sign-in\/actions|signOut|sign-?out|\.auth\.|cookies|getSession|getClaims|getUser|supabase-server|server-session-source|next\/headers|\bimport\s*\(/i,
+  );
+  assert.deepEqual(
+    [
+      ...worker.matchAll(/^export (?:async function|function|const) (\w+)/gm),
+    ].map((match) => match[1]),
+    ["dynamic", "POST", "GET", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"],
   );
   // That handler has no sign-out capability: it takes nothing from the
   // sign-in actions and never ends a session. Its GET renders only: no token
@@ -1170,7 +1264,8 @@ test("10. the sign-in page is an accessible design-system form that shows only f
     [...new Set([...code.matchAll(/\bstate\.\w+/g)].map((match) => match[0]))],
     ["state.status", "state.fieldErrors"],
   );
-  for (const status of ["rejected", "unavailable", "invalid"]) {
+  // MVP-001 S2 adds the throttled state's fixed message.
+  for (const status of ["rejected", "throttled", "unavailable", "invalid"]) {
     assert.match(
       code,
       new RegExp(
@@ -1179,6 +1274,15 @@ test("10. the sign-in page is an accessible design-system form that shows only f
       status,
     );
   }
+  // The throttled message is one fixed text, the same whether or not an
+  // account exists: it names no account, address, or remaining time.
+  assert.ok(
+    code
+      .replace(/\s+/g, " ")
+      .includes(
+        '{state.status === "throttled" ? ( <Alert tone="error" title="Too many attempts" role="alert"> Too many sign-in attempts have been made. Please wait a while and try again later. </Alert> ) : null}',
+      ),
+  );
   // A failure that may have left this browser signed in says so, and points
   // to the home page, where the session shows and sign-out is offered.
   assert.ok(
@@ -1188,7 +1292,7 @@ test("10. the sign-in page is an accessible design-system form that shows only f
         '{state.status === "uncertain" ? ( <Alert tone="warning" title="Sign-in could not be confirmed" role="alert" > Sign-in did not complete, and this browser may still be signed in. Return to the home page to check, and sign out there if it shows you as signed in. </Alert> ) : null}',
       ),
   );
-  assert.equal(code.match(/<Alert\b/g)?.length, 4);
+  assert.equal(code.match(/<Alert\b/g)?.length, 5);
   // Every component comes from the design system: no class, inline style,
   // color, or stylesheet of its own. Its only native element is the form.
   const imported = source
@@ -1378,8 +1482,19 @@ async function identityProvider({ signing = "asymmetric", metadata = 0 } = {}) {
         ? reply(200, user)
         : reply(403, { error_code: "session_not_found", msg: "ended" });
     }
+    // MVP-001 S2: scope "others" ends every other session of the account
+    // and keeps the presented one; every other scope ends the presented one.
     if (route === "/logout") {
-      provider.active.delete(presentedSession(init));
+      const presented = presentedSession(init);
+      if (url.searchParams.get("scope") === "others") {
+        for (const id of [...provider.active]) {
+          if (id !== presented) {
+            provider.active.delete(id);
+          }
+        }
+      } else {
+        provider.active.delete(presented);
+      }
       return reply(204);
     }
     throw new Error(`unexpected provider request: ${route}`);
@@ -1507,7 +1622,12 @@ async function sessionOf(client) {
 // through the changing client, as the server actions did before this
 // correction. It is kept only as a control: each defect scenario must fool
 // it, or the scenario would prove nothing.
-function actionProvider(provider, request, verify = "fresh") {
+function actionProvider(
+  provider,
+  request,
+  verify = "fresh",
+  control = allowingControl(),
+) {
   const client = serverClient(provider, request);
   const fresh =
     verify === "fresh"
@@ -1528,9 +1648,14 @@ function actionProvider(provider, request, verify = "fresh") {
       const { error } = await client.auth.signOut({ scope: "local" });
       return error === null;
     },
+    signOutOtherSessions: async () => {
+      const { error } = await client.auth.signOut({ scope: "others" });
+      return error === null;
+    },
     issuedSession: () => sessionOf(client),
     storedSession: async () => sessionOf(await fresh()),
     session: createSupabaseServerSessionSource(fresh),
+    abuseControl: control,
   });
 }
 
@@ -2175,10 +2300,86 @@ test("21. the request model runs the real adapter's cookie methods and the serve
   const actions = codeOf(read("app/sign-in/actions.ts"));
   for (const line of [
     'const { error } = await client.auth.signOut({ scope: "local" });',
+    // MVP-001 S2: the sign-out of the account's other sessions.
+    'const { error } = await client.auth.signOut({ scope: "others" });',
     "return error === null;",
     'return error.status === 400 ? "rejected" : "unavailable";',
   ]) {
     assert.ok(actions.includes(line), line);
     assert.ok(port.includes(line), line);
+  }
+});
+
+test("22. MVP-001 S2: a sign-in judged suspicious ends the account's other sessions through the installed client and keeps the new one", async (t) => {
+  for (const signing of SIGNINGS) {
+    await t.test(signing, async () => {
+      const provider = await identityProvider({ signing });
+      const first = await signedIn(provider);
+      const second = await signedIn(provider);
+      assert.deepEqual([...provider.active], [first.id, second.id]);
+      const reports = [];
+      const control = Object.freeze({
+        ...allowingControl(),
+        recordSuccess: async (...args) => {
+          reports.push(["recordSuccess", ...args]);
+          return "suspicious";
+        },
+        reportSuspicious: async (...args) => {
+          reports.push(["reportSuspicious", ...args]);
+        },
+      });
+      const agent = userAgent();
+      const request = actionRequest(agent);
+      const state = await signInExistingAccount(
+        async () => actionProvider(provider, request, "fresh", control),
+        validForm(),
+      );
+      assertExactly(state, { status: "signed-in" });
+      request.deliver();
+      const issued = provider.issued.at(-1);
+      // Only the new session remains at the provider, and the judgement got
+      // the address as validated and the account id from the trusted read.
+      assert.deepEqual([...provider.active], [issued]);
+      assert.deepEqual(reports, [
+        ["recordSuccess", EMAIL, ACCOUNT_ID],
+        ["reportSuspicious", "other_sessions_ended"],
+      ]);
+      assert.deepEqual(await nextSession(provider, agent), {
+        kind: "session",
+        id: issued,
+      });
+      assertExactly(await nextView(provider, agent), {
+        session: "authenticated",
+      });
+      // The other browsers' sessions are ended at the provider.
+      assert.deepEqual(
+        await nextSession(provider, first.agent),
+        endedRead(signing, first.id),
+      );
+      assertExactly(await nextView(provider, second.agent), endedView(signing));
+      // When the provider cannot end them, the sign-in still stands and the
+      // report says so.
+      const other = await identityProvider({ signing });
+      const kept = await signedIn(other);
+      other.outage.add("/logout");
+      const failingReports = [];
+      const failing = Object.freeze({
+        ...allowingControl(),
+        recordSuccess: async () => "suspicious",
+        reportSuspicious: async (...args) => {
+          failingReports.push(args);
+        },
+      });
+      const failingRequest = actionRequest(userAgent());
+      assertExactly(
+        await signInExistingAccount(
+          async () => actionProvider(other, failingRequest, "fresh", failing),
+          validForm(),
+        ),
+        { status: "signed-in" },
+      );
+      assert.deepEqual(failingReports, [["other_sessions_not_ended"]]);
+      assert.ok(other.active.has(kept.id));
+    });
   }
 });

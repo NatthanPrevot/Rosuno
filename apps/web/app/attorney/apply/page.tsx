@@ -40,6 +40,7 @@ import {
   Surface,
   Text,
 } from "../../../src/presentation/design-system.tsx";
+import { requireSteppedUp } from "../../account/gate.ts";
 import { startApplication } from "./actions.ts";
 
 export const metadata: Metadata = {
@@ -92,6 +93,7 @@ export default async function AttorneyApplicationPage() {
   // The entry belongs to each request on the server; never prerender or
   // cache it.
   await connection();
+  await requireSteppedUp("attorney");
   const entry = await resolveAttorneyApplicationEntry({
     session: SUPABASE_SERVER_SESSION_SOURCE,
     account: ATTORNEY_APPLICATION_ACCOUNT,

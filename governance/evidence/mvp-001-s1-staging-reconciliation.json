@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "evidence_id": "MVP-001-S1-STAGING-RECONCILIATION",
+  "work_item_id": "WI-P2-MVP-001-TECHNICAL-COMPLETION",
+  "scope": "Read-only reconciliation of Rosuno Staging against the canonical 16-migration state before any S1 application; no persistent change",
+  "recorded_at": "2026-11-17T14:28:09Z",
+  "environment": {
+    "connector": "Rosuno — Supabase Staging",
+    "project_url": "https://mxjlvmowmodzdtdfgqpb.supabase.co",
+    "server_version": "17.11",
+    "access": "read-only queries only"
+  },
+  "applied_migrations": {
+    "count": 16,
+    "first": "20260828192126",
+    "last": "20261115140653",
+    "matches_owner_main_files_1_to_16": true,
+    "s1_migrations_applied": false,
+    "deployment_environment_present": false
+  },
+  "business_rows": "none in any S1-affected or business relation",
+  "fingerprint": {
+    "method": "md5 aggregates of catalog definitions; the hosted platform helper public.rls_auto_enable() excluded on both sides",
+    "comparison_target": "fresh local Supabase PostgreSQL 17.12 with the same 16 canonical migrations",
+    "tables": {
+      "count": 63,
+      "md5": "0a5452623ef3da21cc4291898df4f8df",
+      "equal": true
+    },
+    "policies": {
+      "count": 32,
+      "md5": "8bd014ef2fdbcb5f9d335ba0256db549",
+      "equal": true
+    },
+    "constraints": {
+      "count": 432,
+      "md5": "59b95d98fdae0280f81601099744ab22",
+      "equal": true
+    },
+    "triggers": {
+      "count": 56,
+      "md5": "bfad65ce1f6af6bdb887e2252282a931",
+      "equal": true
+    },
+    "table_privileges": {
+      "md5": "cf678dd219026ca7499e4f8c00205479",
+      "equal": true
+    },
+    "function_privileges": {
+      "count": 72,
+      "md5": "3b274b311a6f6484326b002e483eb197",
+      "equal": true
+    },
+    "function_definitions": {
+      "count": 72,
+      "staging_md5": "32c9fb8e38d01cbd0e5d3546d1940644",
+      "canonical_md5": "526438b1d5a776a8d2e3aba9556b6be1",
+      "equal_functions": 71,
+      "different_functions": ["public.set_updated_at()"]
+    }
+  },
+  "exception": {
+    "object": "public.set_updated_at()",
+    "staging_definition_md5": "e8e36104f4938ead8daedd9bbf049457",
+    "staging_definition_md5_carriage_returns_removed": "71ccb59297ce3fe5657c9bdcf24c1994",
+    "canonical_definition_md5": "71ccb59297ce3fe5657c9bdcf24c1994",
+    "difference": "exactly 5 carriage returns in the function body, one before each of its 5 line feeds; byte-identical otherwise",
+    "attributes_equal": "security invoker, search_path = pg_catalog, volatility and privileges (postgres, service_role) equal canonical",
+    "other_carriage_returns": "none in any other function body in non-system schemas, in public relation comments or in public views",
+    "canonical_file": "supabase/migrations/20260829000015_p1_platform_foundation.sql has one repository version (commit f05d6b5, blob 78368ca8ea56703eecb28d8c9571633092f5aea4, SHA-256 67dfd44b2bd7525a588e6eb59c33a0056f3a5c67eec5f45dd93e6aab37f7afc8) with no carriage return",
+    "recorded_history": "Staging supabase_migrations.schema_migrations stores the canonical statements for version 20260829000015, with no carriage return in any of the 16 recorded migrations"
+  },
+  "origin": {
+    "explanation": "governance/evidence/p1-001-platform-foundation.json records that P1-001 was first recorded on Staging under a generated version (20260829153932), the pattern of the remote apply path, and that the history was then reconciled with the official Supabase CLI 2.116.0 without re-running the SQL (migration_sql_rerun false, direct_history_edit false). The executed SQL therefore created the function from text transmitted with CRLF line endings, while the CLI history repair recorded the canonical LF statements. P1-001 is the only migration recorded through that path, and the only one whose multi-line raw text survives in the catalog as a function body.",
+    "not_identified": "The specific client that introduced the carriage returns during transmission has not been identified."
+  },
+  "owner_decision": {
+    "decision": "Option A: the five-carriage-return difference in public.set_updated_at() is retained as an explained, documented exception. No corrective migration is required solely for this difference.",
+    "approver": "NatthanPrevot",
+    "received": "express owner direction 'S1/S2 DECISIONS', processed in the Builder session at 2026-11-17T14:28:09Z (session clock)",
+    "not_authorized_by_this_decision": "persistent Staging migration application or configuration changes"
+  }
+}

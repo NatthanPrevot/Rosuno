@@ -19,6 +19,7 @@ import {
   Text,
 } from "../../../src/presentation/design-system.tsx";
 import { LIFECYCLE_LABELS } from "../../../src/presentation/staff-configuration-labels.ts";
+import { requireSteppedUp } from "../../account/gate.ts";
 import { BackLink, PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
 
 export const metadata: Metadata = {
@@ -33,6 +34,7 @@ export default async function LaunchPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const { page } = await searchParams;
   const view = await resolveLaunchList(STAFF_CONFIGURATION_SOURCES, page);
   if (view.status !== "ready") {

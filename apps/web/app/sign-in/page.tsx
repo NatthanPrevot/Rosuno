@@ -48,6 +48,12 @@ export default function SignInPage() {
               again.
             </Alert>
           ) : null}
+          {state.status === "throttled" ? (
+            <Alert tone="error" title="Too many attempts" role="alert">
+              Too many sign-in attempts have been made. Please wait a while and
+              try again later.
+            </Alert>
+          ) : null}
           {state.status === "unavailable" ? (
             <Alert tone="error" title="Sign-in is unavailable" role="alert">
               Sign-in could not be completed right now. Please try again later.

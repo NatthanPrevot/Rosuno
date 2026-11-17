@@ -24,6 +24,7 @@ import {
   GRANT_STATE_LABELS,
   utcDateTime,
 } from "../../../../src/presentation/staff-configuration-labels.ts";
+import { requireSteppedUp } from "../../../account/gate.ts";
 import {
   BackLink,
   BoundNotice,
@@ -44,6 +45,7 @@ export default async function MemberCapabilitiesPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  await requireSteppedUp("staff");
   const { member } = await params;
   const view = await resolveMemberCapabilities(
     STAFF_CONFIGURATION_SOURCES,
