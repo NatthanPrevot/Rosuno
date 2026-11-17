@@ -1957,6 +1957,7 @@ const V2_MIGRATIONS = Object.freeze([
   "20261119040000_mvp_001_s3_intake_lifecycle.sql",
   "20261119050000_mvp_001_s3_ai_suggestions.sql",
   "20261119060000_mvp_001_s3_jurisdiction_assessment_review.sql",
+  "20261119070000_mvp_001_s3_intake_lifecycle_correction.sql",
 ]);
 
 // The P1 columns of every relation S3 part 2 relies on (Packet rule 16).
@@ -1992,11 +1993,7 @@ const V2_FUNCTIONS = Object.freeze([
     "authenticated",
     "kept:search_path=pg_catalog",
   ],
-  [
-    "client_close_intake(uuid)",
-    "authenticated",
-    "kept:search_path=pg_catalog",
-  ],
+  ["client_close_intake(uuid)", "authenticated", "kept:search_path=pg_catalog"],
   [
     "resource_begin_voice_memo(uuid, text, bigint, text, integer)",
     "authenticated",
@@ -2018,11 +2015,7 @@ const V2_FUNCTIONS = Object.freeze([
     "authenticated",
     "reader",
   ],
-  [
-    "staff_jurisdiction_review_assessments(uuid)",
-    "authenticated",
-    "reader",
-  ],
+  ["staff_jurisdiction_review_assessments(uuid)", "authenticated", "reader"],
   [
     "staff_review_jurisdiction_assessment(uuid, text)",
     "authenticated",
@@ -2127,6 +2120,13 @@ function requestChange(principal, intake, change, options = {}) {
 
 function intakeState(intake) {
   return sql(`select state from public.intakes where id = '${intake}';`);
+}
+
+// The owner role moves a submitted Intake to active, the only state that
+// carries an expiry time (Domain Model lifecycle; 20261119070000). No
+// application path does this yet.
+function activate(intake) {
+  sql(`update public.intakes set state = 'active' where id = '${intake}';`);
 }
 
 function expireNow(intake) {
@@ -2235,7 +2235,7 @@ function changedRelations(before, after) {
 
 async function v2MigrationChecks() {
   await check(
-    "V2-MIG-1 the three S3 part 2 migrations follow the S3 part 1 migrations, in order, registered unreviewed (sequences 28 to 30) and applied nowhere; they add no relation, column, row policy, type, capability or policy type, and the columns of every relation they use are the P1 columns",
+    "V2-MIG-1 the four S3 part 2 migrations follow the S3 part 1 migrations, in order, registered unreviewed (sequences 28 to 31) and applied nowhere; they add no relation, column, row policy, type, capability or policy type, and the columns of every relation they use are the P1 columns",
     () => {
       const files = migrationFiles();
       const at = files.indexOf(S3_MIGRATIONS[S3_MIGRATIONS.length - 1]);
@@ -2304,13 +2304,14 @@ async function v2MigrationChecks() {
         const actual = sql(
           `select prosecdef::text || '|' || coalesce(array_to_string(proconfig, ';'), '') || '|' || pg_get_userbyid(proowner) from pg_proc where oid = 'public.${signature}'::regprocedure;`,
         );
-        const expected = {
-          definer: "true|search_path=pg_catalog, pg_temp;lock_timeout=3s",
-          reader: "true|search_path=pg_catalog, pg_temp",
-          helper: "false|search_path=pg_catalog, pg_temp",
-          "helper-timeout":
-            "false|search_path=pg_catalog, pg_temp;lock_timeout=3s",
-        }[kind] ?? `true|${kind.slice("kept:".length)}`;
+        const expected =
+          {
+            definer: "true|search_path=pg_catalog, pg_temp;lock_timeout=3s",
+            reader: "true|search_path=pg_catalog, pg_temp",
+            helper: "false|search_path=pg_catalog, pg_temp",
+            "helper-timeout":
+              "false|search_path=pg_catalog, pg_temp;lock_timeout=3s",
+          }[kind] ?? `true|${kind.slice("kept:".length)}`;
         assert.equal(actual, `${expected}|postgres`, signature);
         settings[signature] = actual;
       }
@@ -2321,7 +2322,11 @@ async function v2MigrationChecks() {
   await check(
     "V2-PRIV-2 table privileges: service_role holds no privilege at all on ai_suggestions (the P1 SELECT, INSERT and column UPDATE grants are gone) and no write on intakes or jurisdiction_assessments; authenticated keeps only SELECT under the own-row policies; anon holds nothing; direct writes fail with 42501",
     () => {
-      for (const table of ["ai_suggestions", "intakes", "jurisdiction_assessments"]) {
+      for (const table of [
+        "ai_suggestions",
+        "intakes",
+        "jurisdiction_assessments",
+      ]) {
         for (const role of ["anon", "authenticated", "service_role"]) {
           for (const privilege of [
             "INSERT",
@@ -2346,7 +2351,9 @@ async function v2MigrationChecks() {
           }
         }
         assert.equal(
-          sql(`select has_table_privilege('anon', 'public.${table}', 'SELECT');`),
+          sql(
+            `select has_table_privilege('anon', 'public.${table}', 'SELECT');`,
+          ),
           "f",
         );
         assert.equal(
@@ -2386,7 +2393,7 @@ async function v2MigrationChecks() {
 
 async function v2LifecycleChecks() {
   await check(
-    "V2-LC-1 lifecycle integrity for every role including the owner: an Intake is never deleted or truncated, keeps its identity, client and creation time, moves only along draft -> submitted | closed | expired, submitted -> active | closed | expired | superseded, active -> closed | expired | superseded, never leaves expired, superseded or closed, carries closed_at exactly when closed, and fixes expires_at once ended",
+    "V2-LC-1 lifecycle integrity for every role including the owner: an Intake is never deleted or truncated, keeps its identity, client and creation time, moves only along the locked Domain Model lifecycle draft -> submitted | closed, submitted -> active | closed, active -> closed | expired | superseded (a draft or submitted Intake never expires and is never superseded), never leaves expired, superseded or closed, carries closed_at exactly when closed, carries an expiry time only once active, and fixes expires_at once ended",
     () => {
       const draft = newIntake(world.owner);
       const submitted = newIntake(world.owner, "submitted");
@@ -2408,6 +2415,21 @@ async function v2LifecycleChecks() {
         ),
         draft_to_superseded: refused(
           `update public.intakes set state = 'superseded' where id = '${draft}';`,
+        ),
+        draft_to_expired: refused(
+          `update public.intakes set state = 'expired' where id = '${draft}';`,
+        ),
+        submitted_to_expired: refused(
+          `update public.intakes set state = 'expired' where id = '${submitted}';`,
+        ),
+        submitted_to_superseded: refused(
+          `update public.intakes set state = 'superseded' where id = '${submitted}';`,
+        ),
+        expiry_on_draft: refused(
+          `update public.intakes set expires_at = now() + interval '1 day' where id = '${draft}';`,
+        ),
+        expiry_on_submitted: refused(
+          `update public.intakes set expires_at = now() + interval '1 day' where id = '${submitted}';`,
         ),
         submitted_to_draft: refused(
           `update public.intakes set state = 'draft' where id = '${submitted}';`,
@@ -2443,16 +2465,24 @@ async function v2LifecycleChecks() {
       assert.equal(refusedOutcomes.delete, "55000");
       assert.equal(refusedOutcomes.truncate, "55000");
       assert.equal(refusedOutcomes.closed_without_time, "23514");
+      for (const name of [
+        "draft_to_expired",
+        "submitted_to_expired",
+        "submitted_to_superseded",
+      ]) {
+        assert.equal(refusedOutcomes[name], "55000", name);
+      }
+      assert.equal(refusedOutcomes.expiry_on_draft, "23514");
+      assert.equal(refusedOutcomes.expiry_on_submitted, "23514");
       for (const statement of [
         `update public.intakes set state = 'submitted' where id = '${draft}';`,
         `update public.intakes set state = 'closed', closed_at = now() where id = '${draft}';`,
-        `update public.intakes set state = 'expired' where id = '${draft}';`,
         `update public.intakes set state = 'active' where id = '${submitted}';`,
-        `update public.intakes set state = 'superseded' where id = '${submitted}';`,
+        `update public.intakes set state = 'closed', closed_at = now() where id = '${submitted}';`,
         `update public.intakes set state = 'expired' where id = '${active}';`,
         `update public.intakes set state = 'superseded' where id = '${active}';`,
         `update public.intakes set state = 'closed', closed_at = now() where id = '${active}';`,
-        `update public.intakes set expires_at = now() + interval '1 day' where id = '${submitted}';`,
+        `update public.intakes set expires_at = now() + interval '1 day' where id = '${active}';`,
       ]) {
         acceptedThenRolledBack(statement);
       }
@@ -2461,11 +2491,13 @@ async function v2LifecycleChecks() {
   );
 
   await check(
-    "V2-LC-2 expiry is keyed on expires_at alone and evaluated by every command itself, with no scheduler in this database: with expires_at set in the past by the owner role, the save, submit, close, voice memo and change commands move the open Intake to expired once (one system audit event), answer exactly as for an Intake already expired, and leave every revision as it was; expires_at in the future changes nothing",
+    "V2-LC-2 expiry is keyed on expires_at alone and evaluated by every command itself, with no scheduler in this database: only an active Intake carries an expiry time (20261119070000); with its expires_at set in the past by the owner role, the save, submit, close, voice memo and change commands move the active Intake to expired once (one system audit event), answer exactly as for an Intake already expired, and leave every revision as it was; expires_at in the future changes nothing",
     () => {
       const outcomes = {};
       const run = (name, command) => {
         const { client, intake } = draftThroughFunctions();
+        assert.equal(submitThroughFunctions(client, intake), "submitted");
+        activate(intake);
         const revisions = sql(
           `select string_agg(to_jsonb(r)::text, '|' order by r.revision_number) from public.intake_revisions as r where r.intake_id = '${intake}';`,
         );
@@ -2483,7 +2515,7 @@ async function v2LifecycleChecks() {
           sql(
             `select string_agg(actor_type || ':' || coalesce(actor_user_id::text, '') || ':' || action_code || ':' || (before_snapshot ->> 'state') || ':' || (after_snapshot ->> 'state') || ':' || reason_code, ',') from public.audit_events where resource_type = 'intake' and resource_id = '${intake}' and action_code = 'intake_expired';`,
           ),
-          "system::intake_expired:draft:expired:expires_at_reached",
+          "system::intake_expired:active:expired:expires_at_reached",
           name,
         );
         // A second command finds it expired and writes nothing more.
@@ -2524,47 +2556,70 @@ async function v2LifecycleChecks() {
         change_revise: "expired",
         change_revise_again: "expired",
       });
-      // A submitted Intake expires the same way.
+      // A returning client's confirmation of an Intake that has just expired.
       const { client, intake } = draftThroughFunctions();
       assert.equal(submitThroughFunctions(client, intake), "submitted");
+      activate(intake);
       expireNow(intake);
-      outcomes.submitted_resume = requestChange(client, intake, "resume");
-      assert.equal(outcomes.submitted_resume, "not_configured");
+      outcomes.active_resume = requestChange(client, intake, "resume");
+      assert.equal(outcomes.active_resume, "not_configured");
       assert.equal(intakeState(intake), "expired");
       // A future expiry changes nothing.
       const future = draftThroughFunctions();
+      assert.equal(
+        submitThroughFunctions(future.client, future.intake),
+        "submitted",
+      );
+      activate(future.intake);
       sql(
         `update public.intakes set expires_at = now() + interval '1 day' where id = '${future.intake}';`,
       );
-      outcomes.future_save = saveRevision(future.client, future.intake, 1, {
-        area: v2.otherArea,
-        answers: ANSWERED([world.jurisdiction]),
-      });
-      assert.equal(outcomes.future_save, "saved|2");
-      assert.equal(intakeState(future.intake), "draft");
+      outcomes.future_revise = requestChange(
+        future.client,
+        future.intake,
+        "revise",
+      );
+      assert.equal(outcomes.future_revise, "not_configured");
+      assert.equal(intakeState(future.intake), "active");
+      assert.equal(
+        count(
+          "audit_events",
+          `resource_id = '${future.intake}' and action_code = 'intake_expired'`,
+        ),
+        0,
+      );
       return outcomes;
     },
   );
 
   await check(
-    "V2-LC-3 the database-only sweep expires every due open Intake once (skip-locked, bounded), leaves not-due, unset and ended Intakes as they are, and is idempotent; no API role may run it",
+    "V2-LC-3 the database-only sweep expires every due active Intake once (skip-locked, bounded), leaves not-due, unset, draft, submitted and ended Intakes as they are, and is idempotent; no API role may run it",
     () => {
-      const due = [newIntake(world.owner), newIntake(world.owner, "submitted")];
+      const due = [
+        newIntake(world.owner, "active"),
+        newIntake(world.owner, "active"),
+      ];
       const notDue = newIntake(world.owner, "active");
       const unset = newIntake(world.owner);
+      const unsetSubmitted = newIntake(world.owner, "submitted");
+      const unsetActive = newIntake(world.owner, "active");
       for (const intake of due) {
         expireNow(intake);
       }
       sql(
         `update public.intakes set expires_at = now() + interval '1 hour' where id = '${notDue}';`,
       );
-      const first = JSON.parse(sql("select public.intake_expiry_sweep()::text;"));
+      const first = JSON.parse(
+        sql("select public.intake_expiry_sweep()::text;"),
+      );
       assert.ok(first.expired >= 2);
       for (const intake of due) {
         assert.equal(intakeState(intake), "expired");
       }
       assert.equal(intakeState(notDue), "active");
       assert.equal(intakeState(unset), "draft");
+      assert.equal(intakeState(unsetSubmitted), "submitted");
+      assert.equal(intakeState(unsetActive), "active");
       const second = JSON.parse(
         sql("select public.intake_expiry_sweep()::text;"),
       );
@@ -2649,7 +2704,10 @@ async function v2LifecycleChecks() {
       // No function sets expires_at: every Intake the client functions
       // created and moved through its lifecycle has none.
       const lived = draftThroughFunctions();
-      assert.equal(submitThroughFunctions(lived.client, lived.intake), "submitted");
+      assert.equal(
+        submitThroughFunctions(lived.client, lived.intake),
+        "submitted",
+      );
       assert.equal(closeThroughFunctions(lived.client, lived.intake), "closed");
       assert.equal(
         sql(
@@ -2726,14 +2784,25 @@ async function v2AiChecks() {
         submitThroughFunctions(submitted.client, submitted.intake),
         "submitted",
       );
+      // Only an active Intake carries an expiry time (20261119070000): this one
+      // was submitted, activated and is past its expires_at.
       const expiring = draftThroughFunctions();
+      assert.equal(
+        submitThroughFunctions(expiring.client, expiring.intake),
+        "submitted",
+      );
+      activate(expiring.intake);
       expireNow(expiring.intake);
       const suspended = draftThroughFunctions();
       sql(
         `update public.users set account_state = 'suspended' where id = '${suspended.client.user}';`,
       );
       const profileLess = newAccount();
-      const base = { user: client.user, intake, value: { practice_area_id: v2.area } };
+      const base = {
+        user: client.user,
+        intake,
+        value: { practice_area_id: v2.area },
+      };
       const stored = count("ai_suggestions");
       const outcomes = {
         unknown_type: recordSuggestion({ ...base, type: "best_attorney" }),
@@ -2847,9 +2916,9 @@ async function v2AiChecks() {
         anon_caller: "ERROR 42501",
       });
       assert.equal(count("ai_suggestions"), stored);
-      // The AI function never writes the Intake, even when it recognises
-      // its expiry: the expired-by-time draft is still a draft.
-      assert.equal(intakeState(expiring.intake), "draft");
+      // The AI function never writes the Intake, even when it is past its
+      // expiry: the Intake is still active.
+      assert.equal(intakeState(expiring.intake), "active");
       // A suggestion that was not presented cannot be stored at all, even by
       // the owner role; nor can any other context.
       outcomes.owner_unpresented = refused(
@@ -2922,7 +2991,13 @@ async function v2AiChecks() {
       assert.equal(intakeSnapshot(intake), snapshot);
       const recordedAssessments = assessmentsOf(intake);
       assert.deepEqual(
-        recordedAssessments.map((a) => [a.j, a.source, a.ai, a.review, a.basis]),
+        recordedAssessments.map((a) => [
+          a.j,
+          a.source,
+          a.ai,
+          a.review,
+          a.basis,
+        ]),
         [world.jurisdiction, world.otherJurisdiction].map((j) => [
           j,
           "ai_suggestion",
@@ -2963,13 +3038,20 @@ async function v2AiChecks() {
           value: { practice_area_id: v2.area },
         }),
       );
+      // Only an active Intake carries an expiry time (20261119070000): the
+      // draft is submitted, activated and then passes its expires_at.
+      assert.equal(
+        submitThroughFunctions(expiring.client, expiring.intake),
+        "submitted",
+      );
+      activate(expiring.intake);
       expireNow(expiring.intake);
       outcomes.expired_by_time = decide(
         expiring.client,
         "confirm",
         expiringSuggestion,
       );
-      assert.equal(intakeState(expiring.intake), "draft");
+      assert.equal(intakeState(expiring.intake), "active");
       assert.equal(submitThroughFunctions(client, intake), "submitted");
       outcomes.after_submission = decide(client, "confirm", pending);
       outcomes.reject_after_submission = decide(client, "reject", pending);
@@ -3072,7 +3154,9 @@ async function v2AiChecks() {
         "jurisdiction_assessments",
       ]);
       const integrity = {
-        delete: refused(`delete from public.ai_suggestions where id = '${practice}';`),
+        delete: refused(
+          `delete from public.ai_suggestions where id = '${practice}';`,
+        ),
         truncate: refused("truncate public.ai_suggestions cascade;"),
         value_change: refused(
           `update public.ai_suggestions set suggestion_value = suggestion_value || '{"rank": 1}' where id = '${other}';`,
@@ -3211,8 +3295,13 @@ async function v2ReviewChecks() {
         "submitted",
       );
       const none = draftThroughFunctions({ jurisdictions: "not_sure" });
-      assert.equal(submitThroughFunctions(none.client, none.intake), "submitted");
-      const one = draftThroughFunctions({ jurisdictions: [world.jurisdiction] });
+      assert.equal(
+        submitThroughFunctions(none.client, none.intake),
+        "submitted",
+      );
+      const one = draftThroughFunctions({
+        jurisdictions: [world.jurisdiction],
+      });
       assert.equal(submitThroughFunctions(one.client, one.intake), "submitted");
       const recordedSeveral = assessmentsOf(several.intake);
       assert.deepEqual(
@@ -3278,7 +3367,9 @@ async function v2ReviewChecks() {
       const snapshot = intakeSnapshot(several.intake);
       const outcomes = {
         aal1: review(v2.globalReviewer, inA.id, "confirmed", { aal: "aal1" }),
-        no_claims: review(v2.globalReviewer, inA.id, "confirmed", { aal: null }),
+        no_claims: review(v2.globalReviewer, inA.id, "confirmed", {
+          aal: null,
+        }),
         other_capability: review(v2.otherStaff, inA.id, "confirmed"),
         verification_staff: review(world.verifier, inA.id, "confirmed"),
         client: review(several.client, inA.id, "confirmed"),
@@ -3326,7 +3417,11 @@ async function v2ReviewChecks() {
       );
       assert.equal(decide(draft.client, "confirm", suggestion), "confirmed");
       const [draftAssessment] = assessmentsOf(draft.intake);
-      outcomes.draft = review(v2.globalReviewer, draftAssessment.id, "confirmed");
+      outcomes.draft = review(
+        v2.globalReviewer,
+        draftAssessment.id,
+        "confirmed",
+      );
       assert.deepEqual(reviewAssessments(v2.globalReviewer, draft.intake), []);
       assert.equal(
         reviewQueue(v2.globalReviewer, "unreviewed").some(
@@ -3339,7 +3434,10 @@ async function v2ReviewChecks() {
         submitThroughFunctions(closing.client, closing.intake),
         "submitted",
       );
-      assert.equal(closeThroughFunctions(closing.client, closing.intake), "closed");
+      assert.equal(
+        closeThroughFunctions(closing.client, closing.intake),
+        "closed",
+      );
       outcomes.closed = review(
         v2.globalReviewer,
         assessmentsOf(closing.intake)[0].id,
@@ -3350,13 +3448,15 @@ async function v2ReviewChecks() {
         submitThroughFunctions(expiring.client, expiring.intake),
         "submitted",
       );
+      // Only an active Intake carries an expiry time (20261119070000).
+      activate(expiring.intake);
       expireNow(expiring.intake);
       outcomes.expired_by_time = review(
         v2.globalReviewer,
         assessmentsOf(expiring.intake)[0].id,
         "confirmed",
       );
-      assert.equal(intakeState(expiring.intake), "submitted");
+      assert.equal(intakeState(expiring.intake), "active");
       // Once the draft is submitted, its AI-sourced assessment is reviewable.
       assert.equal(
         submitThroughFunctions(draft.client, draft.intake),
@@ -3409,8 +3509,12 @@ async function v2ReviewChecks() {
       );
       const intake = v2.several.intake;
       const nothing = {
-        aal1_queue: reviewQueue(v2.globalReviewer, "unreviewed", { aal: "aal1" }),
-        aal1_unnamed: reviewQueue(v2.globalReviewer, "unnamed", { aal: "aal1" }),
+        aal1_queue: reviewQueue(v2.globalReviewer, "unreviewed", {
+          aal: "aal1",
+        }),
+        aal1_unnamed: reviewQueue(v2.globalReviewer, "unnamed", {
+          aal: "aal1",
+        }),
         aal1_assessments: reviewAssessments(v2.globalReviewer, intake, {
           aal: "aal1",
         }),
@@ -3424,7 +3528,12 @@ async function v2ReviewChecks() {
         unknown_group: reviewQueue(v2.globalReviewer, "everything"),
         zero_count: reviewQueue(v2.globalReviewer, "unnamed", {}, [0, 0]),
         over_count: reviewQueue(v2.globalReviewer, "unnamed", {}, [0, 102]),
-        negative_offset: reviewQueue(v2.globalReviewer, "unnamed", {}, [-1, 10]),
+        negative_offset: reviewQueue(
+          v2.globalReviewer,
+          "unnamed",
+          {},
+          [-1, 10],
+        ),
       };
       for (const [name, value] of Object.entries(nothing)) {
         assert.deepEqual(value, [], name);

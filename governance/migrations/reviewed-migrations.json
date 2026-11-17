@@ -764,6 +764,27 @@
       "drift_check": "clean",
       "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions, guard or constraint; no assessment, review or audit row is removed.",
       "depends_on": ["20261119050000_mvp_001_s3_ai_suggestions"]
+    },
+    {
+      "migration_id": "20261119070000_mvp_001_s3_intake_lifecycle_correction",
+      "migration_kind": "product",
+      "sequence": 31,
+      "artifact_path": "supabase/migrations/20261119070000_mvp_001_s3_intake_lifecycle_correction.sql",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the guard or the constraint; no Intake, revision or audit row is removed.",
+      "depends_on": ["20261119060000_mvp_001_s3_jurisdiction_assessment_review"]
     }
   ]
 }

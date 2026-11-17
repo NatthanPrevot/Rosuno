@@ -2504,7 +2504,8 @@
         "20261119030000_mvp_001_s3_verification_artifacts",
         "20261119040000_mvp_001_s3_intake_lifecycle",
         "20261119050000_mvp_001_s3_ai_suggestions",
-        "20261119060000_mvp_001_s3_jurisdiction_assessment_review"
+        "20261119060000_mvp_001_s3_jurisdiction_assessment_review",
+        "20261119070000_mvp_001_s3_intake_lifecycle_correction"
       ],
       "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",
