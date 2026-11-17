@@ -81,6 +81,25 @@ function originOf(url: string): string | null {
   }
 }
 
+// The internal listener a self-hosted Next.js server reports as the request
+// URL's origin (MVP-001 S1 correction): behind a reverse proxy, `next start`
+// reports http://localhost:<port> whatever public host the browser used, and
+// forwarding headers are never authority here, so that form says nothing
+// about the public target. Only exact loopback names over plain HTTP qualify.
+const INTERNAL_LISTENER =
+  /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]{1,5})?$/;
+
+// Whether the request targets the configured origin as far as this server
+// can tell: the configured origin itself (a direct deployment), or the
+// internal listener above (a proxied deployment). Any other target is
+// refused. This never replaces the browser Origin check on POST.
+function targetsConfiguredOrigin(request: Request, origin: string): boolean {
+  const target = originOf(request.url);
+  return (
+    target === origin || (target !== null && INTERNAL_LISTENER.test(target))
+  );
+}
+
 // Exactly one token_hash and type=email, or exactly one intent=resume when
 // resume is allowed. Any other key, a repeat, or a malformed value is null.
 function linkOf(
@@ -347,7 +366,7 @@ const CONFIRMATION_SOURCES: ConfirmationSources = Object.freeze({
 
 export function GET(request: Request): Response {
   const origin = trustedOrigin();
-  if (origin === null || originOf(request.url) !== origin) {
+  if (origin === null || !targetsConfiguredOrigin(request, origin)) {
     return unavailablePage();
   }
   const params = new URL(request.url).searchParams;
@@ -365,10 +384,12 @@ export async function POST(request: Request): Promise<Response> {
   if (origin === null) {
     return unavailablePage();
   }
-  // The target and the browser's Origin must both be the configured origin.
+  // The target must be the configured origin (or the internal listener of a
+  // proxied deployment), and the browser's Origin must be exactly the
+  // configured origin, from a same-origin form.
   const fetchSite = request.headers.get("sec-fetch-site");
   if (
-    originOf(request.url) !== origin ||
+    !targetsConfiguredOrigin(request, origin) ||
     request.headers.get("origin") !== origin ||
     (fetchSite !== null && fetchSite !== "same-origin")
   ) {

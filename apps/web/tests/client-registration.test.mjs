@@ -2249,6 +2249,102 @@ test("32. POST requires the configured origin, a same-origin form, and exactly t
   });
 });
 
+test("32a. MVP-001 S1: behind a proxy, the internal listener target is accepted only with the browser's exact configured Origin from a same-origin form; lookalike targets stay refused", async () => {
+  const valid = `token_hash=${LINK_HASH}&type=email`;
+  // `next start` reports its own loopback listener as the request URL,
+  // whatever public host the browser used.
+  const internal = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://[::1]:3000",
+    "http://localhost",
+  ];
+  const lookalikes = [
+    "https://localhost:3000",
+    "http://localhost.synthetic.invalid:3000",
+    "http://127.0.0.2:3000",
+    "http://0.0.0.0:3000",
+    "http://10.0.0.5:3000",
+    "https://other.synthetic.invalid",
+  ];
+  const post = (target, headers = {}) =>
+    new Request(`${target}/auth/confirm`, {
+      method: "POST",
+      headers: {
+        origin: ORIGIN,
+        "content-type": "application/x-www-form-urlencoded",
+        "sec-fetch-site": "same-origin",
+        ...headers,
+      },
+      body: valid,
+    });
+  await withOrigin(ORIGIN, async () => {
+    const direct = await confirmRoute.POST(confirmPost(valid));
+    for (const target of internal) {
+      // GET renders the same confirmation form as a direct request.
+      const page = confirmRoute.GET(
+        new Request(
+          `${target}/auth/confirm?token_hash=${LINK_HASH}&type=email`,
+        ),
+      );
+      assert.equal(page.status, 200, target);
+      assert.equal((await pageOf(page)).split(LINK_HASH).length, 2, target);
+      // POST passes the origin checks exactly as a direct request does.
+      const proxied = await confirmRoute.POST(post(target));
+      assert.equal(proxied.status, direct.status, target);
+      // The browser Origin and Sec-Fetch-Site checks still apply in full.
+      for (const headers of [
+        { origin: "https://elsewhere.synthetic.invalid" },
+        { origin: target },
+        { origin: "null" },
+        { origin: `${ORIGIN}/` },
+        { "sec-fetch-site": "cross-site" },
+        { "sec-fetch-site": "same-site" },
+      ]) {
+        const response = await confirmRoute.POST(post(target, headers));
+        assert.equal(
+          response.status,
+          403,
+          `${target} ${JSON.stringify(headers)}`,
+        );
+        assert.equal((await pageOf(response)).includes(LINK_HASH), false);
+      }
+      const missingOrigin = new Request(`${target}/auth/confirm`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: valid,
+      });
+      assert.equal((await confirmRoute.POST(missingOrigin)).status, 403);
+    }
+    for (const target of lookalikes) {
+      const page = confirmRoute.GET(
+        new Request(
+          `${target}/auth/confirm?token_hash=${LINK_HASH}&type=email`,
+        ),
+      );
+      assert.equal(page.status, 503, target);
+      assert.equal((await pageOf(page)).includes(LINK_HASH), false);
+      const response = await confirmRoute.POST(post(target));
+      assert.equal(response.status, 403, target);
+    }
+  });
+  // An unconfigured origin is still unavailable, even on the listener.
+  await withOrigin(undefined, async () => {
+    assert.equal(
+      confirmRoute.GET(
+        new Request(
+          `http://localhost:3000/auth/confirm?token_hash=${LINK_HASH}&type=email`,
+        ),
+      ).status,
+      503,
+    );
+    assert.equal(
+      (await confirmRoute.POST(post("http://localhost:3000"))).status,
+      503,
+    );
+  });
+});
+
 test("33. a well-formed POST without a bound provider and project fails closed: no redirect, no cookie, no token echo", async () => {
   await withOrigin(ORIGIN, async () => {
     for (const body of [
