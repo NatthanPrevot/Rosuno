@@ -2414,6 +2414,75 @@
       "rollback_reference": "Before merge: forward-only correction commits on the work-item branch. After merge: a separately reviewed forward corrective migration; no destructive rollback, and no intake revision, question-set version, jurisdiction assessment or audit row is removed.",
       "created_at": "2026-11-15T04:30:26Z",
       "updated_at": "2026-11-15T04:30:26Z"
+    },
+    {
+      "work_item_id": "WI-P2-MVP-001-TECHNICAL-COMPLETION",
+      "title": "MVP-001 Technical Completion Program (S1 to S11); slice S1 platform controls",
+      "objective": "Register entry of the MVP-001 Program Packet (register name recorded under this priority-prefixed identifier because the register format requires WI-P0, WI-P1 or WI-P2). Under the owner-adopted Packet (blob 8117636923918a482ed580ef0408ae72bc2f9e96), DL-ENG-3 and PS-A2, reach the technical-complete MVP through eleven bounded slices delivered one PR at a time. Slice S1: environment identity (PS-A2), immutable policy history, the policy-type catalog, the environment-anchored policy resolver, configuration administration, and conformance corrections of earlier work.",
+      "in_scope": [
+        "S1 forward-only migrations: environment identity and development-configuration designation (PS-A2); professional write-boundary conformance (server-generated keys, eligibility type code); configuration administration; availability checks.",
+        "S1 application changes, tests, disposable PostgreSQL proofs and records within the Packet ALLOWED_SCOPE."
+      ],
+      "out_of_scope": [
+        "Application to Staging, Production or any persistent database; recording any persistent environment's identity; any release or deployment; any Replit change.",
+        "Slices S2 to S11 until their predecessors are merged; M14 activation; the M15 production decision."
+      ],
+      "status": "in_progress",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "decision_refs": [
+        "DEC-20261116-DL-ENG-3-PROGRAM-PACKETS",
+        "DEC-20261116-PS-A2-DEPLOYMENT-ENVIRONMENT-IDENTITY",
+        "DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"
+      ],
+      "dependencies": [
+        "WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION",
+        "WI-P1-011-COMPLIANCE-FOUNDATION",
+        "WI-P2-P3-904-P3-003-SECURITY-CORRECTION",
+        "WI-P2-P5-001-CLIENT-INTAKE-FOUNDATION"
+      ],
+      "acceptance_criteria": [
+        "The MVP-001 S1 disposable PostgreSQL proof passes on the final head, including every PS-A2 positive and negative test of the Packet's S1 acceptance list.",
+        "The P5-001, P3-904, M4 and registration abuse-control proofs, p0:validate, the P0 suite, typecheck and build pass on the final head, and the guard self-check prints ROSUNO-GUARD PASS.",
+        "Designated human review approves the exact head before merge."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "node apps/web/tests/mvp-001-s1-db-proof.mjs",
+        "node apps/web/tests/p5-001-db-proof.mjs",
+        "node apps/web/tests/p3-904-db-proof.mjs",
+        "node apps/web/tests/m4-db-proof.mjs",
+        "node apps/web/tests/registration-abuse-db-proof.mjs"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [
+        "20261117010000_mvp_001_s1_environment_identity",
+        "20261117020000_mvp_001_s1_professional_conformance"
+      ],
+      "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
+      "created_at": "2026-11-17T00:50:55Z",
+      "updated_at": "2026-11-17T00:50:55Z"
     }
   ]
 }

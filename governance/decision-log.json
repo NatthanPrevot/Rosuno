@@ -1777,6 +1777,99 @@
         "Optional independent review: not performed"
       ],
       "expiry": null
+    },
+    {
+      "status": "accepted",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-17T00:50:55Z",
+      "updated_at": "2026-11-17T00:50:55Z",
+      "supersedes": [],
+      "expiry": null,
+      "decision_id": "DEC-20261116-DL-ENG-3-PROGRAM-PACKETS",
+      "title": "Adopt DL-ENG-3: Program Packets and repository registration of authority amendments",
+      "scope": "Engineering process only, under the process provisions the LOCKED authorities route to the Decision Log (Implementation Master Plan sections 6 and 47; MVP Build Specification sections 30 and 32; Physical Specification section 53). No product, domain, physical-model, policy or gated matter.",
+      "decision": "The owner adopts DL-ENG-3, rulings P1 to P7, exactly as recorded in governance/dl-eng-3-program-packets.txt (SHA-256 56dd6903f0b539edd26419324aab08e38a59da3a79e36ac0ea056921a892d886). It amends DL-ENG-2 G3 (a Program Packet authorizes its declared slices after merge) and, for amendments approved after it, clarifies the authority manifest of DL-ENG-1 R15 as repository registration. Every other DL-ENG-1 and DL-ENG-2 ruling stands.",
+      "rationale": "One owner authorization for an ordered sequence of bounded slices removes repeated Packet adoption without removing any locked control: each slice stays bounded, reviewed by the designated human and accepted before the next starts, with one PR per slice.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "impact": "Process only: MVP-001 is adopted once as a Program Packet; its slices are delivered one PR at a time on the same branch. Authority amendments approved from now on are registered in governance/authority-references.json and this log.",
+      "evidence": [
+        "Express owner adoption statement (approver NatthanPrevot) naming SHA-256 56dd6903f0b539edd26419324aab08e38a59da3a79e36ac0ea056921a892d886, received in the Builder session and processed at 2026-11-16T23:29:31Z (session clock)",
+        "Exact rulings text, byte-identical to the adopted file dl-eng-3-program-packets.md: governance/dl-eng-3-program-packets.txt, 8,022 bytes, SHA-256 56dd6903f0b539edd26419324aab08e38a59da3a79e36ac0ea056921a892d886 (plain-text extension so the Markdown formatter cannot alter the adopted bytes)",
+        "Optional independent review: not performed"
+      ]
+    },
+    {
+      "status": "accepted",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-17T00:50:55Z",
+      "updated_at": "2026-11-17T00:50:55Z",
+      "supersedes": [],
+      "expiry": null,
+      "decision_id": "DEC-20261116-PS-A2-DEPLOYMENT-ENVIRONMENT-IDENTITY",
+      "title": "Approve the exact text of Physical Specification amendment PS-A2 (deployment environment identity and development-configuration designation)",
+      "scope": "Physical model, bounded: one relation deployment_environment and one column policy_versions.development_only (DL-ENG-1 R9; Physical Specification section 53).",
+      "decision": "The owner expressly approves the exact bytes of PS-A2, rosuno-physical-specification-amendment-ps-a2.md, 11,760 bytes, SHA-256 599c2235f540233c7475dd28799bfb2bb201c09cf88e53d2461b35099a42a1ba (Lock Condition element 1). Its registration in governance/authority-references.json (status pending_lock_condition) and this entry are elements 2 and 3, carried by the MVP-001 S1 pull request; the Lock Condition completes when that pull request merges. No migration implementing PS-A2 is applied to a persistent environment before then.",
+      "rationale": "No PS relation can hold a database's own environment class, and draft status cannot distinguish executable development configuration from an incomplete draft; an application setting alone is not production-isolating (PS-A2 sections 1 and 7).",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "impact": "Migration 20261117010000_mvp_001_s1_environment_identity implements PS-A2. Every policy-driven database function refuses until the database records its environment; each persistent environment is recorded once under separate owner authorization.",
+      "evidence": [
+        "Express owner approval statement (approver NatthanPrevot) naming SHA-256 599c2235f540233c7475dd28799bfb2bb201c09cf88e53d2461b35099a42a1ba, received in the Builder session and processed at 2026-11-16T23:29:31Z (session clock)",
+        "Amendment file: rosuno-physical-specification-amendment-ps-a2.md, 11,760 bytes, SHA-256 599c2235f540233c7475dd28799bfb2bb201c09cf88e53d2461b35099a42a1ba (owner-held; not in the repository)",
+        "Optional independent review: not performed"
+      ]
+    },
+    {
+      "status": "accepted",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-17T00:50:55Z",
+      "updated_at": "2026-11-17T00:50:55Z",
+      "supersedes": [],
+      "expiry": null,
+      "decision_id": "DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM",
+      "title": "Adopt the MVP-001 Technical Completion Program Packet and grant its implementation",
+      "scope": "MVP-001 Program (slices S1 to S11) within the adopted Packet; M14 activation and the M15 production decision excluded.",
+      "decision": "The owner adopted docs/work-items/MVP-001/PACKET.md (Git blob 8117636923918a482ed580ef0408ae72bc2f9e96, SHA-256 3bc6d6504d8c9509fd0cf3f1e2aaba55cac2974f552273e2781934c52cdacfdb) on owner branch wi/MVP-001-technical-completion and granted implementation of S1 to S11 under DL-ENG-3, one slice at a time, with standing delegation to publish validated slice heads and corrections and to run rollback-only Staging validation of merged Program migrations. The Packet's conformance corrections include SCH-4: the eligibility policy-type code is eligibility (Physical Specification section 8.3), replacing attorney_eligibility adopted under P3-904.",
+      "rationale": "Completes the technical MVP through bounded, separately reviewed slices under one authorization (DL-ENG-3).",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "impact": "S1 adds four forward-only migrations and application changes; nothing is applied to a persistent environment by merge.",
+      "evidence": [
+        "Owner adoption commit b17aaf8a4ac03c98ea107834793d41f861072a7e on owner branch wi/MVP-001-technical-completion (2026-11-17T00:19:22Z)",
+        "Owner implementation grant received in the Builder session on 2026-11-17, naming the Packet blob, the adoption commit and the approved SHA-256 values",
+        "Optional independent review: not performed"
+      ]
     }
   ]
 }

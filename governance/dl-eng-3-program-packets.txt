@@ -1,0 +1,120 @@
+# ROSUNO DECISION LOG ENTRY DL-ENG-3 — PROGRAM PACKETS AND REPOSITORY-REGISTERED AUTHORITY AMENDMENTS
+
+| Field | Value |
+| --- | --- |
+| Decision | DL-ENG-3, registered in `governance/decision-log.json` |
+| Title | Program Packets: one owner authorization for an ordered sequence of bounded, separately reviewed and accepted slices; repository registration of authority amendments |
+| Category | Process (Implementation Master Plan §§6, 47) |
+| Owner / approver | NatthanPrevot |
+| Operative | From the owner's express adoption of these exact bytes. Registered on owner `main` in the first slice PR of the first Program Packet adopted under it |
+| Amends | DL-ENG-2 G3 (post-merge use of a Packet, extended by P2). Clarifies, for amendments adopted after this entry, the term "authority manifest" in DL-ENG-1 R15 (P6). Every other DL-ENG-1 and DL-ENG-2 ruling stands, including DL-ENG-1 R3, R6, R7 and R9 |
+
+## Authority basis
+
+The LOCKED authorities route changes to the execution plan to the project Decision Log (Implementation Master Plan
+§47; MVP Build Specification §§30 and 32; Physical Specification §53 for physical changes only). This entry changes
+**how many owner authorizations** an ordered set of slices needs and **where** future authority amendments are
+registered. It changes no locked text, no product, domain, physical-model, payment, policy, counsel- or regulator-gated
+matter, no existing Lock Condition, and none of the requirements each slice must meet. A Decision Log entry ranks above
+UOM v2.0 and C1 rev6.0 (UOM v2.0 §2).
+
+## What this entry does not change (binding restatement)
+
+- Every slice remains a bounded task with the IMP §§5 and 7 fields (IMP §5).
+- Slices are implemented, tested, given the security/integrity review and accepted one at a time (IMP §1).
+- M10 remains its own slice (IMP §24), and the three parts of M12 remain separately implemented (IMP §26).
+- Every slice records an IMP §31 checkpoint.
+- Claude works one task at a time and reads the governing sections and the code before changing anything (IMP §32).
+- Commits stay per slice (IMP §34), and every migration passes IMP §§11 and 35.
+- Required CI and the trusted `rosuno-guard` status run on every head.
+- The designated human reviewer approves every merged head (IMP §§9, 45), and the owner merges.
+- Persistent environments change only under separate owner authorization (IMP §35; UOM §10).
+- Production changes only through IMP §§8, 29 and 40.
+
+## Rulings
+
+**P1 — Program Packet.** The owner may adopt one Packet (a "Program Packet") that defines an ordered list of slices.
+For each slice it states the IMP §7 fields and the expected output:
+- milestone, capability and locked sources;
+- decision and gate references, and dependencies;
+- database, RLS, provider and security impact;
+- acceptance criteria and failure tests;
+- observability, rollback and stop conditions.
+
+One machine header (C1 Appendix A) states the scope for the whole Program. A Program Packet is an ordered set of
+bounded tasks, not a "build everything" instruction (IMP §1).
+
+**P2 — Execution: one slice at a time, one PR per slice, same branch and Packet (amends DL-ENG-2 G3).**
+
+- Each engineering session works on exactly one slice, named at session start, and reads that slice's governing
+  sections and the affected code before changing anything (IMP §32).
+- Each slice is delivered as its own pull request from the Program branch. Implementation of the next slice starts
+  only after the previous slice's PR is merged. Read-only investigation and design of later slices may proceed at any
+  time.
+- After a merge, the Program branch continues with new forward-only commits and an integration merge of current owner
+  `main`. One of the following authorizes the next slice; guard v4 rule R2 accepts both:
+  - the unchanged merged Program Packet;
+  - the owner's forward-only revision of it on the owner branch, carried byte for byte.
+- DL-ENG-2 G3's restriction of post-merge use to corrections does not apply to a slice the Program Packet declares.
+
+**P3 — Corrections inside a Program.**
+- A defect is corrected forward in the current slice's PR when the fix lies inside the Program scope and the defect is
+  in:
+  - an earlier merged slice; or
+  - earlier Rosuno work that the Program Packet places in its correction scope.
+- The PR lists each correction with its evidence. No separate owner word or FIX Packet is needed.
+- A defect outside the Program scope uses a FIX Packet (DL-ENG-1 R5).
+- History and historical migrations are never rewritten (DL-ENG-1 R8, R13).
+
+**P4 — Blocked slices.**
+- When a slice reaches a gate the Packet names (owner, counsel, provider or physical-model), Claude builds the
+  configuration seam the authority allows (MBS §2.5; DL-ENG-1 R12).
+- Only the dependent part stops (Class B), with the exact question and a recommendation.
+- Claude may move on to a later slice only if the Packet's dependency table marks it independent.
+- No unresolved decision is ever guessed.
+
+**P5 — Records and evidence per slice.**
+- Each slice PR carries its IMP §31 checkpoint facts and the register updates known before merge.
+- The previous slice's post-merge facts (approval, merge, Staging application, new baseline) go into the next slice PR
+  or the next PR touching the area.
+- Claude produces evidence of persistent-environment operations as a standalone, dated package. The owner keeps it
+  unchanged; it is summarized in `governance/evidence/`.
+- No closure work item, no standalone records PR unless the owner asks, and no test edits per closure (UOM v2.0 §15;
+  DL-ENG-2 G4).
+
+**P6 — Repository registration of authority amendments (prospective).** This applies to every authority amendment
+whose exact text the owner approves after adopting this entry. The first is PS-A2.
+
+1. **Lock Condition.** Each such amendment states this Lock Condition in its own text:
+   - (a) the owner expressly approves its exact bytes;
+   - (b) it is registered in `governance/authority-references.json` on owner `main`, with its identifier and its
+     SHA-256 as the integrity value;
+   - (c) its adoption is recorded in the Decision Log on owner `main`, with its filename, byte length and SHA-256 in
+     the evidence.
+2. **Sequence.** This order is not circular and follows the PS-A1 precedent:
+   - Registration (b) and (c) may be carried by the pull request that first implements the amendment, with register
+     status `pending_lock_condition`.
+   - That implementation is authorized by the owner-adopted Packet together with approval (a) (DL-ENG-1 R9: amendment
+     and Decision Log entry may be adopted together with the Packet).
+   - The Lock Condition is complete when that pull request is merged after designated human approval.
+   - No migration implementing the amendment is applied to a persistent environment before then (DL-ENG-1 R9; IMP
+     §35).
+   - The register status becomes `active` in the next records update.
+3. **The manifest.** For such amendments, the repository registration together with the owner-held exact file is "the
+   authority manifest" of DL-ENG-1 R15. Claude prepares each amendment as a new, self-contained, dated file. No
+   owner-maintained cumulative private document is required.
+4. **Existing amendments.** The completed Lock Conditions of FP-1, MB-A1 and PS-A1 are preserved unchanged and are not
+   reopened.
+
+**P7 — Unchanged protections.** The restatement above stands, together with these:
+- no AI resolution of a gated item;
+- no fabricated data, evidence or reviews;
+- never weaken a test, RLS policy, constraint or check;
+- the IMP §43 stop conditions;
+- one engineering session writer at a time (UOM v2.0 §6);
+- Claude never approves, reviews or merges a PR.
+
+## Effect on the operating texts
+
+UOM v2.0 §§5, 9 and 14, C1 rev6.0 §C1.2 step 8 and the `CLAUDE.md` "Defects" paragraph read subject to this entry. A
+later consolidated UOM/C1 revision and a `CLAUDE.md` refresh may restate it; neither is a precondition.
