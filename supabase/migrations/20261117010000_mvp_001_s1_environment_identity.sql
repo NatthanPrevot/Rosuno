@@ -228,6 +228,7 @@ alter table public.policy_versions
 --   effective_until may be set once to end it;
 -- - a draft-family version moves only along draft -> internal_review -> counsel_review -> approved
 --   (or back within the draft family) and may be revised while in the draft family;
+-- - every version is created as a draft;
 -- - no version is ever deleted.
 create function public.policy_version_integrity()
 returns trigger
@@ -244,6 +245,11 @@ begin
   end if;
 
   if tg_op = 'INSERT' then
+    -- Every version enters the DM lifecycle as a draft; approval is reached only by transition.
+    if new.status is distinct from 'draft' then
+      raise exception 'a policy version is created as a draft'
+        using errcode = '23514';
+    end if;
     if new.development_only then
       v_class := public.rosuno_environment_class();
       if v_class not in ('development', 'staging') then

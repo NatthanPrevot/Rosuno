@@ -456,7 +456,9 @@ begin
   ) then
     return 'authority_unverified';
   end if;
-  if (p_target_status = 'scheduled'
+  -- effective_from is fixed once a version is approved, so approval needs it set.
+  if (p_target_status = 'approved' and v_before.effective_from is null)
+     or (p_target_status = 'scheduled'
       and (v_before.effective_from is null or v_before.effective_from <= v_now))
      or (p_target_status = 'active'
          and (v_before.effective_from is null or v_before.effective_from > v_now

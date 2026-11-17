@@ -129,6 +129,9 @@ const ACCEPTED = Object.freeze([
   ],
 ]);
 const P5_001_MIGRATION = "20261115140653_p5_001_client_intake_foundation.sql";
+// MVP-001 S1 re-pin: the merged P5-001 migration bytes (owner main).
+const P5_001_SHA256 =
+  "104b76bb3933369619c8dbc7112277ec449648bbf7839280900194bf8b20c17b";
 
 // The adopted initial configuration version (P5-001 Packet section 4): its
 // exact canonical PostgreSQL jsonb text and SHA-256.
@@ -531,14 +534,36 @@ function applyFile(db, file, singleTransaction = true) {
 
 function applyMigrations() {
   const files = inventory();
-  assert.equal(files.length, 16, "fifteen accepted and one P5-001 migration");
+  // MVP-001 S1 re-pin: the fifteen accepted migrations and P5-001 stay an
+  // exact, byte-checked prefix; only later migrations registered in the
+  // migration register may follow, and they are applied after it.
+  assert.ok(files.length >= 16, "fifteen accepted and one P5-001 migration");
   assert.deepEqual(
     files.slice(0, 15),
     ACCEPTED.map((entry) => [...entry]),
   );
   assert.equal(files[15][0], P5_001_MIGRATION);
+  assert.equal(files[15][1], P5_001_SHA256, "P5-001 bytes are unchanged");
+  const registered = new Set(
+    JSON.parse(
+      fs.readFileSync(
+        path.join(
+          REPOSITORY_ROOT,
+          "governance/migrations/reviewed-migrations.json",
+        ),
+        "utf8",
+      ),
+    ).migrations.map((migration) => migration.artifact_path),
+  );
+  for (const [file] of files.slice(16)) {
+    assert.ok(
+      registered.has(`supabase/migrations/${file}`),
+      `${file} is not a registered later migration`,
+    );
+  }
   report.migrations.accepted_verified_before = 15;
   report.migrations.p5_001 = { file: files[15][0], sha256: files[15][1] };
+  report.migrations.later_registered = files.slice(16).map(([file]) => file);
   sql(FIXTURE, "postgres");
   for (const [file] of files) {
     applyFile(DB, file);
@@ -961,7 +986,16 @@ async function privilegeChecks() {
         one(
           "select string_agg(capability_code, ',' order by capability_code) from public.capability_definitions;",
         ),
-        "manage_attorney_verification,manage_intake_configuration",
+        // MVP-001 S1 re-pin: exactly the four capability codes of the later
+        // registered S1 configuration-administration migration follow.
+        [
+          "authorize_jurisdiction_launch",
+          "manage_attorney_verification",
+          "manage_intake_configuration",
+          "manage_jurisdiction_configuration",
+          "manage_policy_configuration",
+          "manage_staff_capabilities",
+        ].join(","),
       );
       for (const table of [
         "intake_question_sets",
@@ -974,7 +1008,7 @@ async function privilegeChecks() {
       ]) {
         assert.equal(count(table), 0, `${table} is empty after migration`);
       }
-      return { capability_codes: 2 };
+      return { capability_codes: 6 };
     },
   );
 
