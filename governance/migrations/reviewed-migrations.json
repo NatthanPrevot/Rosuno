@@ -510,6 +510,81 @@
       "drift_check": "clean",
       "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration; no availability rule exists yet.",
       "depends_on": ["20261117030000_mvp_001_s1_configuration_administration"]
+    },
+    {
+      "migration_id": "20261118010000_mvp_001_s2_operational_jobs",
+      "migration_kind": "product",
+      "sequence": 21,
+      "artifact_path": "supabase/migrations/20261118010000_mvp_001_s2_operational_jobs.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration; no operational job or audit row is removed and no job is deleted.",
+      "depends_on": ["20261117040000_mvp_001_s1_availability_checks"]
+    },
+    {
+      "migration_id": "20261118020000_mvp_001_s2_job_scheduler",
+      "migration_kind": "product",
+      "sequence": 22,
+      "artifact_path": "supabase/migrations/20261118020000_mvp_001_s2_job_scheduler.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration that unschedules or replaces the rosuno_operational_jobs_sweep schedule; correctness never depends on it.",
+      "depends_on": ["20261118010000_mvp_001_s2_operational_jobs"]
+    },
+    {
+      "migration_id": "20261118030000_mvp_001_s2_session_assurance",
+      "migration_kind": "product",
+      "sequence": 23,
+      "artifact_path": "supabase/migrations/20261118030000_mvp_001_s2_session_assurance.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the helper bodies; no row is written by this migration.",
+      "depends_on": ["20261118020000_mvp_001_s2_job_scheduler"]
     }
   ]
 }

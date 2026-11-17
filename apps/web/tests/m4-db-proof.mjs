@@ -34,6 +34,13 @@
 // generates the key (SCH-1, APP-4); and RLS-3 and SEC-1 follow the staff read
 // policies and definer functions S1 adds, as exact assertions.
 //
+// MVP-001 S2 update: the three S2 migrations follow. Staff authority and
+// attorney professional writes need an aal2 session (20261118030000), so
+// every request with a JWT subject now also carries request.jwt.claims with
+// "aal": "aal2", as PostgREST sets it from a verified, MFA-stepped-up JWT;
+// RLS-2 adds the aal1 and claim-less refusals. SEC-1 lists the S2 definer
+// functions (the worker and staff job functions), as exact assertions.
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -191,9 +198,17 @@ function sql(script, db) {
   return result.stdout.trim();
 }
 
+// The JWT claims of a request with a subject (MVP-001 S2): "aal": "aal2"
+// after MFA step-up, "aal1" before it; aal null sends no claims.
+function claimsLine(subject, aal) {
+  return subject === null || aal === null
+    ? ""
+    : `select set_config('request.jwt.claims', '${JSON.stringify({ sub: subject, role: "authenticated", aal })}', true) is not null;`;
+}
+
 // One statement as a role with a JWT subject, inside a transaction that is
 // always rolled back, so probes never change state.
-function as(role, subject, statement) {
+function as(role, subject, statement, { aal = "aal2" } = {}) {
   return psql(
     [
       "begin;",
@@ -201,6 +216,7 @@ function as(role, subject, statement) {
       subject === null
         ? ""
         : `select set_config('request.jwt.claim.sub', '${subject}', true) is not null;`,
+      claimsLine(subject, aal),
       statement,
       "rollback;",
       "",
@@ -208,8 +224,8 @@ function as(role, subject, statement) {
   );
 }
 
-function valueAs(role, subject, statement) {
-  const result = as(role, subject, statement);
+function valueAs(role, subject, statement, options = {}) {
+  const result = as(role, subject, statement, options);
   assert.equal(result.status, 0, result.stderr);
   const lines = result.stdout.trim().split("\n");
   return lines[lines.length - 1];
@@ -252,6 +268,7 @@ function callAs(subject, name, args) {
       "begin;",
       "set local role authenticated;",
       `select set_config('request.jwt.claim.sub', '${subject}', true) is not null;`,
+      claimsLine(subject, "aal2"),
       `select public.${name}(${named});`,
       "commit;",
       "",
@@ -514,18 +531,20 @@ function applyMigrations() {
   }
 }
 
-const SCOPE = (subject, jurisdiction) =>
+const SCOPE = (subject, jurisdiction, options = {}) =>
   valueAs(
     "authenticated",
     subject,
     `select public.has_manage_attorney_verification_scope(${jurisdiction === null ? "null" : `'${jurisdiction}'`}, false);`,
+    options,
   );
-const COUNT = (subject, table, where = "true") =>
+const COUNT = (subject, table, where = "true", options = {}) =>
   Number(
     valueAs(
       "authenticated",
       subject,
       `select count(*) from public.${table} where ${where};`,
+      options,
     ),
   );
 
@@ -666,7 +685,7 @@ function probes() {
   );
 
   check(
-    "RLS-2 the scope predicate and reads for global, jurisdiction-scoped, expired, revoked, resource-scoped, future, and absent grants",
+    "RLS-2 the scope predicate and reads for global, jurisdiction-scoped, expired, revoked, resource-scoped, future, and absent grants; (MVP-001 S2) a global grant holder in an aal1 or claim-less session fails it and reads nothing, while own-row attorney reads need no step-up",
     () => {
       const table = {};
       for (const key of [
@@ -702,6 +721,30 @@ function probes() {
         assert.deepEqual(table[key], ["f", "f", "f", 0, 0, 0], key);
       }
       assert.deepEqual(table.attorneyA, ["f", "f", "f", 1, 0, 1]);
+      // MVP-001 S2: the same global grant holder in an aal1 session (before
+      // MFA step-up) or without claims fails the predicate and reads nothing
+      // of other attorneys; the attorney's own reads need no step-up.
+      for (const aal of ["aal1", null]) {
+        assert.deepEqual(
+          [
+            SCOPE(AUTH.staffGlobal, null, { aal }),
+            SCOPE(AUTH.staffGlobal, J_A, { aal }),
+            COUNT(AUTH.staffGlobal, "licenses", "true", { aal }),
+            COUNT(AUTH.staffGlobal, "verification_evidence", "true", { aal }),
+            COUNT(AUTH.staffGlobal, "attorney_profiles", "true", { aal }),
+          ],
+          ["f", "f", 0, 0, 0],
+          String(aal),
+        );
+        assert.deepEqual(
+          [
+            COUNT(AUTH.attorneyA, "licenses", "true", { aal }),
+            COUNT(AUTH.attorneyA, "attorney_profiles", "true", { aal }),
+          ],
+          [1, 1],
+          String(aal),
+        );
+      }
       // Anonymous callers and the anon role get nothing.
       assert.equal(SCOPE(null, J_A), "f");
       assert.equal(
@@ -1370,6 +1413,11 @@ function probes() {
           "has_resource_metadata_access:s",
           // MVP-001 S1 re-pin (20261117030000).
           "has_staff_capability:s",
+          // MVP-001 S2 re-pin (20261118010000): the worker functions
+          // (service_role only), which write no M4 relation.
+          "job_claim:v",
+          "job_complete:v",
+          "job_fail:v",
           // MVP-001 S1 re-pin (20261117010000, 20261117030000): read-only
           // definers executable by no API role.
           "policy_select_version:s",
@@ -1379,6 +1427,9 @@ function probes() {
           // MVP-001 S1 re-pin (20261117030000): the configuration
           // administration functions, which write no M4 relation.
           "staff_add_policy_authority_reference:v",
+          // MVP-001 S2 re-pin (20261118010000): the staff job functions,
+          // which write no M4 relation.
+          "staff_cancel_job:v",
           "staff_change_jurisdiction_lifecycle:v",
           "staff_change_profile_stage:v",
           "staff_create_jurisdiction:v",
@@ -1397,6 +1448,7 @@ function probes() {
           "staff_record_launch_gate_evaluation:v",
           "staff_record_source_unavailable:v",
           "staff_record_verification_finding:v",
+          "staff_retry_job:v",
           "staff_revise_policy_draft:v",
           "staff_revoke_capability:v",
           "staff_revoke_launch_authorization:v",

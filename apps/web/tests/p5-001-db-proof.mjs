@@ -33,6 +33,14 @@
 // contacted, nothing persists after the run, and every value is synthetic
 // test data. The JSON report goes to stdout; exit 0 means PASS, 1 FAIL,
 // 2 cleanup failure, 3 refused to start.
+//
+// MVP-001 S2 update: staff authority needs an aal2 session (20261118030000).
+// Requests and persistent sessions of a staff principal also carry
+// request.jwt.claims with "aal": "aal2", as PostgREST sets it from a
+// verified, MFA-stepped-up JWT; client requests keep their claim-less shape,
+// so every client check still proves the client functions need no step-up.
+// PUB-3 adds the aal1 and claim-less publication refusals, and PRIV-3 the
+// seventh capability code.
 
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -282,20 +290,35 @@ function ident(name) {
   return name;
 }
 
-const JWT_SUB = (sub) =>
-  sub === null
-    ? ""
-    : `select set_config('request.jwt.claim.sub', ${lit(sub)}, true) is not null;`;
+// MVP-001 S2: the JWT subjects of staff principals, whose requests carry an
+// aal2 session (claims with "aal": "aal2") unless a call names another level.
+const STAFF_SUBJECTS = new Set();
+const JWT_CLAIMS = (sub, aal) =>
+  JSON.stringify({ sub, role: "authenticated", aal });
+
+const JWT_SUB = (sub, aal) => {
+  if (sub === null) {
+    return "";
+  }
+  const level =
+    aal === undefined ? (STAFF_SUBJECTS.has(sub) ? "aal2" : null) : aal;
+  return [
+    `select set_config('request.jwt.claim.sub', ${lit(sub)}, true) is not null;`,
+    level === null
+      ? ""
+      : `select set_config('request.jwt.claims', ${lit(JWT_CLAIMS(sub, level))}, true) is not null;`,
+  ].join("\n");
+};
 
 // One statement as a role (and JWT subject), in its own committed (or
 // rolled-back) transaction: { ok, value } or { ok: false, sqlstate }.
-function as(role, sub, statement, { commit = true, setup = "" } = {}) {
+function as(role, sub, statement, { commit = true, setup = "", aal } = {}) {
   const result = psql(
     [
       "begin;",
       setup,
       `set local role ${role};`,
-      JWT_SUB(sub),
+      JWT_SUB(sub, aal),
       statement,
       commit ? "commit;" : "rollback;",
       "",
@@ -660,12 +683,18 @@ class Session {
     return this;
   }
 
-  // Acts as one principal: the authenticated role with that JWT subject.
+  // Acts as one principal: the authenticated role with that JWT subject
+  // (and, for a staff principal, an aal2 session: MVP-001 S2).
   async as(sub) {
     await this.ok("set role authenticated;");
     await this.ok(
       `select set_config('request.jwt.claim.sub', ${lit(sub)}, false) is not null;`,
     );
+    if (STAFF_SUBJECTS.has(sub)) {
+      await this.ok(
+        `select set_config('request.jwt.claims', ${lit(JWT_CLAIMS(sub, "aal2"))}, false) is not null;`,
+      );
+    }
     return this;
   }
 
@@ -743,6 +772,7 @@ function newStaff({
   grants = [{}],
 } = {}) {
   const ids = newAccount(accountState);
+  STAFF_SUBJECTS.add(ids.auth);
   sql(
     `insert into public.staff_profiles (user_id, staff_state) values ('${ids.user}', '${staffState}');`,
   );
@@ -815,11 +845,16 @@ function closeIntake(principal, intake) {
   return fnAs(principal.auth, "client_close_intake", { p_intake_id: intake });
 }
 
-function publish(principal, key, definition) {
-  return rowAs(principal.auth, "staff_publish_intake_question_set", {
-    p_version_key: key,
-    p_definition: definition,
-  });
+function publish(principal, key, definition, options = {}) {
+  return rowAs(
+    principal.auth,
+    "staff_publish_intake_question_set",
+    {
+      p_version_key: key,
+      p_definition: definition,
+    },
+    options,
+  );
 }
 
 function questionSetId(key) {
@@ -988,11 +1023,14 @@ async function privilegeChecks() {
         ),
         // MVP-001 S1 re-pin: exactly the four capability codes of the later
         // registered S1 configuration-administration migration follow.
+        // MVP-001 S2 re-pin: and exactly the one code of the later registered
+        // S2 operational-jobs migration (20261118010000).
         [
           "authorize_jurisdiction_launch",
           "manage_attorney_verification",
           "manage_intake_configuration",
           "manage_jurisdiction_configuration",
+          "manage_operational_jobs",
           "manage_policy_configuration",
           "manage_staff_capabilities",
         ].join(","),
@@ -1008,7 +1046,7 @@ async function privilegeChecks() {
       ]) {
         assert.equal(count(table), 0, `${table} is empty after migration`);
       }
-      return { capability_codes: 6 };
+      return { capability_codes: 7 };
     },
   );
 
@@ -1105,13 +1143,24 @@ async function publicationChecks() {
   );
 
   await check(
-    "PUB-3 the authorized staff User publishes intake-questions-v1; the stored definition::text is byte-identical to the adopted fixture, its SHA-256 equals the Packet value, and exactly one audit event records the version key and digest without content",
+    "PUB-3 the authorized staff User publishes intake-questions-v1 (MVP-001 S2: only in an aal2 session; aal1 and claim-less sessions are forbidden); the stored definition::text is byte-identical to the adopted fixture, its SHA-256 equals the Packet value, and exactly one audit event records the version key and digest without content",
     () => {
       assert.equal(
         createHash("sha256").update(V1_TEXT, "utf8").digest("hex"),
         V1_SHA256,
         "fixture bytes",
       );
+      // MVP-001 S2: the same authorized staff User before MFA step-up (aal1)
+      // or without JWT claims is forbidden and nothing is stored or audited.
+      for (const aal of ["aal1", null]) {
+        assert.equal(
+          publish(authorized, V1_KEY, V1_TEXT, { aal }).outcome,
+          "forbidden",
+          String(aal),
+        );
+      }
+      assert.equal(count("intake_question_sets"), 0);
+      assert.equal(count("audit_events"), 0);
       const published = publish(authorized, V1_KEY, V1_TEXT);
       assert.equal(published.outcome, "published");
       const stored = one(
