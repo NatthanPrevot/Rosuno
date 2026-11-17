@@ -361,6 +361,10 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "src/infrastructure/identity/authenticator-provider.ts",
     "src/infrastructure/jobs/job-worker-adapter.ts",
     "src/infrastructure/resources/protected-resource-adapter.ts",
+    // MVP-001 S4: the schedule adapter (a failed schedule call, with the
+    // call name and how it failed only, and the sign-out step's fixed
+    // outcome).
+    "src/infrastructure/scheduling/attorney-schedule-adapter.ts",
     "src/infrastructure/staff/staff-configuration-adapter.ts",
   ]);
   for (const file of callers) {

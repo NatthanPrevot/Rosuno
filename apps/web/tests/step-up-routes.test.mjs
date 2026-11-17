@@ -77,6 +77,8 @@ const GATED_PAGES = [
 // The gated server action modules and the kind each serves.
 const GATED_ACTIONS = {
   "app/attorney/professional/actions.ts": "attorney",
+  // MVP-001 S4: the attorney schedule changes and its heartbeat.
+  "app/attorney/schedule/actions.ts": "attorney",
   "app/staff/actions.ts": "staff",
   "app/staff/verification/actions.ts": "staff",
 };
@@ -166,9 +168,11 @@ test("S2-R2. no setup picture, embedded markup, or image is ever rendered, and t
 
 test("S2-R3. every attorney page and every staff page asks the step-up gate first, right after opting out of prerendering", () => {
   // MVP-001 S2: sixteen pages, and the operational job view. MVP-001 S3
-  // part 2: and the jurisdiction assessment review.
-  assert.equal(GATED_PAGES.length, 18);
+  // part 2: and the jurisdiction assessment review. MVP-001 S4: and the
+  // attorney schedule.
+  assert.equal(GATED_PAGES.length, 19);
   assert.ok(GATED_PAGES.includes("app/staff/jurisdiction-review/page.tsx"));
+  assert.ok(GATED_PAGES.includes("app/attorney/schedule/page.tsx"));
   for (const file of GATED_PAGES) {
     const kind = file.startsWith("app/staff/") ? "staff" : "attorney";
     const code = codeOf(read(file));
@@ -218,6 +222,8 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
     assert.ok(after.startsWith("  const state = await operation();"), file);
     // Every exported action goes through the one guarded helper: the six
     // verification changes and (MVP-001 S3) opening an uploaded document.
+    // MVP-001 S4: the schedule's five changes and its heartbeat, the
+    // heartbeat answering the gate's refusal unchanged like every change.
     const verification = file === "app/staff/verification/actions.ts";
     const exported = [...code.matchAll(/^export async function (\w+)\(/gm)];
     assert.equal(exported.length, verification ? 7 : 6, file);

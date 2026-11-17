@@ -1050,6 +1050,8 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
   // MVP-001 D-8 adds only the request-scoped logger, which records that the
   // provider is unconfigured or the provider's HTTP status, nothing else.
   // MVP-001 S2 adds only the server-only authentication-abuse control.
+  // MVP-001 S4 adds only the scheduling adapter, for its one best-effort
+  // sign-out step (pinned below).
   assert.deepEqual(importsOf(source), [
     "next/cache",
     "next/navigation",
@@ -1058,7 +1060,20 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
     "../../src/infrastructure/identity/server-session-source.ts",
     "../../src/infrastructure/identity/supabase-server.ts",
     "../../src/infrastructure/observability/request-log.ts",
+    "../../src/infrastructure/scheduling/attorney-schedule-adapter.ts",
   ]);
+  assert.match(
+    code,
+    /^import \{ endSchedulingSession \} from "\.\.\/\.\.\/src\/infrastructure\/scheduling\/attorney-schedule-adapter\.ts";$/m,
+  );
+  // MVP-001 S4: the local sign-out first runs the session's own server step
+  // (scheduling_end_session) on the same request-scoped client, exactly once,
+  // and only there; that step never throws, so sign-out is never blocked.
+  assert.match(
+    code,
+    /\n {4}signOut: async \(\) => \{\n {6}await endSchedulingSession\(client\);\n {6}const \{ error \} = await client\.auth\.signOut\(\{ scope: "local" \}\);\n {6}return error === null;\n {4}\},\n/,
+  );
+  assert.equal(code.match(/endSchedulingSession/g)?.length, 2);
   // Exactly two actions, and nothing else, are exported.
   assert.deepEqual(
     [...code.matchAll(/\bexport\b[^\n]*/g)].map((match) => match[0]),

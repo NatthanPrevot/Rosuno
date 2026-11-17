@@ -12,6 +12,10 @@
 // attempted or the provider answers with anything but a rejection, one log
 // line records only that fact and the provider's HTTP status.
 //
+// MVP-001 S4: a sign-out first ends this session's application session and
+// Instant mode on the server, best effort, through the same request-scoped
+// client (scheduling_end_session), so Instant mode never survives sign-out.
+//
 // MVP-001 S2 (PS-A4): the provider port also carries the request's
 // server-only authentication-abuse control for sign-in, which the
 // application asks before the provider, and a sign-out of the account's
@@ -33,6 +37,7 @@ import { createAuthenticationAbuseControl } from "../../src/infrastructure/ident
 import { SUPABASE_SERVER_SESSION_SOURCE } from "../../src/infrastructure/identity/server-session-source.ts";
 import { createSupabaseServerClient } from "../../src/infrastructure/identity/supabase-server.ts";
 import { logRequestEvent } from "../../src/infrastructure/observability/request-log.ts";
+import { endSchedulingSession } from "../../src/infrastructure/scheduling/attorney-schedule-adapter.ts";
 
 type ServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
@@ -80,7 +85,11 @@ async function requestProvider(): Promise<AuthenticationProvider | null> {
       return error.status === 400 ? "rejected" : "unavailable";
     },
     // Ends only this browser's session; other sessions are left as they are.
+    // MVP-001 S4: first, best effort, the session's own server step ends its
+    // application session and Instant mode; it never blocks or fails
+    // sign-out.
     signOut: async () => {
+      await endSchedulingSession(client);
       const { error } = await client.auth.signOut({ scope: "local" });
       return error === null;
     },

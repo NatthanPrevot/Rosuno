@@ -785,6 +785,84 @@
       "drift_check": "clean",
       "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the guard or the constraint; no Intake, revision or audit row is removed.",
       "depends_on": ["20261119060000_mvp_001_s3_jurisdiction_assessment_review"]
+    },
+    {
+      "migration_id": "20261120010000_mvp_001_s4_scheduling_integrity",
+      "migration_kind": "product",
+      "sequence": 32,
+      "artifact_path": "supabase/migrations/20261120010000_mvp_001_s4_scheduling_integrity.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing a guard, a constraint or the narrowed grants; no Hold, Booking, rule, Blackout, intent, session, evaluation or audit row is removed.",
+      "depends_on": ["20261119070000_mvp_001_s3_intake_lifecycle_correction"]
+    },
+    {
+      "migration_id": "20261120020000_mvp_001_s4_availability_instant",
+      "migration_kind": "product",
+      "sequence": 33,
+      "artifact_path": "supabase/migrations/20261120020000_mvp_001_s4_availability_instant.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions; no rule, Blackout, application session, intent or audit row is removed.",
+      "depends_on": ["20261120010000_mvp_001_s4_scheduling_integrity"]
+    },
+    {
+      "migration_id": "20261120030000_mvp_001_s4_holds_bookability",
+      "migration_kind": "product",
+      "sequence": 34,
+      "artifact_path": "supabase/migrations/20261120030000_mvp_001_s4_holds_bookability.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions or the pg_cron schedule; no Hold, Request, Booking, evaluation or audit row is removed.",
+      "depends_on": ["20261120020000_mvp_001_s4_availability_instant"]
     }
   ]
 }

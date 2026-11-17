@@ -41,6 +41,11 @@
 // RLS-2 adds the aal1 and claim-less refusals. SEC-1 lists the S2 definer
 // functions (the worker and staff job functions), as exact assertions.
 //
+// MVP-001 S4 update: the three S4 migrations follow. SEC-1 lists exactly the
+// nine S4 definer functions (the attorney schedule and Instant mode
+// functions and the session observation and sign-out), as exact assertions;
+// none writes an M4 relation.
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -1393,10 +1398,22 @@ function probes() {
           // ai_suggestions and audit events; no M4 relation.
           "ai_record_intake_suggestion:v",
           "attorney_change_practice_area_request:v",
+          // MVP-001 S4 re-pin (20261120020000): the attorney's own schedule
+          // functions (authenticated, aal2), which write only availability
+          // rules, Blackouts, application sessions, Instant intents and
+          // audit events; no M4 relation.
+          "attorney_create_availability_rule:v",
+          "attorney_create_blackout:v",
+          "attorney_deactivate_availability_rule:v",
+          "attorney_instant_status:s",
+          "attorney_remove_blackout:v",
           "attorney_request_practice_area:v",
           "attorney_save_insurance_claim:v",
           "attorney_save_license_claim:v",
           "attorney_save_profile_details:v",
+          // MVP-001 S4 re-pin (20261120020000): read and switch, as above.
+          "attorney_schedule_calendar:s",
+          "attorney_set_instant_intent:v",
           "attorney_start_application:v",
           "attorney_submit_application:v",
           // MVP-001 S2 re-pin (20261118040000, PS-A4): the authentication-
@@ -1453,6 +1470,11 @@ function probes() {
           "resource_finalize_upload:v",
           "rosuno_environment_class:s",
           "rosuno_environment_status:s",
+          // MVP-001 S4 re-pin (20261120020000): the application session
+          // observation and sign-out, which write only application
+          // sessions, Instant intents and audit events; no M4 relation.
+          "scheduling_end_session:v",
+          "scheduling_touch_session:v",
           // MVP-001 S1 re-pin (20261117030000): the configuration
           // administration functions, which write no M4 relation.
           "staff_add_policy_authority_reference:v",

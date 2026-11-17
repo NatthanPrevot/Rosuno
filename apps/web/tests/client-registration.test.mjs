@@ -2854,6 +2854,25 @@ const PROTECTED_RESOURCE_RPCS = Object.freeze([
   "resource_abandon_upload",
   "resource_authorize_access",
 ]);
+// MVP-001 S4: the attorney schedule adapter calls the database's own nine
+// schedule functions (the calendar and Instant status reads, the rule and
+// Blackout changes, the Instant switch, the session observation and the
+// sign-out step), each exactly once and each as a literal call through the
+// request's own unprivileged session; it builds or receives no privileged
+// client, and no other file names any of them.
+const SCHEDULE_ADAPTER =
+  "src/infrastructure/scheduling/attorney-schedule-adapter.ts";
+const SCHEDULE_RPCS = Object.freeze([
+  "attorney_schedule_calendar",
+  "attorney_instant_status",
+  "attorney_create_availability_rule",
+  "attorney_deactivate_availability_rule",
+  "attorney_create_blackout",
+  "attorney_remove_blackout",
+  "attorney_set_instant_intent",
+  "scheduling_touch_session",
+  "scheduling_end_session",
+]);
 const CAPABILITY_PREDICATE_RPC =
   'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';
 const CONFIGURATION_REQUEST_CLIENT =
@@ -2877,6 +2896,8 @@ const RPC_OCCURRENCES = Object.freeze({
   [CONFIGURATION_ADAPTER]: CONFIGURATION_RPCS.length + 1,
   // MVP-001 S3: the five resource functions.
   [PROTECTED_RESOURCE_ADAPTER]: PROTECTED_RESOURCE_RPCS.length,
+  // MVP-001 S4: the nine schedule functions.
+  [SCHEDULE_ADAPTER]: SCHEDULE_RPCS.length,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -2912,6 +2933,31 @@ function assertQuotaRpcContract(codes) {
           0,
         file === PROTECTED_RESOURCE_ADAPTER ? 1 : 0,
         `${file}: ${name}`,
+      );
+    }
+    for (const name of SCHEDULE_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === SCHEDULE_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== SCHEDULE_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === SCHEDULE_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        SCHEDULE_RPCS.length,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning/i,
       );
     }
     assert.equal(
