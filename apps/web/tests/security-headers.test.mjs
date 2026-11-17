@@ -163,7 +163,7 @@ test("4. the confirmation handler still sends its own stricter headers on every 
       assert.deepEqual(policy.get("default-src"), ["'none'"]);
       assert.deepEqual(policy.get("frame-ancestors"), ["'none'"]);
       assert.deepEqual(policy.get("base-uri"), ["'none'"]);
-      assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+      assert.equal(response.headers.get("referrer-policy"), "strict-origin");
       assert.equal(response.headers.get("x-frame-options"), "DENY");
       assert.equal(response.headers.get("x-content-type-options"), "nosniff");
     }

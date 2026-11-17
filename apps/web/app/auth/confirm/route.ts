@@ -11,9 +11,12 @@
 // renders, verifies the token once through the request-scoped Auth client or
 // resumes a confirmed account; the application boundary decides the outcome.
 // The token appears only in the incoming link and the hidden form field.
-// Every response is uncacheable, unindexed, unframed, and sent without a
-// referrer; it loads no script or outside resource; and the only
-// destinations are fixed first-party paths.
+// Every response is uncacheable, unindexed, and unframed. Its referrer policy
+// is strict-origin (MVP-001 S1 correction): a referrer never carries the
+// link's path or token, and the browser still sends the real Origin that the
+// POST check requires (under no-referrer browsers send "Origin: null", so
+// every confirmation was refused). It loads no script or outside resource,
+// and the only destinations are fixed first-party paths.
 
 import {
   confirmRegistrationEmail,
@@ -37,7 +40,7 @@ const MAX_BODY_BYTES = 1024;
 const RESPONSE_HEADERS = Object.freeze({
   "cache-control": "no-store, max-age=0",
   pragma: "no-cache",
-  "referrer-policy": "no-referrer",
+  "referrer-policy": "strict-origin",
   "x-robots-tag": "noindex, nofollow, noarchive",
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
@@ -172,7 +175,7 @@ function page(title: string, body: string, status: number): Response {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
-<meta name="referrer" content="no-referrer">
+<meta name="referrer" content="strict-origin">
 <title>${escapeHtml(title)} | Rosuno</title>
 <style>${STYLE}</style>
 </head>

@@ -2045,7 +2045,8 @@ async function withOrigin(value, run) {
 
 function assertProtected(response) {
   assert.equal(response.headers.get("cache-control"), "no-store, max-age=0");
-  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  // MVP-001 S1: strict-origin (origin-only Referer, real Origin on POST).
+  assert.equal(response.headers.get("referrer-policy"), "strict-origin");
   assert.equal(
     response.headers.get("x-robots-tag"),
     "noindex, nofollow, noarchive",
@@ -2074,7 +2075,11 @@ async function pageOf(response) {
     html,
     /<meta name="robots" content="noindex, nofollow, noarchive">/,
   );
-  assert.match(html, /<meta name="referrer" content="no-referrer">/);
+  assert.match(html, /<meta name="referrer" content="strict-origin">/);
+  assert.doesNotMatch(
+    html,
+    /no-referrer|unsafe-url|same-origin|origin-when-cross-origin/,
+  );
   return html;
 }
 
@@ -3175,12 +3180,15 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
 });
 
 test("38. registration navigation is fixed first-party links on the sign-in and home pages", () => {
+  // MVP-001 S1 (D-1 corrected forward to the sign-in page): while account
+  // creation is refused by design, sign-in offers no account-creation link;
+  // its only links are exactly the recovery link and the home page.
   const signIn = codeOf(read("app/sign-in/page.tsx"));
-  assert.match(
-    signIn,
-    /<ButtonLink variant="secondary" href="\/sign-up">\n\s+Create an account\n\s+<\/ButtonLink>/,
+  assert.doesNotMatch(signIn, /\/sign-up|Create an account/);
+  assert.deepEqual(
+    [...signIn.matchAll(/\bhref="([^"]*)"/g)].map((match) => match[1]),
+    ["/forgot-password", "/"],
   );
-  assert.equal(signIn.match(/href="\/sign-up"/g).length, 1);
   // MVP-001 D-1: account creation is refused by design until a client
   // address can be trusted, so the home page offers no account-creation
   // call to action at all. It keeps only the fixed confirmation-resume link.

@@ -98,9 +98,6 @@ export default function SignInPage() {
                 <ButtonLink variant="tertiary" href="/forgot-password">
                   Forgot password?
                 </ButtonLink>
-                <ButtonLink variant="secondary" href="/sign-up">
-                  Create an account
-                </ButtonLink>
                 <ButtonLink variant="tertiary" href="/">
                   Return to the home page
                 </ButtonLink>
