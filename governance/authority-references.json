@@ -164,7 +164,7 @@
       "reinterpreted": false,
       "integrity": "sha256:15d4b3bea4143288d9c751313d0ae9e57a999c68aaba331a6d109d59d710e44e",
       "usage": "reference-only",
-      "status": "pending_lock_condition"
+      "status": "active"
     }
   ]
 }

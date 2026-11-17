@@ -1877,6 +1877,7 @@
         "Owner adoption commit b17aaf8a4ac03c98ea107834793d41f861072a7e on owner branch wi/MVP-001-technical-completion (2026-11-17T00:19:22Z)",
         "Owner implementation grant received in the Builder session on 2026-11-17, naming the Packet blob, the adoption commit and the approved SHA-256 values",
         "Slice S1 merged: PR #96 into owner main at merge commit b7dc44758db05f4492a7d87d17448fcd062e853c, confirmed by the express owner statement 'S1 MERGE CONFIRMED / S2 CONTINUATION' processed at 2026-11-17T07:02:44Z (session clock); designated approval facts (reviewer, time) not supplied and recorded as pending; S1 migrations not applied to any persistent environment (Staging application awaits separate owner authorization)",
+        "Slice S2 merged: PR #97 into owner main at merge commit 3490dbdf6618e11e0d6a4a74a66292a32990bd80, confirmed by the express owner statement 'S2 MERGE CONFIRMED / S3 CONTINUATION' processed at 2026-11-17T16:53:49Z (session clock); designated approval facts (reviewer, time) not supplied and recorded as pending; S2 migrations not applied to any persistent environment (Staging application awaits separate owner authorization)",
         "Optional independent review: not performed"
       ]
     },
@@ -1907,6 +1908,7 @@
       "evidence": [
         "Express owner adoption statement 'OWNER ADOPTION: PS-A4 REVISION 2 / S2 COMPLETION' (approver NatthanPrevot) naming revision 2, 10,704 bytes and SHA-256 15d4b3bea4143288d9c751313d0ae9e57a999c68aaba331a6d109d59d710e44e, received in the Builder session and processed at 2026-11-17T15:26:50Z (session clock)",
         "Amendment file: rosuno-physical-specification-amendment-ps-a4.md, revision 2, 10,704 bytes, SHA-256 15d4b3bea4143288d9c751313d0ae9e57a999c68aaba331a6d109d59d710e44e (owner-held; not in the repository)",
+        "Lock Condition complete: the S2 PR (#97) registering this amendment merged into owner main at merge commit 3490dbdf6618e11e0d6a4a74a66292a32990bd80 (parents b7dc44758db05f4492a7d87d17448fcd062e853c and 6f2c6258841c41871e7f011729012432453ed934; merge tree equals the reviewed S2 head tree), confirmed by the express owner statement 'S2 MERGE CONFIRMED / S3 CONTINUATION' processed at 2026-11-17T16:53:49Z (session clock); PHYSICAL-SPECIFICATION-AMENDMENT-PS-A4-LOCKED is therefore active. The designated reviewer identity and approval time were not supplied and stay pending",
         "Optional independent review: not performed"
       ]
     },
