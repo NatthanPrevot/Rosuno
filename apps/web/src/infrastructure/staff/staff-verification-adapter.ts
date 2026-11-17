@@ -14,8 +14,6 @@
 // staff verification port, now reads only; this module never sees a
 // credential or a privileged client, and only bounds each call in time.
 
-import { randomUUID } from "node:crypto";
-
 import {
   rowsResultOf,
   USER_COLUMNS,
@@ -44,6 +42,7 @@ import {
   type StaffWrites,
 } from "../../application/staff-verification.ts";
 import { SUPABASE_SERVER_SESSION_SOURCE } from "../identity/server-session-source.ts";
+import { readEnvironmentConfiguration } from "../environment/environment-configuration.ts";
 import { createStaffVerificationProvisioning } from "../identity/registration-provisioning.ts";
 import {
   boundedPort,
@@ -239,6 +238,9 @@ export function createStaffReads(
               .order("name")
               .limit(MAX_ROWS),
           ),
+        // PS-A2 section 5: the database's own environment record.
+        environmentIdentity: async () =>
+          rowsResultOf(await client.rpc("deployment_environment_identity")),
       } satisfies StaffReads,
       deadlineMs,
     );
@@ -256,7 +258,6 @@ export function createBoundedStaffProvisioning(
 // The exact keys of one evaluation row as the assessment builds it. The
 // evaluation time is the database's own and is not sent.
 const EVALUATION_ROW_KEYS = Object.freeze([
-  "id",
   "attorney_id",
   "jurisdiction_id",
   "context_type",
@@ -294,7 +295,8 @@ export function createStaffWrites(
       {
         recordFinding: (write) =>
           callWrite(client, "staff_record_verification_finding", {
-            p_evidence_id: write.evidenceId,
+            // SCH-1: the database generates the evidence id.
+            p_evidence_id: null,
             p_subject_kind: write.subjectKind,
             p_subject_id: write.subjectId,
             p_expected_updated_at: write.expectedUpdatedAt,
@@ -318,8 +320,9 @@ export function createStaffWrites(
           }),
         recordDisciplineFinding: (write) =>
           callWrite(client, "staff_record_discipline_finding", {
-            p_discipline_id: write.disciplineId,
-            p_evidence_id: write.evidenceId,
+            // SCH-1: the database generates both ids.
+            p_discipline_id: null,
+            p_evidence_id: null,
             p_attorney_id: write.attorneyId,
             p_jurisdiction_id: write.record.jurisdiction_id,
             p_external_reference: write.record.external_reference,
@@ -362,7 +365,8 @@ export function createStaffWrites(
           !hasExactKeys(row, EVALUATION_ROW_KEYS)
             ? NOT_SENT
             : callWrite(client, "staff_record_eligibility_evaluation", {
-                p_evaluation_id: row.id,
+                // SCH-1: the database generates the evaluation id.
+                p_evaluation_id: null,
                 p_attorney_id: row.attorney_id,
                 p_jurisdiction_id: row.jurisdiction_id,
                 p_context_type: row.context_type,
@@ -387,5 +391,5 @@ export const STAFF_VERIFICATION_SOURCES: StaffSources = Object.freeze({
   provisioning: createBoundedStaffProvisioning(),
   writes: createStaffWrites(),
   clock: () => Date.now(),
-  newId: () => randomUUID(),
+  environment: () => readEnvironmentConfiguration(),
 });

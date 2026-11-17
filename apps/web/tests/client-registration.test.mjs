@@ -2472,6 +2472,7 @@ test("36. the sign-up page is an accessible design-system form with show and hid
     "../../src/application/client-registration.ts",
     "../../src/application/form-operation.ts",
     "../../src/presentation/design-system.tsx",
+    "../../src/presentation/form-entries.ts",
     "./actions.ts",
   ]);
   assert.match(
@@ -2485,7 +2486,14 @@ test("36. the sign-up page is an accessible design-system form with show and hid
   // One semantic form submitted through the server action; nothing blocks
   // paste, autofill, or password managers, and no value is held.
   assert.equal(code.match(/<form\b[^>]*>/g).length, 1);
-  assert.match(code, /<form action=\{formAction\}>/);
+  // MVP-001 D-2: the one form also keeps the typed email address when React
+  // resets it after a submission; neither password is named, so both are
+  // cleared. That exact handler is the one reset handler admitted, and
+  // everything below is still refused in the rest of the page.
+  const keptForm =
+    '<form action={formAction} onReset={keepEntries(["email"])}>';
+  assert.equal(code.split(keptForm).length, 2);
+  assert.equal(code.match(/\bonReset\b/g).length, 1);
   assert.doesNotMatch(
     code,
     /\bmethod=|\bonSubmit\b|\bonPaste\b|\bonCopy\b|\bonCut\b|preventDefault|\bfetch\s*\(|localStorage|sessionStorage|document\.cookie|indexedDB|useEffect|\bdefaultValue\b|\bvalue=|dangerouslySetInnerHTML|maxLength|minLength|pattern=/,
@@ -2656,7 +2664,9 @@ const CLIENT_INTAKE_RPCS = Object.freeze([
 ]);
 const RPC_OCCURRENCES = Object.freeze({
   [PRIVILEGED_MODULE]: 1,
-  [STAFF_ADAPTER]: 1,
+  // MVP-001 S1: the staff adapter's second RPC is exactly the PS-A2
+  // environment accessor, pinned by name below.
+  [STAFF_ADAPTER]: 2,
   [REQUEST_WRITE_MODULE]: 2,
   [APPLICANT_ADAPTER]: 2,
   [CLIENT_INTAKE_ADAPTER]: CLIENT_INTAKE_RPCS.length,
@@ -2683,6 +2693,12 @@ function assertQuotaRpcContract(codes) {
     );
     assert.equal(
       code.match(/has_manage_attorney_verification_scope/g)?.length ?? 0,
+      file === STAFF_ADAPTER ? 1 : 0,
+      file,
+    );
+    assert.equal(
+      code.match(/client\.rpc\("deployment_environment_identity"\)/g)?.length ??
+        0,
       file === STAFF_ADAPTER ? 1 : 0,
       file,
     );
@@ -3103,10 +3119,14 @@ test("38. registration navigation is fixed first-party links on the sign-in and 
     /<ButtonLink variant="secondary" href="\/sign-up">\n\s+Create an account\n\s+<\/ButtonLink>/,
   );
   assert.equal(signIn.match(/href="\/sign-up"/g).length, 1);
+  // MVP-001 D-1: account creation is refused by design until a client
+  // address can be trusted, so the home page offers no account-creation
+  // call to action at all. It keeps only the fixed confirmation-resume link.
   const home = codeOf(read("app/page.tsx"));
+  assert.doesNotMatch(home, /\/sign-up|Create an account/);
   assert.match(
     home,
-    /<ButtonLink variant="secondary" href="\/sign-up">\n\s+Create an account\n\s+<\/ButtonLink>\n\s+<ButtonLink variant="tertiary" href="\/auth\/confirm">\n\s+Finish account confirmation\n\s+<\/ButtonLink>/,
+    /<Cluster>\n\s+<ButtonLink variant="tertiary" href="\/auth\/confirm">\n\s+Finish account confirmation\n\s+<\/ButtonLink>\n\s+<\/Cluster>/,
   );
   // Links only: the home page still has just the one sign-out form.
   assert.equal(home.match(/<form\b/g).length, 1);

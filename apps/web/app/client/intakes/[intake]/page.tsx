@@ -8,7 +8,8 @@
 // read, questions=current, only asks to show the current question version
 // instead of the draft's own, which the server allows only when the draft's
 // version is older. Questions, choices and limits come from the published
-// question-set version; earlier saved versions are never changed.
+// question-set version; earlier saved versions are never changed. An
+// unavailable Intake also writes one log line with no client or Intake data.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -19,6 +20,7 @@ import {
   type QuestionView,
 } from "../../../../src/application/client-intake.ts";
 import { CLIENT_INTAKE_SOURCES } from "../../../../src/infrastructure/client/client-intake-adapter.ts";
+import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
 import {
   Alert,
   ButtonLink,
@@ -231,6 +233,10 @@ export default async function ClientIntakePage({
       </IntakeFrame>
     );
   }
+  await logRequestEvent("warn", "client_intake.view_unavailable", {
+    route: "/client/intakes/[intake]",
+    outcome: view.status,
+  });
   return (
     <IntakeFrame title="Intake unavailable">
       <Alert tone="error" title="Something went wrong" role="alert">

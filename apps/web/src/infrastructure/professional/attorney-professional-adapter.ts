@@ -15,8 +15,6 @@
 // bounds each call in time. Every call answers within its deadline; anything
 // that fails, throws, or is too slow is reported as unreadable.
 
-import { randomUUID } from "node:crypto";
-
 import type {
   AttorneyProfessionalProvisioning,
   AttorneyProfessionalReads,
@@ -170,13 +168,10 @@ export function createAttorneyProfessionalWrites(
             p_coverage_from: claim.coverage_from,
             p_coverage_until: claim.coverage_until,
           }),
-        requestPracticeArea: (
-          authorisationId,
-          jurisdictionId,
-          practiceAreaId,
-        ) =>
+        requestPracticeArea: (jurisdictionId, practiceAreaId) =>
           callWrite(client, "attorney_request_practice_area", {
-            p_authorisation_id: authorisationId,
+            // SCH-1: the database generates the request's id.
+            p_authorisation_id: null,
             p_jurisdiction_id: jurisdictionId,
             p_practice_area_id: practiceAreaId,
           }),
@@ -207,5 +202,4 @@ export const ATTORNEY_PROFESSIONAL_SOURCES: AttorneyProfessionalSources =
     provisioning: createBoundedProfessionalProvisioning(),
     writes: createAttorneyProfessionalWrites(),
     clock: () => Date.now(),
-    newId: () => randomUUID(),
   });

@@ -222,7 +222,10 @@ const trustedSessionImport =
 const trustedShellView = "getShellView(SUPABASE_SERVER_SESSION_SOURCE)";
 const sessionEntryImport = 'import { signOut } from "./sign-in/actions.ts";';
 // P5-001: the authenticated branch also offers one fixed first-party link to
-// the client workspace, beside the sign-out form.
+// the client workspace, beside the sign-out form. MVP-001 D-11: it also
+// offers fixed first-party links to the attorney workspace and the staff
+// verification queue; each destination decides access for itself on the
+// server, and an anonymous request sees none.
 const sessionEntry = `{view.session === "anonymous" ? (
             <ButtonLink variant="primary" href="/sign-in">
               Sign in
@@ -232,6 +235,12 @@ const sessionEntry = `{view.session === "anonymous" ? (
               <ButtonLink variant="primary" href="/client">
                 Client workspace
               </ButtonLink>
+              <ButtonLink variant="secondary" href="/attorney">
+                Attorney workspace
+              </ButtonLink>
+              <ButtonLink variant="secondary" href="/staff/verification">
+                Staff verification
+              </ButtonLink>
               <form action={signOut}>
                 <Button variant="secondary" type="submit">
                   Sign out
@@ -239,13 +248,12 @@ const sessionEntry = `{view.session === "anonymous" ? (
               </form>
             </Cluster>
           )}`;
-// P2-006: fixed registration and confirmation-resume navigation, two plain
-// links shown whatever the session, directly after the session entry. This
-// exact markup is the only further addition to the historical page contract.
+// P2-006: fixed confirmation-resume navigation, a plain link shown whatever
+// the session, directly after the session entry. MVP-001 D-1 withdrew the
+// account-creation link beside it: account creation is refused by design
+// until a client address can be trusted. This exact markup is the only
+// further addition to the historical page contract.
 const registrationEntry = `<Cluster>
-            <ButtonLink variant="secondary" href="/sign-up">
-              Create an account
-            </ButtonLink>
             <ButtonLink variant="tertiary" href="/auth/confirm">
               Finish account confirmation
             </ButtonLink>
@@ -2661,18 +2669,25 @@ test("22. the page shows the foundation through the design system and the server
     sessionEntry,
     /className|\bstyle=|\bdata-|\bon[A-Z]\w*=|\bname=|\bvalue=|\brole=|\bmethod=/,
   );
-  // The registration navigation is two design-system links to fixed
-  // first-party paths: no condition, expression, form, native element, style,
-  // or behavior, and copy without digits.
+  // The confirmation-resume navigation is one design-system link to a fixed
+  // first-party path: no condition, expression, form, native element, style,
+  // or behavior, and copy without digits. No account-creation link remains.
   assert.deepEqual(
     [...registrationEntry.matchAll(/<([A-Za-z]\w*)/g)].map((match) => match[1]),
-    ["Cluster", "ButtonLink", "ButtonLink"],
+    ["Cluster", "ButtonLink"],
   );
   assert.deepEqual(
     [...registrationEntry.matchAll(/\bhref="([^"]*)"/g)].map(
       (match) => match[1],
     ),
-    ["/sign-up", "/auth/confirm"],
+    ["/auth/confirm"],
+  );
+  assert.doesNotMatch(pageCode, /\/sign-up|Create an account/);
+  // The session entry's links are fixed first-party paths, offered only in
+  // its signed-in branch.
+  assert.deepEqual(
+    [...sessionEntry.matchAll(/\bhref="([^"]*)"/g)].map((match) => match[1]),
+    ["/sign-in", "/client", "/attorney", "/staff/verification"],
   );
   assert.doesNotMatch(
     registrationEntry,

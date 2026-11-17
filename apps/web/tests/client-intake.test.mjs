@@ -11,6 +11,8 @@ import {
   saveIntakeRevision,
   startIntake,
   submitIntake,
+  WORKSPACE_PAGE_SIZE,
+  workspacePageOf,
 } from "../src/application/client-intake.ts";
 import { NOT_SURE } from "../src/application/intake-question-set.ts";
 
@@ -138,6 +140,7 @@ function harness(overrides = {}) {
       close: answer("closed"),
     },
     readsAvailable: true,
+    readLog: [],
     ...overrides,
   };
   const sources = {
@@ -164,24 +167,40 @@ function harness(overrides = {}) {
               rows(state.users.filter((u) => u.auth_user_id === a)),
             clientProfilesOf: async (u) =>
               rows(state.profiles.filter((p) => p.user_id === u)),
-            intakesOf: async (c) =>
-              rows(state.intakes.filter((i) => i.client_id === c)),
+            // The client's Intakes, newest first, one bounded slice at a time.
+            intakesOf: async (c, offset, count) => {
+              state.readLog.push(["intakesOf", offset, count]);
+              return rows(
+                state.intakes
+                  .filter((i) => i.client_id === c)
+                  .sort(
+                    (a, b) =>
+                      Date.parse(b.created_at) - Date.parse(a.created_at),
+                  )
+                  .slice(offset, offset + count),
+              );
+            },
             intakeOf: async (c, intake) =>
               rows(
                 state.intakes.filter(
                   (i) => i.client_id === c && i.id === intake,
                 ),
               ),
-            revisionSummariesOf: async (ids) =>
-              rows(
+            // One Intake's latest revision summary, or none.
+            latestRevisionSummaryOf: async (intake) => {
+              state.readLog.push(["latestRevisionSummaryOf", intake]);
+              return rows(
                 state.revisions
-                  .filter((r) => ids.includes(r.intake_id))
+                  .filter((r) => r.intake_id === intake)
+                  .sort((a, b) => b.revision_number - a.revision_number)
+                  .slice(0, 1)
                   .map((r) => ({
                     intake_id: r.intake_id,
                     revision_number: r.revision_number,
                     created_at: r.created_at,
                   })),
-              ),
+              );
+            },
             latestRevisionOf: async (intake) =>
               rows(
                 state.revisions
@@ -308,6 +327,190 @@ test("2. the workspace lists only the client's own Intakes, newest first, with t
   );
   const empty = harness({ sets: [] });
   assert.equal((await resolveClientWorkspace(empty.sources)).canStart, false);
+});
+
+// MVP-001 D-3: many synthetic Intakes for the one client, newest last, each
+// with its own number of synthetic revisions.
+function manyIntakes(count, revisionsOf = () => 1) {
+  const intakes = [];
+  const revisions = [];
+  for (let n = 1; n <= count; n += 1) {
+    const intake = id(10000 + n);
+    intakes.push({
+      id: intake,
+      client_id: CLIENT,
+      state: "draft",
+      created_at: new Date(Date.UTC(2026, 10, 1, 0, n)).toISOString(),
+      closed_at: null,
+    });
+    for (let r = 1; r <= revisionsOf(n); r += 1) {
+      revisions.push({
+        intake_id: intake,
+        revision_number: r,
+        created_at: new Date(Date.UTC(2026, 10, 2, 0, n, r % 60)).toISOString(),
+      });
+    }
+  }
+  return { intakes, revisions };
+}
+
+test("2a. the workspace stays usable at any number of Intakes: one page at a time, newest first, saying when newer or older ones exist", async () => {
+  assert.equal(WORKSPACE_PAGE_SIZE, 20);
+  const { intakes, revisions } = manyIntakes(45, (n) => n % 4);
+  const { sources, state } = harness({ intakes, revisions });
+  const page = async (value) => resolveClientWorkspace(sources, value);
+  const newest = intakes.map((i) => i.id).reverse();
+
+  const first = await page(undefined);
+  assert.equal(first.status, "ready");
+  assert.deepEqual(
+    first.intakes.map((i) => i.id),
+    newest.slice(0, 20),
+  );
+  assert.deepEqual(
+    [first.page, first.pageSize, first.newerPage, first.olderPage],
+    [1, 20, null, 2],
+  );
+  // Each shown Intake carries its own latest saved version.
+  for (const shown of first.intakes) {
+    const n = Number(shown.id.slice(-5)) - 10000;
+    assert.equal(shown.revisions, n % 4, shown.id);
+    assert.equal(shown.lastSavedAt === null, n % 4 === 0, shown.id);
+  }
+  const second = await page("2");
+  assert.deepEqual(
+    second.intakes.map((i) => i.id),
+    newest.slice(20, 40),
+  );
+  assert.deepEqual(
+    [second.page, second.newerPage, second.olderPage],
+    [2, 1, 3],
+  );
+  state.readLog.length = 0;
+  const last = await page("3");
+  assert.deepEqual(
+    last.intakes.map((i) => i.id),
+    newest.slice(40),
+  );
+  assert.deepEqual([last.page, last.newerPage, last.olderPage], [3, 2, null]);
+  // The page asks for exactly one page and one more Intake, after skipping
+  // the earlier pages, and reads only the shown Intakes' summaries.
+  assert.deepEqual(state.readLog, [
+    ["intakesOf", 40, 21],
+    ...newest.slice(40).map((intake) => ["latestRevisionSummaryOf", intake]),
+  ]);
+  // A page past the last one is empty and points back.
+  const beyond = await page("4");
+  assert.equal(beyond.status, "ready");
+  assert.deepEqual(beyond.intakes, []);
+  assert.deepEqual(
+    [beyond.page, beyond.newerPage, beyond.olderPage],
+    [4, 3, null],
+  );
+
+  // Exactly one full page has no older page; one more Intake makes one.
+  for (const [count, older] of [
+    [20, null],
+    [21, 2],
+  ]) {
+    const exact = harness(manyIntakes(count));
+    const view = await resolveClientWorkspace(exact.sources);
+    assert.equal(view.intakes.length, 20);
+    assert.equal(view.olderPage, older, String(count));
+  }
+
+  // Only a plain page number from 1 to 999999 is a page; anything else is
+  // the first page.
+  for (const [value, expected] of [
+    ["1", 1],
+    ["2", 2],
+    ["999999", 999999],
+    [undefined, 1],
+    ["0", 1],
+    ["-1", 1],
+    ["01", 1],
+    ["1.5", 1],
+    ["2 ", 1],
+    [" 2", 1],
+    ["1e3", 1],
+    ["1000000", 1],
+    ["abc", 1],
+    [["2"], 1],
+    [["2", "3"], 1],
+    [2, 1],
+    [null, 1],
+  ]) {
+    assert.equal(workspacePageOf(value), expected, JSON.stringify(value));
+  }
+  assert.equal((await page(["2"])).page, 1);
+});
+
+test("2b. each shown Intake's latest version is read on its own, so none is silently dropped; a port that breaks its bounds is unavailable", async () => {
+  // One Intake with far more revisions than any batch bound would hold.
+  const { intakes, revisions } = manyIntakes(3, (n) => (n === 2 ? 6000 : 1));
+  const { sources } = harness({ intakes, revisions });
+  const view = await resolveClientWorkspace(sources);
+  assert.equal(view.status, "ready");
+  assert.deepEqual(
+    view.intakes.map((i) => i.revisions),
+    [1, 6000, 1],
+  );
+
+  const broken = [
+    // More Intakes than asked for.
+    (reads) => ({
+      ...reads,
+      intakesOf: async (c, offset, count) => {
+        const all = await reads.intakesOf(c, offset, count);
+        return rows(
+          Array.from(
+            { length: count + 1 },
+            (_, index) => all.rows[index % all.rows.length],
+          ),
+        );
+      },
+    }),
+    // Two latest summaries for one Intake.
+    (reads) => ({
+      ...reads,
+      latestRevisionSummaryOf: async (intake) => {
+        const one = await reads.latestRevisionSummaryOf(intake);
+        return rows([...one.rows, ...one.rows]);
+      },
+    }),
+    // A summary of another Intake.
+    (reads) => ({
+      ...reads,
+      latestRevisionSummaryOf: async (intake) =>
+        reads.latestRevisionSummaryOf(
+          intake === intakes[0].id ? intakes[1].id : intake,
+        ),
+    }),
+    // An unreadable summary.
+    (reads) => ({
+      ...reads,
+      latestRevisionSummaryOf: async () => ({ kind: "unreadable" }),
+    }),
+    // A thrown summary read.
+    (reads) => ({
+      ...reads,
+      latestRevisionSummaryOf: async () => {
+        throw new Error("synthetic");
+      },
+    }),
+  ];
+  for (const [index, breakReads] of broken.entries()) {
+    const { sources: original } = harness({ intakes, revisions });
+    const sources = {
+      ...original,
+      reads: async () => breakReads(await original.reads()),
+    };
+    assert.equal(
+      (await resolveClientWorkspace(sources)).status,
+      "unavailable",
+      String(index),
+    );
+  }
 });
 
 test("3. an Intake view shows its governing version's questions and the saved answers; a foreign, missing or malformed id is not found", async () => {

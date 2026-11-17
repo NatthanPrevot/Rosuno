@@ -1,4 +1,4 @@
-// Applicable eligibility policy selection (P3-003).
+// Applicable eligibility policy selection (P3-003; MVP-001 S1: PS-A2 section 5).
 //
 // Pure and deterministic. Given the policy versions and authority references
 // a trusted server read returned for one explicit policy type and one
@@ -11,6 +11,13 @@
 // mode-specific version as applicable: each of those returns a fixed
 // undetermined reason instead. No policy value or legal rule is defined here;
 // absent an actually approved policy, nothing can be determined.
+//
+// PS-A2 (MVP-001 S1): selection depends on the database's recorded environment
+// class. In an unrecorded environment nothing is selected. In a development or
+// staging database a development configuration (development_only, always
+// draft, never approved) is applicable inside its effective period, without an
+// authority reference; in production it never is. This mirrors the database's
+// eligibility_selected_policy exactly.
 
 import {
   epochOf,
@@ -23,11 +30,11 @@ import {
 // The policy type this work item consumes and the parameter schema it reads.
 // Both are implementation contracts awaiting configuration: no policy type
 // row, policy version, or parameter value is created by this work item.
-export const ELIGIBILITY_POLICY_TYPE = "attorney_eligibility";
+export const ELIGIBILITY_POLICY_TYPE = "eligibility";
 export const ELIGIBILITY_POLICY_SCHEMA = "rosuno.attorney_eligibility.v1";
 
 export const POLICY_VERSION_COLUMNS =
-  "id, policy_type_code, jurisdiction_id, regulatory_mode_id, version_label, parameters, status, effective_from, effective_until, approved_at, approved_by_user_id";
+  "id, policy_type_code, jurisdiction_id, regulatory_mode_id, version_label, parameters, status, effective_from, effective_until, approved_at, approved_by_user_id, development_only";
 export const AUTHORITY_REFERENCE_COLUMNS =
   "id, policy_version_id, verification_status, verified_by_user_id";
 
@@ -66,7 +73,18 @@ export type EligibilityPolicy = {
   };
 };
 
+// The database's recorded environment class (PS-A2 section 5), or a binding
+// outcome the application derived before reading it.
+export const ENVIRONMENT_CLASSES = Object.freeze([
+  "development",
+  "staging",
+  "production",
+] as const);
+export type EnvironmentClass = (typeof ENVIRONMENT_CLASSES)[number];
+
 export type PolicyUndeterminedReason =
+  | "environment_unrecorded"
+  | "environment_mismatch"
   | "policy_records_unreadable"
   | "no_applicable_policy"
   | "conflicting_policies"
@@ -93,6 +111,7 @@ type PolicyVersionRow = {
   readonly effectiveUntil: string | null;
   readonly approvedAt: string | null;
   readonly approvedBy: string | null;
+  readonly developmentOnly: boolean;
 };
 
 function undetermined(reason: PolicyUndeterminedReason): PolicySelection {
@@ -118,6 +137,7 @@ function readVersion(row: unknown): PolicyVersionRow | null {
   const effectiveUntil = f.get("effective_until");
   const approvedAt = f.get("approved_at");
   const approvedBy = f.get("approved_by_user_id");
+  const developmentOnly = f.get("development_only");
   if (
     !isUuid(id) ||
     typeof typeCode !== "string" ||
@@ -128,7 +148,8 @@ function readVersion(row: unknown): PolicyVersionRow | null {
     !nullableTimestamp(effectiveFrom) ||
     !nullableTimestamp(effectiveUntil) ||
     !nullableTimestamp(approvedAt) ||
-    !(approvedBy === null || isUuid(approvedBy))
+    !(approvedBy === null || isUuid(approvedBy)) ||
+    typeof developmentOnly !== "boolean"
   ) {
     return null;
   }
@@ -144,6 +165,7 @@ function readVersion(row: unknown): PolicyVersionRow | null {
     effectiveUntil,
     approvedAt,
     approvedBy,
+    developmentOnly,
   };
 }
 
@@ -175,14 +197,22 @@ function readAuthority(row: unknown): AuthorityRow | null {
 }
 
 // In force at the instant: active, approved by a recorded actor, and inside
-// its effective period. Anything else is not applicable at that instant.
-function inForce(version: PolicyVersionRow, asOfMs: number): boolean {
-  if (
-    version.status !== "active" ||
-    version.approvedAt === null ||
-    version.approvedBy === null ||
-    version.effectiveFrom === null
-  ) {
+// its effective period; or, in a development or staging database, a
+// development configuration inside its effective period. Anything else is not
+// applicable at that instant.
+function inForce(
+  version: PolicyVersionRow,
+  asOfMs: number,
+  developmentAllowed: boolean,
+): boolean {
+  const authority =
+    !version.developmentOnly &&
+    version.status === "active" &&
+    version.approvedAt !== null &&
+    version.approvedBy !== null;
+  const development =
+    version.developmentOnly && version.status === "draft" && developmentAllowed;
+  if (!(authority || development) || version.effectiveFrom === null) {
     return false;
   }
   if (epochOf(version.effectiveFrom) > asOfMs) {
@@ -309,13 +339,24 @@ function readParameters(
 
 // Selects the one applicable eligibility policy for exactly this
 // jurisdiction at exactly this instant, or a fixed undetermined reason.
-// versions and authorities are null when the trusted read failed.
+// versions and authorities are null when the trusted read failed. environment
+// is the database's recorded class, "unrecorded", or "mismatch" when the
+// application's environment binding failed (PS-A2 section 6).
 export function selectEligibilityPolicy(
   jurisdictionId: string,
   asOfMs: number,
   versions: readonly unknown[] | null,
   authorities: readonly unknown[] | null,
+  environment: unknown,
 ): PolicySelection {
+  if (environment === "unrecorded") {
+    return undetermined("environment_unrecorded");
+  }
+  if (!isOneOf(ENVIRONMENT_CLASSES, environment)) {
+    return undetermined("environment_mismatch");
+  }
+  const developmentAllowed =
+    environment === "development" || environment === "staging";
   if (versions === null || authorities === null || !Number.isFinite(asOfMs)) {
     return undetermined("policy_records_unreadable");
   }
@@ -340,7 +381,9 @@ export function selectEligibilityPolicy(
     }
     references.push(reference);
   }
-  const applicable = read.filter((version) => inForce(version, asOfMs));
+  const applicable = read.filter((version) =>
+    inForce(version, asOfMs, developmentAllowed),
+  );
   if (applicable.some((version) => version.regulatoryModeId !== null)) {
     // Jurisdiction regulatory-mode selection is counsel-gated: a
     // mode-specific version is never applied by this work item.
@@ -354,6 +397,7 @@ export function selectEligibilityPolicy(
   }
   const version = applicable[0];
   if (
+    !version.developmentOnly &&
     !references.some(
       (reference) =>
         reference.policyVersionId === version.id && reference.verified,

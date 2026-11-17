@@ -110,6 +110,9 @@ export type EligibilityFacts = {
   readonly subjects: readonly unknown[] | null;
   readonly policyVersions: readonly unknown[] | null;
   readonly authorityReferences: readonly unknown[] | null;
+  // The database's recorded environment class, "unrecorded", or "mismatch"
+  // when the application's environment binding failed (PS-A2 sections 5-6).
+  readonly environment: unknown;
 };
 
 // The persisted context types: a jurisdiction-level determination, or one
@@ -596,6 +599,7 @@ export function assessEligibility(
       asOfMs,
       facts.policyVersions,
       facts.authorityReferences,
+      facts.environment,
     );
     const relied = new Set<string>();
     const factors: FactorResult[] = [

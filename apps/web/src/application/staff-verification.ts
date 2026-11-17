@@ -87,6 +87,11 @@ import {
   type ProfileState,
   type SubjectKind,
 } from "./professional-records.ts";
+import {
+  bindEnvironment,
+  type EnvironmentBinding,
+  type EnvironmentConfiguration,
+} from "./environment-binding.ts";
 import type { ServerSessionSource } from "./session.ts";
 
 export const STAFF_PROFILE_COLUMNS = "id, user_id, staff_state";
@@ -125,6 +130,9 @@ export type StaffReads = {
   ) => Promise<RowsResult>;
   readonly evaluationsOf: (attorneyId: string) => Promise<RowsResult>;
   readonly practiceAreas: () => Promise<RowsResult>;
+  // The database's own environment record (PS-A2 section 5), read through
+  // the caller's session.
+  readonly environmentIdentity: () => Promise<RowsResult>;
 };
 
 // The source-grounded evidence a reviewer submits. The evidence row's id,
@@ -162,8 +170,8 @@ export type ReviewTransition = {
   readonly to: "approved" | "applicant" | "suspended";
 };
 
+// The database generates the evidence id (PS section 2.2; MVP-001 S1 SCH-1).
 export type FindingWrite = {
-  readonly evidenceId: string;
   readonly subjectKind: SubjectKind;
   readonly subjectId: string;
   // The record's updated_at exactly as read.
@@ -174,9 +182,8 @@ export type FindingWrite = {
   readonly resolvedAt: string | null;
 };
 
+// The database generates the discipline record and evidence ids (SCH-1).
 export type DisciplineWrite = {
-  readonly disciplineId: string;
-  readonly evidenceId: string;
   readonly attorneyId: string;
   readonly record: DisciplineInsert;
   readonly evidence: EvidenceFields;
@@ -207,7 +214,8 @@ export type StaffWrites = {
     message: string | null,
     note: string | null,
   ) => Promise<WriteAnswer>;
-  // One evaluation row as the assessment builds it, with its new id.
+  // One evaluation row as the assessment builds it; the database generates
+  // its id (SCH-1).
   readonly recordEvaluation: (
     row: Readonly<Record<string, unknown>>,
   ) => Promise<WriteAnswer>;
@@ -257,9 +265,9 @@ export type StaffSources = {
   readonly provisioning: () => Promise<StaffProvisioning | null>;
   readonly writes: () => Promise<StaffWrites | null>;
   readonly clock: () => number;
-  // A new record id generated on the server for each insert, so a repeated
-  // call can never create a second record.
-  readonly newId: () => string;
+  // The server-side environment configuration compared with the database's
+  // own environment record before any policy-driven step (PS-A2 section 6).
+  readonly environment: () => EnvironmentConfiguration;
 };
 
 // ---------------------------------------------------------------------------
@@ -762,6 +770,7 @@ async function assessmentOf(
   jurisdictionId: string,
   practiceAreaId: string | null,
   asOfMs: number,
+  environment: EnvironmentBinding,
 ): Promise<EligibilityAssessment> {
   const profileRows = rowsOf(
     await attempt(() => provisioning.attorneyProfileOf(attorneyId)),
@@ -856,6 +865,7 @@ async function assessmentOf(
       subjects: subjectsReadable ? subjects : null,
       policyVersions: versionRows,
       authorityReferences: authorities,
+      environment,
     },
     asOfMs,
   );
@@ -1174,6 +1184,10 @@ export async function resolveStaffReview(
       ),
     ];
     const asOfMs = sources.clock();
+    const environment = bindEnvironment(
+      rowsOf(await attempt(() => reads.environmentIdentity())),
+      sources.environment(),
+    );
     const assessments: AssessmentView[] = [];
     for (const jurisdictionId of assessedJurisdictions) {
       assessments.push(
@@ -1186,8 +1200,9 @@ export async function resolveStaffReview(
             jurisdictionId,
             null,
             asOfMs,
+            environment,
           ),
-          canRecord: true,
+          canRecord: environment !== "unrecorded" && environment !== "mismatch",
         }),
       );
     }
@@ -1560,14 +1575,58 @@ function subjectKindOf(raw: string | null): SubjectKind | null {
   return isOneOf(SUBJECT_KINDS, raw) ? raw : null;
 }
 
-// A new record id generated on the server, or null when unusable.
-function newIdOf(sources: StaffSources): string | null {
-  try {
-    const id = sources.newId();
-    return isUuid(id) ? id : null;
-  } catch {
+// D-6 (MVP-001 S1): the review page's visibility rule, applied before a
+// record action. True when the caller could review this attorney, false when
+// the review page would treat the attorney as non-existent, null when any
+// answer is unreadable.
+async function reviewableBy(
+  reads: StaffReads,
+  provisioning: StaffProvisioning,
+  attorneyId: string,
+): Promise<boolean | null> {
+  const jurisdictions = await jurisdictionsOf(provisioning);
+  if (jurisdictions === null) {
     return null;
   }
+  const scope = await scopeOf(
+    reads,
+    jurisdictions.map((j) => j.id),
+  );
+  if (scope === null) {
+    return null;
+  }
+  const [profileRows, licenseRows, insuranceRows, disciplineRows, authRows] =
+    await Promise.all([
+      scope.global
+        ? attempt(() => reads.attorneyProfileById(attorneyId))
+        : Promise.resolve(Object.freeze({ kind: "rows", rows: [] })),
+      attempt(() => reads.licensesOf(attorneyId)),
+      attempt(() => reads.insuranceOf(attorneyId)),
+      attempt(() => reads.disciplineOf(attorneyId)),
+      attempt(() => reads.authorisationsOf(attorneyId)),
+    ]);
+  const profiles = listOf(profileRows, readProfile);
+  const lists: readonly (readonly AnyRecord[] | null)[] = [
+    listOf(licenseRows, readLicense),
+    listOf(insuranceRows, readInsurance),
+    listOf(disciplineRows, readDiscipline),
+    listOf(authRows, readPracticeAuthorisation),
+  ];
+  if (profiles === null || lists.some((list) => list === null)) {
+    return null;
+  }
+  if (profiles.some((profile) => profile.id === attorneyId)) {
+    return true;
+  }
+  const inScope = (jurisdictionId: string | null) =>
+    scope.global ||
+    (jurisdictionId !== null && scope.jurisdictions.has(jurisdictionId));
+  return lists.some((list) =>
+    (list ?? []).some(
+      (record) =>
+        record.attorneyId === attorneyId && inScope(record.jurisdictionId),
+    ),
+  );
 }
 
 // The fixed state shown for one write call. Only the database's own
@@ -1659,16 +1718,11 @@ export async function recordVerificationFinding(
       return checked;
     }
     const record = checked.record;
-    const evidenceId = newIdOf(sources);
-    if (evidenceId === null) {
-      return UNAVAILABLE;
-    }
     // The evidence, its link, any status the source reported, and the audit
     // event are one database transaction: a finding is never left partial.
     return stateOf(
       await writeOnce(() =>
         authorized.writes.recordFinding({
-          evidenceId,
           subjectKind: kind,
           subjectId: recordId,
           expectedUpdatedAt: record.updatedAt,
@@ -1834,17 +1888,19 @@ export async function recordDisciplineFinding(
     if (!granted) {
       return DENIED;
     }
+    const reviewable = await reviewableBy(reads, provisioning, attorneyId);
+    if (reviewable === null) {
+      return UNAVAILABLE;
+    }
+    if (!reviewable) {
+      return DENIED;
+    }
     const profile = await gatingProfileOf(provisioning, attorneyId);
     if (profile === null) {
       return DENIED;
     }
     if (!FINDING_STAGES.includes(profile.state)) {
       return LOCKED;
-    }
-    const disciplineId = newIdOf(sources);
-    const evidenceId = newIdOf(sources);
-    if (disciplineId === null || evidenceId === null) {
-      return UNAVAILABLE;
     }
     const insert: DisciplineInsert = {
       jurisdiction_id: jurisdictionId,
@@ -1859,8 +1915,6 @@ export async function recordDisciplineFinding(
     return stateOf(
       await writeOnce(() =>
         authorized.writes.recordDisciplineFinding({
-          disciplineId,
-          evidenceId,
           attorneyId,
           record: insert,
           evidence: fields,
@@ -2100,27 +2154,39 @@ export async function recordEligibilityDetermination(
         });
       }
     }
+    const reviewable = await reviewableBy(reads, provisioning, attorneyId);
+    if (reviewable === null) {
+      return UNAVAILABLE;
+    }
+    if (!reviewable) {
+      return DENIED;
+    }
     const profile = await gatingProfileOf(provisioning, attorneyId);
     if (profile === null) {
       return DENIED;
     }
-    const evaluationId = newIdOf(sources);
-    if (evaluationId === null) {
+    const asOfMs = sources.clock();
+    const environment = bindEnvironment(
+      rowsOf(await attempt(() => reads.environmentIdentity())),
+      sources.environment(),
+    );
+    if (environment === "unrecorded" || environment === "mismatch") {
+      // PS-A2 section 6: no policy-driven step runs on a misbound or
+      // unrecorded environment.
       return UNAVAILABLE;
     }
-    const asOfMs = sources.clock();
     const assessment = await assessmentOf(
       provisioning,
       attorneyId,
       jurisdictionId,
       practiceAreaId,
       asOfMs,
+      environment,
     );
-    const evaluated = evaluationRowOf(assessment, asOfMs);
-    if (evaluated === null) {
+    const row = evaluationRowOf(assessment, asOfMs);
+    if (row === null) {
       return UNAVAILABLE;
     }
-    const row = Object.freeze({ id: evaluationId, ...evaluated });
     // The evaluation and its audit event are one database transaction. The
     // database records the evaluation time and keeps the evaluation only when
     // this determination equals the assessment it derives itself from the

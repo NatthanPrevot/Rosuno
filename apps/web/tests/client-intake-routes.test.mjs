@@ -67,10 +67,16 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
 test("2. pages decide access on the server for every request through the client intake use cases and the production sources", () => {
   const workspace = codeOf(read("app/client/page.tsx"));
   assert.match(workspace, /await connection\(\);/);
+  // MVP-001 D-3: the workspace shows one page of the client's own Intakes.
+  // The only request value it reads is the page query value, which it hands
+  // to the use case unread; the use case checks it on the server.
+  assert.match(workspace, /const \{ page \} = await searchParams;/);
   assert.match(
     workspace,
-    /await resolveClientWorkspace\(CLIENT_INTAKE_SOURCES\);/,
+    /await resolveClientWorkspace\(CLIENT_INTAKE_SOURCES, page\);/,
   );
+  assert.equal(workspace.match(/\bsearchParams\b/g).length, 3);
+  assert.doesNotMatch(workspace, /\bheaders\s*\(|\bcookies\s*\(|\bparams\b/);
   const intake = codeOf(read("app/client/intakes/[intake]/page.tsx"));
   assert.match(intake, /await connection\(\);/);
   assert.match(
@@ -104,6 +110,9 @@ test("3. no client intake module reaches a privileged credential, client or prov
       file,
     );
   }
+  // MVP-001 D-8 adds only the dependency-free logger and its request-scoped
+  // correlation reader, which record a failed call's name, kind, error code
+  // and HTTP status and nothing the call carried or answered.
   assert.deepEqual(
     importsOf(read("src/infrastructure/client/client-intake-adapter.ts")),
     [
@@ -111,6 +120,8 @@ test("3. no client intake module reaches a privileged credential, client or prov
       "../../application/professional-identity.ts",
       "../identity/client-principal-source.ts",
       "../identity/server-session-source.ts",
+      "../observability/log.ts",
+      "../observability/request-log.ts",
       "../professional/professional-request-client.ts",
     ],
   );

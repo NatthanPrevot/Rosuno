@@ -28,6 +28,7 @@ import {
   TextAreaField,
 } from "../../../../src/presentation/design-system.tsx";
 import { outcomeMessage } from "../../../../src/presentation/client-intake-labels.ts";
+import { keepEntries } from "../../../../src/presentation/form-entries.ts";
 import {
   closeIntakeAction,
   saveIntakeAction,
@@ -161,8 +162,14 @@ export function IntakeForm({
     saveIntakeAction,
     INITIAL_CLIENT_INTAKE_STATE,
   );
+  // Every answer field keeps what the client entered after a submission, so
+  // a refused or failed save never erases unsaved answers.
+  const answerFields = [
+    ...questions.map((question) => question.field),
+    "description",
+  ];
   return (
-    <form action={action}>
+    <form action={action} onReset={keepEntries(answerFields)}>
       <Stack>
         <Outcome state={state} />
         <input type="hidden" name="intake" value={intakeId} />

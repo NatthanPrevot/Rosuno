@@ -2344,6 +2344,7 @@ test("30. the request page is an accessible design-system form whose copy never 
     "../../src/application/account-recovery.ts",
     "../../src/application/form-operation.ts",
     "../../src/presentation/design-system.tsx",
+    "../../src/presentation/form-entries.ts",
     "./actions.ts",
   ]);
   assert.match(
@@ -2352,9 +2353,15 @@ test("30. the request page is an accessible design-system form whose copy never 
   );
   assert.equal(code.match(/\brequestRecovery\b/g)?.length, 2);
   assert.equal(code.match(/<form\b[^>]*>/g)?.length, 1);
-  assert.match(code, /<form action=\{formAction\}>/);
+  // MVP-001 D-2: the one form also keeps the typed email address when React
+  // resets it after a submission. That exact handler, naming only the email
+  // field, is the one event handler admitted; every other handler, value,
+  // and default value is still refused below.
+  const keptForm =
+    '<form action={formAction} onReset={keepEntries(["email"])}>';
+  assert.equal(code.split(keptForm).length, 2);
   assert.doesNotMatch(
-    code,
+    code.replace(keptForm, "<form action={formAction}>"),
     /\bmethod=|\bonSubmit\b|\bon[A-Z]\w*=|\bfetch\s*\(|localStorage|sessionStorage|document\.cookie|indexedDB|useEffect|\bdefaultValue\b|\bvalue=|dangerouslySetInnerHTML|searchParams|resetPasswordForEmail|createSupabaseServerClient/,
   );
   assert.match(

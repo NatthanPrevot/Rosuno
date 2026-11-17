@@ -263,10 +263,11 @@ test("M4-I2. the attorney write port calls exactly one fixed write function per 
     }),
     applied,
   );
-  await writes.saveLicense(ID(7), null, claim);
+  // SCH-1: a create sends no key (the database generates it).
+  await writes.saveLicense(null, null, claim);
   await writes.saveLicense(ID(7), "2026-11-04T12:00:00.000000+00:00", claim);
-  await writes.saveInsurance(ID(8), null, insurance);
-  await writes.requestPracticeArea(ID(9), ID(5), ID(6));
+  await writes.saveInsurance(null, null, insurance);
+  await writes.requestPracticeArea(ID(5), ID(6));
   await writes.changePracticeAreaRequest(
     ID(9),
     "withdraw",
@@ -292,7 +293,7 @@ test("M4-I2. the attorney write port calls exactly one fixed write function per 
         "rpc",
         "attorney_save_license_claim",
         {
-          p_license_id: ID(7),
+          p_license_id: null,
           p_expected_updated_at: null,
           p_jurisdiction_id: ID(5),
           p_license_number: "SYN-1",
@@ -322,7 +323,7 @@ test("M4-I2. the attorney write port calls exactly one fixed write function per 
         "rpc",
         "attorney_save_insurance_claim",
         {
-          p_record_id: ID(8),
+          p_record_id: null,
           p_expected_updated_at: null,
           p_jurisdiction_id: ID(5),
           p_carrier_name: "Synthetic",
@@ -341,7 +342,7 @@ test("M4-I2. the attorney write port calls exactly one fixed write function per 
         "rpc",
         "attorney_request_practice_area",
         {
-          p_authorisation_id: ID(9),
+          p_authorisation_id: null,
           p_jurisdiction_id: ID(5),
           p_practice_area_id: ID(6),
         },
@@ -409,8 +410,8 @@ test("M4-I3. the staff write port calls exactly one fixed write function per cha
     p_evidence_digest: null,
     p_discrepancy_flag: false,
   };
+  // SCH-1: no write carries a key; the database generates each one.
   await writes.recordFinding({
-    evidenceId: ID(10),
     subjectKind: "license",
     subjectId: ID(7),
     expectedUpdatedAt: "u",
@@ -421,8 +422,6 @@ test("M4-I3. the staff write port calls exactly one fixed write function per cha
   });
   await writes.recordSourceUnavailable("insurance", ID(8), "synthetic");
   await writes.recordDisciplineFinding({
-    disciplineId: ID(11),
-    evidenceId: ID(12),
     attorneyId: ID(3),
     record: {
       jurisdiction_id: ID(5),
@@ -442,7 +441,6 @@ test("M4-I3. the staff write port calls exactly one fixed write function per cha
   );
   await writes.changeProfileStage(ID(3), "request_information", "m", null);
   const row = {
-    id: ID(13),
     attorney_id: ID(3),
     jurisdiction_id: ID(5),
     context_type: "jurisdiction",
@@ -461,7 +459,7 @@ test("M4-I3. the staff write port calls exactly one fixed write function per cha
         "rpc",
         "staff_record_verification_finding",
         {
-          p_evidence_id: ID(10),
+          p_evidence_id: null,
           p_subject_kind: "license",
           p_subject_id: ID(7),
           p_expected_updated_at: "u",
@@ -488,8 +486,8 @@ test("M4-I3. the staff write port calls exactly one fixed write function per cha
         "rpc",
         "staff_record_discipline_finding",
         {
-          p_discipline_id: ID(11),
-          p_evidence_id: ID(12),
+          p_discipline_id: null,
+          p_evidence_id: null,
           p_attorney_id: ID(3),
           p_jurisdiction_id: ID(5),
           p_external_reference: null,
@@ -532,7 +530,7 @@ test("M4-I3. the staff write port calls exactly one fixed write function per cha
         "rpc",
         "staff_record_eligibility_evaluation",
         {
-          p_evaluation_id: ID(13),
+          p_evaluation_id: null,
           p_attorney_id: ID(3),
           p_jurisdiction_id: ID(5),
           p_context_type: "jurisdiction",
@@ -549,7 +547,9 @@ test("M4-I3. the staff write port calls exactly one fixed write function per cha
   log.length = 0;
   for (const malformed of [
     { ...row, extra: 1 },
-    { id: ID(13), attorney_id: ID(3), result: "eligible" },
+    // A caller-chosen key is refused before sending (SCH-1).
+    { ...row, id: ID(13) },
+    { attorney_id: ID(3), result: "eligible" },
   ]) {
     assert.deepEqual(await writes.recordEvaluation(malformed), {
       kind: "rejected",

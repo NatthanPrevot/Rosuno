@@ -112,6 +112,11 @@ export function createWorld() {
     audit_events: [],
     policy_versions: [],
     policy_authority_references: [],
+    // PS-A2: the one recorded deployment environment (null = unrecorded).
+    deployment_environment: {
+      environment_class: "development",
+      project_ref: null,
+    },
     calls: [],
     failures: new Set(),
     lost: new Set(),
@@ -340,6 +345,7 @@ export function addPolicy(
     effective_until: null,
     approved_at: stamp(world.now - 31 * 86_400_000),
     approved_by_user_id: idOf(2, 999),
+    development_only: false,
     ...overrides,
   });
   if (authority !== null) {
@@ -679,6 +685,12 @@ export function staffReadsFor(world, authId) {
       ),
     practiceAreas: async () =>
       rows(world.practice_areas.map((a) => pick(a, PRACTICE_AREA_COLUMNS))),
+    environmentIdentity: async () =>
+      rows(
+        world.deployment_environment === null
+          ? []
+          : [{ ...world.deployment_environment }],
+      ),
   };
 }
 
@@ -834,10 +846,15 @@ export function attorneyWritesFor(world, authId) {
       row.license_number === claim.license_number;
     const snapshot = (row) =>
       Object.fromEntries(snapshotKeys.map((k) => [k, row[k]]));
+    if ((id === null) !== (expected === null)) {
+      return outcome("invalid");
+    }
     if (expected === null) {
-      if (world[table].some((r) => r.id === id || duplicate(r))) {
+      if (world[table].some((r) => duplicate(r))) {
         return outcome("conflict");
       }
+      // SCH-1 (PS section 2.2): the server generates the key.
+      id = world.nextId();
       const row = {
         id,
         attorney_id: ctx.profile.id,
@@ -944,7 +961,7 @@ export function attorneyWritesFor(world, authId) {
         expected,
         claim,
       ),
-    requestPracticeArea: async (id, jurisdictionId, practiceAreaId) => {
+    requestPracticeArea: async (jurisdictionId, practiceAreaId) => {
       const ctx = own(["applicant"]);
       if (ctx.refusal) {
         return ctx.refusal;
@@ -957,14 +974,15 @@ export function attorneyWritesFor(world, authId) {
       if (
         world.practice_area_authorisations.some(
           (r) =>
-            r.id === id ||
-            (r.attorney_id === ctx.profile.id &&
-              r.jurisdiction_id === jurisdictionId &&
-              r.practice_area_id === practiceAreaId),
+            r.attorney_id === ctx.profile.id &&
+            r.jurisdiction_id === jurisdictionId &&
+            r.practice_area_id === practiceAreaId,
         )
       ) {
         return outcome("conflict");
       }
+      // SCH-1: the server generates the key.
+      const id = world.nextId();
       const now = stamp(world.tick());
       return commit(
         world,
@@ -1104,20 +1122,19 @@ export function staffWritesFor(world, authId) {
       if (!FINDING_STAGES.includes(profile.profile_state)) {
         return outcome("locked");
       }
-      if (
-        record.updated_at !== w.expectedUpdatedAt ||
-        world.verification_evidence.some((e) => e.id === w.evidenceId)
-      ) {
+      if (record.updated_at !== w.expectedUpdatedAt) {
         return outcome("conflict");
       }
+      // SCH-1: the server generates the evidence key.
+      const evidenceId = world.nextId();
       return commit(
         world,
         () => {
           world.verification_evidence.push(
-            evidenceRow(w.evidenceId, record.jurisdiction_id, user, w.evidence),
+            evidenceRow(evidenceId, record.jurisdiction_id, user, w.evidence),
           );
           world.verification_evidence_subjects.push(
-            linkRow(w.evidenceId, w.subjectKind, w.subjectId),
+            linkRow(evidenceId, w.subjectKind, w.subjectId),
           );
           if (w.observedStatus !== null) {
             Object.assign(record, {
@@ -1136,7 +1153,7 @@ export function staffWritesFor(world, authId) {
         audit(user, {
           action: "verification_evidence_recorded",
           resourceType: "verification_evidence",
-          resourceId: w.evidenceId,
+          resourceId: evidenceId,
           after: {
             subject_kind: w.subjectKind,
             subject_id: w.subjectId,
@@ -1183,17 +1200,14 @@ export function staffWritesFor(world, authId) {
       if (!FINDING_STAGES.includes(profile.profile_state)) {
         return outcome("locked");
       }
-      if (
-        world.discipline_records.some((r) => r.id === w.disciplineId) ||
-        world.verification_evidence.some((e) => e.id === w.evidenceId)
-      ) {
-        return outcome("conflict");
-      }
+      // SCH-1: the server generates both keys.
+      const disciplineId = world.nextId();
+      const evidenceId = world.nextId();
       return commit(
         world,
         () => {
           world.discipline_records.push({
-            id: w.disciplineId,
+            id: disciplineId,
             attorney_id: w.attorneyId,
             ...w.record,
             details_reference: null,
@@ -1201,27 +1215,22 @@ export function staffWritesFor(world, authId) {
             updated_at: stamp(world.now),
           });
           world.verification_evidence.push(
-            evidenceRow(
-              w.evidenceId,
-              w.record.jurisdiction_id,
-              user,
-              w.evidence,
-            ),
+            evidenceRow(evidenceId, w.record.jurisdiction_id, user, w.evidence),
           );
           world.verification_evidence_subjects.push(
-            linkRow(w.evidenceId, "discipline", w.disciplineId),
+            linkRow(evidenceId, "discipline", disciplineId),
           );
         },
         audit(user, {
           action: "discipline_record_recorded",
           resourceType: "discipline_record",
-          resourceId: w.disciplineId,
+          resourceId: disciplineId,
           after: {
             attorney_id: w.attorneyId,
             status: w.record.status,
             finding_type: w.record.finding_type,
             external_reference: w.record.external_reference,
-            evidence_id: w.evidenceId,
+            evidence_id: evidenceId,
           },
           jurisdictionId: w.record.jurisdiction_id,
         }),
@@ -1306,10 +1315,12 @@ export function staffWritesFor(world, authId) {
       if (profile === null) {
         return outcome("denied");
       }
-      if (world.eligibility_evaluations.some((e) => e.id === row.id)) {
-        return outcome("conflict");
+      if ("id" in row) {
+        return outcome("invalid");
       }
-      const plain = JSON.parse(JSON.stringify(row));
+      // SCH-1: the server generates the evaluation key.
+      const id = world.nextId();
+      const plain = { id, ...JSON.parse(JSON.stringify(row)) };
       return commit(
         world,
         () =>
@@ -1321,7 +1332,7 @@ export function staffWritesFor(world, authId) {
         audit(user, {
           action: "eligibility_evaluation_recorded",
           resourceType: "eligibility_evaluation",
-          resourceId: row.id,
+          resourceId: id,
           after: {
             result: row.result,
             attorney_id: row.attorney_id,
@@ -1366,7 +1377,6 @@ export function attorneySources(world, authId, overrides = {}) {
     writes: async () =>
       instrument(world, "writes", attorneyWritesFor(world, authId)),
     clock: () => world.now,
-    newId: () => world.nextId(),
     ...overrides,
   };
 }
@@ -1381,7 +1391,10 @@ export function staffSources(world, authId, overrides = {}) {
     writes: async () =>
       instrument(world, "writes", staffWritesFor(world, authId)),
     clock: () => world.now,
-    newId: () => world.nextId(),
+    environment: () => ({
+      configuredClass: "development",
+      expectedProjectRef: null,
+    }),
     ...overrides,
   };
 }

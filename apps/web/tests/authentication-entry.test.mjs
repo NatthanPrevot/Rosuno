@@ -987,12 +987,15 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
   const source = read(file);
   const code = codeOf(source);
   assert.match(source, /^"use server";\n/);
+  // MVP-001 D-8 adds only the request-scoped logger, which records that the
+  // provider is unconfigured or the provider's HTTP status, nothing else.
   assert.deepEqual(importsOf(source), [
     "next/cache",
     "next/navigation",
     "../../src/application/authentication-entry.ts",
     "../../src/infrastructure/identity/server-session-source.ts",
     "../../src/infrastructure/identity/supabase-server.ts",
+    "../../src/infrastructure/observability/request-log.ts",
   ]);
   // Exactly two actions, and nothing else, are exported.
   assert.deepEqual(
@@ -1126,6 +1129,7 @@ test("10. the sign-in page is an accessible design-system form that shows only f
     "../../src/application/authentication-entry.ts",
     "../../src/application/form-operation.ts",
     "../../src/presentation/design-system.tsx",
+    "../../src/presentation/form-entries.ts",
     "./actions.ts",
   ]);
   assert.match(
@@ -1135,9 +1139,15 @@ test("10. the sign-in page is an accessible design-system form that shows only f
   // One semantic form submitted through the server action: no GET method, no
   // client-side handler, and no client-held identity.
   assert.equal(code.match(/<form\b[^>]*>/g)?.length, 1);
-  assert.match(code, /<form action=\{formAction\}>/);
+  // MVP-001 D-2: the one form also keeps the typed email address when React
+  // resets it after a submission; the password is never named, so it is
+  // cleared. That exact handler is the one event handler admitted; every
+  // other handler, value, and default value is still refused below.
+  const keptForm =
+    '<form action={formAction} onReset={keepEntries(["email"])}>';
+  assert.equal(code.split(keptForm).length, 2);
   assert.doesNotMatch(
-    code,
+    code.replace(keptForm, "<form action={formAction}>"),
     /\bmethod=|\bonSubmit\b|\bon[A-Z]\w*=|\bfetch\s*\(|localStorage|sessionStorage|document\.cookie|indexedDB|useEffect|\bdefaultValue\b|\bvalue=|dangerouslySetInnerHTML/,
   );
   // Labelled email and password controls with matching input types,

@@ -8,7 +8,9 @@
 // request's updated cookie store, never through the client that made the
 // change. Next.js accepts these only as POST requests and applies its
 // Server Action origin checks. The only destination is the fixed home page;
-// nothing the caller sends chooses where to go.
+// nothing the caller sends chooses where to go. When sign-in cannot be
+// attempted or the provider answers with anything but a rejection, one log
+// line records only that fact and the provider's HTTP status.
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -22,6 +24,7 @@ import {
 } from "../../src/application/authentication-entry.ts";
 import { SUPABASE_SERVER_SESSION_SOURCE } from "../../src/infrastructure/identity/server-session-source.ts";
 import { createSupabaseServerClient } from "../../src/infrastructure/identity/supabase-server.ts";
+import { logRequestEvent } from "../../src/infrastructure/observability/request-log.ts";
 
 type ServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
@@ -49,6 +52,7 @@ async function sessionOf(client: ServerClient): Promise<SessionRead> {
 async function requestProvider(): Promise<AuthenticationProvider | null> {
   const client = await createSupabaseServerClient();
   if (client === null) {
+    await logRequestEvent("warn", "auth.provider_unconfigured");
     return null;
   }
   return Object.freeze({
@@ -59,6 +63,11 @@ async function requestProvider(): Promise<AuthenticationProvider | null> {
       });
       if (error === null) {
         return "accepted";
+      }
+      if (error.status !== 400) {
+        await logRequestEvent("warn", "auth.sign_in.provider_unavailable", {
+          status: error.status,
+        });
       }
       return error.status === 400 ? "rejected" : "unavailable";
     },
