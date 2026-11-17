@@ -10,9 +10,11 @@
 // relation readable exactly as its row policy says. The write port stands in
 // for the staff configuration functions only as far as the application
 // boundary can see them: it records each call with its exact arguments and
-// answers what the test configures, so every outcome can be driven. Every
-// id, account, and value is synthetic test data; nothing here contacts a
-// provider, network, or database.
+// answers what the test configures, so every outcome can be driven. MVP-001
+// S2: operational jobs are readable exactly as their row policy says (the
+// global manage_operational_jobs grant). Every id, account, and value is
+// synthetic test data; nothing here contacts a provider, network, or
+// database.
 
 import { USER_COLUMNS } from "../src/application/professional-identity.ts";
 import { PRACTICE_AREA_COLUMNS } from "../src/application/professional-records.ts";
@@ -23,9 +25,11 @@ import {
   CONFIGURATION_POLICY_COLUMNS,
   GATE_EVALUATION_COLUMNS,
   GRANT_COLUMNS,
+  JOB_GROUP_STATES,
   LAUNCH_AUTHORIZATION_COLUMNS,
   LAUNCH_GATE_COLUMNS,
   MEMBER_USER_COLUMNS,
+  OPERATIONAL_JOB_COLUMNS,
   POLICY_TYPE_COLUMNS,
   QUESTION_SET_COLUMNS,
   SERVICE_AREA_COLUMNS,
@@ -78,6 +82,7 @@ export function createWorld() {
       "manage_attorney_verification",
       "manage_intake_configuration",
       "manage_jurisdiction_configuration",
+      "manage_operational_jobs",
       "manage_policy_configuration",
       "manage_staff_capabilities",
     ].map((capability_code) => ({ capability_code })),
@@ -91,6 +96,7 @@ export function createWorld() {
     launch_authorizations: [],
     practice_areas: [],
     intake_question_sets: [],
+    operational_jobs: [],
     // PS-A2: the one recorded deployment environment (null = unrecorded).
     deployment_environment: {
       environment_class: "development",
@@ -266,6 +272,32 @@ export function addPracticeArea(world, n, active = true) {
   return id;
 }
 
+// One synthetic operational job in a consistent state (MVP-001 S2).
+export function addJob(world, overrides = {}) {
+  const state = overrides.state ?? "pending";
+  const row = {
+    id: world.nextId(),
+    job_type: "synthetic.check",
+    subject_type: "synthetic",
+    subject_id: idOf(8, world.operational_jobs.length + 1),
+    state,
+    available_at: stamp(world.now - 60_000),
+    locked_at: state === "running" ? stamp(world.now - 30_000) : null,
+    attempt_count: state === "pending" ? 0 : 1,
+    max_attempts: state === "escalated" ? 1 : 3,
+    last_error_code: state === "escalated" ? "unknown_job_type" : null,
+    completed_at: state === "completed" ? stamp(world.now - 10_000) : null,
+    failed_at: state === "escalated" ? stamp(world.now - 20_000) : null,
+    created_at: stamp(world.now - 120_000 + world.operational_jobs.length),
+    // Never read by the staff view.
+    locked_by: state === "running" ? "synthetic-worker" : null,
+    last_error_message: "Synthetic message never shown",
+    ...overrides,
+  };
+  world.operational_jobs.push(row);
+  return row;
+}
+
 // ---------------------------------------------------------------------------
 // The predicate and the row policies, as the migration defines them.
 // ---------------------------------------------------------------------------
@@ -342,6 +374,7 @@ function policies(world, authId) {
     capability_definitions: () => holds("manage_staff_capabilities", null),
     capability_grants: () => holds("manage_staff_capabilities", null),
     intake_question_sets: () => true,
+    operational_jobs: () => holds("manage_operational_jobs", null),
   };
 }
 
@@ -531,6 +564,25 @@ export function configurationReadsFor(world, authId) {
           compare(b.published_at, a.published_at) || compare(b.id, a.id),
       )(offset, count),
     ),
+    operationalJobs: call("operationalJobs", async (group, offset, count) =>
+      rows(
+        world.operational_jobs
+          .filter(
+            (j) =>
+              JOB_GROUP_STATES[group].includes(j.state) &&
+              visible.operational_jobs(j),
+          )
+          .sort((a, b) =>
+            group === "open"
+              ? compare(a.available_at, b.available_at) || compare(a.id, b.id)
+              : group === "escalated"
+                ? compare(b.failed_at, a.failed_at) || compare(b.id, a.id)
+                : compare(b.created_at, a.created_at) || compare(b.id, a.id),
+          )
+          .slice(offset, offset + count)
+          .map((j) => pick(j, OPERATIONAL_JOB_COLUMNS)),
+      ),
+    ),
   };
 }
 
@@ -568,6 +620,8 @@ export const WRITE_NAMES = Object.freeze([
   "grantCapability",
   "revokeCapability",
   "publishQuestionSet",
+  "retryOperationalJob",
+  "cancelOperationalJob",
 ]);
 
 export const answer = (outcome, value = null) =>

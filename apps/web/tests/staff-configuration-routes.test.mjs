@@ -29,6 +29,7 @@ import ts from "typescript";
 
 import {
   addGate,
+  addJob,
   addJurisdiction,
   addPolicyType,
   addPolicyVersion,
@@ -79,6 +80,9 @@ const CONFIGURATION_FILES = [
   "app/staff/frame.tsx",
   "app/staff/intake-configuration/forms.tsx",
   "app/staff/intake-configuration/page.tsx",
+  // MVP-001 S2: the operational job view and its forms.
+  "app/staff/jobs/forms.tsx",
+  "app/staff/jobs/page.tsx",
   "app/staff/jurisdictions/[jurisdiction]/page.tsx",
   "app/staff/jurisdictions/forms.tsx",
   "app/staff/jurisdictions/page.tsx",
@@ -127,7 +131,7 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
     CONFIGURATION_FILES,
   );
   const pages = CONFIGURATION_FILES.filter((f) => f.endsWith("page.tsx"));
-  assert.equal(pages.length, 11);
+  assert.equal(pages.length, 12);
   for (const file of pages) {
     const source = read(file);
     const code = codeOf(source);
@@ -165,6 +169,22 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
     );
     assert.doesNotMatch(code, /\bparams\b/, file);
   }
+  // MVP-001 S2: the job view reads exactly two query values, state and
+  // page, in exactly these three places, and hands both unread to its use
+  // case, which checks them.
+  const jobs = codeOf(read("app/staff/jobs/page.tsx"));
+  assert.equal(jobs.match(/\bsearchParams\b/g)?.length, 3);
+  assert.ok(
+    jobs.includes(
+      "readonly searchParams: Promise<{\n    readonly state?: string | string[];\n    readonly page?: string | string[];\n  }>;",
+    ),
+  );
+  assert.ok(jobs.includes("const { state, page } = await searchParams;"));
+  assert.match(
+    jobs.replace(/\s+/g, " "),
+    /const view = await resolveOperationalJobs\( ?STAFF_CONFIGURATION_SOURCES, state, page,? ?\);/,
+  );
+  assert.doesNotMatch(jobs, /\bparams\b|last_error_message|lastErrorMessage/);
   for (const [file, [segment, resolver]] of Object.entries(DETAIL_PAGES)) {
     const code = codeOf(read(file));
     assert.equal(code.match(/\bparams\b/g)?.length, 3, file);
@@ -212,8 +232,9 @@ test("SR-2. the server actions hand the form and the trusted sources to the use 
   const exported = [...code.matchAll(/^export async function (\w+)\(/gm)].map(
     (m) => m[1],
   );
-  assert.equal(exported.length, 18);
-  assert.equal(code.match(/^export /gm).length, 18);
+  // MVP-001 S2: eighteen configuration actions and the two job actions.
+  assert.equal(exported.length, 20);
+  assert.equal(code.match(/^export /gm).length, 20);
   for (const name of exported) {
     assert.match(name, /^[a-z][A-Za-z]+Action$/);
     const operation = name.replace(/Action$/, "");
@@ -483,6 +504,8 @@ test("SR-5. every surface refuses a caller without its capability with no form a
       { params: Promise.resolve({ member: plain.userId }) },
     ],
     ["app/staff/intake-configuration/page.tsx", firstPage],
+    // MVP-001 S2.
+    ["app/staff/jobs/page.tsx", firstPage],
   ];
   for (const [path, props] of pages) {
     const denied = await render(path, sources(w, plain), props);
@@ -689,4 +712,135 @@ test("SR-9. D-4: the verification queue page links to its neighbouring pages and
     { searchParams: Promise.resolve({ page: ["2", "3"] }) },
   );
   assert.ok(odd.text.includes("Page 1 of the queue."));
+});
+
+// ---------------------------------------------------------------------------
+// MVP-001 S2: the operational job view
+// ---------------------------------------------------------------------------
+
+function jobWorld() {
+  const w = createWorld();
+  const operator = addStaff(w, 50, { name: "Synthetic Operator" });
+  grant(w, operator.userId, "manage_operational_jobs");
+  const plain = addStaff(w, 51);
+  const escalated = addJob(w, { state: "escalated" });
+  const overdue = addJob(w, { available_at: stamp(w.now - 5_000) });
+  const running = addJob(w, {
+    state: "running",
+    available_at: stamp(w.now + 90_000),
+  });
+  const done = addJob(w, { state: "completed" });
+  const cancelled = addJob(w, { state: "cancelled" });
+  return { w, operator, plain, escalated, overdue, running, done, cancelled };
+}
+
+const jobsPage = (query = {}) => ({ searchParams: Promise.resolve(query) });
+
+test("SR-10. the job view is listed for its capability holders, shows escalated jobs first with retry and cancel, and never a message, worker, or subject data", async () => {
+  const j = jobWorld();
+  const home = await render("app/staff/page.tsx", sources(j.w, j.operator));
+  assert.deepEqual(home.hrefs, ["/staff/jobs"]);
+  assert.ok(home.text.includes("Operational jobs"));
+  const view = await render(
+    "app/staff/jobs/page.tsx",
+    sources(j.w, j.operator),
+    jobsPage(),
+  );
+  assert.deepEqual(view.log, ["connection"]);
+  assert.ok(view.metadata.robots.index === false);
+  assert.ok(view.text.includes("Escalated jobs"));
+  assert.ok(view.text.includes("synthetic.check"));
+  assert.ok(view.text.includes("unknown_job_type"));
+  assert.ok(view.text.includes("1 of 1"));
+  assert.ok(view.text.includes(j.escalated.subject_id));
+  assert.ok(view.text.includes("Retry this job"));
+  assert.ok(view.text.includes("Cancel this job"));
+  assert.equal(view.html.match(/<form/g).length, 2);
+  assert.equal(
+    view.html.match(new RegExp(`name="job" value="${j.escalated.id}"`, "g"))
+      .length,
+    2,
+  );
+  // Only the escalated group is listed: no other job's id appears.
+  for (const other of [j.overdue, j.running, j.done, j.cancelled]) {
+    assert.equal(view.html.includes(other.id), false);
+  }
+  assert.equal(view.text.includes("Synthetic message never shown"), false);
+  assert.equal(view.html.includes("synthetic-worker"), false);
+  assert.deepEqual(view.hrefs, [
+    "/staff",
+    "/staff/jobs",
+    "/staff/jobs?state=open",
+    "/staff/jobs?state=finished",
+  ]);
+  assert.ok(
+    view.html.includes(
+      'aria-current="page" class="rs-button" data-variant="primary" href="/staff/jobs"',
+    ),
+  );
+});
+
+test("SR-11. waiting and running jobs show that they wait for a worker run, finished jobs offer no change, and every group pages on its own address", async () => {
+  const j = jobWorld();
+  const open = await render(
+    "app/staff/jobs/page.tsx",
+    sources(j.w, j.operator),
+    jobsPage({ state: "open" }),
+  );
+  assert.ok(open.text.includes("Waiting or running jobs"));
+  assert.ok(open.text.includes("waiting for a worker run"));
+  assert.ok(open.text.includes("lease until"));
+  assert.equal(open.text.includes("Retry this job"), false);
+  assert.equal(open.html.match(/<form/g).length, 2);
+  assert.equal(open.html.includes(j.escalated.id), false);
+  const finished = await render(
+    "app/staff/jobs/page.tsx",
+    sources(j.w, j.operator),
+    jobsPage({ state: "finished" }),
+  );
+  assert.ok(finished.text.includes("Completed at"));
+  assert.ok(finished.text.includes("Cancelled"));
+  assert.equal(finished.html.includes("<form"), false);
+  // A group with no jobs says so; paging keeps the group in its addresses.
+  const empty = createWorld();
+  const operator = addStaff(empty, 60);
+  grant(empty, operator.userId, "manage_operational_jobs");
+  const none = await render(
+    "app/staff/jobs/page.tsx",
+    sources(empty, operator),
+    jobsPage({ state: "open" }),
+  );
+  assert.ok(none.text.includes("There are no waiting or running jobs."));
+  for (let n = 0; n < 27; n += 1) {
+    addJob(empty, { available_at: stamp(empty.now + 1_000 + n) });
+  }
+  const first = await render(
+    "app/staff/jobs/page.tsx",
+    sources(empty, operator),
+    jobsPage({ state: "open" }),
+  );
+  // The markup escapes the separator.
+  assert.ok(first.hrefs.includes("/staff/jobs?state=open&amp;page=2"));
+  const second = await render(
+    "app/staff/jobs/page.tsx",
+    sources(empty, operator),
+    jobsPage({ state: "open", page: "2" }),
+  );
+  assert.ok(second.hrefs.includes("/staff/jobs?state=open"));
+  assert.ok(second.text.includes("There are no more jobs."));
+  // A value the server does not accept shows the escalated group.
+  const odd = await render(
+    "app/staff/jobs/page.tsx",
+    sources(j.w, j.operator),
+    jobsPage({ state: ["open", "finished"], page: "x" }),
+  );
+  assert.ok(odd.text.includes("Escalated jobs"));
+  // Without the capability nothing of the view is shown.
+  const denied = await render(
+    "app/staff/jobs/page.tsx",
+    sources(j.w, j.plain),
+    jobsPage({ state: "open" }),
+  );
+  assert.ok(denied.text.includes("No access"));
+  assert.equal(denied.html.includes("synthetic.check"), false);
 });

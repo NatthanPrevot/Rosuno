@@ -2789,14 +2789,30 @@ const CONFIGURATION_RPCS = Object.freeze([
   "staff_grant_capability",
   "staff_revoke_capability",
   "staff_publish_intake_question_set",
+  // MVP-001 S2: the two audited staff operational job functions.
+  "staff_retry_job",
+  "staff_cancel_job",
   "has_staff_capability",
 ]);
+// MVP-001 S2: the privileged module's only other calls are the three fixed
+// operational job worker functions, each exactly once, as a literal call on
+// its own privileged worker client, with exactly its named arguments and a
+// deadline; no other file names them.
+const JOB_WORKER_RPCS = Object.freeze({
+  job_claim:
+    'await admin\n          .rpc("job_claim", {\n            p_worker: workerId,\n            p_lease_seconds: leaseSeconds,\n            p_limit: limit,\n          })\n          .abortSignal(AbortSignal.timeout(JOB_CALL_DEADLINE_MS));',
+  job_complete:
+    'await admin\n          .rpc("job_complete", {\n            p_job_id: jobId,\n            p_worker: workerId,\n          })\n          .abortSignal(AbortSignal.timeout(JOB_CALL_DEADLINE_MS));',
+  job_fail:
+    'await admin\n          .rpc("job_fail", {\n            p_job_id: jobId,\n            p_worker: workerId,\n            p_error_code: errorCode,\n            p_error_message: errorMessage,\n          })\n          .abortSignal(AbortSignal.timeout(JOB_CALL_DEADLINE_MS));',
+});
 const CAPABILITY_PREDICATE_RPC =
   'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';
 const CONFIGURATION_REQUEST_CLIENT =
   "const client: RequestClient | null = await withinDeadline(\n      clientSource,\n      null,\n      deadlineMs,\n    );";
 const RPC_OCCURRENCES = Object.freeze({
-  [PRIVILEGED_MODULE]: 1,
+  // The quota decision and (MVP-001 S2) the three job worker calls.
+  [PRIVILEGED_MODULE]: 1 + Object.keys(JOB_WORKER_RPCS).length,
   // MVP-001 S1: the staff adapter's second RPC is exactly the PS-A2
   // environment accessor, pinned by name below.
   [STAFF_ADAPTER]: 2,
@@ -2850,6 +2866,18 @@ function assertQuotaRpcContract(codes) {
       file === PRIVILEGED_MODULE ? 1 : 0,
       file,
     );
+    for (const [name, call] of Object.entries(JOB_WORKER_RPCS)) {
+      assert.equal(
+        code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+        file === PRIVILEGED_MODULE ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      assert.equal(
+        code.split(call).length,
+        file === PRIVILEGED_MODULE ? 2 : 1,
+        `${file}: ${name}`,
+      );
+    }
   }
   const staffAdapter = codes.get(STAFF_ADAPTER);
   assert.equal(staffAdapter.split(SCOPE_PREDICATE_RPC).length, 2);
@@ -2908,26 +2936,49 @@ function assertQuotaRpcContract(codes) {
     provisioning,
     /\nconst DIGEST = \/\^\[0-9a-f\]\{64\}\$\/;\n\nfunction isDigest\(value: unknown\): value is string \{\n {2}return typeof value === "string" && DIGEST\.test\(value\);\n\}\n\nfunction isMaximum\(value: unknown\): value is number \{\n {2}return Number\.isSafeInteger\(value\) && \(value as number\) >= 1;\n\}\n/,
   );
-  // Five privileged clients (Admin provisioning, the P3-002
+  // Six privileged clients (Admin provisioning, the P3-002
   // attorney-applicant provisioning, the P3-003 professional and staff
-  // verification provisioning, and the quota decision) and one publishable
-  // client (the confirmation request), each built only from the verified
-  // binding.
+  // verification provisioning, the quota decision, and the MVP-001 S2
+  // operational job worker) and one publishable client (the confirmation
+  // request), each built only from the verified binding.
   assert.equal(
     provisioning.match(
       /\bcreate\(binding\.url, binding\.adminKey, clientOptions\(\)\)/g,
     ).length,
-    5,
+    6,
   );
-  assert.equal(provisioning.match(/\bcreate\(/g).length, 6);
+  assert.equal(provisioning.match(/\bcreate\(/g).length, 7);
   assert.equal(provisioning.match(/\bbinding\.publishableKey\b/g).length, 1);
-  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 5);
+  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 6);
+  // The worker port is built exactly like the other ports: the verified
+  // binding first, then its one cookie-free privileged client, never
+  // returned; it offers exactly the three worker calls and nothing else.
+  const workerStart = provisioning.indexOf(
+    "export async function createJobWorkerPort(",
+  );
+  const workerEnd = provisioning.indexOf("const MAX_IDS = 500;");
+  assert.ok(workerStart > 0 && workerEnd > workerStart);
+  const worker = provisioning.slice(workerStart, workerEnd);
+  assert.match(
+    worker,
+    /\): Promise<JobWorkerPort \| null> \{\n {2}const binding = readProjectBinding\(environment\);\n {2}if \(binding === null\) \{\n {4}return null;\n {2}\}\n {2}const admin = create\(binding\.url, binding\.adminKey, clientOptions\(\)\);\n {2}return Object\.freeze\(\{\n {4}claim: async /,
+  );
+  assert.deepEqual(
+    [...worker.matchAll(/^ {4}(\w+): async /gm)].map((match) => match[1]),
+    ["claim", "complete", "fail"],
+  );
+  assert.equal(worker.match(/\.rpc\(/g).length, 3);
+  assert.doesNotMatch(
+    worker,
+    /\.from\(|\.insert\(|\.update\(|\.upsert\(|\.delete\(|auth\.admin|job_enqueue|job_cancel_for_subject|operational_jobs|return admin\b|admin[,;)]|process\.env|\.\.\./,
+  );
 }
 
 // The exact export list: the original three, the one narrow quota
 // capability, the one narrow P3-002 attorney-applicant capability, the
-// P3-003 binding check (a boolean only, building no client), and the two
-// narrow P3-003 professional and staff verification capabilities, and no
+// P3-003 binding check (a boolean only, building no client), the two
+// narrow P3-003 professional and staff verification capabilities, and the
+// one narrow MVP-001 S2 operational job worker capability, and no
 // re-export, default export, or wildcard.
 function assertPrivilegedExports(provisioning) {
   assert.deepEqual(
@@ -2941,13 +2992,14 @@ function assertPrivilegedExports(provisioning) {
       "createRegistrationProvisioning",
       "createConfirmationDispatch",
       "hasPrivilegedProjectBinding",
+      "createJobWorkerPort",
       "createAttorneyProfessionalProvisioning",
       "createStaffVerificationProvisioning",
       "createAttorneyApplicantProvisioning",
       "decideQuotaRpc",
     ],
   );
-  assert.equal(provisioning.match(/\bexport\b/g).length, 8);
+  assert.equal(provisioning.match(/\bexport\b/g).length, 9);
   // The binding check returns only whether a binding exists.
   assert.match(
     provisioning,
@@ -2996,8 +3048,9 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
       file,
     );
     // Only the two server entry points, the server-only P3-002 attorney
-    // application adapter, and the server-only P3-003 professional and staff
-    // verification adapters load the privileged module, and no client module
+    // application adapter, the server-only P3-003 professional and staff
+    // verification adapters, and (MVP-001 S2) the server-only operational job
+    // worker adapter load the privileged module, and no client module
     // reaches it.
     const imports = importsOf(read(file));
     if (
@@ -3012,6 +3065,7 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
           "src/infrastructure/identity/attorney-application-provisioning.ts",
           "src/infrastructure/professional/attorney-professional-adapter.ts",
           "src/infrastructure/staff/staff-verification-adapter.ts",
+          "src/infrastructure/jobs/job-worker-adapter.ts",
         ].includes(file),
         file,
       );
@@ -3041,6 +3095,8 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
       "../../application/attorney-application.ts",
       "../../application/attorney-professional.ts",
       "../../application/client-registration.ts",
+      // MVP-001 S2: the worker port's type and its strict answer readers.
+      "../../application/job-worker.ts",
       "../../application/policy-selection.ts",
       "../../application/professional-records.ts",
       "../../application/staff-verification.ts",

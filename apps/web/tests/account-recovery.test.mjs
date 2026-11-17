@@ -2466,9 +2466,15 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
     "app/reset-password/actions.ts",
     "app/reset-password/page.tsx",
   ]);
+  // MVP-001 S2: the protected operational job worker route is the one other
+  // route handler, admitted by its exact path; it knows nothing of recovery.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
-    ["app/auth/confirm/route.ts"],
+    ["app/api/jobs/run/route.ts", "app/auth/confirm/route.ts"],
+  );
+  assert.doesNotMatch(
+    codeOf(read("app/api/jobs/run/route.ts")),
+    /recovery|reset-password|forgot-password|exchangeCodeForSession|updateUser|verifyOtp|\.auth\./i,
   );
   // The signup confirmation handler still verifies only signup links and
   // knows nothing of recovery.

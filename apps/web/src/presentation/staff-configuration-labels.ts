@@ -9,6 +9,8 @@
 import type {
   ConfigurationActionState,
   GrantState,
+  JobGroup,
+  JobState,
   LifecycleState,
   PolicyStatus,
   RefusalReason,
@@ -67,6 +69,30 @@ export const SURFACE_LINKS: Readonly<
     title: "Intake configuration",
     summary: "Publish new intake question-set versions.",
   },
+  jobs: {
+    href: "/staff/jobs",
+    title: "Operational jobs",
+    summary:
+      "See escalated, waiting, and finished background jobs, and retry or cancel them.",
+  },
+});
+
+// MVP-001 S2: the operational job states and the groups the job view lists.
+export const JOB_STATE_LABELS: Readonly<Record<JobState, Label>> =
+  Object.freeze({
+    pending: { label: "Waiting", tone: "information" },
+    running: { label: "Running", tone: "information" },
+    completed: { label: "Completed", tone: "success" },
+    escalated: { label: "Escalated", tone: "error" },
+    cancelled: { label: "Cancelled", tone: "neutral" },
+  });
+
+export const JOB_GROUP_LINKS: Readonly<
+  Record<JobGroup, { readonly href: string; readonly title: string }>
+> = Object.freeze({
+  escalated: { href: "/staff/jobs", title: "Escalated" },
+  open: { href: "/staff/jobs?state=open", title: "Waiting or running" },
+  finished: { href: "/staff/jobs?state=finished", title: "Finished" },
 });
 
 export const POLICY_STATUS_LABELS: Readonly<Record<PolicyStatus, Label>> =
@@ -165,7 +191,7 @@ const REASON_MESSAGES: Readonly<
   },
   invalid_transition: {
     title: "Transition not allowed",
-    body: "A policy version cannot move from its current status to that status. Nothing was saved.",
+    body: "The record's current state does not allow that move: a policy version follows its lifecycle, an operational job can be retried only while escalated, and only an unfinished job can be cancelled. Nothing was saved.",
   },
   authority_unverified: {
     title: "Verified authority required",

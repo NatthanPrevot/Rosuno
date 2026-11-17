@@ -31,6 +31,16 @@ export type LogFields = {
   readonly errorCode?: string;
   // An HTTP status reported with an error or answer (0 when there was none).
   readonly status?: number;
+  // MVP-001 S2: an operational job type, in the database's own job type
+  // format, such as "synthetic.check" (never a subject or payload).
+  readonly jobType?: string;
+  // MVP-001 S2: the counts of one operational job worker batch.
+  readonly claimed?: number;
+  readonly completed?: number;
+  readonly retried?: number;
+  readonly escalated?: number;
+  readonly superseded?: number;
+  readonly unconfirmed?: number;
 };
 
 export type LogSink = (level: LogLevel, line: string) => void;
@@ -67,7 +77,23 @@ const FIELD_SHAPES: ReadonlyArray<
       (value as number) >= 0 &&
       (value as number) <= 599,
   ],
+  ["jobType", (value) => matches(value, /^[a-z][a-z0-9_.]{2,63}$/)],
+  ["claimed", isCount],
+  ["completed", isCount],
+  ["retried", isCount],
+  ["escalated", isCount],
+  ["superseded", isCount],
+  ["unconfirmed", isCount],
 ]);
+
+// A count of jobs in one worker batch: a whole number from 0 to 1000.
+function isCount(value: unknown): boolean {
+  return (
+    Number.isSafeInteger(value) &&
+    (value as number) >= 0 &&
+    (value as number) <= 1000
+  );
+}
 
 function matches(value: unknown, shape: RegExp): boolean {
   return typeof value === "string" && shape.test(value);

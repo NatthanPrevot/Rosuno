@@ -14,6 +14,7 @@ import { USER_COLUMNS } from "../src/application/professional-identity.ts";
 import { PRACTICE_AREA_COLUMNS } from "../src/application/professional-records.ts";
 import {
   AUTHORITY_COLUMNS,
+  CANCEL_JOB_OUTCOMES,
   CAPABILITY_DEFINITION_COLUMNS,
   CONFIGURATION_JURISDICTION_COLUMNS,
   CONFIGURATION_POLICY_COLUMNS,
@@ -23,8 +24,10 @@ import {
   LAUNCH_AUTHORIZATION_COLUMNS,
   LAUNCH_GATE_COLUMNS,
   MEMBER_USER_COLUMNS,
+  OPERATIONAL_JOB_COLUMNS,
   POLICY_TYPE_COLUMNS,
   QUESTION_SET_COLUMNS,
+  RETRY_JOB_OUTCOMES,
   REVISE_POLICY_OUTCOMES,
   SERVICE_AREA_COLUMNS,
 } from "../src/application/staff-configuration.ts";
@@ -290,6 +293,19 @@ const WRITES = [
     { p_version_key: "synthetic-v3", p_definition: { format: 1 } },
     "question_set_id",
   ],
+  // MVP-001 S2: the two audited staff operational job functions.
+  [
+    (w) => w.retryOperationalJob(ID(10)),
+    "staff_retry_job",
+    { p_job_id: ID(10) },
+    null,
+  ],
+  [
+    (w) => w.cancelOperationalJob(ID(10)),
+    "staff_cancel_job",
+    { p_job_id: ID(10) },
+    null,
+  ],
 ];
 
 test("SC-I1. each write calls exactly one fixed staff function with only its named arguments, never an actor, staff User, grant, or scope", async () => {
@@ -449,6 +465,31 @@ test("SC-I2. answers are read strictly against the function's own outcomes; a da
     ),
     { kind: "rejected" },
   );
+  // MVP-001 S2: the staff job functions' own five outcomes, and nothing else.
+  for (const outcomes of [RETRY_JOB_OUTCOMES, CANCEL_JOB_OUTCOMES]) {
+    assert.deepEqual(
+      [...outcomes],
+      ["applied", "invalid", "denied", "not_found", "invalid_transition"],
+    );
+    for (const outcome of outcomes) {
+      assert.deepEqual(
+        textAnswerOf({ data: outcome, error: null, status: 200 }, outcomes),
+        { kind: "answer", outcome, value: null },
+      );
+    }
+    for (const data of [
+      "completed",
+      "cancelled",
+      "Applied",
+      null,
+      ["applied"],
+    ]) {
+      assert.deepEqual(
+        textAnswerOf({ data, error: null, status: 200 }, outcomes),
+        { kind: "unreadable" },
+      );
+    }
+  }
 });
 
 test("SC-I3. every read names its exact columns, is keyed only by the ids it is given, and is paged or bounded by the count asked for", async () => {
@@ -659,9 +700,51 @@ test("SC-I3. every read names its exact columns, is keyed only by the ids it is 
       ["limit", 1],
     ],
   );
+  // MVP-001 S2: one group of job states per read, in the group's own order.
+  await expect(
+    () => reads.operationalJobs("escalated", 0, 26),
+    [
+      ["from", "operational_jobs"],
+      ["select", OPERATIONAL_JOB_COLUMNS],
+      ["in", "state", ["escalated"]],
+      ["order", "failed_at", { ascending: false }],
+      ["order", "id", { ascending: false }],
+      ["limit", 26],
+    ],
+  );
+  await expect(
+    () => reads.operationalJobs("open", 25, 26),
+    [
+      ["from", "operational_jobs"],
+      ["select", OPERATIONAL_JOB_COLUMNS],
+      ["in", "state", ["running", "pending"]],
+      ["order", "available_at"],
+      ["order", "id"],
+      ["range", 25, 50],
+    ],
+  );
+  await expect(
+    () => reads.operationalJobs("finished", 0, 26),
+    [
+      ["from", "operational_jobs"],
+      ["select", OPERATIONAL_JOB_COLUMNS],
+      ["in", "state", ["completed", "cancelled"]],
+      ["order", "created_at", { ascending: false }],
+      ["order", "id", { ascending: false }],
+      ["limit", 26],
+    ],
+  );
+  assert.doesNotMatch(
+    OPERATIONAL_JOB_COLUMNS,
+    /last_error_message|locked_by|payload/,
+  );
   // Malformed ids, pages, and counts are unreadable and send nothing.
   log.length = 0;
   for (const call of [
+    () => reads.operationalJobs("all", 0, 26),
+    () => reads.operationalJobs("__proto__", 0, 26),
+    () => reads.operationalJobs("open", -1, 26),
+    () => reads.operationalJobs("open", 0, 1001),
     () => reads.policyVersions(-1, 26),
     () => reads.policyVersions(0, 0),
     () => reads.policyVersions(0, 1001),
@@ -841,6 +924,8 @@ test("SC-I6. the adapter's source stays request-scoped: exact imports, named tab
       "launch_authorizations",
       "launch_gate_evaluations",
       "launch_gates",
+      // MVP-001 S2: the operational job view, read under its row policy.
+      "operational_jobs",
       "policy_authority_references",
       "policy_types",
       "policy_versions",

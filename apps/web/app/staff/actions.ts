@@ -12,12 +12,14 @@
 // unavailable, unconfirmed, or not saved also writes one log line naming the
 // action and the outcome, with nothing the caller submitted. MVP-001 S2:
 // each action first asks the step-up gate; a session that is not stepped up
-// gets one fixed refusal, and nothing is handed to the use case.
+// gets one fixed refusal, and nothing is handed to the use case. The two
+// operational job actions (retry, cancel) follow the same rules.
 
 import { revalidatePath } from "next/cache";
 
 import {
   addAuthorityReference,
+  cancelOperationalJob,
   changeJurisdictionLifecycle,
   createJurisdiction,
   createPolicyVersion,
@@ -30,6 +32,7 @@ import {
   grantLaunchAuthorization,
   publishQuestionSet,
   recordLaunchGateEvaluation,
+  retryOperationalJob,
   revisePolicyDraft,
   revokeCapability,
   revokeLaunchAuthorization,
@@ -70,6 +73,7 @@ const PAGES: Readonly<Record<string, readonly string[]>> = Object.freeze({
   catalog: ["/staff/catalog"],
   capabilities: ["/staff/capabilities", "/staff/capabilities/[member]"],
   intake: ["/staff/intake-configuration"],
+  jobs: ["/staff/jobs"],
 });
 
 async function run(
@@ -270,4 +274,18 @@ export async function publishQuestionSetAction(
   formData: FormData,
 ): Promise<ConfigurationActionState> {
   return run("publishQuestionSet", publishQuestionSet, "intake", formData);
+}
+
+export async function retryOperationalJobAction(
+  _previous: ConfigurationActionState,
+  formData: FormData,
+): Promise<ConfigurationActionState> {
+  return run("retryOperationalJob", retryOperationalJob, "jobs", formData);
+}
+
+export async function cancelOperationalJobAction(
+  _previous: ConfigurationActionState,
+  formData: FormData,
+): Promise<ConfigurationActionState> {
+  return run("cancelOperationalJob", cancelOperationalJob, "jobs", formData);
 }

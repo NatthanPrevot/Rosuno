@@ -1068,12 +1068,31 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
     code.replace(sessionRead, " "),
     /\bconsole\b|\bprocess\b|getSession|getUser|access_?token|refresh_?token|error\.message|\bdata\b|\.session\b(?!:)|session_id/,
   );
-  // GET cannot sign out. The only route handler is the P2-006 email
-  // confirmation handler, admitted by its exact path and nothing broader, and
+  // GET cannot sign out. The only route handlers are the P2-006 email
+  // confirmation handler and (MVP-001 S2) the protected operational job
+  // worker route, each admitted by its exact path and nothing broader, and
   // the sign-out form is a POST server action on the home page.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
-    ["app/auth/confirm/route.ts"],
+    ["app/api/jobs/run/route.ts", "app/auth/confirm/route.ts"],
+  );
+  // The job worker route has no sign-out or session capability: it imports
+  // only the server-only worker adapter, reads no cookie or session, never
+  // ends one, and its only non-405 method is POST.
+  const workerSource = read("app/api/jobs/run/route.ts");
+  const worker = codeOf(workerSource);
+  assert.deepEqual(importsOf(workerSource), [
+    "../../../../src/infrastructure/jobs/job-worker-adapter.ts",
+  ]);
+  assert.doesNotMatch(
+    worker,
+    /sign-in\/actions|signOut|sign-?out|\.auth\.|cookies|getSession|getClaims|getUser|supabase-server|server-session-source|next\/headers|\bimport\s*\(/i,
+  );
+  assert.deepEqual(
+    [
+      ...worker.matchAll(/^export (?:async function|function|const) (\w+)/gm),
+    ].map((match) => match[1]),
+    ["dynamic", "POST", "GET", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"],
   );
   // That handler has no sign-out capability: it takes nothing from the
   // sign-in actions and never ends a session. Its GET renders only: no token

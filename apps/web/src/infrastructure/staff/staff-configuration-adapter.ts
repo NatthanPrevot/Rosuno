@@ -16,7 +16,8 @@
 // call is bounded in time; anything that fails, throws, or is too slow is
 // unreadable, and each such failure writes one log line naming the call and
 // how it failed, with the error code and HTTP status reported, and nothing
-// the call carried or answered.
+// the call carried or answered. MVP-001 S2: the operational job reads and the
+// two audited staff job functions (retry, cancel) follow the same rules.
 
 import {
   isUuid,
@@ -32,6 +33,7 @@ import {
 import {
   ADD_REFERENCE_OUTCOMES,
   AUTHORITY_COLUMNS,
+  CANCEL_JOB_OUTCOMES,
   CAPABILITY_DEFINITION_COLUMNS,
   CONFIGURATION_JURISDICTION_COLUMNS,
   CONFIGURATION_POLICY_COLUMNS,
@@ -47,14 +49,18 @@ import {
   GRANT_CAPABILITY_OUTCOMES,
   GRANT_COLUMNS,
   GRANT_LAUNCH_OUTCOMES,
+  JOB_GROUP_STATES,
+  JOB_GROUPS,
   LAUNCH_AUTHORIZATION_COLUMNS,
   LAUNCH_GATE_COLUMNS,
   LIFECYCLE_OUTCOMES,
   MEMBER_USER_COLUMNS,
+  OPERATIONAL_JOB_COLUMNS,
   POLICY_TYPE_COLUMNS,
   PRACTICE_AREA_ACTIVITY_OUTCOMES,
   PUBLISH_QUESTION_SET_OUTCOMES,
   QUESTION_SET_COLUMNS,
+  RETRY_JOB_OUTCOMES,
   REVISE_POLICY_OUTCOMES,
   REVOKE_CAPABILITY_OUTCOMES,
   REVOKE_LAUNCH_OUTCOMES,
@@ -66,6 +72,7 @@ import {
   type ConfigurationReads,
   type ConfigurationSources,
   type ConfigurationWrites,
+  type JobGroup,
 } from "../../application/staff-configuration.ts";
 import { STAFF_PROFILE_COLUMNS } from "../../application/staff-verification.ts";
 import { readEnvironmentConfiguration } from "../environment/environment-configuration.ts";
@@ -573,6 +580,33 @@ export function createConfigurationReads(
                 ),
               )
             : UNREADABLE_ROWS,
+        // MVP-001 S2: one group of states, ordered for staff: escalated jobs
+        // newest escalation first, open jobs soonest due first, and finished
+        // jobs newest first.
+        operationalJobs: async (
+          group: JobGroup,
+          offset: number,
+          count: number,
+        ) => {
+          if (!isPage(offset, count) || !JOB_GROUPS.includes(group)) {
+            return UNREADABLE_ROWS;
+          }
+          return observedRead("operationalJobs", deadlineMs, () => {
+            const query = client
+              .from("operational_jobs")
+              .select(OPERATIONAL_JOB_COLUMNS)
+              .in("state", [...JOB_GROUP_STATES[group]]);
+            const ordered =
+              group === "open"
+                ? query.order("available_at").order("id")
+                : query
+                    .order(group === "escalated" ? "failed_at" : "created_at", {
+                      ascending: false,
+                    })
+                    .order("id", { ascending: false });
+            return pageQuery(ordered, offset, count);
+          });
+        },
       } satisfies ConfigurationReads,
       deadlineMs,
     );
@@ -853,6 +887,26 @@ export function createConfigurationWrites(
               PUBLISH_QUESTION_SET_OUTCOMES,
               "question_set_id",
             ),
+        ),
+      retryOperationalJob: (jobId) =>
+        observedWrite(
+          "staff_retry_job",
+          deadlineMs,
+          () =>
+            client.rpc("staff_retry_job", {
+              p_job_id: jobId,
+            }),
+          (result) => textAnswerOf(result, RETRY_JOB_OUTCOMES),
+        ),
+      cancelOperationalJob: (jobId) =>
+        observedWrite(
+          "staff_cancel_job",
+          deadlineMs,
+          () =>
+            client.rpc("staff_cancel_job", {
+              p_job_id: jobId,
+            }),
+          (result) => textAnswerOf(result, CANCEL_JOB_OUTCOMES),
         ),
     } satisfies ConfigurationWrites);
   };

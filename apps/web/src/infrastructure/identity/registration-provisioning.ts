@@ -16,8 +16,10 @@
 // operation-specific functions, called through the request's own
 // authenticated session, so a privileged credential can never stand in for
 // an attorney's or a reviewer's current authority.
-// Another makes only the one fixed registration quota decision call. A
-// further client, built from
+// Another makes only the one fixed registration quota decision call, and
+// another only the three fixed operational job worker calls (MVP-001 S2:
+// claim, complete, and fail; no enqueue, read, or other write). A further
+// client, built from
 // the publishable key alone and never given the privileged credential, only
 // requests signup confirmation emails. No client receives a request cookie or
 // Authorization header, stores or refreshes a session, or reaches
@@ -37,6 +39,18 @@ import type {
   RegistrationProvisioning,
   RowsResult,
 } from "../../application/client-registration.ts";
+import {
+  claimAnswerOf,
+  completeAnswerOf,
+  failAnswerOf,
+  isClaimLimit,
+  isJobErrorCode,
+  isJobErrorMessage,
+  isLeaseSeconds,
+  isWorkerId,
+  UNKNOWN_CLAIM,
+  type JobWorkerPort,
+} from "../../application/job-worker.ts";
 import {
   AUTHORITY_REFERENCE_COLUMNS,
   ELIGIBILITY_POLICY_TYPE,
@@ -399,6 +413,90 @@ export function hasPrivilegedProjectBinding(
   environment: RegistrationEnvironment = runtimeEnvironment(),
 ): boolean {
   return readProjectBinding(environment) !== null;
+}
+
+// MVP-001 S2: the operational job worker port (Packet S2 job architecture
+// item 4), through its own cookie-free privileged client. It makes only the
+// three fixed worker calls, each a literal call of one database function
+// with exactly its named arguments, after checking every argument against
+// the database's own bounds, under a deadline. Each answer is read strictly
+// against that function's own outcomes; anything else, including a failed,
+// refused, aborted, or thrown call, is "unknown", so nothing is ever
+// reported as done that the database did not answer. The database derives
+// every other value (lease, attempts, backoff, escalation, audit) itself.
+const JOB_CALL_DEADLINE_MS = 10_000;
+
+export async function createJobWorkerPort(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<JobWorkerPort | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    claim: async (workerId, leaseSeconds, limit) => {
+      if (
+        !isWorkerId(workerId) ||
+        !isLeaseSeconds(leaseSeconds) ||
+        !isClaimLimit(limit)
+      ) {
+        return UNKNOWN_CLAIM;
+      }
+      try {
+        const { data, error } = await admin
+          .rpc("job_claim", {
+            p_worker: workerId,
+            p_lease_seconds: leaseSeconds,
+            p_limit: limit,
+          })
+          .abortSignal(AbortSignal.timeout(JOB_CALL_DEADLINE_MS));
+        return error === null ? claimAnswerOf(data, limit) : UNKNOWN_CLAIM;
+      } catch {
+        return UNKNOWN_CLAIM;
+      }
+    },
+    complete: async (jobId, workerId) => {
+      if (!isUuid(jobId) || !isWorkerId(workerId)) {
+        return "unknown";
+      }
+      try {
+        const { data, error } = await admin
+          .rpc("job_complete", {
+            p_job_id: jobId,
+            p_worker: workerId,
+          })
+          .abortSignal(AbortSignal.timeout(JOB_CALL_DEADLINE_MS));
+        return error === null ? completeAnswerOf(data) : "unknown";
+      } catch {
+        return "unknown";
+      }
+    },
+    fail: async (jobId, workerId, errorCode, errorMessage) => {
+      if (
+        !isUuid(jobId) ||
+        !isWorkerId(workerId) ||
+        !isJobErrorCode(errorCode) ||
+        !isJobErrorMessage(errorMessage)
+      ) {
+        return "unknown";
+      }
+      try {
+        const { data, error } = await admin
+          .rpc("job_fail", {
+            p_job_id: jobId,
+            p_worker: workerId,
+            p_error_code: errorCode,
+            p_error_message: errorMessage,
+          })
+          .abortSignal(AbortSignal.timeout(JOB_CALL_DEADLINE_MS));
+        return error === null ? failAnswerOf(data) : "unknown";
+      } catch {
+        return "unknown";
+      }
+    },
+  } satisfies JobWorkerPort);
 }
 
 // P3-003 professional read ports. Every list read is bounded and every id
