@@ -11,9 +11,12 @@
 // renders, verifies the token once through the request-scoped Auth client or
 // resumes a confirmed account; the application boundary decides the outcome.
 // The token appears only in the incoming link and the hidden form field.
-// Every response is uncacheable, unindexed, unframed, and sent without a
-// referrer; it loads no script or outside resource; and the only
-// destinations are fixed first-party paths.
+// Every response is uncacheable, unindexed, and unframed. Its referrer policy
+// is strict-origin (MVP-001 S1 correction): a referrer never carries the
+// link's path or token, and the browser still sends the real Origin that the
+// POST check requires (under no-referrer browsers send "Origin: null", so
+// every confirmation was refused). It loads no script or outside resource,
+// and the only destinations are fixed first-party paths.
 
 import {
   confirmRegistrationEmail,
@@ -37,7 +40,7 @@ const MAX_BODY_BYTES = 1024;
 const RESPONSE_HEADERS = Object.freeze({
   "cache-control": "no-store, max-age=0",
   pragma: "no-cache",
-  "referrer-policy": "no-referrer",
+  "referrer-policy": "strict-origin",
   "x-robots-tag": "noindex, nofollow, noarchive",
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
@@ -76,6 +79,25 @@ function originOf(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+// The internal listener a self-hosted Next.js server reports as the request
+// URL's origin (MVP-001 S1 correction): behind a reverse proxy, `next start`
+// reports http://localhost:<port> whatever public host the browser used, and
+// forwarding headers are never authority here, so that form says nothing
+// about the public target. Only exact loopback names over plain HTTP qualify.
+const INTERNAL_LISTENER =
+  /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]{1,5})?$/;
+
+// Whether the request targets the configured origin as far as this server
+// can tell: the configured origin itself (a direct deployment), or the
+// internal listener above (a proxied deployment). Any other target is
+// refused. This never replaces the browser Origin check on POST.
+function targetsConfiguredOrigin(request: Request, origin: string): boolean {
+  const target = originOf(request.url);
+  return (
+    target === origin || (target !== null && INTERNAL_LISTENER.test(target))
+  );
 }
 
 // Exactly one token_hash and type=email, or exactly one intent=resume when
@@ -172,7 +194,7 @@ function page(title: string, body: string, status: number): Response {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
-<meta name="referrer" content="no-referrer">
+<meta name="referrer" content="strict-origin">
 <title>${escapeHtml(title)} | Rosuno</title>
 <style>${STYLE}</style>
 </head>
@@ -344,7 +366,7 @@ const CONFIRMATION_SOURCES: ConfirmationSources = Object.freeze({
 
 export function GET(request: Request): Response {
   const origin = trustedOrigin();
-  if (origin === null || originOf(request.url) !== origin) {
+  if (origin === null || !targetsConfiguredOrigin(request, origin)) {
     return unavailablePage();
   }
   const params = new URL(request.url).searchParams;
@@ -362,10 +384,12 @@ export async function POST(request: Request): Promise<Response> {
   if (origin === null) {
     return unavailablePage();
   }
-  // The target and the browser's Origin must both be the configured origin.
+  // The target must be the configured origin (or the internal listener of a
+  // proxied deployment), and the browser's Origin must be exactly the
+  // configured origin, from a same-origin form.
   const fetchSite = request.headers.get("sec-fetch-site");
   if (
-    originOf(request.url) !== origin ||
+    !targetsConfiguredOrigin(request, origin) ||
     request.headers.get("origin") !== origin ||
     (fetchSite !== null && fetchSite !== "same-origin")
   ) {

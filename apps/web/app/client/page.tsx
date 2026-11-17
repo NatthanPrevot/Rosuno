@@ -3,9 +3,14 @@
 // Rendered on the server for every request: the trusted server session, the
 // trusted client principal source and the Security Shell decide access, and
 // the client's own Intakes are read through the request's own session under
-// the database's row policies. The page reads no route parameter, query,
-// header, cookie, or form field of its own. Refused and unavailable requests
-// each see one fixed message and no Intake data.
+// the database's row policies. The one query value read, page, only asks
+// which page of the client's own Intakes to show (newest first); the server
+// checks it and shows the first page for anything else. The page reads no
+// route parameter, header, cookie, or form field of its own. When a page
+// does not hold every Intake, it says so and links to its neighbours, so no
+// Intake is left out unseen. Refused and unavailable requests each see one
+// fixed message and no Intake data; an unavailable workspace also writes one
+// log line with no client or Intake data.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -13,6 +18,7 @@ import type { ReactNode } from "react";
 
 import { resolveClientWorkspace } from "../../src/application/client-intake.ts";
 import { CLIENT_INTAKE_SOURCES } from "../../src/infrastructure/client/client-intake-adapter.ts";
+import { logRequestEvent } from "../../src/infrastructure/observability/request-log.ts";
 import {
   Alert,
   ButtonLink,
@@ -60,11 +66,22 @@ function dateTime(timestamp: string): string {
   return `${new Date(timestamp).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
-export default async function ClientWorkspacePage() {
+function pageHref(page: number): string {
+  return page === 1 ? "/client" : `/client?page=${page}`;
+}
+
+export default async function ClientWorkspacePage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{ readonly page?: string | string[] }>;
+}) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
-  const view = await resolveClientWorkspace(CLIENT_INTAKE_SOURCES);
+  const { page } = await searchParams;
+  const view = await resolveClientWorkspace(CLIENT_INTAKE_SOURCES, page);
   if (view.status === "ready") {
+    const first = (view.page - 1) * view.pageSize + 1;
+    const last = first + view.intakes.length - 1;
     return (
       <WorkspaceFrame title="Your Intakes">
         <Text tone="muted">
@@ -72,9 +89,20 @@ export default async function ClientWorkspacePage() {
           you save, a new version is kept; earlier versions are never changed or
           deleted.
         </Text>
-        {view.intakes.length === 0 ? (
+        {view.intakes.length === 0 && view.page === 1 ? (
           <Text>You have not started an Intake yet.</Text>
-        ) : (
+        ) : null}
+        {view.intakes.length === 0 && view.page > 1 ? (
+          <>
+            <Text>There are no Intakes on this page.</Text>
+            <Cluster>
+              <ButtonLink variant="secondary" href="/client">
+                Show your most recent Intakes
+              </ButtonLink>
+            </Cluster>
+          </>
+        ) : null}
+        {view.intakes.length === 0 ? null : (
           <Table id="client-intakes" caption="Your Intakes">
             <thead>
               <tr>
@@ -111,6 +139,29 @@ export default async function ClientWorkspacePage() {
             </tbody>
           </Table>
         )}
+        {view.intakes.length > 0 &&
+        (view.newerPage !== null || view.olderPage !== null) ? (
+          <>
+            <Text tone="muted">
+              {`Showing Intakes ${first} to ${last}, newest first.`}
+              {view.olderPage === null
+                ? " There are no older Intakes."
+                : " Older Intakes are on the next page."}
+            </Text>
+            <Cluster>
+              {view.newerPage === null ? null : (
+                <ButtonLink variant="secondary" href={pageHref(view.newerPage)}>
+                  Show newer Intakes
+                </ButtonLink>
+              )}
+              {view.olderPage === null ? null : (
+                <ButtonLink variant="secondary" href={pageHref(view.olderPage)}>
+                  Show older Intakes
+                </ButtonLink>
+              )}
+            </Cluster>
+          </>
+        ) : null}
         {view.canStart ? (
           <StartIntakeForm />
         ) : (
@@ -152,6 +203,10 @@ export default async function ClientWorkspacePage() {
       </WorkspaceFrame>
     );
   }
+  await logRequestEvent("warn", "client_workspace.unavailable", {
+    route: "/client",
+    outcome: view.status,
+  });
   return (
     <WorkspaceFrame title="Client workspace unavailable">
       <Alert tone="error" title="Something went wrong" role="alert">

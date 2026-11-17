@@ -298,7 +298,14 @@ test("M4-R4. the staff queue and review render only within the reviewer's scope,
   addLicense(w, applicant.attorneyId, a);
   const global = addStaff(w, 30);
   addGrant(w, global.userId);
-  const queue = await render(staffQueue, staffSources(w, global.authId));
+  // MVP-001 D-4: the queue page receives its query values, as Next.js
+  // always passes them; none is given here, so the first page is shown.
+  const firstPage = { searchParams: Promise.resolve({}) };
+  const queue = await render(
+    staffQueue,
+    staffSources(w, global.authId),
+    firstPage,
+  );
   assert.ok(queue.text.includes("Synthetic Applicant"));
   assert.ok(
     queue.html.includes(`href="/staff/verification/${applicant.attorneyId}"`),
@@ -333,7 +340,7 @@ test("M4-R4. the staff queue and review render only within the reviewer's scope,
   // A reviewer without access sees no record data or form.
   const none = addStaff(w, 31);
   for (const [page, props] of [
-    [staffQueue, undefined],
+    [staffQueue, firstPage],
     [
       staffReview,
       { params: Promise.resolve({ attorney: applicant.attorneyId }) },

@@ -56,6 +56,12 @@ export default async function HomePage() {
               <ButtonLink variant="primary" href="/client">
                 Client workspace
               </ButtonLink>
+              <ButtonLink variant="secondary" href="/attorney">
+                Attorney workspace
+              </ButtonLink>
+              <ButtonLink variant="secondary" href="/staff/verification">
+                Staff verification
+              </ButtonLink>
               <form action={signOut}>
                 <Button variant="secondary" type="submit">
                   Sign out
@@ -64,9 +70,6 @@ export default async function HomePage() {
             </Cluster>
           )}
           <Cluster>
-            <ButtonLink variant="secondary" href="/sign-up">
-              Create an account
-            </ButtonLink>
             <ButtonLink variant="tertiary" href="/auth/confirm">
               Finish account confirmation
             </ButtonLink>

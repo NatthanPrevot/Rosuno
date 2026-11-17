@@ -401,8 +401,115 @@
       "applied_environment": "none",
       "non_production_validation": true,
       "drift_check": "clean",
-      "rollback_plan": "Before merge: forward-only correction commits on the work-item branch. After merge: a separately reviewed forward corrective migration; no destructive rollback, and no intake revision, question-set version, jurisdiction assessment or audit row is removed.",
+      "rollback_plan": "Merged to owner main (91af560f2654f63ea20b19da75a166ca274d0ddf); historical (DL-ENG-1 R8) and not applied to any persistent environment. A defect is corrected only by a separately reviewed forward corrective migration; no destructive rollback, and no intake revision, question-set version, jurisdiction assessment or audit row is removed.",
       "depends_on": ["20261106090000_p3_904_professional_write_boundary"]
+    },
+    {
+      "migration_id": "20261117010000_mvp_001_s1_environment_identity",
+      "migration_kind": "product",
+      "sequence": 17,
+      "artifact_path": "supabase/migrations/20261117010000_mvp_001_s1_environment_identity.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": [
+        "DEC-20261116-PS-A2-DEPLOYMENT-ENVIRONMENT-IDENTITY",
+        "DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"
+      ],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration; the environment record is never deleted and no policy version or authority reference is removed.",
+      "depends_on": ["20261115140653_p5_001_client_intake_foundation"]
+    },
+    {
+      "migration_id": "20261117020000_mvp_001_s1_professional_conformance",
+      "migration_kind": "product",
+      "sequence": 18,
+      "artifact_path": "supabase/migrations/20261117020000_mvp_001_s1_professional_conformance.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the function bodies; no professional record, evidence, evaluation or audit row is removed.",
+      "depends_on": ["20261117010000_mvp_001_s1_environment_identity"]
+    },
+    {
+      "migration_id": "20261117030000_mvp_001_s1_configuration_administration",
+      "migration_kind": "product",
+      "sequence": 19,
+      "artifact_path": "supabase/migrations/20261117030000_mvp_001_s1_configuration_administration.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration; no policy version, authority reference, gate evaluation, launch authorization, capability grant or audit row is removed.",
+      "depends_on": ["20261117020000_mvp_001_s1_professional_conformance"]
+    },
+    {
+      "migration_id": "20261117040000_mvp_001_s1_availability_checks",
+      "migration_kind": "product",
+      "sequence": 20,
+      "artifact_path": "supabase/migrations/20261117040000_mvp_001_s1_availability_checks.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration; no availability rule exists yet.",
+      "depends_on": ["20261117030000_mvp_001_s1_configuration_administration"]
     }
   ]
 }

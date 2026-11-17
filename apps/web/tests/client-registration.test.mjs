@@ -2045,7 +2045,8 @@ async function withOrigin(value, run) {
 
 function assertProtected(response) {
   assert.equal(response.headers.get("cache-control"), "no-store, max-age=0");
-  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  // MVP-001 S1: strict-origin (origin-only Referer, real Origin on POST).
+  assert.equal(response.headers.get("referrer-policy"), "strict-origin");
   assert.equal(
     response.headers.get("x-robots-tag"),
     "noindex, nofollow, noarchive",
@@ -2074,7 +2075,11 @@ async function pageOf(response) {
     html,
     /<meta name="robots" content="noindex, nofollow, noarchive">/,
   );
-  assert.match(html, /<meta name="referrer" content="no-referrer">/);
+  assert.match(html, /<meta name="referrer" content="strict-origin">/);
+  assert.doesNotMatch(
+    html,
+    /no-referrer|unsafe-url|same-origin|origin-when-cross-origin/,
+  );
   return html;
 }
 
@@ -2241,6 +2246,102 @@ test("32. POST requires the configured origin, a same-origin form, and exactly t
   await withOrigin(undefined, async () => {
     const response = await confirmRoute.POST(confirmPost(valid));
     assert.equal(response.status, 503);
+  });
+});
+
+test("32a. MVP-001 S1: behind a proxy, the internal listener target is accepted only with the browser's exact configured Origin from a same-origin form; lookalike targets stay refused", async () => {
+  const valid = `token_hash=${LINK_HASH}&type=email`;
+  // `next start` reports its own loopback listener as the request URL,
+  // whatever public host the browser used.
+  const internal = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://[::1]:3000",
+    "http://localhost",
+  ];
+  const lookalikes = [
+    "https://localhost:3000",
+    "http://localhost.synthetic.invalid:3000",
+    "http://127.0.0.2:3000",
+    "http://0.0.0.0:3000",
+    "http://10.0.0.5:3000",
+    "https://other.synthetic.invalid",
+  ];
+  const post = (target, headers = {}) =>
+    new Request(`${target}/auth/confirm`, {
+      method: "POST",
+      headers: {
+        origin: ORIGIN,
+        "content-type": "application/x-www-form-urlencoded",
+        "sec-fetch-site": "same-origin",
+        ...headers,
+      },
+      body: valid,
+    });
+  await withOrigin(ORIGIN, async () => {
+    const direct = await confirmRoute.POST(confirmPost(valid));
+    for (const target of internal) {
+      // GET renders the same confirmation form as a direct request.
+      const page = confirmRoute.GET(
+        new Request(
+          `${target}/auth/confirm?token_hash=${LINK_HASH}&type=email`,
+        ),
+      );
+      assert.equal(page.status, 200, target);
+      assert.equal((await pageOf(page)).split(LINK_HASH).length, 2, target);
+      // POST passes the origin checks exactly as a direct request does.
+      const proxied = await confirmRoute.POST(post(target));
+      assert.equal(proxied.status, direct.status, target);
+      // The browser Origin and Sec-Fetch-Site checks still apply in full.
+      for (const headers of [
+        { origin: "https://elsewhere.synthetic.invalid" },
+        { origin: target },
+        { origin: "null" },
+        { origin: `${ORIGIN}/` },
+        { "sec-fetch-site": "cross-site" },
+        { "sec-fetch-site": "same-site" },
+      ]) {
+        const response = await confirmRoute.POST(post(target, headers));
+        assert.equal(
+          response.status,
+          403,
+          `${target} ${JSON.stringify(headers)}`,
+        );
+        assert.equal((await pageOf(response)).includes(LINK_HASH), false);
+      }
+      const missingOrigin = new Request(`${target}/auth/confirm`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: valid,
+      });
+      assert.equal((await confirmRoute.POST(missingOrigin)).status, 403);
+    }
+    for (const target of lookalikes) {
+      const page = confirmRoute.GET(
+        new Request(
+          `${target}/auth/confirm?token_hash=${LINK_HASH}&type=email`,
+        ),
+      );
+      assert.equal(page.status, 503, target);
+      assert.equal((await pageOf(page)).includes(LINK_HASH), false);
+      const response = await confirmRoute.POST(post(target));
+      assert.equal(response.status, 403, target);
+    }
+  });
+  // An unconfigured origin is still unavailable, even on the listener.
+  await withOrigin(undefined, async () => {
+    assert.equal(
+      confirmRoute.GET(
+        new Request(
+          `http://localhost:3000/auth/confirm?token_hash=${LINK_HASH}&type=email`,
+        ),
+      ).status,
+      503,
+    );
+    assert.equal(
+      (await confirmRoute.POST(post("http://localhost:3000"))).status,
+      503,
+    );
   });
 });
 
@@ -2472,6 +2573,7 @@ test("36. the sign-up page is an accessible design-system form with show and hid
     "../../src/application/client-registration.ts",
     "../../src/application/form-operation.ts",
     "../../src/presentation/design-system.tsx",
+    "../../src/presentation/form-entries.ts",
     "./actions.ts",
   ]);
   assert.match(
@@ -2485,7 +2587,14 @@ test("36. the sign-up page is an accessible design-system form with show and hid
   // One semantic form submitted through the server action; nothing blocks
   // paste, autofill, or password managers, and no value is held.
   assert.equal(code.match(/<form\b[^>]*>/g).length, 1);
-  assert.match(code, /<form action=\{formAction\}>/);
+  // MVP-001 D-2: the one form also keeps the typed email address when React
+  // resets it after a submission; neither password is named, so both are
+  // cleared. That exact handler is the one reset handler admitted, and
+  // everything below is still refused in the rest of the page.
+  const keptForm =
+    '<form action={formAction} onReset={keepEntries(["email"])}>';
+  assert.equal(code.split(keptForm).length, 2);
+  assert.equal(code.match(/\bonReset\b/g).length, 1);
   assert.doesNotMatch(
     code,
     /\bmethod=|\bonSubmit\b|\bonPaste\b|\bonCopy\b|\bonCut\b|preventDefault|\bfetch\s*\(|localStorage|sessionStorage|document\.cookie|indexedDB|useEffect|\bdefaultValue\b|\bvalue=|dangerouslySetInnerHTML|maxLength|minLength|pattern=/,
@@ -2654,12 +2763,48 @@ const CLIENT_INTAKE_RPCS = Object.freeze([
   "client_submit_intake",
   "client_close_intake",
 ]);
+// MVP-001 S1: the staff configuration adapter calls the database's own
+// has_staff_capability predicate, the PS-A2 environment accessor, and the
+// eighteen operation-specific staff configuration functions, each exactly
+// once and each as a literal call through the request's own unprivileged
+// session; it builds or receives no privileged client.
+const CONFIGURATION_ADAPTER =
+  "src/infrastructure/staff/staff-configuration-adapter.ts";
+const CONFIGURATION_RPCS = Object.freeze([
+  "staff_create_policy_version",
+  "staff_revise_policy_draft",
+  "staff_transition_policy_version",
+  "staff_end_policy_version",
+  "staff_add_policy_authority_reference",
+  "staff_decide_policy_authority_reference",
+  "staff_create_jurisdiction",
+  "staff_change_jurisdiction_lifecycle",
+  "staff_create_service_area",
+  "staff_create_practice_area",
+  "staff_set_practice_area_active",
+  "staff_define_launch_gate",
+  "staff_record_launch_gate_evaluation",
+  "staff_grant_launch_authorization",
+  "staff_revoke_launch_authorization",
+  "staff_grant_capability",
+  "staff_revoke_capability",
+  "staff_publish_intake_question_set",
+  "has_staff_capability",
+]);
+const CAPABILITY_PREDICATE_RPC =
+  'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';
+const CONFIGURATION_REQUEST_CLIENT =
+  "const client: RequestClient | null = await withinDeadline(\n      clientSource,\n      null,\n      deadlineMs,\n    );";
 const RPC_OCCURRENCES = Object.freeze({
   [PRIVILEGED_MODULE]: 1,
-  [STAFF_ADAPTER]: 1,
+  // MVP-001 S1: the staff adapter's second RPC is exactly the PS-A2
+  // environment accessor, pinned by name below.
+  [STAFF_ADAPTER]: 2,
   [REQUEST_WRITE_MODULE]: 2,
   [APPLICANT_ADAPTER]: 2,
   [CLIENT_INTAKE_ADAPTER]: CLIENT_INTAKE_RPCS.length,
+  // The configuration functions and predicate, plus the environment accessor.
+  [CONFIGURATION_ADAPTER]: CONFIGURATION_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -2676,6 +2821,14 @@ function assertQuotaRpcContract(codes) {
     if (file === CLIENT_INTAKE_ADAPTER) {
       assert.doesNotMatch(code, /createClient\b|ADMIN_KEY|service_role/i);
     }
+    for (const name of CONFIGURATION_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === CONFIGURATION_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+    }
     assert.equal(
       code.match(/\brpc\b/gi)?.length ?? 0,
       RPC_OCCURRENCES[file] ?? 0,
@@ -2684,6 +2837,12 @@ function assertQuotaRpcContract(codes) {
     assert.equal(
       code.match(/has_manage_attorney_verification_scope/g)?.length ?? 0,
       file === STAFF_ADAPTER ? 1 : 0,
+      file,
+    );
+    assert.equal(
+      code.match(/client\.rpc\("deployment_environment_identity"\)/g)?.length ??
+        0,
+      file === STAFF_ADAPTER || file === CONFIGURATION_ADAPTER ? 1 : 0,
       file,
     );
     assert.equal(
@@ -2707,6 +2866,24 @@ function assertQuotaRpcContract(codes) {
   assert.doesNotMatch(
     staffAdapter,
     /\badmin\b|createClient\b|adminKey|allow_any_jurisdiction: true/,
+  );
+  // The configuration adapter: every RPC is a literal call by its own name
+  // (no computed, destructured, or dynamic target), the predicate is called
+  // with exactly its three named arguments, and the request client is built
+  // in exactly two places, its read port and its write port.
+  const configurationAdapter = codes.get(CONFIGURATION_ADAPTER);
+  assert.equal(
+    configurationAdapter.match(/client\.rpc\("[a-z_]+"/g)?.length,
+    RPC_OCCURRENCES[CONFIGURATION_ADAPTER],
+  );
+  assert.equal(configurationAdapter.split(CAPABILITY_PREDICATE_RPC).length, 2);
+  assert.equal(
+    configurationAdapter.split(CONFIGURATION_REQUEST_CLIENT).length,
+    3,
+  );
+  assert.doesNotMatch(
+    configurationAdapter,
+    /\badmin\b|createClient\b|adminKey|registration-provisioning|has_manage_attorney_verification_scope/,
   );
   for (const file of [REQUEST_WRITE_MODULE, APPLICANT_ADAPTER]) {
     const code = codes.get(file);
@@ -3055,6 +3232,8 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
     [
       "process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       "process.env.NEXT_PUBLIC_SUPABASE_URL",
+      // MVP-001 D-9: the server environment class setting (PS-A2).
+      "process.env.ROSUNO_ENVIRONMENT_CLASS",
       "process.env.ROSUNO_SUPABASE_ADMIN_KEY",
       "process.env.ROSUNO_SUPABASE_EXPECTED_PROJECT_REF",
     ],
@@ -3097,16 +3276,23 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
 });
 
 test("38. registration navigation is fixed first-party links on the sign-in and home pages", () => {
+  // MVP-001 S1 (D-1 corrected forward to the sign-in page): while account
+  // creation is refused by design, sign-in offers no account-creation link;
+  // its only links are exactly the recovery link and the home page.
   const signIn = codeOf(read("app/sign-in/page.tsx"));
-  assert.match(
-    signIn,
-    /<ButtonLink variant="secondary" href="\/sign-up">\n\s+Create an account\n\s+<\/ButtonLink>/,
+  assert.doesNotMatch(signIn, /\/sign-up|Create an account/);
+  assert.deepEqual(
+    [...signIn.matchAll(/\bhref="([^"]*)"/g)].map((match) => match[1]),
+    ["/forgot-password", "/"],
   );
-  assert.equal(signIn.match(/href="\/sign-up"/g).length, 1);
+  // MVP-001 D-1: account creation is refused by design until a client
+  // address can be trusted, so the home page offers no account-creation
+  // call to action at all. It keeps only the fixed confirmation-resume link.
   const home = codeOf(read("app/page.tsx"));
+  assert.doesNotMatch(home, /\/sign-up|Create an account/);
   assert.match(
     home,
-    /<ButtonLink variant="secondary" href="\/sign-up">\n\s+Create an account\n\s+<\/ButtonLink>\n\s+<ButtonLink variant="tertiary" href="\/auth\/confirm">\n\s+Finish account confirmation\n\s+<\/ButtonLink>/,
+    /<Cluster>\n\s+<ButtonLink variant="tertiary" href="\/auth\/confirm">\n\s+Finish account confirmation\n\s+<\/ButtonLink>\n\s+<\/Cluster>/,
   );
   // Links only: the home page still has just the one sign-out form.
   assert.equal(home.match(/<form\b/g).length, 1);

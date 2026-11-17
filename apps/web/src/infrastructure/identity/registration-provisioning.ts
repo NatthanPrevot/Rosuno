@@ -57,15 +57,17 @@ import {
 } from "../../application/professional-records.ts";
 import type { StaffProvisioning } from "../../application/staff-verification.ts";
 
-// The four server runtime inputs this module reads, and nothing else. The URL
+// The five server runtime inputs this module reads, and nothing else. The URL
 // and publishable key are the ones the request-scoped session client already
-// uses; the expected project reference and the privileged key are server-only
-// and are never read from a request, form, header, or cookie.
+// uses; the expected project reference, the privileged key, and the
+// environment class setting (PS-A2; MVP-001 D-9) are server-only and are
+// never read from a request, form, header, or cookie.
 export type RegistrationEnvironment = {
   readonly NEXT_PUBLIC_SUPABASE_URL: string | undefined;
   readonly NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: string | undefined;
   readonly ROSUNO_SUPABASE_ADMIN_KEY: string | undefined;
   readonly ROSUNO_SUPABASE_EXPECTED_PROJECT_REF: string | undefined;
+  readonly ROSUNO_ENVIRONMENT_CLASS?: string | undefined;
 };
 
 type ClientFactory = typeof createClient;
@@ -84,6 +86,7 @@ function runtimeEnvironment(): RegistrationEnvironment {
     ROSUNO_SUPABASE_ADMIN_KEY: process.env.ROSUNO_SUPABASE_ADMIN_KEY,
     ROSUNO_SUPABASE_EXPECTED_PROJECT_REF:
       process.env.ROSUNO_SUPABASE_EXPECTED_PROJECT_REF,
+    ROSUNO_ENVIRONMENT_CLASS: process.env.ROSUNO_ENVIRONMENT_CLASS,
   };
 }
 
@@ -137,13 +140,91 @@ function isKeyFor(
   }
 }
 
-// The verified binding of all four inputs to the one expected project, or
-// null. The URL must be exactly that project's managed HTTPS origin: no other
-// host, scheme, port, credentials, path, query, or fragment, and no fallback,
-// default project, or inference from the request.
+// MVP-001 D-9: the local Supabase stack's loopback API origins. A local
+// binding exists only when the environment class setting is exactly
+// "development" and no hosted project reference is configured.
+const LOCAL_ORIGINS = Object.freeze([
+  "http://127.0.0.1:54321",
+  "http://localhost:54321",
+]);
+
+// Whether a key belongs to the local stack for this purpose: a current key
+// carrying the purpose's prefix, or a legacy local demo JWT for exactly this
+// role that names no project. Any other shape is refused.
+function isLocalKeyFor(
+  key: unknown,
+  role: string,
+  prefix: string,
+): key is string {
+  if (typeof key !== "string" || !KEY_TEXT.test(key)) {
+    return false;
+  }
+  if (key.startsWith(prefix)) {
+    return key.length > prefix.length;
+  }
+  const parts = key.split(".");
+  if (parts.length !== 3) {
+    return false;
+  }
+  try {
+    const payload: unknown = JSON.parse(
+      Buffer.from(parts[1], "base64url").toString("utf8"),
+    );
+    return (
+      payload !== null &&
+      typeof payload === "object" &&
+      !Array.isArray(payload) &&
+      !Object.hasOwn(payload, "ref") &&
+      (payload as { readonly iss?: unknown }).iss === "supabase-demo" &&
+      (payload as { readonly role?: unknown }).role === role
+    );
+  } catch {
+    return false;
+  }
+}
+
+// The verified binding of the inputs to the local development stack, or
+// null: exactly one loopback origin (no other host, scheme, port, path,
+// query, or fragment), two distinct keys of the local stack, and no hosted
+// project reference.
+function readLocalBinding(
+  environment: RegistrationEnvironment,
+): ProjectBinding | null {
+  if (environment.ROSUNO_SUPABASE_EXPECTED_PROJECT_REF !== undefined) {
+    return null;
+  }
+  const url = environment.NEXT_PUBLIC_SUPABASE_URL;
+  const origin = LOCAL_ORIGINS.find(
+    (candidate) => url === candidate || url === `${candidate}/`,
+  );
+  if (origin === undefined) {
+    return null;
+  }
+  const publishableKey = environment.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const adminKey = environment.ROSUNO_SUPABASE_ADMIN_KEY;
+  if (
+    !isLocalKeyFor(publishableKey, "anon", "sb_publishable_") ||
+    !isLocalKeyFor(adminKey, "service_role", "sb_secret_") ||
+    adminKey === publishableKey
+  ) {
+    return null;
+  }
+  return Object.freeze({ url: origin, publishableKey, adminKey });
+}
+
+// The verified binding of all inputs to the one expected project, or null.
+// With the environment class setting "development" only the local binding
+// above can exist, and a hosted project is never bound. For every other
+// setting, including none, the URL must be exactly the expected project's
+// managed HTTPS origin: no other host, scheme, port, credentials, path,
+// query, or fragment, and no fallback, default project, or inference from
+// the request.
 function readProjectBinding(
   environment: RegistrationEnvironment,
 ): ProjectBinding | null {
+  if (environment.ROSUNO_ENVIRONMENT_CLASS === "development") {
+    return readLocalBinding(environment);
+  }
   const projectRef = environment.ROSUNO_SUPABASE_EXPECTED_PROJECT_REF;
   if (typeof projectRef !== "string" || !PROJECT_REF.test(projectRef)) {
     return null;

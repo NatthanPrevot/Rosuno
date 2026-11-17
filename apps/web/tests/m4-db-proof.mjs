@@ -25,6 +25,15 @@
 // APP-4) write through the operation-specific database functions. The full
 // P3-904 proof is p3-904-db-proof.mjs.
 //
+// MVP-001 S1 update: the four S1 migrations follow. The database records its
+// environment once, as the owner, before the policy-driven checks (PS-A2;
+// ENV-1 first proves the unrecorded refusal); policy fixtures are created as
+// drafts by the owner and walked through the lifecycle (the service role no
+// longer writes policy or configuration relations); the eligibility policy
+// type is 'eligibility' (SCH-4); create paths take a NULL id and the database
+// generates the key (SCH-1, APP-4); and RLS-3 and SEC-1 follow the staff read
+// policies and definer functions S1 adds, as exact assertions.
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -520,8 +529,115 @@ const COUNT = (subject, table, where = "true") =>
     ),
   );
 
+// MVP-001 S1: a synthetic test-only policy version, created as a draft by the
+// table owner (the service role no longer writes policy relations), with one
+// synthetic authority reference, then walked through the lifecycle the
+// policy_version_integrity trigger allows. Approval, its actor, and the
+// effective start are set in the same update; nothing changes afterwards.
+function policySeedSql(
+  id,
+  jurisdiction,
+  label,
+  parameters,
+  { activate = true, verified = true } = {},
+) {
+  const lines = [
+    `insert into public.policy_versions (id, policy_type_code, jurisdiction_id, version_label, parameters) values ('${id}', 'eligibility', '${jurisdiction}', '${label}', $j$${JSON.stringify(parameters)}$j$::jsonb);`,
+    `insert into public.policy_authority_references (policy_version_id, authority_type, citation_text, source_title, retrieved_at, verified_by_user_id, verification_status) values ('${id}', 'synthetic', 'synthetic citation', 'synthetic source', now(), ${verified ? `'${USER.grantor}'` : "null"}, '${verified ? "verified" : "unverified"}');`,
+  ];
+  if (activate) {
+    lines.push(
+      `update public.policy_versions set status = 'internal_review' where id = '${id}';`,
+      `update public.policy_versions set status = 'counsel_review' where id = '${id}';`,
+      `update public.policy_versions set status = 'approved', approved_at = now() - interval '2 days', approved_by_user_id = '${USER.grantor}', effective_from = now() - interval '1 day' where id = '${id}';`,
+      `update public.policy_versions set status = 'active' where id = '${id}';`,
+    );
+  }
+  return lines.join("\n");
+}
+
+// PS-A2: nothing is selectable before the database records its environment;
+// the owner records it once, as development, and the record is immutable.
+function environmentChecks() {
+  check(
+    "ENV-1 (MVP-001 S1, PS-A2) an unrecorded database refuses eligibility selection; the owner records the environment once, API roles cannot, and the record is immutable",
+    () => {
+      const identity = () =>
+        valueAs(
+          "authenticated",
+          AUTH.attorneyA,
+          "select environment_class || '|' || coalesce(project_ref, '') from public.deployment_environment_identity();",
+        );
+      assert.equal(identity(), "unrecorded|");
+      assert.deepEqual(
+        JSON.parse(
+          sql(
+            `select public.eligibility_selected_policy('${J_A}', now())::text;`,
+          ),
+        ),
+        { status: "undetermined", reason: "environment_unrecorded" },
+      );
+      assert.equal(
+        selectEligibilityPolicy(J_A, Date.now(), [], [], "unrecorded").reason,
+        "environment_unrecorded",
+      );
+      for (const role of ["authenticated", "service_role", "anon"]) {
+        assert.equal(
+          sqlstateOf(
+            as(
+              role,
+              null,
+              "select public.record_deployment_environment('development', null);",
+            ),
+          ),
+          "42501",
+          role,
+        );
+      }
+      assert.match(
+        sql(
+          "select public.record_deployment_environment('development', null);",
+        ),
+        /^[0-9a-f-]{36}$/,
+      );
+      assert.equal(
+        sqlstateOf(
+          psql(
+            "select public.record_deployment_environment('development', null);",
+          ),
+        ),
+        "55000",
+      );
+      assert.equal(
+        sqlstateOf(
+          psql(
+            "begin; update public.deployment_environment set environment_class = 'production', project_ref = 'syntheticprojectrefa'; rollback;",
+          ),
+        ),
+        "55000",
+      );
+      assert.equal(
+        sqlstateOf(
+          psql("begin; delete from public.deployment_environment; rollback;"),
+        ),
+        "55000",
+      );
+      assert.equal(identity(), "development|");
+      return { before: "environment_unrecorded", recorded: "development" };
+    },
+  );
+}
+
+function ensureEnvironmentRecorded() {
+  sql(
+    "select public.record_deployment_environment('development', null) where not exists (select 1 from public.deployment_environment);",
+  );
+}
+
 function probes() {
   // Synthetic professional records: A in SYN_A with evidence; B in SYN_B.
+  // MVP-001 S1: plus an inert synthetic draft policy version (never
+  // selectable) so RLS-3 probes non-empty policy relations.
   sql(`
     insert into public.licenses (id, attorney_id, jurisdiction_id, license_number) values
       ('${U(601)}', '${PROFILE_A}', '${J_A}', 'SYN-A-1'),
@@ -530,6 +646,7 @@ function probes() {
       values ('${U(701)}', '${J_A}', 'synthetic register', 'synthetic entry', now() - interval '1 hour', '${USER.staffA}', 'synthetic', 'synthetic lookup', false),
              ('${U(702)}', '${J_B}', 'synthetic register', 'synthetic entry', now() - interval '1 hour', '${USER.staffGlobal}', 'synthetic', 'synthetic lookup', false);
     insert into public.verification_evidence_subjects (verification_evidence_id, license_id) values ('${U(701)}', '${U(601)}'), ('${U(702)}', '${U(602)}');
+    ${policySeedSql(U(802), J_B, "synthetic-draft-b", {}, { activate: false, verified: false })}
   `);
 
   check(
@@ -606,7 +723,7 @@ function probes() {
   );
 
   check(
-    "RLS-3 ordinary sessions cannot write professional, evidence, evaluation, grant, or audit rows; capability grants and policy are unreadable",
+    "RLS-3 ordinary sessions cannot write professional, evidence, evaluation, grant, policy, jurisdiction, or audit rows; capability grants, policy, and jurisdictions are invisible to them (MVP-001 S1: SELECT is granted under staff-capability row policies, so the read answers zero rows instead of 42501)",
     () => {
       const writes = [
         `insert into public.licenses (attorney_id, jurisdiction_id, license_number) values ('${PROFILE_A}', '${J_A}', 'SYN-SELF');`,
@@ -615,9 +732,17 @@ function probes() {
         `insert into public.verification_evidence (retrieved_at) values (now());`,
         `insert into public.eligibility_evaluations (attorney_id, jurisdiction_id, context_type, evaluated_at, policy_references, result, factor_results, evidence_references, as_of) values ('${PROFILE_A}', '${J_A}', 'jurisdiction', now(), '[]', 'eligible', '[]', '{}', now());`,
         `insert into public.audit_events (actor_type, action_code, resource_type, occurred_at) values ('attorney', 'x', 'y', now());`,
-        `select count(*) from public.capability_grants;`,
-        `select count(*) from public.policy_versions;`,
-        `select count(*) from public.jurisdictions;`,
+        // MVP-001 S1: the relations that became readable under staff row
+        // policies stay closed to every write by an API session.
+        `insert into public.capability_grants (user_id, capability_code, granted_by_user_id) values ('${USER.staffGlobal}', 'manage_attorney_verification', '${USER.staffGlobal}');`,
+        `update public.capability_grants set revoked_at = now();`,
+        `delete from public.capability_grants;`,
+        `insert into public.policy_versions (policy_type_code, jurisdiction_id, version_label, parameters) values ('eligibility', '${J_A}', 'synthetic-self', '{}');`,
+        `update public.policy_versions set status = 'internal_review';`,
+        `delete from public.policy_versions;`,
+        `insert into public.jurisdictions (code, name, region_type) values ('SYN_SELF', 'Synthetic', 'synthetic');`,
+        `update public.jurisdictions set lifecycle_state = 'live';`,
+        `delete from public.jurisdictions;`,
       ];
       for (const subject of [AUTH.attorneyA, AUTH.staffGlobal]) {
         for (const statement of writes) {
@@ -628,6 +753,31 @@ function probes() {
           );
         }
       }
+      // Rows exist in every probed relation, and neither an attorney nor a
+      // verification reviewer (no configuration capability) sees any of them.
+      const hidden = [
+        "capability_grants",
+        "policy_versions",
+        "policy_authority_references",
+        "policy_types",
+        "jurisdictions",
+        "capability_definitions",
+      ];
+      const visible = {};
+      for (const table of hidden) {
+        assert.ok(
+          Number(sql(`select count(*) from public.${table};`)) > 0,
+          `${table} has rows`,
+        );
+        for (const subject of [AUTH.attorneyA, AUTH.staffGlobal]) {
+          assert.equal(COUNT(subject, table), 0, `${table} ${subject}`);
+        }
+        visible[table] = 0;
+      }
+      return {
+        api_writes: "42501",
+        rows_visible_to_ordinary_sessions: visible,
+      };
     },
   );
 
@@ -841,12 +991,11 @@ function probes() {
         },
         practice_area: { authorisation_required: true },
       };
+      // MVP-001 S1: the 'eligibility' type is seeded by the S1 migration
+      // (SCH-4); the version is created as a draft by the table owner and
+      // walked through the lifecycle (policySeedSql).
       sql(`
-      insert into public.policy_types (code, name) values ('attorney_eligibility', 'Synthetic test fixture');
-      insert into public.policy_versions (id, policy_type_code, jurisdiction_id, version_label, parameters) values ('${U(801)}', 'attorney_eligibility', '${J_A}', 'synthetic-v1', $j$${JSON.stringify(parameters)}$j$::jsonb);
-      insert into public.policy_authority_references (policy_version_id, authority_type, citation_text, source_title, retrieved_at, verified_by_user_id, verification_status)
-        values ('${U(801)}', 'synthetic', 'synthetic citation', 'synthetic source', now(), '${USER.grantor}', 'verified');
-      update public.policy_versions set status = 'active', approved_at = now() - interval '2 days', approved_by_user_id = '${USER.grantor}', effective_from = now() - interval '1 day' where id = '${U(801)}';
+      ${policySeedSql(U(801), J_A, "synthetic-v1", parameters)}
       update public.attorney_profiles set profile_state = 'approved' where id = '${PROFILE_A}';
       update public.licenses set reported_status = 'synthetic-active' where id = '${U(601)}';
       insert into public.insurance_records (id, attorney_id, jurisdiction_id, carrier_name, per_occurrence_limit_minor, currency_code, coverage_from, coverage_until)
@@ -856,13 +1005,56 @@ function probes() {
       insert into public.verification_evidence_subjects (verification_evidence_id, insurance_record_id) values ('${U(703)}', '${U(901)}');
     `);
       // A draft policy is never applied: the trigger refuses an active
-      // version without verified provenance.
-      const unverified = as(
-        "service_role",
-        null,
-        `insert into public.policy_versions (policy_type_code, jurisdiction_id, version_label, parameters, status, approved_at, approved_by_user_id, effective_from) values ('attorney_eligibility', '${J_B}', 'synthetic-unverified', '{}'::jsonb, 'active', now(), '${USER.grantor}', now());`,
+      // version without verified provenance. MVP-001 S1: the service role can
+      // no longer write policy versions at all (42501); as the table owner a
+      // version can only be created as a draft (23514), and walking an
+      // unverified draft to approval is still refused by the provenance
+      // trigger (23514). Both owner attempts are rolled back.
+      const activeInsert = `insert into public.policy_versions (policy_type_code, jurisdiction_id, version_label, parameters, status, approved_at, approved_by_user_id, effective_from) values ('eligibility', '${J_B}', 'synthetic-unverified', '{}'::jsonb, 'active', now(), '${USER.grantor}', now());`;
+      const unverified = as("service_role", null, activeInsert);
+      assert.equal(sqlstateOf(unverified), "42501");
+      const ownerActive = psql(
+        ["begin;", activeInsert, "rollback;", ""].join("\n"),
       );
-      assert.equal(sqlstateOf(unverified), "23514");
+      assert.equal(sqlstateOf(ownerActive), "23514");
+      assert.match(
+        ownerActive.stderr,
+        /a policy version is created as a draft/,
+      );
+      const ownerApproval = psql(
+        [
+          "begin;",
+          policySeedSql(
+            U(803),
+            J_B,
+            "synthetic-unverified",
+            {},
+            { verified: false },
+          ),
+          "rollback;",
+          "",
+        ].join("\n"),
+      );
+      assert.equal(sqlstateOf(ownerApproval), "23514");
+      assert.match(
+        ownerApproval.stderr,
+        /approved policy version requires verified authority provenance/,
+      );
+      assert.equal(
+        sql(
+          `select count(*) from public.policy_versions where version_label = 'synthetic-unverified';`,
+        ),
+        "0",
+      );
+      // The database's own selection agrees now the environment is recorded.
+      assert.equal(
+        JSON.parse(
+          sql(
+            `select public.eligibility_selected_policy('${J_A}', now())::text;`,
+          ),
+        ).policy_version_id,
+        U(801),
+      );
       const nowMs = Number(
         sql("select (extract(epoch from now()) * 1000)::bigint;"),
       );
@@ -903,12 +1095,14 @@ function probes() {
         ),
         policyVersions: jsonRows(
           POLICY_VERSION_COLUMNS,
-          `public.policy_versions where policy_type_code = 'attorney_eligibility' and jurisdiction_id = '${J_A}'`,
+          `public.policy_versions where policy_type_code = 'eligibility' and jurisdiction_id = '${J_A}'`,
         ),
         authorityReferences: jsonRows(
           AUTHORITY_REFERENCE_COLUMNS,
           `public.policy_authority_references where policy_version_id = '${U(801)}'`,
         ),
+        // MVP-001 S1 (PS-A2): the recorded environment class.
+        environment: "development",
       });
       const t1Facts = facts();
       assert.equal(
@@ -917,8 +1111,31 @@ function probes() {
           nowMs,
           t1Facts.policyVersions,
           t1Facts.authorityReferences,
+          "development",
         ).status,
         "selected",
+      );
+      // The same rows select nothing for an unrecorded or misbound
+      // environment (PS-A2).
+      assert.equal(
+        selectEligibilityPolicy(
+          J_A,
+          nowMs,
+          t1Facts.policyVersions,
+          t1Facts.authorityReferences,
+          "unrecorded",
+        ).reason,
+        "environment_unrecorded",
+      );
+      assert.equal(
+        selectEligibilityPolicy(
+          J_A,
+          nowMs,
+          t1Facts.policyVersions,
+          t1Facts.authorityReferences,
+          "mismatch",
+        ).reason,
+        "environment_mismatch",
       );
       for (const row of t1Facts.insurance) {
         assert.notEqual(readInsurance(row), null);
@@ -927,25 +1144,71 @@ function probes() {
       assert.equal(t1.result, "eligible", JSON.stringify(t1.factors));
       // Persisted through the P3-904 staff write function as the
       // jurisdiction-scoped reviewer, never by the service role.
+      // MVP-001 S1 (SCH-1): a caller-chosen evaluation id is refused with
+      // nothing written; with a NULL id the database generates the key, and
+      // the one new row is found by diffing the attorney's evaluation ids.
       const insertEvaluation = (assessment) => {
         const row = evaluationRowOf(assessment, nowMs);
-        const id = randomUUID();
+        const args = (id) => ({
+          p_evaluation_id: id,
+          p_attorney_id: row.attorney_id,
+          p_jurisdiction_id: row.jurisdiction_id,
+          p_context_type: row.context_type,
+          p_context_id: row.context_id,
+          p_as_of: row.as_of,
+          p_result: row.result,
+          p_factor_results: row.factor_results,
+          p_policy_references: row.policy_references,
+          p_evidence_references: row.evidence_references,
+        });
+        const idsBefore = new Set(
+          jsonRows(
+            "id",
+            `public.eligibility_evaluations where attorney_id = '${PROFILE_A}'`,
+          ).map((r) => r.id),
+        );
+        const auditBefore = sql("select count(*) from public.audit_events;");
+        const callerId = randomUUID();
         assert.equal(
-          callAs(AUTH.staffA, "staff_record_eligibility_evaluation", {
-            p_evaluation_id: id,
-            p_attorney_id: row.attorney_id,
-            p_jurisdiction_id: row.jurisdiction_id,
-            p_context_type: row.context_type,
-            p_context_id: row.context_id,
-            p_as_of: row.as_of,
-            p_result: row.result,
-            p_factor_results: row.factor_results,
-            p_policy_references: row.policy_references,
-            p_evidence_references: row.evidence_references,
-          }),
+          callAs(
+            AUTH.staffA,
+            "staff_record_eligibility_evaluation",
+            args(callerId),
+          ),
+          "invalid",
+        );
+        assert.equal(
+          sql(
+            `select count(*) from public.eligibility_evaluations where id = '${callerId}';`,
+          ),
+          "0",
+        );
+        assert.equal(
+          sql("select count(*) from public.audit_events;"),
+          auditBefore,
+        );
+        assert.equal(
+          callAs(
+            AUTH.staffA,
+            "staff_record_eligibility_evaluation",
+            args(null),
+          ),
           "applied",
         );
-        return id;
+        const created = jsonRows(
+          "id",
+          `public.eligibility_evaluations where attorney_id = '${PROFILE_A}'`,
+        )
+          .map((r) => r.id)
+          .filter((id) => !idsBefore.has(id));
+        assert.equal(created.length, 1);
+        assert.equal(
+          sql(
+            `select count(*) || '|' || min(actor_user_id::text) from public.audit_events where resource_id = '${created[0]}' and action_code = 'eligibility_evaluation_recorded';`,
+          ),
+          `1|${USER.staffA}`,
+        );
+        return created[0];
       };
       const t1Id = insertEvaluation(t1);
       const t1Before = jsonRows(
@@ -1089,6 +1352,9 @@ function probes() {
           "attorney_save_profile_details:v",
           "attorney_start_application:v",
           "attorney_submit_application:v",
+          // MVP-001 S1 re-pin (20261117030000): the staff read predicates for
+          // the configuration row policies, which write nothing.
+          "capability_admin_may_read_user:s",
           // P5-001 re-pin: the client intake and configuration-publication
           // functions, which write no M4 relation.
           "client_close_intake:v",
@@ -1097,15 +1363,45 @@ function probes() {
           "client_intake_practice_areas:s",
           "client_save_intake_revision:v",
           "client_submit_intake:v",
+          // MVP-001 S1 re-pin (20261117010000): the environment identity
+          // accessors and the environment-anchored policy resolver.
+          "deployment_environment_identity:s",
           "has_manage_attorney_verification_scope:s",
           "has_resource_metadata_access:s",
+          // MVP-001 S1 re-pin (20261117030000).
+          "has_staff_capability:s",
+          // MVP-001 S1 re-pin (20261117010000, 20261117030000): read-only
+          // definers executable by no API role.
+          "policy_select_version:s",
+          "production_financial_gate:s",
+          "rosuno_environment_class:s",
+          "rosuno_environment_status:s",
+          // MVP-001 S1 re-pin (20261117030000): the configuration
+          // administration functions, which write no M4 relation.
+          "staff_add_policy_authority_reference:v",
+          "staff_change_jurisdiction_lifecycle:v",
           "staff_change_profile_stage:v",
+          "staff_create_jurisdiction:v",
+          "staff_create_policy_version:v",
+          "staff_create_practice_area:v",
+          "staff_create_service_area:v",
+          "staff_decide_policy_authority_reference:v",
           "staff_decide_practice_area:v",
+          "staff_define_launch_gate:v",
+          "staff_end_policy_version:v",
+          "staff_grant_capability:v",
+          "staff_grant_launch_authorization:v",
           "staff_publish_intake_question_set:v",
           "staff_record_discipline_finding:v",
           "staff_record_eligibility_evaluation:v",
+          "staff_record_launch_gate_evaluation:v",
           "staff_record_source_unavailable:v",
           "staff_record_verification_finding:v",
+          "staff_revise_policy_draft:v",
+          "staff_revoke_capability:v",
+          "staff_revoke_launch_authorization:v",
+          "staff_set_practice_area_active:v",
+          "staff_transition_policy_version:v",
         ].join(","),
       );
       assert.equal(
@@ -1219,7 +1515,7 @@ function probes() {
   );
 
   check(
-    "APP-4 (P3-904) a server-generated id is written once through the attorney write function with exactly one audit row naming the attorney; the same id cannot be written twice and no write-ahead attempt or outcome row exists",
+    "APP-4 (P3-904; MVP-001 S1 SCH-1) a caller-chosen id is refused with nothing written; a create with a NULL id writes exactly one license with a server-generated key and exactly one audit row naming the attorney; neither a replay of the create (natural-key conflict) nor a create naming the server key writes anything more, and no write-ahead attempt or outcome row exists",
     () => {
       const auth = U(121);
       const user = U(221);
@@ -1227,9 +1523,9 @@ function probes() {
       sql(`insert into auth.users (id) values ('${auth}');
         insert into public.users (id, auth_user_id, account_state) values ('${user}', '${auth}', 'active');
         insert into public.attorney_profiles (id, user_id, profile_state) values ('${profile}', '${user}', 'applicant');`);
-      const licenseId = U(611);
-      const claim = (number) => ({
-        p_license_id: licenseId,
+      const callerId = U(611);
+      const claim = (id, number) => ({
+        p_license_id: id,
         p_expected_updated_at: null,
         p_jurisdiction_id: J_B,
         p_license_number: number,
@@ -1237,16 +1533,64 @@ function probes() {
         p_effective_from: null,
         p_effective_until: null,
       });
+      const ownLicenses = () =>
+        jsonRows(
+          "id, license_number",
+          `public.licenses where attorney_id = '${profile}'`,
+        );
+      const ownAudit = () =>
+        sql(
+          `select count(*) from public.audit_events where actor_user_id = '${user}';`,
+        );
+      // A caller-chosen id on create is refused before anything is written.
       assert.equal(
-        callAs(auth, "attorney_save_license_claim", claim("SYN-GEN-1")),
+        callAs(
+          auth,
+          "attorney_save_license_claim",
+          claim(callerId, "SYN-GEN-0"),
+        ),
+        "invalid",
+      );
+      assert.equal(
+        sql(
+          `select count(*) from public.licenses where id = '${callerId}' or license_number = 'SYN-GEN-0';`,
+        ),
+        "0",
+      );
+      assert.equal(ownAudit(), "0");
+      // The create with a NULL id writes one row with a server key.
+      assert.equal(
+        callAs(auth, "attorney_save_license_claim", claim(null, "SYN-GEN-1")),
         "applied",
       );
+      const created = ownLicenses();
+      assert.equal(created.length, 1);
+      const licenseId = created[0].id;
+      assert.equal(created[0].license_number, "SYN-GEN-1");
+      assert.notEqual(licenseId, callerId);
+      assert.match(
+        licenseId,
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+      // A replay of the same create cannot duplicate the license.
       assert.equal(
-        callAs(auth, "attorney_save_license_claim", claim("SYN-GEN-2")),
+        callAs(auth, "attorney_save_license_claim", claim(null, "SYN-GEN-1")),
         "conflict",
       );
+      // The server key cannot be written again as a new claim either.
       assert.equal(
-        sql(`select count(*) from public.licenses where id = '${licenseId}';`),
+        callAs(
+          auth,
+          "attorney_save_license_claim",
+          claim(licenseId, "SYN-GEN-2"),
+        ),
+        "invalid",
+      );
+      assert.deepEqual(ownLicenses(), created);
+      assert.equal(
+        sql(
+          `select count(*) from public.licenses where license_number in ('SYN-GEN-1', 'SYN-GEN-2');`,
+        ),
         "1",
       );
       assert.equal(
@@ -1255,13 +1599,20 @@ function probes() {
         ),
         `1|${user}|attorney`,
       );
+      assert.equal(ownAudit(), "1");
       assert.equal(
         sql(
           "select count(*) from public.audit_events where action_code = 'audited_change_outcome' or after_snapshot ? 'audit_phase';",
         ),
         "0",
       );
-      return { first: "applied", repeated: "conflict", audit_rows: 1 };
+      return {
+        caller_id: "invalid",
+        first: "applied",
+        replay: "conflict",
+        server_key_rewrite: "invalid",
+        audit_rows: 1,
+      };
     },
   );
 }
@@ -1272,6 +1623,10 @@ function main() {
     sql(FIXTURE, "postgres");
     applyMigrations();
     sql(seedSql());
+    // MVP-001 S1 (PS-A2): record the environment as the owner, once, after
+    // ENV-1 has proved the unrecorded refusal.
+    environmentChecks();
+    ensureEnvironmentRecorded();
     probes();
   } catch (error) {
     report.checks.push({

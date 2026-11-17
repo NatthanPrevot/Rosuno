@@ -51,7 +51,7 @@ export default function ResetPasswordPage({
   return (
     <>
       <meta name="robots" content="noindex, nofollow, noarchive" />
-      <meta name="referrer" content="no-referrer" />
+      <meta name="referrer" content="strict-origin" />
       <Page density="public">
         <Surface emphasis="raised" labelledBy="reset-password-title">
           <Stack>

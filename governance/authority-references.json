@@ -142,6 +142,17 @@
       "reinterpreted": false,
       "integrity": "sha256:1612e751d6d94ffdf4c7c13f168d9e97bd85f793b03ccc5aa41e3d48eb1e803e",
       "usage": "reference-only",
+      "status": "active"
+    },
+    {
+      "authority_id": "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+      "title": "Rosuno Physical Specification Bounded Amendment PS-A2 (deployment environment identity and development-configuration designation), rosuno-physical-specification-amendment-ps-a2.md",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "sha256:599c2235f540233c7475dd28799bfb2bb201c09cf88e53d2461b35099a42a1ba",
+      "usage": "reference-only",
       "status": "pending_lock_condition"
     }
   ]

@@ -144,6 +144,9 @@ function factsOf(world, attorneyId, jurisdictionId, practiceAreaId = null) {
     authorityReferences: world.policy_authority_references
       .filter((r) => versionIds.has(r.policy_version_id))
       .map((r) => pick(r, AUTHORITY_REFERENCE_COLUMNS)),
+    // PS-A2: the bound deployment environment class. Production is the
+    // strictest: a development-only configuration is never selected there.
+    environment: "production",
   };
 }
 
@@ -178,7 +181,7 @@ test("M4-E1. a fully supported synthetic attorney is eligible only under a selec
     {
       policy_version_id: s.policy,
       version_label: "synthetic-v1",
-      policy_type_code: "attorney_eligibility",
+      policy_type_code: "eligibility",
     },
   ]);
   assert.equal(result.references.evidence_ids.length, 2);
@@ -326,15 +329,16 @@ test("M4-E3. conflicting versions, mode-specific versions, another jurisdiction'
       s.world.now,
       [foreign],
       facts.authorityReferences,
+      "production",
     ).reason,
     "policy_records_unreadable",
   );
   assert.equal(
-    selectEligibilityPolicy(s.a, s.world.now, null, []).reason,
+    selectEligibilityPolicy(s.a, s.world.now, null, [], "production").reason,
     "policy_records_unreadable",
   );
   assert.equal(
-    selectEligibilityPolicy(s.a, s.world.now, [], null).reason,
+    selectEligibilityPolicy(s.a, s.world.now, [], null, "production").reason,
     "policy_records_unreadable",
   );
 });
@@ -772,4 +776,95 @@ test("M4-E10. T1 -> adverse fact -> T2: a later evaluation reflects the new fact
   );
   // An unreadable assessment cannot become a persisted row.
   assert.equal(evaluationRowOf({ ...t2, asOf: "" }, s.world.now), null);
+});
+
+test("M4-E11. PS-A2: an unrecorded or mismatched environment holds every result undetermined; a development-only draft applies only in development or staging", () => {
+  const s = eligibleWorld();
+  const base = factsOf(s.world, s.attorney.attorneyId, s.a);
+  for (const [environment, reason] of [
+    ["unrecorded", "environment_unrecorded"],
+    ["mismatch", "environment_mismatch"],
+    [undefined, "environment_mismatch"],
+    [null, "environment_mismatch"],
+    ["Production", "environment_mismatch"],
+  ]) {
+    const result = assessEligibility({ ...base, environment }, s.world.now);
+    assert.equal(result.result, "undetermined", String(environment));
+    assert.equal(factor(result, "policy").reason, reason, String(environment));
+  }
+  for (const environment of ["development", "staging", "production"]) {
+    assert.equal(
+      assessEligibility({ ...base, environment }, s.world.now).result,
+      "eligible",
+      environment,
+    );
+  }
+  // The same jurisdiction under a development-only draft (never approved,
+  // no authority reference needed) instead of the approved version.
+  const dev = eligibleWorld();
+  const version = dev.world.policy_versions.find((v) => v.id === dev.policy);
+  Object.assign(version, {
+    status: "draft",
+    approved_at: null,
+    approved_by_user_id: null,
+    development_only: true,
+  });
+  dev.world.policy_authority_references.length = 0;
+  const devFacts = factsOf(dev.world, dev.attorney.attorneyId, dev.a);
+  for (const environment of ["development", "staging"]) {
+    const result = assessEligibility(
+      { ...devFacts, environment },
+      dev.world.now,
+    );
+    assert.equal(result.result, "eligible", environment);
+    assert.deepEqual(
+      result.policyReferences.map((r) => r.policy_version_id),
+      [dev.policy],
+    );
+  }
+  const inProduction = assessEligibility(
+    { ...devFacts, environment: "production" },
+    dev.world.now,
+  );
+  assert.equal(inProduction.result, "undetermined");
+  assert.equal(factor(inProduction, "policy").reason, "no_applicable_policy");
+  // A development-only row in any other status, or an ordinary draft, is
+  // never selected, in any environment.
+  for (const status of [
+    "internal_review",
+    "counsel_review",
+    "approved",
+    "active",
+  ]) {
+    Object.assign(version, { status });
+    for (const environment of ["development", "staging", "production"]) {
+      const result = assessEligibility(
+        { ...factsOf(dev.world, dev.attorney.attorneyId, dev.a), environment },
+        dev.world.now,
+      );
+      assert.equal(result.result, "undetermined", `${status}/${environment}`);
+    }
+  }
+  Object.assign(version, { status: "draft", development_only: false });
+  for (const environment of ["development", "staging", "production"]) {
+    const result = assessEligibility(
+      { ...factsOf(dev.world, dev.attorney.attorneyId, dev.a), environment },
+      dev.world.now,
+    );
+    assert.equal(result.result, "undetermined", environment);
+    assert.equal(factor(result, "policy").reason, "no_applicable_policy");
+  }
+  // A development-only row that is not a boolean flag is unreadable input.
+  Object.assign(version, { development_only: "true" });
+  const unreadable = assessEligibility(
+    {
+      ...factsOf(dev.world, dev.attorney.attorneyId, dev.a),
+      environment: "development",
+    },
+    dev.world.now,
+  );
+  assert.equal(
+    factor(unreadable, "policy").reason,
+    "policy_records_unreadable",
+  );
 });

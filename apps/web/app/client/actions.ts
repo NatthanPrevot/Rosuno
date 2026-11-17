@@ -8,7 +8,9 @@
 // accepts these only as POST requests and applies its Server Action origin
 // checks. The previous state comes back from the browser and is never read.
 // Nothing the browser sends chooses an identity, User, profile, state, or
-// authority. After a change the pages are read afresh.
+// authority. After a change the pages are read afresh. An unavailable or
+// unknown outcome also writes one log line naming the action and the
+// outcome, with nothing the client submitted.
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -22,12 +24,31 @@ import {
 } from "../../src/application/client-intake.ts";
 import { isUuid } from "../../src/application/professional-records.ts";
 import { CLIENT_INTAKE_SOURCES } from "../../src/infrastructure/client/client-intake-adapter.ts";
+import { logRequestEvent } from "../../src/infrastructure/observability/request-log.ts";
 
 const CHANGED = new Set<ClientIntakeActionState["status"]>([
   "saved",
   "submitted",
   "closed",
 ]);
+
+const NOT_COMPLETED = new Set<ClientIntakeActionState["status"]>([
+  "unavailable",
+  "outcome-unknown",
+]);
+
+async function observed(
+  operation: string,
+  state: ClientIntakeActionState,
+): Promise<ClientIntakeActionState> {
+  if (NOT_COMPLETED.has(state.status)) {
+    await logRequestEvent("warn", "client_intake.action_not_completed", {
+      operation,
+      outcome: state.status,
+    });
+  }
+  return state;
+}
 
 function refreshed(
   formData: FormData,
@@ -47,7 +68,10 @@ export async function startIntakeAction(
   _previous: ClientIntakeActionState,
   _formData: FormData,
 ): Promise<ClientIntakeActionState> {
-  const state = await startIntake(CLIENT_INTAKE_SOURCES);
+  const state = await observed(
+    "startIntake",
+    await startIntake(CLIENT_INTAKE_SOURCES),
+  );
   if (state.status === "created") {
     revalidatePath("/client");
     redirect(`/client/intakes/${state.intakeId}`);
@@ -61,7 +85,10 @@ export async function saveIntakeAction(
 ): Promise<ClientIntakeActionState> {
   return refreshed(
     formData,
-    await saveIntakeRevision(CLIENT_INTAKE_SOURCES, formData),
+    await observed(
+      "saveIntakeRevision",
+      await saveIntakeRevision(CLIENT_INTAKE_SOURCES, formData),
+    ),
   );
 }
 
@@ -71,7 +98,10 @@ export async function submitIntakeAction(
 ): Promise<ClientIntakeActionState> {
   return refreshed(
     formData,
-    await submitIntake(CLIENT_INTAKE_SOURCES, formData),
+    await observed(
+      "submitIntake",
+      await submitIntake(CLIENT_INTAKE_SOURCES, formData),
+    ),
   );
 }
 
@@ -81,6 +111,9 @@ export async function closeIntakeAction(
 ): Promise<ClientIntakeActionState> {
   return refreshed(
     formData,
-    await closeIntake(CLIENT_INTAKE_SOURCES, formData),
+    await observed(
+      "closeIntake",
+      await closeIntake(CLIENT_INTAKE_SOURCES, formData),
+    ),
   );
 }

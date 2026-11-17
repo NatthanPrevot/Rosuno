@@ -137,20 +137,20 @@ export type AttorneyProfessionalWrites = {
     expectedStage: "applicant" | "approved",
     details: ProfileDetails,
   ) => Promise<WriteAnswer>;
-  // A null version adds a claim with the given new id; a version revises the
-  // claim with that id.
+  // A null id and null version add a claim (the database generates its id,
+  // PS section 2.2; MVP-001 S1 SCH-1); an id and version revise that claim.
   readonly saveLicense: (
-    licenseId: string,
+    licenseId: string | null,
     expectedUpdatedAt: string | null,
     claim: LicenseClaim,
   ) => Promise<WriteAnswer>;
   readonly saveInsurance: (
-    recordId: string,
+    recordId: string | null,
     expectedUpdatedAt: string | null,
     claim: InsuranceClaim,
   ) => Promise<WriteAnswer>;
+  // The database generates the new request's id (SCH-1).
   readonly requestPracticeArea: (
-    authorisationId: string,
     jurisdictionId: string,
     practiceAreaId: string,
   ) => Promise<WriteAnswer>;
@@ -169,9 +169,6 @@ export type AttorneyProfessionalSources = {
   readonly provisioning: () => Promise<AttorneyProfessionalProvisioning | null>;
   readonly writes: () => Promise<AttorneyProfessionalWrites | null>;
   readonly clock: () => number;
-  // A new record id generated on the server for each insert, so a repeated
-  // call can never create a second record.
-  readonly newId: () => string;
 };
 
 // ---------------------------------------------------------------------------
@@ -952,16 +949,6 @@ function stateOf(result: WriteResult): ProfessionalActionState {
   }
 }
 
-// A new record id generated on the server, or null when unusable.
-function newIdOf(sources: AttorneyProfessionalSources): string | null {
-  try {
-    const id = sources.newId();
-    return isUuid(id) ? id : null;
-  } catch {
-    return null;
-  }
-}
-
 // Saves the attorney's own ordinary profile details. In the applicant stage
 // display name, headline, biography, and years of experience can change; once
 // approved, only the presentation fields (display name, headline, biography)
@@ -1172,14 +1159,10 @@ export async function saveLicenseClaim(
         return LOCKED;
       }
     }
-    const id = recordId ?? newIdOf(sources);
-    if (id === null) {
-      return UNAVAILABLE;
-    }
     const expectedUpdatedAt = before?.updatedAt ?? null;
     return stateOf(
       await writeOnce(() =>
-        writable.writes.saveLicense(id, expectedUpdatedAt, claim),
+        writable.writes.saveLicense(recordId, expectedUpdatedAt, claim),
       ),
     );
   } catch {
@@ -1351,14 +1334,10 @@ export async function saveInsuranceClaim(
         return LOCKED;
       }
     }
-    const id = recordId ?? newIdOf(sources);
-    if (id === null) {
-      return UNAVAILABLE;
-    }
     const expectedUpdatedAt = before?.updatedAt ?? null;
     return stateOf(
       await writeOnce(() =>
-        writable.writes.saveInsurance(id, expectedUpdatedAt, claim),
+        writable.writes.saveInsurance(recordId, expectedUpdatedAt, claim),
       ),
     );
   } catch {
@@ -1428,13 +1407,9 @@ export async function requestPracticeArea(
         ],
       });
     }
-    const id = newIdOf(sources);
-    if (id === null) {
-      return UNAVAILABLE;
-    }
     return stateOf(
       await writeOnce(() =>
-        writable.writes.requestPracticeArea(id, jurisdiction, area),
+        writable.writes.requestPracticeArea(jurisdiction, area),
       ),
     );
   } catch {

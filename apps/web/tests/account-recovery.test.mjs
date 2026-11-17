@@ -2238,10 +2238,12 @@ test("29. the recovery page renders only: the code goes only into its own hidden
     code,
     /exchangeCodeForSession|exchangeCode|updateUser|updatePassword|signOut|resetPasswordForEmail|getClaims|createSupabaseServerClient|\bcookies\b|\bheaders\b|\bfetch\s*\(|useEffect|useLayoutEffect|useRouter|\bwindow\b|\bdocument\b|location|history|localStorage|sessionStorage|indexedDB|redirect|navigate|\bconsole\b|dangerouslySetInnerHTML|\bmethod=|\bonSubmit\b|\bon[A-Z]\w*=|\bdefaultValue\b|\bkey=|\bsrc=|\baction="/,
   );
-  // The page asks not to be indexed or archived and sends no referrer.
+  // The page asks not to be indexed or archived and sends at most its origin
+  // as referrer (MVP-001 S1: strict-origin, so the recovery code never leaves
+  // in a Referer and a post still carries a real Origin).
   assert.deepEqual(code.match(/<meta [^>]*\/>/g), [
     '<meta name="robots" content="noindex, nofollow, noarchive" />',
-    '<meta name="referrer" content="no-referrer" />',
+    '<meta name="referrer" content="strict-origin" />',
   ]);
   // Every component comes from the design system; its only native elements
   // are the two meta tags, the form, and the hidden field. No class, style,
@@ -2344,6 +2346,7 @@ test("30. the request page is an accessible design-system form whose copy never 
     "../../src/application/account-recovery.ts",
     "../../src/application/form-operation.ts",
     "../../src/presentation/design-system.tsx",
+    "../../src/presentation/form-entries.ts",
     "./actions.ts",
   ]);
   assert.match(
@@ -2352,9 +2355,15 @@ test("30. the request page is an accessible design-system form whose copy never 
   );
   assert.equal(code.match(/\brequestRecovery\b/g)?.length, 2);
   assert.equal(code.match(/<form\b[^>]*>/g)?.length, 1);
-  assert.match(code, /<form action=\{formAction\}>/);
+  // MVP-001 D-2: the one form also keeps the typed email address when React
+  // resets it after a submission. That exact handler, naming only the email
+  // field, is the one event handler admitted; every other handler, value,
+  // and default value is still refused below.
+  const keptForm =
+    '<form action={formAction} onReset={keepEntries(["email"])}>';
+  assert.equal(code.split(keptForm).length, 2);
   assert.doesNotMatch(
-    code,
+    code.replace(keptForm, "<form action={formAction}>"),
     /\bmethod=|\bonSubmit\b|\bon[A-Z]\w*=|\bfetch\s*\(|localStorage|sessionStorage|document\.cookie|indexedDB|useEffect|\bdefaultValue\b|\bvalue=|dangerouslySetInnerHTML|searchParams|resetPasswordForEmail|createSupabaseServerClient/,
   );
   assert.match(
@@ -2431,12 +2440,13 @@ test("31. the sign-in page gains one fixed, keyboard-reachable recovery link and
   const code = codeOf(read("app/sign-in/page.tsx"));
   assert.match(
     code,
-    /<Button variant="primary" type="submit" disabled=\{pending\}>\n\s+Sign in\n\s+<\/Button>\n\s+<ButtonLink variant="tertiary" href="\/forgot-password">\n\s+Forgot password\?\n\s+<\/ButtonLink>\n\s+<ButtonLink variant="secondary" href="\/sign-up">/,
+    /<Button variant="primary" type="submit" disabled=\{pending\}>\n\s+Sign in\n\s+<\/Button>\n\s+<ButtonLink variant="tertiary" href="\/forgot-password">\n\s+Forgot password\?\n\s+<\/ButtonLink>\n\s+<ButtonLink variant="tertiary" href="\/">/,
   );
   assert.equal(code.match(/href="\/forgot-password"/g)?.length, 1);
+  // MVP-001 S1: no account-creation link while registration is refused.
   assert.deepEqual(
     [...code.matchAll(/\bhref="([^"]*)"/g)].map((match) => match[1]),
-    ["/forgot-password", "/sign-up", "/"],
+    ["/forgot-password", "/"],
   );
   // Sign-in itself is untouched: one form, submitted through the same action.
   assert.equal(code.match(/<form\b[^>]*>/g)?.length, 1);

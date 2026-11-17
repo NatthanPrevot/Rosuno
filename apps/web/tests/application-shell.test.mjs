@@ -123,16 +123,28 @@ const trustedShellView = "getShellView(SUPABASE_SERVER_SESSION_SOURCE)";
 const sessionEntryImport = 'import { signOut } from "./sign-in/actions.ts";';
 // P5-001: the authenticated branch of the session entry also offers one fixed
 // first-party link to the client workspace, beside the sign-out form.
+// MVP-001 D-11: it also offers fixed first-party links to the attorney
+// workspace and the staff verification queue. Each destination decides
+// access for itself on the server, and an anonymous request sees none.
 const sessionEntry =
-  'view.session === "anonymous" ? ( <ButtonLink variant="primary" href="/sign-in"> Sign in </ButtonLink> ) : ( <Cluster> <ButtonLink variant="primary" href="/client"> Client workspace </ButtonLink> <form action={signOut}> <Button variant="secondary" type="submit"> Sign out </Button> </form> </Cluster> )';
+  'view.session === "anonymous" ? ( <ButtonLink variant="primary" href="/sign-in"> Sign in </ButtonLink> ) : ( <Cluster> <ButtonLink variant="primary" href="/client"> Client workspace </ButtonLink> <ButtonLink variant="secondary" href="/attorney"> Attorney workspace </ButtonLink> <ButtonLink variant="secondary" href="/staff/verification"> Staff verification </ButtonLink> <form action={signOut}> <Button variant="secondary" type="submit"> Sign out </Button> </form> </Cluster> )';
+// The attorney workspace link is the one use of that word the page may hold,
+// in exactly this source form, once.
+const attorneyWorkspaceLink =
+  '<ButtonLink variant="secondary" href="/attorney">\n                Attorney workspace\n              </ButtonLink>';
 const trustedSourceVocabulary = new Map([
-  ["app/page.tsx", [trustedSessionImport, trustedShellView]],
+  [
+    "app/page.tsx",
+    [trustedSessionImport, trustedShellView, attorneyWorkspaceLink],
+  ],
 ]);
-// P2-006: the page also offers fixed registration and confirmation-resume
-// navigation, two plain links shown whatever the session. This exact markup
-// is the only further addition admitted to the historical page contract.
+// P2-006: the page also offers fixed confirmation-resume navigation, a plain
+// link shown whatever the session. MVP-001 D-1 withdrew the account-creation
+// link beside it: account creation is refused by design until a client
+// address can be trusted. This exact markup is the only further addition
+// admitted to the historical page contract.
 const registrationEntry =
-  '<Cluster> <ButtonLink variant="secondary" href="/sign-up"> Create an account </ButtonLink> <ButtonLink variant="tertiary" href="/auth/confirm"> Finish account confirmation </ButtonLink> </Cluster>';
+  '<Cluster> <ButtonLink variant="tertiary" href="/auth/confirm"> Finish account confirmation </ButtonLink> </Cluster>';
 
 // Import or export syntax without the spacing Prettier writes, or with a
 // comment inside it, would hide its specifier from importsOf.
@@ -1019,7 +1031,6 @@ test("12. presentation reaches application state only through application module
       "Status",
       "Cluster",
       "ButtonLink",
-      "ButtonLink",
       "Columns",
       "Stack",
       "Heading",
@@ -1105,8 +1116,6 @@ test("12. presentation reaches application state only through application module
       "tone",
       "variant",
       "href",
-      "variant",
-      "href",
       "columns",
       "size",
       "tone",
@@ -1182,7 +1191,6 @@ test("12. presentation reaches application state only through application module
       "One visual language for every Rosuno screen: warm surfaces, restrained gold, and clear hierarchy.",
       "Session: {}",
       "{}",
-      "Create an account",
       "Finish account confirmation",
       "Actions and status",
       "Three levels of emphasis, each with hover, focus, pressed, and disabled states.",
@@ -1249,9 +1257,11 @@ test("12. presentation reaches application state only through application module
       "variant=primary",
       "href=/client",
       "variant=secondary",
-      "type=submit",
+      "href=/attorney",
       "variant=secondary",
-      "href=/sign-up",
+      "href=/staff/verification",
+      "variant=secondary",
+      "type=submit",
       "variant=tertiary",
       "href=/auth/confirm",
       "columns=split",
@@ -1443,16 +1453,27 @@ test("13. generic shell contains no feature-specific business logic or records",
   }
 });
 
-test("14. generated Next.js state stays in ignored app-local locations", () => {
+test("14. generated Next.js state stays in ignored app-local locations", async () => {
   // next.config.ts runs here too: output goes to dist/ and next dev writes no
-  // agent files into the app.
-  assert.deepEqual(nextConfig, { agentRules: false, distDir: "dist" });
+  // agent files into the app. MVP-001 D-5 adds exactly one more directive,
+  // headers(), which returns the fixed security headers (pinned in full by
+  // tests/security-headers.test.mjs).
+  assert.deepEqual(Reflect.ownKeys(nextConfig), [
+    "agentRules",
+    "distDir",
+    "headers",
+  ]);
+  assert.equal(nextConfig.agentRules, false);
+  assert.equal(nextConfig.distDir, "dist");
+  assert.equal(typeof nextConfig.headers, "function");
+  assert.equal((await nextConfig.headers()).length, 2);
   // Next.js copies every own key of the config, enumerable or not, and runs it
-  // in its own process, so the file itself is exactly these two directives:
-  // nothing hidden, computed, or conditional on how it is run.
+  // in its own process, so the file itself is exactly these three directives
+  // and their fixed header values: nothing hidden, computed from the
+  // environment, or conditional on how it is run.
   assert.equal(
     codeOf(read("next.config.ts")),
-    'import type { NextConfig } from "next";\n\nconst nextConfig: NextConfig = {\n  agentRules: false,\n  distDir: "dist",\n};\n\nexport default nextConfig;\n',
+    'import type { NextConfig } from "next";\nconst CONTENT_SECURITY_POLICY = [\n  "default-src \'self\'",\n  "script-src \'self\' \'unsafe-inline\'",\n  "style-src \'self\'",\n  "img-src \'self\'",\n  "font-src \'self\'",\n  "connect-src \'self\'",\n  "object-src \'none\'",\n  "base-uri \'none\'",\n  "form-action \'self\'",\n  "frame-ancestors \'none\'",\n].join("; ");\n\nconst TRANSPORT_SECURITY = {\n  key: "Strict-Transport-Security",\n  value: "max-age=31536000; includeSubDomains",\n};\n\nconst SECURITY_HEADERS = [\n  { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },\n  { key: "X-Frame-Options", value: "DENY" },\n  { key: "Referrer-Policy", value: "same-origin" },\n  { key: "X-Content-Type-Options", value: "nosniff" },\n  TRANSPORT_SECURITY,\n];\n\nconst nextConfig: NextConfig = {\n  agentRules: false,\n  distDir: "dist",\n  async headers() {\n    return [\n      { source: "/((?!auth/confirm$).*)", headers: SECURITY_HEADERS },\n      { source: "/auth/confirm", headers: [TRANSPORT_SECURITY] },\n    ];\n  },\n};\n\nexport default nextConfig;\n',
   );
   // Next.js loads next.config.js or next.config.mjs ahead of next.config.ts,
   // so no other config file may exist beside it.

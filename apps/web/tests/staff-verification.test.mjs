@@ -321,11 +321,11 @@ test("M4-S4. a source-grounded finding writes immutable evidence linked to exact
     Date.parse(evidence.created_at) <= Date.parse(s.licenseA.updated_at),
   );
   // One write call carried the evidence, the record and its version, and
-  // the observed status; no reviewer, User, account, or scope was sent.
+  // the observed status; no reviewer, User, account, or scope was sent, and
+  // no key: the database generates the evidence id (SCH-1).
   assert.deepEqual(Object.keys(sent).sort(), [
     "disciplineStatus",
     "evidence",
-    "evidenceId",
     "expectedUpdatedAt",
     "observedStatus",
     "resolvedAt",
@@ -659,7 +659,7 @@ test("M4-S8. viewing computes assessments without persisting; an explicit determ
   assert.ok(t1.evidence_references.evidence_ids.length >= 2);
   assert.equal(
     t1.policy_references[0].policy_type_code,
-    "attorney_eligibility",
+    "eligibility",
   );
   const [recorded] = auditsOf(s.world, "eligibility_evaluation_recorded");
   assert.equal(recorded.resource_id, t1.id);

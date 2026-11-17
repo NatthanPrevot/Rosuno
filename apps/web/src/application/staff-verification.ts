@@ -87,6 +87,11 @@ import {
   type ProfileState,
   type SubjectKind,
 } from "./professional-records.ts";
+import {
+  bindEnvironment,
+  type EnvironmentBinding,
+  type EnvironmentConfiguration,
+} from "./environment-binding.ts";
 import type { ServerSessionSource } from "./session.ts";
 
 export const STAFF_PROFILE_COLUMNS = "id, user_id, staff_state";
@@ -104,14 +109,40 @@ export type StaffReads = {
   readonly holdsVerificationScope: (
     jurisdictionId: string | null,
   ) => Promise<ScopeAnswer>;
-  readonly attorneyProfiles: () => Promise<RowsResult>;
+  // The review queue, one page at a time (MVP-001 D-4). Each paged read
+  // leaves out removed profiles, the caller's own attorney profile, and
+  // anything but pending requests in the database itself, so a page is never
+  // shortened afterwards.
+  readonly queueProfiles: (
+    excludedAttorneyId: string | null,
+    offset: number,
+    count: number,
+  ) => Promise<RowsResult>;
+  readonly queueLicenses: (
+    excludedAttorneyId: string | null,
+    offset: number,
+    count: number,
+  ) => Promise<RowsResult>;
+  readonly queueRequests: (
+    excludedAttorneyId: string | null,
+    offset: number,
+    count: number,
+  ) => Promise<RowsResult>;
+  // The license claims and pending practice-area requests of the attorneys
+  // one queue page shows, read within an explicit row count.
+  readonly licensesOfAttorneys: (
+    attorneyIds: readonly string[],
+    count: number,
+  ) => Promise<RowsResult>;
+  readonly requestsOfAttorneys: (
+    attorneyIds: readonly string[],
+    count: number,
+  ) => Promise<RowsResult>;
   readonly attorneyProfileById: (attorneyId: string) => Promise<RowsResult>;
   readonly licensesOf: (attorneyId: string) => Promise<RowsResult>;
   readonly insuranceOf: (attorneyId: string) => Promise<RowsResult>;
   readonly disciplineOf: (attorneyId: string) => Promise<RowsResult>;
   readonly authorisationsOf: (attorneyId: string) => Promise<RowsResult>;
-  readonly pendingAuthorisations: () => Promise<RowsResult>;
-  readonly visibleLicenses: () => Promise<RowsResult>;
   readonly recordById: (
     kind: SubjectKind,
     recordId: string,
@@ -125,6 +156,9 @@ export type StaffReads = {
   ) => Promise<RowsResult>;
   readonly evaluationsOf: (attorneyId: string) => Promise<RowsResult>;
   readonly practiceAreas: () => Promise<RowsResult>;
+  // The database's own environment record (PS-A2 section 5), read through
+  // the caller's session.
+  readonly environmentIdentity: () => Promise<RowsResult>;
 };
 
 // The source-grounded evidence a reviewer submits. The evidence row's id,
@@ -162,8 +196,8 @@ export type ReviewTransition = {
   readonly to: "approved" | "applicant" | "suspended";
 };
 
+// The database generates the evidence id (PS section 2.2; MVP-001 S1 SCH-1).
 export type FindingWrite = {
-  readonly evidenceId: string;
   readonly subjectKind: SubjectKind;
   readonly subjectId: string;
   // The record's updated_at exactly as read.
@@ -174,9 +208,8 @@ export type FindingWrite = {
   readonly resolvedAt: string | null;
 };
 
+// The database generates the discipline record and evidence ids (SCH-1).
 export type DisciplineWrite = {
-  readonly disciplineId: string;
-  readonly evidenceId: string;
   readonly attorneyId: string;
   readonly record: DisciplineInsert;
   readonly evidence: EvidenceFields;
@@ -207,7 +240,8 @@ export type StaffWrites = {
     message: string | null,
     note: string | null,
   ) => Promise<WriteAnswer>;
-  // One evaluation row as the assessment builds it, with its new id.
+  // One evaluation row as the assessment builds it; the database generates
+  // its id (SCH-1).
   readonly recordEvaluation: (
     row: Readonly<Record<string, unknown>>,
   ) => Promise<WriteAnswer>;
@@ -257,9 +291,9 @@ export type StaffSources = {
   readonly provisioning: () => Promise<StaffProvisioning | null>;
   readonly writes: () => Promise<StaffWrites | null>;
   readonly clock: () => number;
-  // A new record id generated on the server for each insert, so a repeated
-  // call can never create a second record.
-  readonly newId: () => string;
+  // The server-side environment configuration compared with the database's
+  // own environment record before any policy-driven step (PS-A2 section 6).
+  readonly environment: () => EnvironmentConfiguration;
 };
 
 // ---------------------------------------------------------------------------
@@ -432,7 +466,28 @@ export type StaffQueueView =
       readonly global: boolean;
       readonly scope: readonly string[];
       readonly entries: readonly QueueEntry[];
+      // Which page this is, how many rows of the queue a page reads, and the
+      // neighbouring pages (null when there is none), so nothing in scope is
+      // ever left out without the page saying so (MVP-001 D-4).
+      readonly page: number;
+      readonly pageSize: number;
+      readonly previousPage: number | null;
+      readonly nextPage: number | null;
     };
+
+// The queue is read one page at a time, at any size (MVP-001 D-4).
+export const QUEUE_PAGE_SIZE = 25;
+// The most license claims, and the most pending requests, counted for the
+// attorneys of one page. More than that is unavailable, never cut.
+export const QUEUE_RECORD_BOUND = 1000;
+
+// The page a request asks for: a plain decimal page number from 1 to
+// 999999, or the first page for anything else.
+export function queuePageOf(value: unknown): number {
+  return typeof value === "string" && /^[1-9][0-9]{0,5}$/.test(value)
+    ? Number(value)
+    : 1;
+}
 
 const STAGE_ORDER: Readonly<Record<ProfileState, number>> = {
   under_review: 0,
@@ -442,14 +497,20 @@ const STAGE_ORDER: Readonly<Record<ProfileState, number>> = {
   removed: 4,
 };
 
-// The authorized review queue: every attorney profile the global scope can
-// read, or, for a jurisdiction-scoped reviewer, the attorneys whose license
-// claims or pending practice-area requests the row policies show. The
-// caller's own attorney profile never appears.
+// The authorized review queue, one page at a time: for the global scope, a
+// page of the attorney profiles it can read (most recently changed first);
+// for a jurisdiction-scoped reviewer, the attorneys of a page of the license
+// claims and a page of the pending practice-area requests the row policies
+// show (by attorney). Each entry counts all of that attorney's license claims
+// and pending requests in scope. A read that answers more than it was asked
+// for, or anything it was not asked for, makes the queue unavailable rather
+// than silently cut. The caller's own attorney profile never appears.
 export async function resolveStaffQueue(
   sources: StaffSources,
+  requestedPage?: unknown,
 ): Promise<StaffQueueView> {
   try {
+    const page = queuePageOf(requestedPage);
     const reads = await portFrom(sources.reads);
     const provisioning = await portFrom(sources.provisioning);
     if (reads === null || provisioning === null) {
@@ -473,79 +534,122 @@ export async function resolveStaffQueue(
     if (!scope.global && scope.jurisdictions.size === 0) {
       return DENIED;
     }
-    const [profileRows, licenseRows, requestRows] = await Promise.all([
-      scope.global
-        ? attempt(() => reads.attorneyProfiles())
-        : Promise.resolve(Object.freeze({ kind: "rows", rows: [] })),
-      attempt(() => reads.visibleLicenses()),
-      attempt(() => reads.pendingAuthorisations()),
-    ]);
-    const profiles = listOf(profileRows, readProfile);
-    const licenses = listOf(licenseRows, readLicense);
-    const requests = listOf(requestRows, readPracticeAuthorisation);
-    if (profiles === null || licenses === null || requests === null) {
-      return UNAVAILABLE;
+    const own = staff.ownAttorneyId;
+    const offset = (page - 1) * QUEUE_PAGE_SIZE;
+    // One more than a page, so the page knows whether another follows.
+    const asked = QUEUE_PAGE_SIZE + 1;
+    let profiles: readonly ProfileRecord[] = [];
+    let attorneyIds: readonly string[];
+    let more: boolean;
+    if (scope.global) {
+      const read = listOf(
+        await attempt(() => reads.queueProfiles(own, offset, asked)),
+        readProfile,
+      );
+      if (
+        read === null ||
+        read.length > asked ||
+        read.some((p) => p.id === own || p.state === "removed")
+      ) {
+        return UNAVAILABLE;
+      }
+      profiles = read.slice(0, QUEUE_PAGE_SIZE);
+      attorneyIds = profiles.map((p) => p.id);
+      more = read.length > QUEUE_PAGE_SIZE;
+    } else {
+      const [licenseRows, requestRows] = await Promise.all([
+        attempt(() => reads.queueLicenses(own, offset, asked)),
+        attempt(() => reads.queueRequests(own, offset, asked)),
+      ]);
+      const licenses = listOf(licenseRows, readLicense);
+      const requests = listOf(requestRows, readPracticeAuthorisation);
+      if (
+        licenses === null ||
+        requests === null ||
+        licenses.length > asked ||
+        requests.length > asked ||
+        licenses.some((l) => l.attorneyId === own) ||
+        requests.some((r) => r.attorneyId === own || r.status !== "requested")
+      ) {
+        return UNAVAILABLE;
+      }
+      attorneyIds = [
+        ...new Set([
+          ...licenses.slice(0, QUEUE_PAGE_SIZE).map((l) => l.attorneyId),
+          ...requests.slice(0, QUEUE_PAGE_SIZE).map((r) => r.attorneyId),
+        ]),
+      ];
+      more =
+        licenses.length > QUEUE_PAGE_SIZE || requests.length > QUEUE_PAGE_SIZE;
+    }
+    const shown = new Set(attorneyIds);
+    let licenseCounts: readonly LicenseRecord[] = [];
+    let requestCounts: readonly PracticeAuthorisationRecord[] = [];
+    if (attorneyIds.length > 0) {
+      const [licenseRows, requestRows] = await Promise.all([
+        attempt(() =>
+          reads.licensesOfAttorneys(attorneyIds, QUEUE_RECORD_BOUND + 1),
+        ),
+        attempt(() =>
+          reads.requestsOfAttorneys(attorneyIds, QUEUE_RECORD_BOUND + 1),
+        ),
+      ]);
+      const licenses = listOf(licenseRows, readLicense);
+      const requests = listOf(requestRows, readPracticeAuthorisation);
+      if (
+        licenses === null ||
+        requests === null ||
+        licenses.length > QUEUE_RECORD_BOUND ||
+        requests.length > QUEUE_RECORD_BOUND ||
+        licenses.some((l) => !shown.has(l.attorneyId)) ||
+        requests.some(
+          (r) => !shown.has(r.attorneyId) || r.status !== "requested",
+        )
+      ) {
+        return UNAVAILABLE;
+      }
+      licenseCounts = licenses;
+      requestCounts = requests;
     }
     const inScope = (jurisdictionId: string) =>
       scope.global || scope.jurisdictions.has(jurisdictionId);
     const entries = new Map<string, QueueEntry>();
-    const touch = (attorneyId: string): QueueEntry => {
-      const existing = entries.get(attorneyId);
-      if (existing !== undefined) {
-        return existing;
-      }
-      const created: QueueEntry = {
+    for (const attorneyId of attorneyIds) {
+      entries.set(attorneyId, {
         attorneyId,
         name: "Attorney record",
         stage: null,
         pendingRequests: 0,
         licenseClaims: 0,
-      };
-      entries.set(attorneyId, created);
-      return created;
-    };
+      });
+    }
     for (const profile of profiles) {
-      if (profile.id === staff.ownAttorneyId || profile.state === "removed") {
-        continue;
+      const entry = entries.get(profile.id);
+      if (entry !== undefined) {
+        entries.set(profile.id, {
+          ...entry,
+          name: profile.displayName?.trim() || "Name not provided",
+          stage: profile.state,
+        });
       }
-      entries.set(profile.id, {
-        ...touch(profile.id),
-        name: profile.displayName?.trim() || "Name not provided",
-        stage: profile.state,
-      });
     }
-    for (const license of licenses) {
-      if (
-        license.attorneyId === staff.ownAttorneyId ||
-        !inScope(license.jurisdictionId)
-      ) {
-        continue;
+    for (const license of licenseCounts) {
+      const entry = entries.get(license.attorneyId);
+      if (entry !== undefined && inScope(license.jurisdictionId)) {
+        entries.set(license.attorneyId, {
+          ...entry,
+          licenseClaims: entry.licenseClaims + 1,
+        });
       }
-      if (scope.global && !entries.has(license.attorneyId)) {
-        continue;
-      }
-      const entry = touch(license.attorneyId);
-      entries.set(license.attorneyId, {
-        ...entry,
-        licenseClaims: entry.licenseClaims + 1,
-      });
     }
-    for (const request of requests) {
-      if (
-        request.attorneyId === staff.ownAttorneyId ||
-        request.status !== "requested" ||
-        !inScope(request.jurisdictionId)
-      ) {
-        continue;
+    for (const request of requestCounts) {
+      const entry = entries.get(request.attorneyId);
+      if (entry !== undefined && inScope(request.jurisdictionId)) {
+        entries.set(request.attorneyId, {
+          ...entry,
+          pendingRequests: entry.pendingRequests + 1,
+        });
       }
-      if (scope.global && !entries.has(request.attorneyId)) {
-        continue;
-      }
-      const entry = touch(request.attorneyId);
-      entries.set(request.attorneyId, {
-        ...entry,
-        pendingRequests: entry.pendingRequests + 1,
-      });
     }
     const sorted = [...entries.values()].sort(
       (a, b) =>
@@ -565,6 +669,10 @@ export async function resolveStaffQueue(
               .map((j) => j.label),
       ),
       entries: Object.freeze(sorted.map((entry) => Object.freeze(entry))),
+      page,
+      pageSize: QUEUE_PAGE_SIZE,
+      previousPage: page > 1 ? page - 1 : null,
+      nextPage: more ? page + 1 : null,
     });
   } catch {
     return UNAVAILABLE;
@@ -762,6 +870,7 @@ async function assessmentOf(
   jurisdictionId: string,
   practiceAreaId: string | null,
   asOfMs: number,
+  environment: EnvironmentBinding,
 ): Promise<EligibilityAssessment> {
   const profileRows = rowsOf(
     await attempt(() => provisioning.attorneyProfileOf(attorneyId)),
@@ -856,6 +965,7 @@ async function assessmentOf(
       subjects: subjectsReadable ? subjects : null,
       policyVersions: versionRows,
       authorityReferences: authorities,
+      environment,
     },
     asOfMs,
   );
@@ -1174,6 +1284,10 @@ export async function resolveStaffReview(
       ),
     ];
     const asOfMs = sources.clock();
+    const environment = bindEnvironment(
+      rowsOf(await attempt(() => reads.environmentIdentity())),
+      sources.environment(),
+    );
     const assessments: AssessmentView[] = [];
     for (const jurisdictionId of assessedJurisdictions) {
       assessments.push(
@@ -1186,8 +1300,9 @@ export async function resolveStaffReview(
             jurisdictionId,
             null,
             asOfMs,
+            environment,
           ),
-          canRecord: true,
+          canRecord: environment !== "unrecorded" && environment !== "mismatch",
         }),
       );
     }
@@ -1560,14 +1675,58 @@ function subjectKindOf(raw: string | null): SubjectKind | null {
   return isOneOf(SUBJECT_KINDS, raw) ? raw : null;
 }
 
-// A new record id generated on the server, or null when unusable.
-function newIdOf(sources: StaffSources): string | null {
-  try {
-    const id = sources.newId();
-    return isUuid(id) ? id : null;
-  } catch {
+// D-6 (MVP-001 S1): the review page's visibility rule, applied before a
+// record action. True when the caller could review this attorney, false when
+// the review page would treat the attorney as non-existent, null when any
+// answer is unreadable.
+async function reviewableBy(
+  reads: StaffReads,
+  provisioning: StaffProvisioning,
+  attorneyId: string,
+): Promise<boolean | null> {
+  const jurisdictions = await jurisdictionsOf(provisioning);
+  if (jurisdictions === null) {
     return null;
   }
+  const scope = await scopeOf(
+    reads,
+    jurisdictions.map((j) => j.id),
+  );
+  if (scope === null) {
+    return null;
+  }
+  const [profileRows, licenseRows, insuranceRows, disciplineRows, authRows] =
+    await Promise.all([
+      scope.global
+        ? attempt(() => reads.attorneyProfileById(attorneyId))
+        : Promise.resolve(Object.freeze({ kind: "rows", rows: [] })),
+      attempt(() => reads.licensesOf(attorneyId)),
+      attempt(() => reads.insuranceOf(attorneyId)),
+      attempt(() => reads.disciplineOf(attorneyId)),
+      attempt(() => reads.authorisationsOf(attorneyId)),
+    ]);
+  const profiles = listOf(profileRows, readProfile);
+  const lists: readonly (readonly AnyRecord[] | null)[] = [
+    listOf(licenseRows, readLicense),
+    listOf(insuranceRows, readInsurance),
+    listOf(disciplineRows, readDiscipline),
+    listOf(authRows, readPracticeAuthorisation),
+  ];
+  if (profiles === null || lists.some((list) => list === null)) {
+    return null;
+  }
+  if (profiles.some((profile) => profile.id === attorneyId)) {
+    return true;
+  }
+  const inScope = (jurisdictionId: string | null) =>
+    scope.global ||
+    (jurisdictionId !== null && scope.jurisdictions.has(jurisdictionId));
+  return lists.some((list) =>
+    (list ?? []).some(
+      (record) =>
+        record.attorneyId === attorneyId && inScope(record.jurisdictionId),
+    ),
+  );
 }
 
 // The fixed state shown for one write call. Only the database's own
@@ -1659,16 +1818,11 @@ export async function recordVerificationFinding(
       return checked;
     }
     const record = checked.record;
-    const evidenceId = newIdOf(sources);
-    if (evidenceId === null) {
-      return UNAVAILABLE;
-    }
     // The evidence, its link, any status the source reported, and the audit
     // event are one database transaction: a finding is never left partial.
     return stateOf(
       await writeOnce(() =>
         authorized.writes.recordFinding({
-          evidenceId,
           subjectKind: kind,
           subjectId: recordId,
           expectedUpdatedAt: record.updatedAt,
@@ -1834,17 +1988,19 @@ export async function recordDisciplineFinding(
     if (!granted) {
       return DENIED;
     }
+    const reviewable = await reviewableBy(reads, provisioning, attorneyId);
+    if (reviewable === null) {
+      return UNAVAILABLE;
+    }
+    if (!reviewable) {
+      return DENIED;
+    }
     const profile = await gatingProfileOf(provisioning, attorneyId);
     if (profile === null) {
       return DENIED;
     }
     if (!FINDING_STAGES.includes(profile.state)) {
       return LOCKED;
-    }
-    const disciplineId = newIdOf(sources);
-    const evidenceId = newIdOf(sources);
-    if (disciplineId === null || evidenceId === null) {
-      return UNAVAILABLE;
     }
     const insert: DisciplineInsert = {
       jurisdiction_id: jurisdictionId,
@@ -1859,8 +2015,6 @@ export async function recordDisciplineFinding(
     return stateOf(
       await writeOnce(() =>
         authorized.writes.recordDisciplineFinding({
-          disciplineId,
-          evidenceId,
           attorneyId,
           record: insert,
           evidence: fields,
@@ -2100,27 +2254,39 @@ export async function recordEligibilityDetermination(
         });
       }
     }
+    const reviewable = await reviewableBy(reads, provisioning, attorneyId);
+    if (reviewable === null) {
+      return UNAVAILABLE;
+    }
+    if (!reviewable) {
+      return DENIED;
+    }
     const profile = await gatingProfileOf(provisioning, attorneyId);
     if (profile === null) {
       return DENIED;
     }
-    const evaluationId = newIdOf(sources);
-    if (evaluationId === null) {
+    const asOfMs = sources.clock();
+    const environment = bindEnvironment(
+      rowsOf(await attempt(() => reads.environmentIdentity())),
+      sources.environment(),
+    );
+    if (environment === "unrecorded" || environment === "mismatch") {
+      // PS-A2 section 6: no policy-driven step runs on a misbound or
+      // unrecorded environment.
       return UNAVAILABLE;
     }
-    const asOfMs = sources.clock();
     const assessment = await assessmentOf(
       provisioning,
       attorneyId,
       jurisdictionId,
       practiceAreaId,
       asOfMs,
+      environment,
     );
-    const evaluated = evaluationRowOf(assessment, asOfMs);
-    if (evaluated === null) {
+    const row = evaluationRowOf(assessment, asOfMs);
+    if (row === null) {
       return UNAVAILABLE;
     }
-    const row = Object.freeze({ id: evaluationId, ...evaluated });
     // The evaluation and its audit event are one database transaction. The
     // database records the evaluation time and keeps the evaluation only when
     // this determination equals the assessment it derives itself from the

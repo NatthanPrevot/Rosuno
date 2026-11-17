@@ -1335,20 +1335,21 @@
         "status": "pending"
       },
       "created_at": "2026-10-13T04:21:28Z",
-      "updated_at": "2026-10-13T06:20:08Z",
+      "updated_at": "2026-11-17T01:40:55Z",
       "supersedes": [],
       "impact": "Proposed process-only installation; no declaration of approval, validation, merge, runtime readiness, security warranty or later-phase authority.",
       "evidence": [
         "Reviewed private Cloud Builder revision 5.1 ZIP SHA-256 e3d6026dc4127adeb85620b4845c91f663efafd2800e0c55eca8d9576f44abe5 (reference only; not published).",
         "Adopted single-use P2-900 procedural exception SHA-256 b73ed406683258f2561a44c785b9c9569c3ee2bfd51dc0c030dab6ecd27a9e02 (reference only; not published).",
-        "Five fixed installation artifact SHA-256 digests are bound in the separately audited P2-900 Gate 0 Packet (reference only; not published)."
+        "Five fixed installation artifact SHA-256 digests are bound in the separately audited P2-900 Gate 0 Packet (reference only; not published).",
+        "Post-merge record (MVP-001 S1 records, Packet REC-1): the five kit files (.claude/settings.json, .github/scripts/rosuno-guard.sh, .github/scripts/rosuno-guard-trust.sh, .github/workflows/rosuno-guard.yml, CLAUDE.md), this registration and the P2-901 compatibility change were merged together to owner main through PR #69 as two-parent merge commit 572bc7127a741d30c9245ca6ae04c0da014eee08 (committed 2026-10-14T07:51:55Z; parents 214be2043617cc842c24c46e7a4dbcbc9ac0a034 and 24f878648c0f11e1a51a7c998e0a16a4992bde18; merge tree equals the head tree; nine paths changed). The designated approval, required-check and independent audit facts of PR #69 are not evidenced in this repository and are not claimed; the reviewer status stays pending until the owner supplies them."
       ],
       "expiry": null
     },
     {
       "decision_id": "DEC-20261013-P2-901-P2900-CONTROLS-COMPATIBILITY",
       "title": "Propose prospective combined P2-900/P2-901 validator recovery",
-      "status": "proposed",
+      "status": "accepted",
       "scope": "Exactly five unchanged reviewed Cloud Builder paths, two forward-only governance registration additions, and two precise P0 validator/test compatibility edits, delivered together only under a separately adopted nine-path, one-time exception and independently PASSed Gate 0 Packet.",
       "decision": "Propose to correct the exact-five-file P0 path allowlist and add focused tests under new P2-901 while preserving the original approved P2-900 records and installed file bytes. Permit one common branch, full Fast-Control and protected PR only after a new prospective exception is independently PASSed and owner adopted and the separate nine-path Packet passes Backup review. This proposed record is not present authorization to implement or publish.",
       "rationale": "Mandatory P2-900 Fast-Control STOP occurred because neutral-path P0 validator rejects the five fixed reviewed PROCESS paths. The live P0 test and required quality CI depend on the same validator. Independent Backup PASSED a one-combined-PR recovery strategy only; the original seven-path single-use exception is treated as expired following STOP.",
@@ -1366,7 +1367,7 @@
         "status": "pending"
       },
       "created_at": "2026-10-13T08:04:39Z",
-      "updated_at": "2026-10-13T08:04:39Z",
+      "updated_at": "2026-11-17T01:40:55Z",
       "supersedes": [],
       "impact": "Prospective PROCESS validation compatibility and shared protected PR delivery only. Earlier P2-900 registration values and historical STOP/PASS evidence remain unchanged. No claim of approved implementation, successful rerun, CI, review, merge, fork readiness, database change or Production authority.",
       "evidence": [
@@ -1374,7 +1375,8 @@
         "Prior P2-900 Prettier STOP and subsequent four-edit separately authorized formatting correction/verification PASS are preserved as historical evidence.",
         "P2-900 corrected original seven-path Gate 0 Packet SHA-256 6897fc251abef017e151d872d93dbfd50b036b98aeaea034ec931ed99704008a (reference only; no republication).",
         "Consolidated read-only compatibility assessment SHA-256 314b3d6c16fee393751b3df13cb973dac0ca6f6be34aa2cc51e9072239cc4170; independent Backup strategy-only PASS, not execution permission.",
-        "Prior single-use exception SHA-256 b73ed406683258f2561a44c785b9c9569c3ee2bfd51dc0c030dab6ecd27a9e02, treated as expired for future implementation."
+        "Prior single-use exception SHA-256 b73ed406683258f2561a44c785b9c9569c3ee2bfd51dc0c030dab6ecd27a9e02, treated as expired for future implementation.",
+        "Post-merge record (MVP-001 S1 records, Packet REC-1): the owner merged the combined nine-path candidate this decision proposes (the five P2-900 kit files, the P2-900 and P2-901 registrations, tools/p0/lib/controls.mjs and tools/p0/tests/p0-controls.test.mjs) to owner main through PR #69, two-parent merge commit 572bc7127a741d30c9245ca6ae04c0da014eee08 titled 'P2-900/P2-901: install Cloud Builder guard kit and compatibility controls' (committed 2026-10-14T07:51:55Z; merge tree equals the head tree); the status records that owner merge. The designated approval, required-check and independent audit facts of PR #69, and the adoption record of the nine-path exception, are not evidenced in this repository and are not claimed; the reviewer status stays pending until the owner supplies them."
       ],
       "expiry": null
     },
@@ -1588,7 +1590,7 @@
         "status": "approved"
       },
       "created_at": "2026-11-04T06:12:13Z",
-      "updated_at": "2026-11-04T06:12:13Z",
+      "updated_at": "2026-11-17T01:40:55Z",
       "supersedes": [],
       "impact": "Governance registration only: exactly two appended governance objects. The P3-002 implementation, the P3-002 and P2-913 Packets, locked authority, historical migrations, existing governance records and evidence, Git history and all external environments are unchanged; no source, migration, schema, RLS, ACL, database, Supabase, Staging, Production or OLD project operation; no configuration, dependency, workflow, validator, test, permission or credential change; no Replit synchronization, deployment, release, provider or production authority or data; no automated closure role activation, and the Claude CLOSURE_CANDIDATE role remains uncommissioned and disabled. Retained HOLDs, unresolved without separate owner authorization: correction of the three retained P3-002 limitations; attorney professional verification, license and evidence review, staff approval, eligibility and bookability; marketplace activation; consultation, scheduling and payment workflows; outstanding technical, regulatory and financial gates; and Supabase persistence, Replit synchronization, deployment and production authorization. The P2-913 closure PR, its independent Backup audit and its Rosuno closure-PR approval are still pending, and its protected merge and final verification remain separate gates; P3-002 is not WORK ITEM CLOSED until these records are canonical on main.",
       "evidence": [
@@ -1605,7 +1607,8 @@
         "No migration or database operation: the P3-002 diff touches no supabase path, and all 14 registered migrations are preserved with supabase/migrations subtree 6be2d384d257eeeb43189f568640f98077f2811d at both 2e298f7ad43df8432c55cfa0bf8b4edbc6123cb6 and 38dbb44c2ca134350508840c47466955c2a852a4; .replit blob f39d897b8c2721ded05c8031306e73eb4f3c3e8d is unchanged.",
         "Pre-closure canonical governance at 38dbb44c2ca134350508840c47466955c2a852a4: 31 work items (index blob 918f6b7a689cd9df296bfab53a6494b5a8192b0c) and 42 decisions (decision-log blob cb36ed8877f21b31c6342f91cc383d5e8342a028), neither containing a P3-002 work item or closure decision; schemas governance/work-items/schema.json (blob f95023db1a59729ee415e226d0d508b0ddbcd521) and governance/decision-log.schema.json (blob 59f9a9529ca6028e492e6b7cd7a6d5fdee369a03) unchanged.",
         "Owner-adopted P2-913 Packet docs/work-items/P2-913/PACKET.md, SHA-256 0eb5182efa6b8228df46a6f6220883da6eb10d5bfdb4ffbb8435ae4dcd4a464f, Git blob c76da02f91117e36a30c3c81fa42c8fed2d2d1e2, owner Packet commit f1fffe72482b0717f883f71ab13c8576dbda441f, fork Packet-only commit 2c9ac075ef9ba6397042544a117bf0e4ee0ad96a on base 38dbb44c2ca134350508840c47466955c2a852a4; preserved byte-exact, including its historical Gate 0 candidate status banner, after owner adoption of that exact file.",
-        "Forward-only recovery: any later correction is a separately authorized forward-only record; accepted records, Git history and migration history are never rewritten."
+        "Forward-only recovery: any later correction is a separately authorized forward-only record; accepted records, Git history and migration history are never rewritten.",
+        "Limitation closure, recorded in the MVP-001 S1 records (Packet REC-1) from evidence on owner main: limitations (2) and (3) were corrected by P3-003 commit 4425c5f5f3be59bdb08b14c20eb4afa5f6701893 (a segment error boundary for /attorney/apply with a specific message and one explicit retry; the start form is offered only when the privileged start boundary is configured). That commit retained limitation (1); P3-904 migration 20261106090000_p3_904_professional_write_boundary closed it: attorney_start_application() locks the caller's User FOR SHARE through lock_current_active_user(), requires account_state active and inserts the applicant profile in the same transaction, the service role loses INSERT, UPDATE and DELETE on attorney_profiles, and P3-002 creation calls the function through the request-scoped client (commit 90ef51fcaac6d5737ed41cd4465dc99bcb7c9898). Both corrections were merged to owner main through PR #93 (merge commit fc31ed34763c44d5ada0c0d749e0a3e901e96519), and the migration was applied to Rosuno Staging (migration register sequence 15; release REL-20261114-P3-904-STAGING-APPLICATION)."
       ],
       "expiry": null
     },
@@ -1767,16 +1770,113 @@
         "status": "pending"
       },
       "created_at": "2026-11-15T04:30:26Z",
-      "updated_at": "2026-11-15T04:30:26Z",
+      "updated_at": "2026-11-17T01:40:55Z",
       "supersedes": [],
       "impact": "Work item: the Packet's register entry WI-P5-001-CLIENT-INTAKE-FOUNDATION is recorded as WI-P2-P5-001-CLIENT-INTAKE-FOUNDATION, the identifier the work-item register format requires. PS-A1 is registered here by identifier and SHA-256 with status pending_lock_condition; it becomes formally LOCKED only when its owner-held authority-manifest record exists and this registration is on owner main. One forward-only migration candidate (unreviewed, unapplied) adding two relations, client and configuration functions, one capability-catalog code and narrowed direct privileges on intakes and jurisdiction_assessments; new authenticated client workspace routes. Security and integrity obligations: own-client access only, actor from the authenticated session, fixed search_path and restricted function execution, immutable revisions and configuration versions, serialized lifecycle with stale-write rejection, atomic audit evidence without intake content, and no direct writes by API roles or service credentials. Persistent application requires completion of the PS-A1 Lock Condition and a separate owner database authorization; publishing any configuration version on a persistent environment is a separate owner-authorized, audited operation. Production intake collection is not enabled while the counsel-gated RMS REG-CA-035 determination (pre-collection notices, minimum information, pre-acceptance disclosure) remains unresolved. P5-001 acceptance is not M5 completion: AI Suggestions, voice memos and Storage, privacy and help surfaces, counsel-gated intake notices and disclosures, attorney-decline and referral retry verification, and the remaining M5 criteria stay outstanding.",
       "evidence": [
         "Owner decisions D1 and D2 and the Privacy/Help deferral: P5-001 owner directions in the Builder session (the messages carry no timestamps)",
         "Owner exact-text approval of PS-A1 (SHA-256 1612e751d6d94ffdf4c7c13f168d9e97bd85f793b03ccc5aa41e3d48eb1e803e, 21,425 bytes): express owner adoption authorization in the Builder session, received at about 2026-11-14T19:55:55Z by the session clock; the authority-manifest record is owner-held and is not evidenced in this repository",
         "Owner adoption: P5-001 Packet commit bc35cb7c691ad6ecdd1eea6ae596dd95678ba591 on owner branch wi/P5-001-client-intake-foundation (2026-11-15T04:30:26Z), Packet blob 3480108a8a95bc25cc9a65f7fd92d3661b21d5f5",
-        "Optional independent review: not performed"
+        "Optional independent review: not performed",
+        "Post-merge record (MVP-001 S1 records, Packet REC-1): merged to owner main through PR #95 as two-parent merge commit 91af560f2654f63ea20b19da75a166ca274d0ddf (committed 2026-11-15T17:25:23Z; parents bc54701c0af9ea9f5e5b40e7d5dac99fec8bdd00 and 43dcab55827b532102c2a62b427548974d7d2efc; merge tree equals the head tree). The PR #95 designated approval facts (reviewer, review identifier and time) have not been supplied by the owner and are not recorded; the reviewer status stays pending until they are.",
+        "PS-A1 Lock Condition complete: this registration of PHYSICAL-SPECIFICATION-AMENDMENT-PS-A1-LOCKED is on owner main from merge commit 91af560f2654f63ea20b19da75a166ca274d0ddf, and owner-adopted DL-ENG-3 P6 item 4 (governance/dl-eng-3-program-packets.txt) records the PS-A1 Lock Condition as completed. Register status set to active in the MVP-001 S1 records, as the owner-adopted MVP-001 Packet REC-1 directs.",
+        "Migration 20261115140653_p5_001_client_intake_foundation: no record evidences application to any persistent environment; applied_environment stays none. Closure (DL-ENG-2 G4) waits for the PR #95 approval facts and for Staging application or an owner decision not to apply it yet."
       ],
       "expiry": null
+    },
+    {
+      "status": "accepted",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-17T00:50:55Z",
+      "updated_at": "2026-11-17T00:50:55Z",
+      "supersedes": [],
+      "expiry": null,
+      "decision_id": "DEC-20261116-DL-ENG-3-PROGRAM-PACKETS",
+      "title": "Adopt DL-ENG-3: Program Packets and repository registration of authority amendments",
+      "scope": "Engineering process only, under the process provisions the LOCKED authorities route to the Decision Log (Implementation Master Plan sections 6 and 47; MVP Build Specification sections 30 and 32; Physical Specification section 53). No product, domain, physical-model, policy or gated matter.",
+      "decision": "The owner adopts DL-ENG-3, rulings P1 to P7, exactly as recorded in governance/dl-eng-3-program-packets.txt (SHA-256 56dd6903f0b539edd26419324aab08e38a59da3a79e36ac0ea056921a892d886). It amends DL-ENG-2 G3 (a Program Packet authorizes its declared slices after merge) and, for amendments approved after it, clarifies the authority manifest of DL-ENG-1 R15 as repository registration. Every other DL-ENG-1 and DL-ENG-2 ruling stands.",
+      "rationale": "One owner authorization for an ordered sequence of bounded slices removes repeated Packet adoption without removing any locked control: each slice stays bounded, reviewed by the designated human and accepted before the next starts, with one PR per slice.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "impact": "Process only: MVP-001 is adopted once as a Program Packet; its slices are delivered one PR at a time on the same branch. Authority amendments approved from now on are registered in governance/authority-references.json and this log.",
+      "evidence": [
+        "Express owner adoption statement (approver NatthanPrevot) naming SHA-256 56dd6903f0b539edd26419324aab08e38a59da3a79e36ac0ea056921a892d886, received in the Builder session and processed at 2026-11-16T23:29:31Z (session clock)",
+        "Exact rulings text, byte-identical to the adopted file dl-eng-3-program-packets.md: governance/dl-eng-3-program-packets.txt, 8,022 bytes, SHA-256 56dd6903f0b539edd26419324aab08e38a59da3a79e36ac0ea056921a892d886 (plain-text extension so the Markdown formatter cannot alter the adopted bytes)",
+        "Location accepted by the owner: express owner decision (approver NatthanPrevot, 'S1 C1 resolution, Option B') retaining DL-ENG-3 at governance/dl-eng-3-program-packets.txt with its exact adopted bytes and SHA-256, received in the Builder session and processed at 2026-11-17T05:42:10Z (session clock); the governance/dl-eng-3-program-packets.md path was a planning expectation only, required by no locked authority, adopted Packet, DL-ENG text, validator or guard",
+        "Optional independent review: not performed"
+      ]
+    },
+    {
+      "status": "accepted",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-17T00:50:55Z",
+      "updated_at": "2026-11-17T00:50:55Z",
+      "supersedes": [],
+      "expiry": null,
+      "decision_id": "DEC-20261116-PS-A2-DEPLOYMENT-ENVIRONMENT-IDENTITY",
+      "title": "Approve the exact text of Physical Specification amendment PS-A2 (deployment environment identity and development-configuration designation)",
+      "scope": "Physical model, bounded: one relation deployment_environment and one column policy_versions.development_only (DL-ENG-1 R9; Physical Specification section 53).",
+      "decision": "The owner expressly approves the exact bytes of PS-A2, rosuno-physical-specification-amendment-ps-a2.md, 11,760 bytes, SHA-256 599c2235f540233c7475dd28799bfb2bb201c09cf88e53d2461b35099a42a1ba (Lock Condition element 1). Its registration in governance/authority-references.json (status pending_lock_condition) and this entry are elements 2 and 3, carried by the MVP-001 S1 pull request; the Lock Condition completes when that pull request merges. No migration implementing PS-A2 is applied to a persistent environment before then.",
+      "rationale": "No PS relation can hold a database's own environment class, and draft status cannot distinguish executable development configuration from an incomplete draft; an application setting alone is not production-isolating (PS-A2 sections 1 and 7).",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "impact": "Migration 20261117010000_mvp_001_s1_environment_identity implements PS-A2. Every policy-driven database function refuses until the database records its environment; each persistent environment is recorded once under separate owner authorization.",
+      "evidence": [
+        "Express owner approval statement (approver NatthanPrevot) naming SHA-256 599c2235f540233c7475dd28799bfb2bb201c09cf88e53d2461b35099a42a1ba, received in the Builder session and processed at 2026-11-16T23:29:31Z (session clock)",
+        "Amendment file: rosuno-physical-specification-amendment-ps-a2.md, 11,760 bytes, SHA-256 599c2235f540233c7475dd28799bfb2bb201c09cf88e53d2461b35099a42a1ba (owner-held; not in the repository)",
+        "Optional independent review: not performed"
+      ]
+    },
+    {
+      "status": "accepted",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-17T00:50:55Z",
+      "updated_at": "2026-11-17T00:50:55Z",
+      "supersedes": [],
+      "expiry": null,
+      "decision_id": "DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM",
+      "title": "Adopt the MVP-001 Technical Completion Program Packet and grant its implementation",
+      "scope": "MVP-001 Program (slices S1 to S11) within the adopted Packet; M14 activation and the M15 production decision excluded.",
+      "decision": "The owner adopted docs/work-items/MVP-001/PACKET.md (Git blob 8117636923918a482ed580ef0408ae72bc2f9e96, SHA-256 3bc6d6504d8c9509fd0cf3f1e2aaba55cac2974f552273e2781934c52cdacfdb) on owner branch wi/MVP-001-technical-completion and granted implementation of S1 to S11 under DL-ENG-3, one slice at a time, with standing delegation to publish validated slice heads and corrections and to run rollback-only Staging validation of merged Program migrations. The Packet's conformance corrections include SCH-4: the eligibility policy-type code is eligibility (Physical Specification section 8.3), replacing attorney_eligibility adopted under P3-904.",
+      "rationale": "Completes the technical MVP through bounded, separately reviewed slices under one authorization (DL-ENG-3).",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "impact": "S1 adds four forward-only migrations and application changes; nothing is applied to a persistent environment by merge.",
+      "evidence": [
+        "Owner adoption commit b17aaf8a4ac03c98ea107834793d41f861072a7e on owner branch wi/MVP-001-technical-completion (2026-11-17T00:19:22Z)",
+        "Owner implementation grant received in the Builder session on 2026-11-17, naming the Packet blob, the adoption commit and the approved SHA-256 values",
+        "Optional independent review: not performed"
+      ]
     }
   ]
 }

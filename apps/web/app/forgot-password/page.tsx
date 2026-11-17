@@ -17,12 +17,14 @@ import {
   Text,
   TextField,
 } from "../../src/presentation/design-system.tsx";
+import { keepEntries } from "../../src/presentation/form-entries.ts";
 import { requestRecovery } from "./actions.ts";
 
 // Password recovery request. Opening the page asks for nothing; only a
 // deliberate submission reaches the server action, which decides the
 // outcome. This page shows only the fixed message for the state it returns,
 // and never says whether an account exists or that an email was delivered.
+// After each submission the email address stays as typed.
 export default function ForgotPasswordPage() {
   const [state, formAction, pending] = useActionState(
     requestRecovery,
@@ -66,7 +68,7 @@ export default function ForgotPasswordPage() {
               link.
             </Alert>
           ) : null}
-          <form action={formAction}>
+          <form action={formAction} onReset={keepEntries(["email"])}>
             <Stack>
               <TextField
                 id="forgot-password-email"

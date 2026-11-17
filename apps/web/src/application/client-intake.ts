@@ -90,14 +90,19 @@ export type IntakeState = (typeof INTAKE_STATES)[number];
 export type ClientIntakeReads = {
   readonly usersOf: (accountId: string) => Promise<RowsResult>;
   readonly clientProfilesOf: (userId: string) => Promise<RowsResult>;
-  readonly intakesOf: (clientId: string) => Promise<RowsResult>;
+  // At most `count` of the client's Intakes, newest first, after skipping the
+  // `offset` newest.
+  readonly intakesOf: (
+    clientId: string,
+    offset: number,
+    count: number,
+  ) => Promise<RowsResult>;
   readonly intakeOf: (
     clientId: string,
     intakeId: string,
   ) => Promise<RowsResult>;
-  readonly revisionSummariesOf: (
-    intakeIds: readonly string[],
-  ) => Promise<RowsResult>;
+  // The one latest revision summary of an Intake, or none.
+  readonly latestRevisionSummaryOf: (intakeId: string) => Promise<RowsResult>;
   readonly latestRevisionOf: (intakeId: string) => Promise<RowsResult>;
   readonly questionSets: () => Promise<RowsResult>;
   readonly assessmentsOf: (intakeId: string) => Promise<RowsResult>;
@@ -514,17 +519,57 @@ export type WorkspaceView =
   | Refusal
   | {
       readonly status: "ready";
+      // One page of the client's Intakes, newest first.
       readonly intakes: readonly IntakeSummary[];
       // Whether a published question set exists, so an Intake can start.
       readonly canStart: boolean;
+      // Which page this is, how many Intakes a page holds, and the
+      // neighbouring pages that hold Intakes (null when there is none), so
+      // no Intake is ever left out without the page saying so.
+      readonly page: number;
+      readonly pageSize: number;
+      readonly newerPage: number | null;
+      readonly olderPage: number | null;
     };
 
-const MAX_INTAKES = 200;
+// The workspace shows the client's Intakes one page at a time, at any number
+// of Intakes, and reads each shown Intake's own latest revision summary.
+export const WORKSPACE_PAGE_SIZE = 20;
+
+// The page a request asks for: a plain decimal page number from 1 to
+// 999999, or the first page for anything else.
+export function workspacePageOf(value: unknown): number {
+  return typeof value === "string" && /^[1-9][0-9]{0,5}$/.test(value)
+    ? Number(value)
+    : 1;
+}
+
+// The latest revision summary of one shown Intake: the summary, null when it
+// has none, or "unreadable".
+async function latestSummaryOf(
+  reads: ClientIntakeReads,
+  intakeId: string,
+): Promise<RevisionSummary | null | "unreadable"> {
+  const summaries = listOf(
+    await attempt(() => reads.latestRevisionSummaryOf(intakeId)),
+    readRevisionSummary,
+  );
+  if (
+    summaries === null ||
+    summaries.length > 1 ||
+    summaries.some((summary) => summary.intakeId !== intakeId)
+  ) {
+    return "unreadable";
+  }
+  return summaries[0] ?? null;
+}
 
 export async function resolveClientWorkspace(
   sources: ClientIntakeSources,
+  requestedPage?: unknown,
 ): Promise<WorkspaceView> {
   try {
+    const page = workspacePageOf(requestedPage);
     const reads = await portFrom(sources.reads);
     if (reads === null) {
       return UNAVAILABLE;
@@ -533,56 +578,56 @@ export async function resolveClientWorkspace(
     if (!("clientId" in context)) {
       return context;
     }
+    // One more than a page, so the page knows whether older Intakes exist.
+    const asked = WORKSPACE_PAGE_SIZE + 1;
     const intakes = listOf(
-      await attempt(() => reads.intakesOf(context.clientId)),
+      await attempt(() =>
+        reads.intakesOf(
+          context.clientId,
+          (page - 1) * WORKSPACE_PAGE_SIZE,
+          asked,
+        ),
+      ),
       readIntake,
     );
     if (
       intakes === null ||
-      intakes.length > MAX_INTAKES ||
+      intakes.length > asked ||
       intakes.some((intake) => intake.clientId !== context.clientId)
     ) {
       return UNAVAILABLE;
     }
-    const ids = intakes.map((intake) => intake.id);
-    const summaries =
-      ids.length === 0
-        ? []
-        : listOf(
-            await attempt(() => reads.revisionSummariesOf(ids)),
-            readRevisionSummary,
-          );
-    if (
-      summaries === null ||
-      summaries.some((s) => !ids.includes(s.intakeId))
-    ) {
+    const shown = [...intakes]
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+      .slice(0, WORKSPACE_PAGE_SIZE);
+    const latest = await Promise.all(
+      shown.map((intake) => latestSummaryOf(reads, intake.id)),
+    );
+    if (latest.includes("unreadable")) {
       return UNAVAILABLE;
     }
     const sets = await questionSetsOf(reads);
     if (sets === null) {
       return UNAVAILABLE;
     }
-    const view = intakes
-      .map((intake) => {
-        const own = summaries.filter((s) => s.intakeId === intake.id);
-        const latest = own.reduce<RevisionSummary | null>(
-          (best, s) =>
-            best === null || s.revisionNumber > best.revisionNumber ? s : best,
-          null,
-        );
-        return Object.freeze({
-          id: intake.id,
-          state: intake.state,
-          createdAt: intake.createdAt,
-          lastSavedAt: latest?.createdAt ?? null,
-          revisions: latest?.revisionNumber ?? 0,
-        });
-      })
-      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    const view = shown.map((intake, index) => {
+      const summary = latest[index] as RevisionSummary | null;
+      return Object.freeze({
+        id: intake.id,
+        state: intake.state,
+        createdAt: intake.createdAt,
+        lastSavedAt: summary?.createdAt ?? null,
+        revisions: summary?.revisionNumber ?? 0,
+      });
+    });
     return Object.freeze({
       status: "ready",
       intakes: Object.freeze(view),
       canStart: sets.length > 0,
+      page,
+      pageSize: WORKSPACE_PAGE_SIZE,
+      newerPage: page > 1 ? page - 1 : null,
+      olderPage: intakes.length > WORKSPACE_PAGE_SIZE ? page + 1 : null,
     });
   } catch {
     return UNAVAILABLE;

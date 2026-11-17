@@ -17,13 +17,15 @@ import {
   Text,
   TextField,
 } from "../../src/presentation/design-system.tsx";
+import { keepEntries } from "../../src/presentation/form-entries.ts";
 import { register } from "./actions.ts";
 
 // Client registration entry. The server action decides the outcome; this page
 // shows only the fixed message for the state it returns. The two show and
 // hide controls change only how each password is displayed: values stay in
 // their own fields, so password managers, autofill, and copy and paste work
-// as usual, and nothing is kept in page state.
+// as usual, and nothing is kept in page state. After each submission the
+// email address stays as typed and both passwords are cleared.
 export default function SignUpPage() {
   const [state, formAction, pending] = useActionState(
     register,
@@ -68,7 +70,7 @@ export default function SignUpPage() {
               Some details need attention before you can create an account.
             </Alert>
           ) : null}
-          <form action={formAction}>
+          <form action={formAction} onReset={keepEntries(["email"])}>
             <Stack>
               <TextField
                 id="sign-up-email"

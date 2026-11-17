@@ -9,7 +9,12 @@
 // from the request's own authenticated session. No privileged credential or
 // client is used or seen here. Every call is bounded in time; anything that
 // fails, throws, or is too slow is reported as unreadable, and a write's
-// answer is read strictly against that function's own outcomes.
+// answer is read strictly against that function's own outcomes. Each such
+// failure also writes one log line naming the call and how it failed, with
+// the error code and HTTP status the database or API reported, and nothing
+// the call carried or answered (MVP-001 D-8). The workspace list is read one
+// page at a time, and each shown Intake's latest revision summary is read on
+// its own, so no shown Intake can be silently dropped (MVP-001 D-3).
 
 import {
   ASSESSMENT_COLUMNS,
@@ -30,11 +35,15 @@ import {
 } from "../../application/client-intake.ts";
 import {
   rowsResultOf,
+  UNREADABLE_ROWS,
   USER_COLUMNS,
   withinDeadline,
+  type RowsResult,
 } from "../../application/professional-identity.ts";
 import { CLIENT_PRINCIPAL_SOURCE } from "../identity/client-principal-source.ts";
 import { SUPABASE_SERVER_SESSION_SOURCE } from "../identity/server-session-source.ts";
+import { errorFieldsOf, type LogFields } from "../observability/log.ts";
+import { logRequestEvent } from "../observability/request-log.ts";
 import {
   boundedPort,
   CALL_DEADLINE_MS,
@@ -45,13 +54,14 @@ import {
   type RequestClientSource,
 } from "../professional/professional-request-client.ts";
 
-const MAX_INTAKES = 200;
-const MAX_REVISION_SUMMARIES = 5000;
 const MAX_VERSIONS = 200;
 const MAX_ASSESSMENTS = 100;
 
 const REJECTED: CallAnswer = Object.freeze({ kind: "rejected" });
 const UNREADABLE: CallAnswer = Object.freeze({ kind: "unreadable" });
+
+const CALL_FAILED = "client_intake.call_failed";
+const EXPIRED = Symbol("expired");
 
 // A PostgreSQL error code (SQLSTATE): five digits or capital letters.
 const SQLSTATE = /^[0-9A-Z]{5}$/;
@@ -131,6 +141,111 @@ export function rowAnswerOf(
   return Object.freeze({ kind: "answer", outcome, value });
 }
 
+// The error code and HTTP status a call's answer reported, and nothing else.
+function failureOf(result: unknown): LogFields {
+  const status = ownField(result, "status");
+  return {
+    ...errorFieldsOf(ownField(result, "error")),
+    ...(typeof status === "number" ? { status } : {}),
+  };
+}
+
+type Observation<T> = {
+  readonly answer: T;
+  readonly failure: LogFields | null;
+};
+
+// Runs one call within the deadline. It answers what the call answered, or
+// the fallback when the call threw or was still running at the deadline. A
+// call that threw, answered with a failure, or ran out of time writes one
+// log line; the outcome is never changed by it.
+async function observed<T>(
+  operation: string,
+  deadlineMs: number,
+  fallback: T,
+  call: () => Promise<Observation<T>>,
+): Promise<T> {
+  const settled = await withinDeadline<Observation<T> | typeof EXPIRED>(
+    async () => {
+      try {
+        return await call();
+      } catch (error) {
+        return {
+          answer: fallback,
+          failure: { outcome: "threw", ...errorFieldsOf(error) },
+        };
+      }
+    },
+    EXPIRED,
+    deadlineMs,
+  );
+  if (settled === EXPIRED) {
+    await logRequestEvent("warn", CALL_FAILED, {
+      operation,
+      outcome: "deadline",
+    });
+    return fallback;
+  }
+  if (settled.failure !== null) {
+    await logRequestEvent("warn", CALL_FAILED, {
+      operation,
+      ...settled.failure,
+    });
+  }
+  return settled.answer;
+}
+
+type QueryAnswer = { readonly data: unknown; readonly error: unknown };
+
+function observedRead(
+  operation: string,
+  deadlineMs: number,
+  query: () => PromiseLike<QueryAnswer>,
+): Promise<RowsResult> {
+  return observed(operation, deadlineMs, UNREADABLE_ROWS, async () => {
+    const result = await query();
+    const rows = rowsResultOf(result);
+    return {
+      answer: rows,
+      failure:
+        rows.kind === "rows"
+          ? null
+          : {
+              outcome: result.error === null ? "malformed" : "error",
+              ...failureOf(result),
+            },
+    };
+  });
+}
+
+function observedWrite(
+  operation: string,
+  deadlineMs: number,
+  call: () => PromiseLike<unknown>,
+  read: (result: unknown) => CallAnswer,
+): Promise<CallAnswer> {
+  return observed(operation, deadlineMs, UNREADABLE, async () => {
+    const result = await call();
+    const answer = read(result);
+    return {
+      answer,
+      failure:
+        answer.kind === "answer"
+          ? null
+          : { outcome: answer.kind, ...failureOf(result) },
+    };
+  });
+}
+
+function isPageBound(offset: unknown, count: unknown): boolean {
+  return (
+    Number.isSafeInteger(offset) &&
+    (offset as number) >= 0 &&
+    Number.isSafeInteger(count) &&
+    (count as number) >= 1
+  );
+}
+
 export function createClientIntakeReads(
   clientSource: RequestClientSource = createDefaultRequestClient,
   deadlineMs: number = CALL_DEADLINE_MS,
@@ -143,90 +258,95 @@ export function createClientIntakeReads(
     }
     return boundedPort(
       {
-        usersOf: async (accountId: string) =>
-          rowsResultOf(
-            await client
+        usersOf: (accountId: string) =>
+          observedRead("usersOf", deadlineMs, () =>
+            client
               .from("users")
               .select(USER_COLUMNS)
               .eq("auth_user_id", accountId)
               .limit(2),
           ),
-        clientProfilesOf: async (userId: string) =>
-          rowsResultOf(
-            await client
+        clientProfilesOf: (userId: string) =>
+          observedRead("clientProfilesOf", deadlineMs, () =>
+            client
               .from("client_profiles")
               .select(CLIENT_PROFILE_COLUMNS)
               .eq("user_id", userId)
               .limit(2),
           ),
-        intakesOf: async (clientId: string) =>
-          rowsResultOf(
-            await client
+        intakesOf: async (clientId: string, offset: number, count: number) => {
+          if (!isPageBound(offset, count)) {
+            return UNREADABLE_ROWS;
+          }
+          return observedRead("intakesOf", deadlineMs, () => {
+            const newestFirst = client
               .from("intakes")
               .select(INTAKE_COLUMNS)
               .eq("client_id", clientId)
               .order("created_at", { ascending: false })
-              .limit(MAX_INTAKES + 1),
-          ),
-        intakeOf: async (clientId: string, intakeId: string) =>
-          rowsResultOf(
-            await client
+              .order("id", { ascending: false });
+            // The first page skips nothing, so it needs no offset.
+            return offset === 0
+              ? newestFirst.limit(count)
+              : newestFirst.range(offset, offset + count - 1);
+          });
+        },
+        intakeOf: (clientId: string, intakeId: string) =>
+          observedRead("intakeOf", deadlineMs, () =>
+            client
               .from("intakes")
               .select(INTAKE_COLUMNS)
               .eq("id", intakeId)
               .eq("client_id", clientId)
               .limit(2),
           ),
-        revisionSummariesOf: async (intakeIds: readonly string[]) =>
-          rowsResultOf(
-            await client
+        latestRevisionSummaryOf: (intakeId: string) =>
+          observedRead("latestRevisionSummaryOf", deadlineMs, () =>
+            client
               .from("intake_revisions")
               .select(REVISION_SUMMARY_COLUMNS)
-              .in("intake_id", [...intakeIds])
+              .eq("intake_id", intakeId)
               .order("revision_number", { ascending: false })
-              .limit(MAX_REVISION_SUMMARIES),
+              .limit(1),
           ),
-        latestRevisionOf: async (intakeId: string) =>
-          rowsResultOf(
-            await client
+        latestRevisionOf: (intakeId: string) =>
+          observedRead("latestRevisionOf", deadlineMs, () =>
+            client
               .from("intake_revisions")
               .select(REVISION_COLUMNS)
               .eq("intake_id", intakeId)
               .order("revision_number", { ascending: false })
               .limit(1),
           ),
-        questionSets: async () =>
-          rowsResultOf(
-            await client
+        questionSets: () =>
+          observedRead("questionSets", deadlineMs, () =>
+            client
               .from("intake_question_sets")
               .select(QUESTION_SET_COLUMNS)
               .order("published_at", { ascending: false })
               .limit(MAX_VERSIONS),
           ),
-        assessmentsOf: async (intakeId: string) =>
-          rowsResultOf(
-            await client
+        assessmentsOf: (intakeId: string) =>
+          observedRead("assessmentsOf", deadlineMs, () =>
+            client
               .from("jurisdiction_assessments")
               .select(ASSESSMENT_COLUMNS)
               .eq("intake_id", intakeId)
               .order("created_at", { ascending: true })
               .limit(MAX_ASSESSMENTS),
           ),
-        practiceAreas: async () =>
-          rowsResultOf(await client.rpc("client_intake_practice_areas")),
-        jurisdictions: async () =>
-          rowsResultOf(await client.rpc("client_intake_jurisdictions")),
+        practiceAreas: () =>
+          observedRead("practiceAreas", deadlineMs, () =>
+            client.rpc("client_intake_practice_areas"),
+          ),
+        jurisdictions: () =>
+          observedRead("jurisdictions", deadlineMs, () =>
+            client.rpc("client_intake_jurisdictions"),
+          ),
       },
       deadlineMs,
     );
   };
-}
-
-function boundedWrite(
-  work: () => Promise<CallAnswer>,
-  deadlineMs: number,
-): Promise<CallAnswer> {
-  return withinDeadline(work, UNREADABLE, deadlineMs);
 }
 
 export function createClientIntakeWrites(
@@ -245,54 +365,47 @@ export function createClientIntakeWrites(
     }
     return Object.freeze({
       createIntake: () =>
-        boundedWrite(
-          async () =>
-            rowAnswerOf(
-              await client.rpc("client_create_intake"),
-              CREATE_OUTCOMES,
-              "intake_id",
-            ),
+        observedWrite(
+          "client_create_intake",
           deadlineMs,
+          () => client.rpc("client_create_intake"),
+          (result) => rowAnswerOf(result, CREATE_OUTCOMES, "intake_id"),
         ),
       saveRevision: (input: RevisionInput) =>
-        boundedWrite(
-          async () =>
-            rowAnswerOf(
-              await client.rpc("client_save_intake_revision", {
-                p_intake_id: input.intakeId,
-                p_expected_revision: input.expectedRevision,
-                p_question_set_id: input.questionSetId,
-                p_practice_area_id: input.practiceAreaId,
-                p_description: input.description,
-                p_answers: input.answers,
-              }),
-              SAVE_OUTCOMES,
-              "revision_number",
-            ),
+        observedWrite(
+          "client_save_intake_revision",
           deadlineMs,
+          () =>
+            client.rpc("client_save_intake_revision", {
+              p_intake_id: input.intakeId,
+              p_expected_revision: input.expectedRevision,
+              p_question_set_id: input.questionSetId,
+              p_practice_area_id: input.practiceAreaId,
+              p_description: input.description,
+              p_answers: input.answers,
+            }),
+          (result) => rowAnswerOf(result, SAVE_OUTCOMES, "revision_number"),
         ),
       submitIntake: (intakeId: string, expectedRevision: number | null) =>
-        boundedWrite(
-          async () =>
-            textAnswerOf(
-              await client.rpc("client_submit_intake", {
-                p_intake_id: intakeId,
-                p_expected_revision: expectedRevision,
-              }),
-              SUBMIT_OUTCOMES,
-            ),
+        observedWrite(
+          "client_submit_intake",
           deadlineMs,
+          () =>
+            client.rpc("client_submit_intake", {
+              p_intake_id: intakeId,
+              p_expected_revision: expectedRevision,
+            }),
+          (result) => textAnswerOf(result, SUBMIT_OUTCOMES),
         ),
       closeIntake: (intakeId: string) =>
-        boundedWrite(
-          async () =>
-            textAnswerOf(
-              await client.rpc("client_close_intake", {
-                p_intake_id: intakeId,
-              }),
-              CLOSE_OUTCOMES,
-            ),
+        observedWrite(
+          "client_close_intake",
           deadlineMs,
+          () =>
+            client.rpc("client_close_intake", {
+              p_intake_id: intakeId,
+            }),
+          (result) => textAnswerOf(result, CLOSE_OUTCOMES),
         ),
     } satisfies ClientIntakeWrites);
   };

@@ -49,6 +49,7 @@ import {
   addPracticeArea,
   addStaff,
   attorneySources,
+  attorneyWritesFor,
   createWorld,
   form,
   staffSources,
@@ -319,48 +320,69 @@ test("M4-AU3. an unknown or lost answer is never reported as success: a lost cal
   }
 });
 
-test("M4-AU4. a replayed write with the same server-generated id never duplicates a record or an audit row", async () => {
+test("M4-AU4. SCH-1: the server generates every key; a caller-chosen id never creates a record, and a replayed create never duplicates a record or an audit row", async () => {
   const s = world();
-  const fixedId = "00000000-0000-4000-8000-000099990001";
-  const attorney = attorneySources(s.w, s.applicant.authId, {
-    newId: () => fixedId,
-  });
+  const attorney = attorneySources(s.w, s.applicant.authId);
+  const before = s.w.licenses.length;
   assert.deepEqual(await saveLicenseClaim(attorney, LICENSE(s)), {
     status: "saved",
   });
-  assert.deepEqual(
-    await saveLicenseClaim(attorney, LICENSE(s, { license_number: "SYN-2" })),
-    { status: "not-saved" },
-  );
-  assert.equal(s.w.licenses.filter((l) => l.id === fixedId).length, 1);
-  const evidenceId = "00000000-0000-4000-8000-000099990002";
-  const reviewer = staffSources(s.w, s.staff.authId, {
-    newId: () => evidenceId,
+  // A replay of the same create is refused (one license per jurisdiction
+  // and number), leaving exactly one record and one audit row.
+  assert.deepEqual(await saveLicenseClaim(attorney, LICENSE(s)), {
+    status: "not-saved",
   });
-  assert.deepEqual(
-    await recordVerificationFinding(
-      reviewer,
-      FINDING(s.licenseA.id, { observed_status: "" }),
-    ),
-    { status: "recorded" },
-  );
-  assert.deepEqual(
-    await recordVerificationFinding(
-      reviewer,
-      FINDING(s.licenseA.id, { observed_status: "" }),
-    ),
-    { status: "not-saved" },
-  );
+  const created = s.w.licenses.filter((l) => l.license_number === "SYN-NEW");
+  assert.equal(created.length, 1);
+  assert.equal(s.w.licenses.length, before + 1);
   assert.equal(
-    s.w.verification_evidence.filter((e) => e.id === evidenceId).length,
+    s.w.audit_events.filter((e) => e.resource_id === created[0].id).length,
     1,
   );
-  assert.equal(
-    s.w.audit_events.filter((e) =>
-      [fixedId, evidenceId].includes(e.resource_id),
-    ).length,
-    2,
+  // The write port itself refuses a caller-chosen id on create, and an
+  // update without its expected version, before anything changes.
+  const writes = attorneyWritesFor(s.w, s.applicant.authId);
+  const callerId = "00000000-0000-4000-8000-000099990001";
+  const claim = {
+    jurisdiction_id: s.a,
+    license_number: "SYN-CALLER",
+    license_type: null,
+    effective_from: null,
+    effective_until: null,
+  };
+  for (const [id, expected] of [
+    [callerId, null],
+    [null, "2026-11-04T10:00:00.000000+00:00"],
+  ]) {
+    assert.deepEqual(await writes.saveLicense(id, expected, claim), {
+      kind: "outcome",
+      outcome: "invalid",
+    });
+  }
+  assert.ok(!s.w.licenses.some((l) => l.id === callerId));
+  // Two findings get two distinct server-generated evidence keys, each
+  // audited exactly once.
+  const reviewer = staffSources(s.w, s.staff.authId);
+  const evidenceBefore = new Set(s.w.verification_evidence.map((e) => e.id));
+  for (let i = 0; i < 2; i += 1) {
+    assert.deepEqual(
+      await recordVerificationFinding(
+        reviewer,
+        FINDING(s.licenseA.id, { observed_status: "" }),
+      ),
+      { status: "recorded" },
+    );
+  }
+  const fresh = s.w.verification_evidence.filter(
+    (e) => !evidenceBefore.has(e.id),
   );
+  assert.equal(new Set(fresh.map((e) => e.id)).size, 2);
+  for (const evidence of fresh) {
+    assert.equal(
+      s.w.audit_events.filter((e) => e.resource_id === evidence.id).length,
+      1,
+    );
+  }
 });
 
 test("M4-AU5. the applicant sees every committed request for more information, newest first, and only the message written for the applicant", async () => {

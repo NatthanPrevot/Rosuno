@@ -17,10 +17,13 @@ import {
   Text,
   TextField,
 } from "../../src/presentation/design-system.tsx";
+import { keepEntries } from "../../src/presentation/form-entries.ts";
 import { signIn } from "./actions.ts";
 
 // Sign-in entry for an existing account. The server action decides the
 // outcome; this page shows only the fixed message for the state it returns.
+// After each submission the email address stays as typed and the password
+// is cleared.
 export default function SignInPage() {
   const [state, formAction, pending] = useActionState(
     signIn,
@@ -66,7 +69,7 @@ export default function SignInPage() {
               Some details need attention before you can sign in.
             </Alert>
           ) : null}
-          <form action={formAction}>
+          <form action={formAction} onReset={keepEntries(["email"])}>
             <Stack>
               <TextField
                 id="sign-in-email"
@@ -94,9 +97,6 @@ export default function SignInPage() {
                 </Button>
                 <ButtonLink variant="tertiary" href="/forgot-password">
                   Forgot password?
-                </ButtonLink>
-                <ButtonLink variant="secondary" href="/sign-up">
-                  Create an account
                 </ButtonLink>
                 <ButtonLink variant="tertiary" href="/">
                   Return to the home page
