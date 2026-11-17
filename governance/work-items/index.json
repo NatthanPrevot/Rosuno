@@ -2478,7 +2478,9 @@
       "release_refs": [],
       "migration_refs": [
         "20261117010000_mvp_001_s1_environment_identity",
-        "20261117020000_mvp_001_s1_professional_conformance"
+        "20261117020000_mvp_001_s1_professional_conformance",
+        "20261117030000_mvp_001_s1_configuration_administration",
+        "20261117040000_mvp_001_s1_availability_checks"
       ],
       "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",

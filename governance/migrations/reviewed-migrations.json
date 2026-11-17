@@ -458,6 +458,58 @@
       "drift_check": "clean",
       "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the function bodies; no professional record, evidence, evaluation or audit row is removed.",
       "depends_on": ["20261117010000_mvp_001_s1_environment_identity"]
+    },
+    {
+      "migration_id": "20261117030000_mvp_001_s1_configuration_administration",
+      "migration_kind": "product",
+      "sequence": 19,
+      "artifact_path": "supabase/migrations/20261117030000_mvp_001_s1_configuration_administration.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration; no policy version, authority reference, gate evaluation, launch authorization, capability grant or audit row is removed.",
+      "depends_on": ["20261117020000_mvp_001_s1_professional_conformance"]
+    },
+    {
+      "migration_id": "20261117040000_mvp_001_s1_availability_checks",
+      "migration_kind": "product",
+      "sequence": 20,
+      "artifact_path": "supabase/migrations/20261117040000_mvp_001_s1_availability_checks.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration; no availability rule exists yet.",
+      "depends_on": ["20261117030000_mvp_001_s1_configuration_administration"]
     }
   ]
 }
