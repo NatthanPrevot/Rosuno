@@ -13,6 +13,10 @@
 // privileged port is the shared, server-only provisioning boundary's narrow
 // staff verification port, now reads only; this module never sees a
 // credential or a privileged client, and only bounds each call in time.
+// MVP-001 D-4: the review queue is read one page at a time, filtered and
+// ordered in the database, and the records counted for a page's attorneys
+// are read within the count the application asks for, so nothing is ever
+// silently cut.
 
 import {
   rowsResultOf,
@@ -78,6 +82,46 @@ function idList(ids: readonly string[]): readonly string[] | null {
 }
 
 const NO_ROWS_FOR_BAD_IDS = Object.freeze({ kind: "unreadable" } as const);
+
+// The most rows one queue read may ask for (MVP-001 D-4); the application
+// asks for one more than it shows, so a read is never silently cut.
+const MAX_QUEUE_ROWS = 1001;
+
+function isRowCount(count: unknown): count is number {
+  return (
+    Number.isSafeInteger(count) &&
+    (count as number) >= 1 &&
+    (count as number) <= MAX_QUEUE_ROWS
+  );
+}
+
+function isQueuePage(
+  excludedAttorneyId: unknown,
+  offset: unknown,
+  count: unknown,
+): boolean {
+  return (
+    (excludedAttorneyId === null || isUuid(excludedAttorneyId)) &&
+    Number.isSafeInteger(offset) &&
+    (offset as number) >= 0 &&
+    isRowCount(count)
+  );
+}
+
+// One page of an ordered query: the first page skips nothing, so it needs
+// no offset.
+function pageOf<Query>(
+  query: {
+    readonly limit: (count: number) => Query;
+    readonly range: (from: number, to: number) => Query;
+  },
+  offset: number,
+  count: number,
+): Query {
+  return offset === 0
+    ? query.limit(count)
+    : query.range(offset, offset + count - 1);
+}
 
 export function createStaffReads(
   clientSource: RequestClientSource = createDefaultRequestClient,
@@ -145,14 +189,118 @@ export function createStaffReads(
             ? Object.freeze({ kind: "answer", granted: data })
             : UNREADABLE_SCOPE;
         },
-        attorneyProfiles: async () =>
-          rowsResultOf(
-            await client
-              .from("attorney_profiles")
-              .select(PROFILE_COLUMNS)
-              .order("updated_at", { ascending: false })
-              .limit(MAX_ROWS),
-          ),
+        // MVP-001 D-4: the queue is read one page at a time. Each page is
+        // filtered in the database and ordered by a unique key, so pages
+        // never overlap or skip a row, and a page is never cut afterwards.
+        queueProfiles: async (
+          excludedAttorneyId: string | null,
+          offset: number,
+          count: number,
+        ) => {
+          if (!isQueuePage(excludedAttorneyId, offset, count)) {
+            return NO_ROWS_FOR_BAD_IDS;
+          }
+          const profiles = client
+            .from("attorney_profiles")
+            .select(PROFILE_COLUMNS)
+            .neq("profile_state", "removed");
+          return rowsResultOf(
+            await pageOf(
+              (excludedAttorneyId === null
+                ? profiles
+                : profiles.neq("id", excludedAttorneyId)
+              )
+                .order("updated_at", { ascending: false })
+                .order("id", { ascending: false }),
+              offset,
+              count,
+            ),
+          );
+        },
+        queueLicenses: async (
+          excludedAttorneyId: string | null,
+          offset: number,
+          count: number,
+        ) => {
+          if (!isQueuePage(excludedAttorneyId, offset, count)) {
+            return NO_ROWS_FOR_BAD_IDS;
+          }
+          const licenses = client.from("licenses").select(LICENSE_COLUMNS);
+          return rowsResultOf(
+            await pageOf(
+              (excludedAttorneyId === null
+                ? licenses
+                : licenses.neq("attorney_id", excludedAttorneyId)
+              )
+                .order("attorney_id")
+                .order("created_at")
+                .order("id"),
+              offset,
+              count,
+            ),
+          );
+        },
+        queueRequests: async (
+          excludedAttorneyId: string | null,
+          offset: number,
+          count: number,
+        ) => {
+          if (!isQueuePage(excludedAttorneyId, offset, count)) {
+            return NO_ROWS_FOR_BAD_IDS;
+          }
+          const requests = client
+            .from("practice_area_authorisations")
+            .select(PRACTICE_AUTHORISATION_COLUMNS)
+            .eq("status", "requested");
+          return rowsResultOf(
+            await pageOf(
+              (excludedAttorneyId === null
+                ? requests
+                : requests.neq("attorney_id", excludedAttorneyId)
+              )
+                .order("attorney_id")
+                .order("requested_at")
+                .order("id"),
+              offset,
+              count,
+            ),
+          );
+        },
+        licensesOfAttorneys: async (
+          attorneyIds: readonly string[],
+          count: number,
+        ) => {
+          const ids = idList(attorneyIds);
+          return ids === null || !isRowCount(count)
+            ? NO_ROWS_FOR_BAD_IDS
+            : rowsResultOf(
+                await client
+                  .from("licenses")
+                  .select(LICENSE_COLUMNS)
+                  .in("attorney_id", ids)
+                  .order("attorney_id")
+                  .order("id")
+                  .limit(count),
+              );
+        },
+        requestsOfAttorneys: async (
+          attorneyIds: readonly string[],
+          count: number,
+        ) => {
+          const ids = idList(attorneyIds);
+          return ids === null || !isRowCount(count)
+            ? NO_ROWS_FOR_BAD_IDS
+            : rowsResultOf(
+                await client
+                  .from("practice_area_authorisations")
+                  .select(PRACTICE_AUTHORISATION_COLUMNS)
+                  .eq("status", "requested")
+                  .in("attorney_id", ids)
+                  .order("attorney_id")
+                  .order("id")
+                  .limit(count),
+              );
+        },
         attorneyProfileById: async (attorneyId: string) =>
           rowsResultOf(
             await client
@@ -168,22 +316,6 @@ export function createStaffReads(
           ofAttorney("discipline", attorneyId),
         authorisationsOf: (attorneyId: string) =>
           ofAttorney("practice_area_authorisation", attorneyId),
-        pendingAuthorisations: async () =>
-          rowsResultOf(
-            await client
-              .from("practice_area_authorisations")
-              .select(PRACTICE_AUTHORISATION_COLUMNS)
-              .eq("status", "requested")
-              .limit(MAX_ROWS),
-          ),
-        visibleLicenses: async () =>
-          rowsResultOf(
-            await client
-              .from("licenses")
-              .select(LICENSE_COLUMNS)
-              .order("created_at")
-              .limit(MAX_ROWS),
-          ),
         recordById: async (kind: SubjectKind, recordId: string) => {
           const [table, columns] = TABLES[kind];
           return rowsResultOf(

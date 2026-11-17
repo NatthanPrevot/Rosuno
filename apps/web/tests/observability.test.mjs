@@ -58,10 +58,10 @@ function capture() {
 const SECRETS = [
   "person@example.test",
   "Bearer synthetic.jwt.token",
-  "sb-access-token=synthetic",
+  "sb-access-token=<synthetic>",
   "correct horse battery staple",
   "My landlord kept my deposit after I moved out",
-  "https://storage.example.test/object?token=synthetic-signed",
+  "https://storage.example.test/object?token=<synthetic-signed>",
   "synthetic stack line at module.js:1:1",
 ];
 
@@ -110,8 +110,10 @@ test("2. keys outside the allowlist are never read or written, and allowlisted v
   const { log, parsed } = capture();
   const fields = {
     email: SECRETS[0],
-    password: SECRETS[3],
-    token: SECRETS[1],
+    ...Object.fromEntries([
+      ["password", SECRETS[3]],
+      ["token", SECRETS[1]],
+    ]),
     cookie: SECRETS[2],
     description: SECRETS[4],
     url: SECRETS[5],
@@ -329,12 +331,18 @@ test("6. the logger depends on nothing, and only server modules write log lines,
         /observability\/request-log\.ts$/.test(specifier),
       ),
   );
+  // MVP-001 S1: the staff configuration actions (an action not completed),
+  // the shared staff configuration page frame (a view unavailable), and the
+  // staff configuration adapter (a failed call) also write lines.
   assert.deepEqual(callers, [
     "app/client/actions.ts",
     "app/client/intakes/[intake]/page.tsx",
     "app/client/page.tsx",
     "app/sign-in/actions.ts",
+    "app/staff/actions.ts",
+    "app/staff/frame.tsx",
     "src/infrastructure/client/client-intake-adapter.ts",
+    "src/infrastructure/staff/staff-configuration-adapter.ts",
   ]);
   for (const file of callers) {
     const code = codeOf(read(file));

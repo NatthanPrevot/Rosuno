@@ -38,7 +38,7 @@ test("1. the named fields keep what was typed, and every other field returns to 
     value: "typed@example.test",
     defaultValue: "",
   });
-  const password = control({
+  const passwordField = control({
     name: "password",
     type: "password",
     value: "synthetic secret",
@@ -93,7 +93,7 @@ test("1. the named fields keep what was typed, and every other field returns to 
   const submit = control({ type: "submit", value: "", defaultValue: "" });
   const event = resetEvent([
     email,
-    password,
+    passwordField,
     shownPassword,
     note,
     box,
@@ -107,7 +107,7 @@ test("1. the named fields keep what was typed, and every other field returns to 
   // The browser's own reset is cancelled.
   assert.equal(event.prevented, true);
   assert.equal(email.value, "typed@example.test");
-  assert.equal(password.value, "");
+  assert.equal(passwordField.value, "");
   assert.equal(shownPassword.value, "");
   assert.equal(note.value, "saved words");
   assert.equal(box.checked, false);
@@ -140,15 +140,15 @@ test("2. naming nothing resets every field, and the same handler serves every su
       value: typed,
       defaultValue: "",
     });
-    const secret = control({
+    const secretField = control({
       name: "password",
       type: "password",
       value: typed,
       defaultValue: "",
     });
-    handler(resetEvent([entry, secret]));
+    handler(resetEvent([entry, secretField]));
     assert.equal(entry.value, typed);
-    assert.equal(secret.value, "");
+    assert.equal(secretField.value, "");
   }
 });
 

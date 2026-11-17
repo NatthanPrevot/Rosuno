@@ -3,8 +3,13 @@
 // Rendered on the server for every request. A fresh Staff identity and the
 // database's own verification scope predicate decide access; the queue lists
 // only what the reviewer's own session may read under the row policies, and
-// never the reviewer's own attorney profile. The page reads no route
-// parameter, query, header, or cookie of its own and offers no change.
+// never the reviewer's own attorney profile. MVP-001 D-4: the queue is shown
+// one page at a time, at any size. The one query value read, page, only asks
+// which page to show; the server checks it and shows the first page for
+// anything else. When a page does not hold the whole queue, it says so and
+// links to its neighbours, so nothing in scope is left out unseen. The page
+// reads no route parameter, header, or cookie of its own and offers no
+// change.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -62,10 +67,21 @@ function StaffFrame({
   );
 }
 
-export default async function StaffVerificationQueuePage() {
+function pageHref(page: number): string {
+  return page === 1
+    ? "/staff/verification"
+    : `/staff/verification?page=${page}`;
+}
+
+export default async function StaffVerificationQueuePage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{ readonly page?: string | string[] }>;
+}) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
-  const view = await resolveStaffQueue(STAFF_VERIFICATION_SOURCES);
+  const { page } = await searchParams;
+  const view = await resolveStaffQueue(STAFF_VERIFICATION_SOURCES, page);
   if (view.status === "sign-in-required") {
     return (
       <StaffFrame title="Sign in to continue">
@@ -88,6 +104,11 @@ export default async function StaffVerificationQueuePage() {
           This account does not hold current verification access. A staff
           profile alone grants none.
         </Alert>
+        <Cluster>
+          <ButtonLink variant="tertiary" href="/staff">
+            Other staff tools
+          </ButtonLink>
+        </Cluster>
       </StaffFrame>
     );
   }
@@ -112,9 +133,20 @@ export default async function StaffVerificationQueuePage() {
           access. You can review the professional records in your jurisdictions.
         </Alert>
       )}
-      {view.entries.length === 0 ? (
+      {view.entries.length === 0 && view.page === 1 ? (
         <Text tone="muted">Nothing in your scope is waiting.</Text>
-      ) : (
+      ) : null}
+      {view.entries.length === 0 && view.page > 1 ? (
+        <>
+          <Text>There is nothing on this page of the queue.</Text>
+          <Cluster>
+            <ButtonLink variant="secondary" href="/staff/verification">
+              Show the first page
+            </ButtonLink>
+          </Cluster>
+        </>
+      ) : null}
+      {view.entries.length === 0 ? null : (
         <Table
           id="verification-queue"
           caption="Applications and records in scope"
@@ -154,6 +186,39 @@ export default async function StaffVerificationQueuePage() {
           </tbody>
         </Table>
       )}
+      {view.previousPage === null && view.nextPage === null ? null : (
+        <>
+          <Text tone="muted">
+            {`Page ${view.page} of the queue.`}
+            {view.global
+              ? " Profiles are listed most recently changed first."
+              : " Attorneys are listed from your license claims and pending requests; an attorney whose records span pages appears on each, always with full counts."}
+            {view.nextPage === null
+              ? " This is the last page."
+              : " More of the queue is on the next page."}
+          </Text>
+          <Cluster>
+            {view.previousPage === null ? null : (
+              <ButtonLink
+                variant="secondary"
+                href={pageHref(view.previousPage)}
+              >
+                Previous page
+              </ButtonLink>
+            )}
+            {view.nextPage === null ? null : (
+              <ButtonLink variant="secondary" href={pageHref(view.nextPage)}>
+                Next page
+              </ButtonLink>
+            )}
+          </Cluster>
+        </>
+      )}
+      <Cluster>
+        <ButtonLink variant="tertiary" href="/staff">
+          Other staff tools
+        </ButtonLink>
+      </Cluster>
     </StaffFrame>
   );
 }

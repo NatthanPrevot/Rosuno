@@ -61,6 +61,11 @@ const RECORD_COLUMNS = {
   practice_area_authorisations: PRACTICE_AUTHORISATION_COLUMNS,
 };
 
+// Plain ordering of two comparable values (MVP-001 D-4 paged reads).
+function compare(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 // A synthetic, canonical, version-4-shaped id for a label and a number.
 export function idOf(group, n) {
   return `00000000-0000-4000-8000-${String(group).padStart(4, "0")}${String(n).padStart(8, "0")}`;
@@ -643,6 +648,85 @@ export function staffReadsFor(world, authId) {
           .filter(visible("licenses"))
           .map((r) => pick(r, LICENSE_COLUMNS)),
       ),
+    // MVP-001 D-4: the paged queue reads, filtered and ordered as the
+    // adapter asks the database to, then cut to the asked page.
+    queueProfiles: async (excluded, offset, count) => {
+      world.calls.push(`queueProfiles:${offset}:${count}`);
+      return rows(
+        world.attorney_profiles
+          .filter(
+            (p) =>
+              p.id !== excluded &&
+              p.profile_state !== "removed" &&
+              (ownsAttorney(world, authId, p.id) ||
+                predicate(world, authId, null)),
+          )
+          .sort(
+            (a, b) =>
+              compare(b.updated_at, a.updated_at) || compare(b.id, a.id),
+          )
+          .slice(offset, offset + count)
+          .map((p) => pick(p, PROFILE_COLUMNS)),
+      );
+    },
+    queueLicenses: async (excluded, offset, count) => {
+      world.calls.push(`queueLicenses:${offset}:${count}`);
+      return rows(
+        world.licenses
+          .filter((r) => r.attorney_id !== excluded && visible("licenses")(r))
+          .sort(
+            (a, b) =>
+              compare(a.attorney_id, b.attorney_id) ||
+              compare(a.created_at, b.created_at) ||
+              compare(a.id, b.id),
+          )
+          .slice(offset, offset + count)
+          .map((r) => pick(r, LICENSE_COLUMNS)),
+      );
+    },
+    queueRequests: async (excluded, offset, count) => {
+      world.calls.push(`queueRequests:${offset}:${count}`);
+      return rows(
+        world.practice_area_authorisations
+          .filter(
+            (r) =>
+              r.status === "requested" &&
+              r.attorney_id !== excluded &&
+              visible("x")(r),
+          )
+          .sort(
+            (a, b) =>
+              compare(a.attorney_id, b.attorney_id) ||
+              compare(a.requested_at, b.requested_at) ||
+              compare(a.id, b.id),
+          )
+          .slice(offset, offset + count)
+          .map((r) => pick(r, PRACTICE_AUTHORISATION_COLUMNS)),
+      );
+    },
+    licensesOfAttorneys: async (ids, count) => {
+      world.calls.push(`licensesOfAttorneys:${ids.length}:${count}`);
+      return rows(
+        world.licenses
+          .filter((r) => ids.includes(r.attorney_id) && visible("licenses")(r))
+          .slice(0, count)
+          .map((r) => pick(r, LICENSE_COLUMNS)),
+      );
+    },
+    requestsOfAttorneys: async (ids, count) => {
+      world.calls.push(`requestsOfAttorneys:${ids.length}:${count}`);
+      return rows(
+        world.practice_area_authorisations
+          .filter(
+            (r) =>
+              r.status === "requested" &&
+              ids.includes(r.attorney_id) &&
+              visible("x")(r),
+          )
+          .slice(0, count)
+          .map((r) => pick(r, PRACTICE_AUTHORISATION_COLUMNS)),
+      );
+    },
     recordById: async (kind, id) => {
       const table = RECORD_TABLE[kind];
       return rows(

@@ -2662,6 +2662,38 @@ const CLIENT_INTAKE_RPCS = Object.freeze([
   "client_submit_intake",
   "client_close_intake",
 ]);
+// MVP-001 S1: the staff configuration adapter calls the database's own
+// has_staff_capability predicate, the PS-A2 environment accessor, and the
+// eighteen operation-specific staff configuration functions, each exactly
+// once and each as a literal call through the request's own unprivileged
+// session; it builds or receives no privileged client.
+const CONFIGURATION_ADAPTER =
+  "src/infrastructure/staff/staff-configuration-adapter.ts";
+const CONFIGURATION_RPCS = Object.freeze([
+  "staff_create_policy_version",
+  "staff_revise_policy_draft",
+  "staff_transition_policy_version",
+  "staff_end_policy_version",
+  "staff_add_policy_authority_reference",
+  "staff_decide_policy_authority_reference",
+  "staff_create_jurisdiction",
+  "staff_change_jurisdiction_lifecycle",
+  "staff_create_service_area",
+  "staff_create_practice_area",
+  "staff_set_practice_area_active",
+  "staff_define_launch_gate",
+  "staff_record_launch_gate_evaluation",
+  "staff_grant_launch_authorization",
+  "staff_revoke_launch_authorization",
+  "staff_grant_capability",
+  "staff_revoke_capability",
+  "staff_publish_intake_question_set",
+  "has_staff_capability",
+]);
+const CAPABILITY_PREDICATE_RPC =
+  'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';
+const CONFIGURATION_REQUEST_CLIENT =
+  "const client: RequestClient | null = await withinDeadline(\n      clientSource,\n      null,\n      deadlineMs,\n    );";
 const RPC_OCCURRENCES = Object.freeze({
   [PRIVILEGED_MODULE]: 1,
   // MVP-001 S1: the staff adapter's second RPC is exactly the PS-A2
@@ -2670,6 +2702,8 @@ const RPC_OCCURRENCES = Object.freeze({
   [REQUEST_WRITE_MODULE]: 2,
   [APPLICANT_ADAPTER]: 2,
   [CLIENT_INTAKE_ADAPTER]: CLIENT_INTAKE_RPCS.length,
+  // The configuration functions and predicate, plus the environment accessor.
+  [CONFIGURATION_ADAPTER]: CONFIGURATION_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -2686,6 +2720,14 @@ function assertQuotaRpcContract(codes) {
     if (file === CLIENT_INTAKE_ADAPTER) {
       assert.doesNotMatch(code, /createClient\b|ADMIN_KEY|service_role/i);
     }
+    for (const name of CONFIGURATION_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === CONFIGURATION_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+    }
     assert.equal(
       code.match(/\brpc\b/gi)?.length ?? 0,
       RPC_OCCURRENCES[file] ?? 0,
@@ -2699,7 +2741,7 @@ function assertQuotaRpcContract(codes) {
     assert.equal(
       code.match(/client\.rpc\("deployment_environment_identity"\)/g)?.length ??
         0,
-      file === STAFF_ADAPTER ? 1 : 0,
+      file === STAFF_ADAPTER || file === CONFIGURATION_ADAPTER ? 1 : 0,
       file,
     );
     assert.equal(
@@ -2723,6 +2765,24 @@ function assertQuotaRpcContract(codes) {
   assert.doesNotMatch(
     staffAdapter,
     /\badmin\b|createClient\b|adminKey|allow_any_jurisdiction: true/,
+  );
+  // The configuration adapter: every RPC is a literal call by its own name
+  // (no computed, destructured, or dynamic target), the predicate is called
+  // with exactly its three named arguments, and the request client is built
+  // in exactly two places, its read port and its write port.
+  const configurationAdapter = codes.get(CONFIGURATION_ADAPTER);
+  assert.equal(
+    configurationAdapter.match(/client\.rpc\("[a-z_]+"/g)?.length,
+    RPC_OCCURRENCES[CONFIGURATION_ADAPTER],
+  );
+  assert.equal(configurationAdapter.split(CAPABILITY_PREDICATE_RPC).length, 2);
+  assert.equal(
+    configurationAdapter.split(CONFIGURATION_REQUEST_CLIENT).length,
+    3,
+  );
+  assert.doesNotMatch(
+    configurationAdapter,
+    /\badmin\b|createClient\b|adminKey|registration-provisioning|has_manage_attorney_verification_scope/,
   );
   for (const file of [REQUEST_WRITE_MODULE, APPLICANT_ADAPTER]) {
     const code = codes.get(file);

@@ -750,14 +750,66 @@ const P3003_INFRASTRUCTURE = [
   "src/infrastructure/staff/staff-verification-adapter.ts",
 ];
 
+// MVP-001 S1: the staff configuration surfaces beside the verification
+// routes, exactly these files (their own contract is in
+// staff-configuration-routes.test.mjs).
+const MVP001_STAFF_APP = [
+  "app/staff/actions.ts",
+  "app/staff/capabilities/[member]/page.tsx",
+  "app/staff/capabilities/forms.tsx",
+  "app/staff/capabilities/page.tsx",
+  "app/staff/catalog/forms.tsx",
+  "app/staff/catalog/page.tsx",
+  "app/staff/frame.tsx",
+  "app/staff/intake-configuration/forms.tsx",
+  "app/staff/intake-configuration/page.tsx",
+  "app/staff/jurisdictions/[jurisdiction]/page.tsx",
+  "app/staff/jurisdictions/forms.tsx",
+  "app/staff/jurisdictions/page.tsx",
+  "app/staff/launch/[jurisdiction]/page.tsx",
+  "app/staff/launch/forms.tsx",
+  "app/staff/launch/page.tsx",
+  "app/staff/outcome.tsx",
+  "app/staff/page.tsx",
+  "app/staff/policies/[version]/page.tsx",
+  "app/staff/policies/forms.tsx",
+  "app/staff/policies/page.tsx",
+];
+
+// MVP-001 D-4: the verification queue page reads exactly one query value,
+// page, in exactly these three places, and hands it unread to the use case,
+// which checks it. Removing exactly those occurrences leaves the page's code
+// to every other check below, unchanged.
+const QUEUE_PAGE_QUERY = [
+  "export default async function StaffVerificationQueuePage({\n  searchParams,\n}: {",
+  "  readonly searchParams: Promise<{ readonly page?: string | string[] }>;\n",
+  "  const { page } = await searchParams;\n  const view = await resolveStaffQueue(STAFF_VERIFICATION_SOURCES, page);",
+];
+
+function withoutQueuePageQuery(code) {
+  assert.equal(code.match(/\bsearchParams\b/g)?.length, 3);
+  let rest = code;
+  for (const exact of QUEUE_PAGE_QUERY) {
+    assert.equal(rest.split(exact).length, 2, exact);
+    rest = rest.replace(exact, "");
+  }
+  return rest;
+}
+
 test("M4-I5. the new routes are exactly these files, server-rendered per request, unindexed, and read no request input of their own", () => {
   assert.deepEqual(
     filesIn("app/attorney/professional/"),
     P3003_APP.slice(0, 3),
   );
-  assert.deepEqual(filesIn("app/staff/"), P3003_APP.slice(3));
+  assert.deepEqual(
+    filesIn("app/staff/"),
+    [...P3003_APP.slice(3), ...MVP001_STAFF_APP].sort(),
+  );
   for (const file of P3003_APP.filter((f) => f.endsWith("page.tsx"))) {
-    const code = codeOf(read(file));
+    const code =
+      file === "app/staff/verification/page.tsx"
+        ? withoutQueuePageQuery(codeOf(read(file)))
+        : codeOf(read(file));
     assert.doesNotMatch(read(file), /["']use (?:client|server)["']/, file);
     assert.match(code, /robots: \{ index: false, follow: false \},/, file);
     assert.ok(code.indexOf("await connection();") > 0, file);
