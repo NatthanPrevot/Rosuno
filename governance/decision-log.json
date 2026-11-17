@@ -1879,6 +1879,64 @@
         "Slice S1 merged: PR #96 into owner main at merge commit b7dc44758db05f4492a7d87d17448fcd062e853c, confirmed by the express owner statement 'S1 MERGE CONFIRMED / S2 CONTINUATION' processed at 2026-11-17T07:02:44Z (session clock); designated approval facts (reviewer, time) not supplied and recorded as pending; S1 migrations not applied to any persistent environment (Staging application awaits separate owner authorization)",
         "Optional independent review: not performed"
       ]
+    },
+    {
+      "status": "accepted",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-17T15:26:50Z",
+      "updated_at": "2026-11-17T15:26:50Z",
+      "supersedes": [],
+      "expiry": null,
+      "decision_id": "DEC-20261117-PS-A4-AUTHENTICATION-ABUSE-COUNTERS",
+      "title": "Approve the exact text of Physical Specification amendment PS-A4, revision 2 (authentication-abuse counters)",
+      "scope": "Physical model, bounded: one private relation authentication_abuse_counters and the binding decision, security-event and unavailable-reporting semantics of PS-A4 (DL-ENG-1 R9; Physical Specification section 53).",
+      "decision": "The owner expressly approves the complete, unchanged bytes of PS-A4 revision 2, rosuno-physical-specification-amendment-ps-a4.md, 10,704 bytes, SHA-256 15d4b3bea4143288d9c751313d0ae9e57a999c68aaba331a6d109d59d710e44e (Lock Condition element 1). Its registration in governance/authority-references.json (status pending_lock_condition) and this entry are carried by the S2 pull request; the Lock Condition completes when that pull request merges, after which the register status becomes active in the next records update.",
+      "rationale": "Sign-in and recovery rate limits and suspicious-login signals need durable per-identity and global counts that no PS relation can hold: registration_quota_counters carries a different meaning (PS P10), audit_events is append-only evidence and never current state (PS section 25.1), per-User columns would reveal account existence (PS P11, P12), and the provider's limits see only the Rosuno server's address (PS-A4 section 5).",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A4-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "impact": "One forward-only S2 migration implements PS-A4: the private counter relation and its server-only decision functions; sign-in and recovery reserve before the provider call; suspicious sign-ins are recorded and handled; unavailable protection is reported through the database audit when possible and always through the structured server log.",
+      "evidence": [
+        "Express owner adoption statement 'OWNER ADOPTION: PS-A4 REVISION 2 / S2 COMPLETION' (approver NatthanPrevot) naming revision 2, 10,704 bytes and SHA-256 15d4b3bea4143288d9c751313d0ae9e57a999c68aaba331a6d109d59d710e44e, received in the Builder session and processed at 2026-11-17T15:26:50Z (session clock)",
+        "Amendment file: rosuno-physical-specification-amendment-ps-a4.md, revision 2, 10,704 bytes, SHA-256 15d4b3bea4143288d9c751313d0ae9e57a999c68aaba331a6d109d59d710e44e (owner-held; not in the repository)",
+        "Optional independent review: not performed"
+      ]
+    },
+    {
+      "status": "accepted",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-17T15:26:50Z",
+      "updated_at": "2026-11-17T15:26:50Z",
+      "supersedes": [],
+      "expiry": null,
+      "decision_id": "DEC-20261117-S2-AUTHENTICATION-PROTECTION-UNAVAILABLE-BEHAVIOR",
+      "title": "Behaviour of sign-in and recovery when authentication-abuse protection is unavailable",
+      "scope": "Security behaviour of sign-in and password recovery when the PS-A4 protection configuration is missing or invalid, or the protection decision fails at runtime.",
+      "decision": "Sign-in with missing or invalid protection configuration is refused. Sign-in during a runtime protection failure is permitted temporarily, with security alerting, and is never treated as healthy operation. Recovery with missing or invalid configuration is refused. Recovery during a runtime protection failure is refused. Every unavailable outcome is recorded as a database audit event when the database accepts it and is always reported as a structured, non-sensitive server log line that never claims persistence the database did not confirm; production alert delivery is verified during deployment readiness, and ordinary application logging is not proof that staff received an alert.",
+      "rationale": "Recovery is a high-value account-takeover path whose refusal costs little availability; a misconfiguration must never silently remove sign-in protection; a runtime failure of the limiter must not let an attacker who can induce it lock every user out, while attorney and staff sessions stay protected by mandatory MFA (aal2).",
+      "authority_refs": [
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A4-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "impact": "The S2 sign-in and recovery actions implement these four outcomes and the two reporting paths of PS-A4 section 4.",
+      "evidence": [
+        "Express owner direction 'S1/S2 DECISIONS' (approver NatthanPrevot) approving the four outcomes and the structured-logging fallback, received in the Builder session and processed at 2026-11-17T14:28:09Z (session clock), confirmed in the adoption statement processed at 2026-11-17T15:26:50Z (session clock)",
+        "Optional independent review: not performed"
+      ]
     }
   ]
 }
