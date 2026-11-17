@@ -13,7 +13,8 @@
 // action and the outcome, with nothing the caller submitted. MVP-001 S2:
 // each action first asks the step-up gate; a session that is not stepped up
 // gets one fixed refusal, and nothing is handed to the use case. The two
-// operational job actions (retry, cancel) follow the same rules.
+// operational job actions (retry, cancel) follow the same rules, and so does
+// the MVP-001 S3 part 2 jurisdiction assessment review.
 
 import { revalidatePath } from "next/cache";
 
@@ -33,6 +34,7 @@ import {
   publishQuestionSet,
   recordLaunchGateEvaluation,
   retryOperationalJob,
+  reviewJurisdictionAssessment,
   revisePolicyDraft,
   revokeCapability,
   revokeLaunchAuthorization,
@@ -74,6 +76,7 @@ const PAGES: Readonly<Record<string, readonly string[]>> = Object.freeze({
   capabilities: ["/staff/capabilities", "/staff/capabilities/[member]"],
   intake: ["/staff/intake-configuration"],
   jobs: ["/staff/jobs"],
+  review: ["/staff/jurisdiction-review"],
 });
 
 async function run(
@@ -288,4 +291,17 @@ export async function cancelOperationalJobAction(
   formData: FormData,
 ): Promise<ConfigurationActionState> {
   return run("cancelOperationalJob", cancelOperationalJob, "jobs", formData);
+}
+
+// MVP-001 S3 part 2.
+export async function reviewJurisdictionAssessmentAction(
+  _previous: ConfigurationActionState,
+  formData: FormData,
+): Promise<ConfigurationActionState> {
+  return run(
+    "reviewJurisdictionAssessment",
+    reviewJurisdictionAssessment,
+    "review",
+    formData,
+  );
 }

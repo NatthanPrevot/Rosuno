@@ -16,6 +16,12 @@
 // browser's timer and its automatic stop only help the client stay within
 // the limit and decide nothing. Playback asks the server for a short-lived
 // link to the one authorized voice memo each time.
+//
+// MVP-001 S3 part 2: the suggestion request sends only the Intake and the
+// revision the page showed; a decision names one suggestion the page showed
+// and whether the client confirms or dismisses it; a change request names
+// one fixed post-submission change. Each shows only the fixed message for
+// the state its action returns; the server decides everything.
 
 import {
   startTransition,
@@ -25,9 +31,11 @@ import {
   useState,
 } from "react";
 
+import { INITIAL_SUGGESTION_STATE } from "../../../../src/application/ai-suggestion.ts";
 import {
   INITIAL_CLIENT_INTAKE_STATE,
   type ClientIntakeActionState,
+  type IntakeChange,
   type QuestionView,
 } from "../../../../src/application/client-intake.ts";
 import { NOT_SURE } from "../../../../src/application/intake-question-set.ts";
@@ -46,7 +54,11 @@ import {
   Text,
   TextAreaField,
 } from "../../../../src/presentation/design-system.tsx";
-import { outcomeMessage } from "../../../../src/presentation/client-intake-labels.ts";
+import {
+  CHANGE_LABELS,
+  outcomeMessage,
+  suggestionMessage,
+} from "../../../../src/presentation/client-intake-labels.ts";
 import { keepEntries } from "../../../../src/presentation/form-entries.ts";
 import {
   playbackMessage,
@@ -55,7 +67,10 @@ import {
 } from "../../../../src/presentation/voice-memo-labels.ts";
 import {
   closeIntakeAction,
+  decideSuggestionAction,
   playVoiceMemoAction,
+  requestIntakeChangeAction,
+  requestSuggestionsAction,
   saveIntakeAction,
   submitIntakeAction,
   uploadVoiceMemoAction,
@@ -254,6 +269,126 @@ export function SubmitIntakeForm({
         <Button variant="secondary" type="submit" disabled={pending}>
           Submit saved answers
         </Button>
+      </Stack>
+    </form>
+  );
+}
+
+// MVP-001 S3 part 2: asks for suggestions made from the saved revision.
+export function SuggestionRequestForm({
+  intakeId,
+  latestRevision,
+}: {
+  readonly intakeId: string;
+  readonly latestRevision: number;
+}) {
+  const [state, action, pending] = useActionState(
+    requestSuggestionsAction,
+    INITIAL_SUGGESTION_STATE,
+  );
+  const message = suggestionMessage(state);
+  return (
+    <form action={action}>
+      <Stack>
+        {message === null ? null : (
+          <Alert
+            tone={message.tone}
+            title={message.title}
+            role={message.tone === "error" ? "alert" : "status"}
+          >
+            {message.body}
+          </Alert>
+        )}
+        <input type="hidden" name="intake" value={intakeId} />
+        <input
+          type="hidden"
+          name="expected_revision"
+          value={String(latestRevision)}
+        />
+        <Cluster>
+          <Button variant="secondary" type="submit" disabled={pending}>
+            Ask for a suggestion
+          </Button>
+        </Cluster>
+      </Stack>
+    </form>
+  );
+}
+
+// MVP-001 S3 part 2: confirms or dismisses one presented suggestion. Each
+// choice is its own form, so the decision sent is exactly the button used.
+export function SuggestionDecisionForms({
+  intakeId,
+  suggestionId,
+}: {
+  readonly intakeId: string;
+  readonly suggestionId: string;
+}) {
+  const [confirmState, confirmAction, confirming] = useActionState(
+    decideSuggestionAction,
+    INITIAL_CLIENT_INTAKE_STATE,
+  );
+  const [rejectState, rejectAction, rejecting] = useActionState(
+    decideSuggestionAction,
+    INITIAL_CLIENT_INTAKE_STATE,
+  );
+  return (
+    <Stack>
+      <Outcome state={confirmState} />
+      <Outcome state={rejectState} />
+      <Cluster>
+        <form action={confirmAction}>
+          <input type="hidden" name="intake" value={intakeId} />
+          <input type="hidden" name="suggestion" value={suggestionId} />
+          <input type="hidden" name="decision" value="confirm" />
+          <Button
+            variant="secondary"
+            type="submit"
+            disabled={confirming || rejecting}
+          >
+            Confirm suggestion
+          </Button>
+        </form>
+        <form action={rejectAction}>
+          <input type="hidden" name="intake" value={intakeId} />
+          <input type="hidden" name="suggestion" value={suggestionId} />
+          <input type="hidden" name="decision" value="reject" />
+          <Button
+            variant="tertiary"
+            type="submit"
+            disabled={confirming || rejecting}
+          >
+            Dismiss suggestion
+          </Button>
+        </form>
+      </Cluster>
+    </Stack>
+  );
+}
+
+// MVP-001 S3 part 2: asks about one post-submission change.
+export function IntakeChangeForm({
+  intakeId,
+  change,
+}: {
+  readonly intakeId: string;
+  readonly change: IntakeChange;
+}) {
+  const [state, action, pending] = useActionState(
+    requestIntakeChangeAction,
+    INITIAL_CLIENT_INTAKE_STATE,
+  );
+  return (
+    <form action={action}>
+      <Stack>
+        <Outcome state={state} />
+        <input type="hidden" name="intake" value={intakeId} />
+        <input type="hidden" name="change" value={change} />
+        <Cluster>
+          <Button variant="tertiary" type="submit" disabled={pending}>
+            {CHANGE_LABELS[change]}
+          </Button>
+        </Cluster>
       </Stack>
     </form>
   );

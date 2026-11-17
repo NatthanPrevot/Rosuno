@@ -165,8 +165,10 @@ test("S2-R2. no setup picture, embedded markup, or image is ever rendered, and t
 });
 
 test("S2-R3. every attorney page and every staff page asks the step-up gate first, right after opting out of prerendering", () => {
-  // MVP-001 S2: sixteen pages, and the operational job view.
-  assert.equal(GATED_PAGES.length, 17);
+  // MVP-001 S2: sixteen pages, and the operational job view. MVP-001 S3
+  // part 2: and the jurisdiction assessment review.
+  assert.equal(GATED_PAGES.length, 18);
+  assert.ok(GATED_PAGES.includes("app/staff/jurisdiction-review/page.tsx"));
   for (const file of GATED_PAGES) {
     const kind = file.startsWith("app/staff/") ? "staff" : "attorney";
     const code = codeOf(read(file));

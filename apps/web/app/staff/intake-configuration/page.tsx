@@ -5,7 +5,10 @@
 // manage_intake_configuration capability for all jurisdictions, exactly as
 // the publishing function does. Published versions are listed one page at a
 // time, newest first; the newest is the current one. The one query value
-// read, page, only asks which page to show; the server checks it.
+// read, page, only asks which page to show; the server checks it. MVP-001
+// S3 part 2: the page also says whether the current version asks for the
+// category that routes an Intake; question sets stay one platform-wide
+// sequence (PS-A1 section 1.8), so no version is tied to a category.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -89,6 +92,13 @@ export default async function IntakeConfigurationPage({
         noun="versions"
         shown={view.versions.length}
       />
+      {view.currentAsksCategory === null ? null : (
+        <Text tone="muted">
+          {view.currentAsksCategory
+            ? "Category routing: the current version asks for a practice area. An Intake's category is the practice area its client saves; a missing or not-sure answer stays unresolved and is never guessed."
+            : "Category routing: the current version asks for no practice area, so Intakes answered under it carry no category."}
+        </Text>
+      )}
       <Heading as="h2" size="md">
         Publish a new version
       </Heading>

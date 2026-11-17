@@ -142,9 +142,12 @@ const trustedSourceVocabulary = new Map([
 // link shown whatever the session. MVP-001 D-1 withdrew the account-creation
 // link beside it: account creation is refused by design until a client
 // address can be trusted. This exact markup is the only further addition
-// admitted to the historical page contract.
+// admitted to the historical page contract. MVP-001 S3 part 2 (MBS section
+// 18; Packet rule 11): the same fixed cluster also offers the two fixed
+// first-party entry points to the help and privacy pages, which say only
+// that the information is not yet available; nothing else is admitted.
 const registrationEntry =
-  '<Cluster> <ButtonLink variant="tertiary" href="/auth/confirm"> Finish account confirmation </ButtonLink> </Cluster>';
+  '<Cluster> <ButtonLink variant="tertiary" href="/auth/confirm"> Finish account confirmation </ButtonLink> <ButtonLink variant="tertiary" href="/help"> Help </ButtonLink> <ButtonLink variant="tertiary" href="/privacy"> Privacy </ButtonLink> </Cluster>';
 
 // Import or export syntax without the spacing Prettier writes, or with a
 // comment inside it, would hide its specifier from importsOf.
@@ -1031,6 +1034,8 @@ test("12. presentation reaches application state only through application module
       "Status",
       "Cluster",
       "ButtonLink",
+      "ButtonLink",
+      "ButtonLink",
       "Columns",
       "Stack",
       "Heading",
@@ -1116,6 +1121,10 @@ test("12. presentation reaches application state only through application module
       "tone",
       "variant",
       "href",
+      "variant",
+      "href",
+      "variant",
+      "href",
       "columns",
       "size",
       "tone",
@@ -1192,6 +1201,8 @@ test("12. presentation reaches application state only through application module
       "Session: {}",
       "{}",
       "Finish account confirmation",
+      "Help",
+      "Privacy",
       "Actions and status",
       "Three levels of emphasis, each with hover, focus, pressed, and disabled states.",
       "Primary action",
@@ -1264,6 +1275,11 @@ test("12. presentation reaches application state only through application module
       "type=submit",
       "variant=tertiary",
       "href=/auth/confirm",
+      // MVP-001 S3 part 2: the help and privacy entry points.
+      "variant=tertiary",
+      "href=/help",
+      "variant=tertiary",
+      "href=/privacy",
       "columns=split",
       "size=lg",
       "tone=muted",

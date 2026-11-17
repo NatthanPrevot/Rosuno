@@ -5,11 +5,20 @@
 // The jurisdiction wording follows the locked rule that a jurisdiction
 // suggestion says attorneys in a place "may be relevant" and never that a
 // law applies; an unresolved or multiple answer is shown as unresolved.
+// MVP-001 S3 part 2: an AI suggestion is shown only as a suggestion the
+// client may confirm or dismiss (never a recommendation, a match, or a
+// choice made for them), the routing category only as the client's own
+// choice, and a post-submission change only as not yet available.
 
+import type { SuggestionActionState } from "../application/ai-suggestion.ts";
 import type {
   ClientIntakeActionState,
+  IntakeChange,
   IntakeState,
   JurisdictionStatement,
+  RoutingCategory,
+  SuggestionStatus,
+  SuggestionType,
 } from "../application/client-intake.ts";
 import type { Tone } from "./design-system.tsx";
 
@@ -55,6 +64,55 @@ export function jurisdictionSuggestion(
 
 export const SUGGESTION_NOTE =
   "This is a suggestion based on your answers. It is not a decision about which law applies.";
+
+// MVP-001 S3 part 2: the routing category, as the client's own statement.
+export function routingText(routing: RoutingCategory): string {
+  switch (routing.kind) {
+    case "category":
+      return `You chose ${routing.name}. This is your own choice, not a legal classification, and it does not choose an attorney for you.`;
+    case "not_sure":
+      return "You told us you are not sure which category fits. We have not chosen one for you.";
+    case "unanswered":
+      return "You have not chosen a category yet. We have not chosen one for you.";
+    case "none":
+      return "These questions do not ask for a category.";
+  }
+}
+
+// MVP-001 S3 part 2: one AI suggestion, in suggestion wording only.
+export function suggestionText(
+  type: SuggestionType,
+  names: readonly string[],
+): string {
+  return type === "practice_category"
+    ? `A category that may fit what you told us: ${names.join("")}.`
+    : `Places where attorneys may be relevant, based on what you told us: ${either(names)}.`;
+}
+
+export const SUGGESTION_STATUS_LABELS: Readonly<
+  Record<SuggestionStatus, { readonly label: string; readonly tone: Tone }>
+> = Object.freeze({
+  pending: { label: "Not decided", tone: "information" },
+  confirmed: { label: "Confirmed by you", tone: "success" },
+  rejected: { label: "Dismissed by you", tone: "neutral" },
+});
+
+export const AI_SUGGESTION_NOTE =
+  "Suggestions are generated automatically from your own answers. They do not decide which law applies, and they never choose an attorney. Nothing changes in your answers unless you save them.";
+
+export const PREFILL_NOTE =
+  "Filled in from a suggestion you confirmed. It is saved only when you save your answers.";
+
+// MVP-001 S3 part 2: the post-submission changes, each not yet available.
+export const CHANGE_LABELS: Readonly<Record<IntakeChange, string>> =
+  Object.freeze({
+    revise: "Change my submitted answers",
+    replace: "This is a different legal need",
+    resume: "Continue this Intake",
+  });
+
+export const CHANGE_NOTE =
+  "Changing an Intake after it is submitted, starting a replacement for it, or continuing an expired Intake is not available yet. Your saved answers are kept either way.";
 
 export type OutcomeMessage = {
   readonly tone: Tone;
@@ -106,7 +164,7 @@ export function outcomeMessage(
       return {
         tone: "warning",
         title: "This Intake can no longer be changed",
-        body: "It has been submitted or closed. Your saved answers are kept.",
+        body: "It has been submitted, closed, or has expired. Your saved answers are kept.",
       };
     case "rate-limited":
       return {
@@ -161,6 +219,118 @@ export function outcomeMessage(
         tone: "warning",
         title: "We could not confirm the result",
         body: "Reload the page to see what was saved before trying again.",
+      };
+    case "sign-in-required":
+      return {
+        tone: "warning",
+        title: "Sign in required",
+        body: "Sign in to continue with your Intake.",
+      };
+    case "denied":
+      return {
+        tone: "error",
+        title: "Not available for this account",
+        body: "The client workspace is available to signed-in client accounts.",
+      };
+    case "unavailable":
+      return {
+        tone: "error",
+        title: "Something went wrong",
+        body: "Nothing was changed. Please try again later.",
+      };
+    case "suggestion-confirmed":
+      return {
+        tone: "success",
+        title: "Suggestion confirmed",
+        body: "It is filled in on the form. Nothing changes in your answers until you save them.",
+      };
+    case "suggestion-rejected":
+      return {
+        tone: "information",
+        title: "Suggestion dismissed",
+        body: "Your answers stay exactly as you saved them.",
+      };
+    case "already-decided":
+      return {
+        tone: "information",
+        title: "Already decided",
+        body: "You already confirmed or dismissed this suggestion.",
+      };
+    case "change-not-configured":
+      return {
+        tone: "information",
+        title: "Not available yet",
+        body: CHANGE_NOTE,
+      };
+    case "change-not-applicable":
+      return {
+        tone: "information",
+        title: "Nothing to change",
+        body: "That change does not apply to this Intake as it is now.",
+      };
+    case "expired":
+      return {
+        tone: "warning",
+        title: "This Intake has expired",
+        body: "It is no longer offered for new attorney searches. Its saved answers are kept.",
+      };
+  }
+}
+
+// MVP-001 S3 part 2: the fixed message for each suggestion request outcome.
+export function suggestionMessage(
+  state: SuggestionActionState,
+): OutcomeMessage | null {
+  switch (state.status) {
+    case "idle":
+      return null;
+    case "suggested":
+      return {
+        tone: "success",
+        title: "Suggestions to review",
+        body: "Each is only a suggestion. Confirm one to fill it in on the form, or dismiss it.",
+      };
+    case "no-suggestion":
+      return {
+        tone: "information",
+        title: "No suggestion this time",
+        body: "Nothing was suggested from your answers. You can continue on your own.",
+      };
+    case "ai-unavailable":
+      return {
+        tone: "information",
+        title: "Suggestions are not available",
+        body: "Automatic suggestions are not available. You can complete and submit your Intake on your own; nothing is missing.",
+      };
+    case "conflict":
+      return {
+        tone: "warning",
+        title: "Save your answers first",
+        body: "Suggestions are made from your saved answers. Save them, reload the page, and ask again.",
+      };
+    case "not-editable":
+      return {
+        tone: "warning",
+        title: "This Intake can no longer be changed",
+        body: "It has been submitted, closed, or has expired. Your saved answers are kept.",
+      };
+    case "not-found":
+      return {
+        tone: "warning",
+        title: "Intake not found",
+        body: "We could not find that Intake in your workspace.",
+      };
+    case "rate-limited":
+      return {
+        tone: "warning",
+        title: "No more suggestions for this Intake",
+        body: "This Intake has had as many suggestions as it can hold. You can continue on your own.",
+      };
+    case "outcome-unknown":
+      return {
+        tone: "warning",
+        title: "We could not confirm the result",
+        body: "Reload the page to see any suggestion before asking again.",
       };
     case "sign-in-required":
       return {

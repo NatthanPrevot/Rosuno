@@ -73,6 +73,12 @@ export default async function HomePage() {
             <ButtonLink variant="tertiary" href="/auth/confirm">
               Finish account confirmation
             </ButtonLink>
+            <ButtonLink variant="tertiary" href="/help">
+              Help
+            </ButtonLink>
+            <ButtonLink variant="tertiary" href="/privacy">
+              Privacy
+            </ButtonLink>
           </Cluster>
         </Stack>
       </Surface>

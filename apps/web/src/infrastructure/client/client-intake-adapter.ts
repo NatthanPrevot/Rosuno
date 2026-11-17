@@ -15,22 +15,34 @@
 // the call carried or answered (MVP-001 D-8). The workspace list is read one
 // page at a time, and each shown Intake's latest revision summary is read on
 // its own, so no shown Intake can be silently dropped (MVP-001 D-3).
+// MVP-001 S3 part 2: it also reads the Intake's presented AI suggestions
+// under their own-row policy, and makes the client's decision on one
+// (client_confirm_ai_suggestion or client_reject_ai_suggestion) and the
+// post-submission change request (client_request_intake_change), each one
+// literal call through the same request-scoped client. Nothing a
+// suggestion holds is logged.
 
 import {
   ASSESSMENT_COLUMNS,
+  CHANGE_OUTCOMES,
   CLIENT_PROFILE_COLUMNS,
   CLOSE_OUTCOMES,
+  CONFIRM_SUGGESTION_OUTCOMES,
   CREATE_OUTCOMES,
+  INTAKE_CHANGES,
   INTAKE_COLUMNS,
   QUESTION_SET_COLUMNS,
+  REJECT_SUGGESTION_OUTCOMES,
   REVISION_COLUMNS,
   REVISION_SUMMARY_COLUMNS,
   SAVE_OUTCOMES,
   SUBMIT_OUTCOMES,
+  SUGGESTION_COLUMNS,
   type CallAnswer,
   type ClientIntakeReads,
   type ClientIntakeSources,
   type ClientIntakeWrites,
+  type IntakeChange,
   type RevisionInput,
 } from "../../application/client-intake.ts";
 import {
@@ -56,6 +68,8 @@ import {
 
 const MAX_VERSIONS = 200;
 const MAX_ASSESSMENTS = 100;
+// The suggestions one Intake can hold (the database's own abuse bound).
+const MAX_SUGGESTIONS = 50;
 
 const REJECTED: CallAnswer = Object.freeze({ kind: "rejected" });
 const UNREADABLE: CallAnswer = Object.freeze({ kind: "unreadable" });
@@ -343,6 +357,17 @@ export function createClientIntakeReads(
           observedRead("jurisdictions", deadlineMs, () =>
             client.rpc("client_intake_jurisdictions"),
           ),
+        suggestionsOf: (intakeId: string) =>
+          observedRead("suggestionsOf", deadlineMs, () =>
+            client
+              .from("ai_suggestions")
+              .select(SUGGESTION_COLUMNS)
+              .eq("context_type", "intake")
+              .eq("context_id", intakeId)
+              .order("presented_at", { ascending: false })
+              .order("id", { ascending: false })
+              .limit(MAX_SUGGESTIONS),
+          ),
       },
       deadlineMs,
     );
@@ -407,6 +432,47 @@ export function createClientIntakeWrites(
             }),
           (result) => textAnswerOf(result, CLOSE_OUTCOMES),
         ),
+      decideSuggestion: async (
+        suggestionId: string,
+        decision: "confirm" | "reject",
+      ) => {
+        if (decision === "confirm") {
+          return observedWrite(
+            "client_confirm_ai_suggestion",
+            deadlineMs,
+            () =>
+              client.rpc("client_confirm_ai_suggestion", {
+                p_suggestion_id: suggestionId,
+              }),
+            (result) => textAnswerOf(result, CONFIRM_SUGGESTION_OUTCOMES),
+          );
+        }
+        if (decision === "reject") {
+          return observedWrite(
+            "client_reject_ai_suggestion",
+            deadlineMs,
+            () =>
+              client.rpc("client_reject_ai_suggestion", {
+                p_suggestion_id: suggestionId,
+              }),
+            (result) => textAnswerOf(result, REJECT_SUGGESTION_OUTCOMES),
+          );
+        }
+        return UNREADABLE;
+      },
+      requestChange: async (intakeId: string, change: IntakeChange) =>
+        INTAKE_CHANGES.includes(change)
+          ? observedWrite(
+              "client_request_intake_change",
+              deadlineMs,
+              () =>
+                client.rpc("client_request_intake_change", {
+                  p_intake_id: intakeId,
+                  p_change: change,
+                }),
+              (result) => textAnswerOf(result, CHANGE_OUTCOMES),
+            )
+          : UNREADABLE,
     } satisfies ClientIntakeWrites);
   };
 }

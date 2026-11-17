@@ -173,6 +173,12 @@ test("3. every route gets the full set, and the confirmation handler gets only t
     "/account/step-up",
     "/staff/jobs",
     "/api/jobs/run",
+    // MVP-001 S3 part 2: the help and privacy entry points and the
+    // jurisdiction assessment review.
+    "/help",
+    "/privacy",
+    "/staff/jurisdiction-review",
+    "/staff/jurisdiction-review?group=unnamed",
     "/_next/static/chunks/synthetic.js",
     "/no-such-page",
     "/auth",

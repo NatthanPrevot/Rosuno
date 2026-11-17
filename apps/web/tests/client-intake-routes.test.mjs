@@ -93,6 +93,12 @@ test("2. pages decide access on the server for every request through the client 
     // own production sources.
     "uploadVoiceMemo(VOICE_MEMO_SOURCES, formData)",
     "voiceMemoPlayback(VOICE_MEMO_SOURCES, formData)",
+    // MVP-001 S3 part 2: the suggestion request with its own production
+    // sources, and the decision and change use cases with the client
+    // intake sources.
+    "requestIntakeSuggestions( INTAKE_SUGGESTION_SOURCES, formData, )",
+    "decideSuggestion(CLIENT_INTAKE_SOURCES, formData)",
+    "requestIntakeChange(CLIENT_INTAKE_SOURCES, formData)",
   ]) {
     assert.ok(actions.replace(/\s+/g, " ").includes(call), call);
   }
@@ -108,7 +114,10 @@ test("2. pages decide access on the server for every request through the client 
     intake.indexOf('if (view.status === "ready") {') <
       intake.indexOf("await resolveVoiceMemo("),
   );
-  assert.equal(actions.match(/export async function \w+\(/g).length, 6);
+  // MVP-001 S3 part 2: exactly three more actions (the suggestion request,
+  // the suggestion decision, and the post-submission change request).
+  assert.equal(actions.match(/export async function \w+\(/g).length, 9);
+  assert.equal(actions.match(/INTAKE_SUGGESTION_SOURCES/g).length, 2);
 });
 
 test("3. no client intake module reaches a privileged credential, client or provisioning module", () => {

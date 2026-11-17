@@ -506,8 +506,18 @@ test("SC-2. the staff home lists exactly the surfaces the caller holds a current
     "catalog",
     "capabilities",
     "intake",
+    // MVP-001 S3 part 2: the admin's global intake grant opens the review.
+    "jurisdiction-review",
     "jobs",
   ]);
+  // MVP-001 S3 part 2: a jurisdiction-scoped manage_intake_configuration
+  // grant opens the review and nothing else (publishing needs the global
+  // grant).
+  const reviewer = addStaff(s.world, 34);
+  grant(s.world, reviewer.userId, "manage_intake_configuration", {
+    jurisdiction_id: s.a,
+  });
+  assert.deepEqual(await home(reviewer), ["jurisdiction-review"]);
   // MVP-001 S2: the job view needs the global manage_operational_jobs grant;
   // a jurisdiction-scoped one counts for nothing.
   const operator = addStaff(s.world, 32);

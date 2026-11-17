@@ -344,6 +344,9 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // its fixed outcome only) and the protected resource adapter (a failed
   // resource call, storage call, or read, with no bytes, digest, path, or
   // URL) write lines too; the client actions and Intake page already did.
+  // MVP-001 S3 part 2: the AI suggestion sources (a late or failed provider
+  // answer or recording, with the call name and how it failed only; never a
+  // description, answer, suggestion or model output) write lines too.
   assert.deepEqual(callers, [
     "app/client/actions.ts",
     "app/client/intakes/[intake]/page.tsx",
@@ -353,6 +356,7 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/staff/frame.tsx",
     "app/staff/verification/actions.ts",
     "src/infrastructure/client/client-intake-adapter.ts",
+    "src/infrastructure/client/intake-suggestion-adapter.ts",
     "src/infrastructure/identity/authentication-abuse-control.ts",
     "src/infrastructure/identity/authenticator-provider.ts",
     "src/infrastructure/jobs/job-worker-adapter.ts",

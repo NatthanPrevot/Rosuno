@@ -1388,6 +1388,10 @@ function probes() {
       assert.equal(
         definers,
         [
+          // MVP-001 S3 part 2 re-pin (20261119050000): the AI suggestion
+          // recording function (service_role only), which writes only
+          // ai_suggestions and audit events; no M4 relation.
+          "ai_record_intake_suggestion:v",
           "attorney_change_practice_area_request:v",
           "attorney_request_practice_area:v",
           "attorney_save_insurance_claim:v",
@@ -1408,9 +1412,18 @@ function probes() {
           // P5-001 re-pin: the client intake and configuration-publication
           // functions, which write no M4 relation.
           "client_close_intake:v",
+          // MVP-001 S3 part 2 re-pin (20261119050000): the client's AI
+          // suggestion decision, which writes only ai_suggestions,
+          // unreviewed jurisdiction assessments and audit events.
+          "client_confirm_ai_suggestion:v",
           "client_create_intake:v",
           "client_intake_jurisdictions:s",
           "client_intake_practice_areas:s",
+          // MVP-001 S3 part 2 re-pin (20261119050000, 20261119040000): the
+          // rejection, and the post-submission change seam, which writes
+          // nothing but an expiry transition; no M4 relation.
+          "client_reject_ai_suggestion:v",
+          "client_request_intake_change:v",
           "client_save_intake_revision:v",
           "client_submit_intake:v",
           // MVP-001 S1 re-pin (20261117010000): the environment identity
@@ -1458,6 +1471,10 @@ function probes() {
           "staff_end_policy_version:v",
           "staff_grant_capability:v",
           "staff_grant_launch_authorization:v",
+          // MVP-001 S3 part 2 re-pin (20261119060000): the jurisdiction
+          // assessment review reads, which write nothing.
+          "staff_jurisdiction_review_assessments:s",
+          "staff_jurisdiction_review_intakes:s",
           "staff_publish_intake_question_set:v",
           "staff_record_discipline_finding:v",
           "staff_record_eligibility_evaluation:v",
@@ -1465,6 +1482,10 @@ function probes() {
           "staff_record_source_unavailable:v",
           "staff_record_verification_finding:v",
           "staff_retry_job:v",
+          // MVP-001 S3 part 2 re-pin (20261119060000): the review, which
+          // writes only a jurisdiction assessment's review and its audit
+          // event; no M4 relation.
+          "staff_review_jurisdiction_assessment:v",
           "staff_revise_policy_draft:v",
           "staff_revoke_capability:v",
           "staff_revoke_launch_authorization:v",

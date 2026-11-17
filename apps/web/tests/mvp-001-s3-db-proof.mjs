@@ -37,7 +37,21 @@
 // without scope, Sharing Grants active, expired, future and revoked, Legal
 // Hold, pending and rejected resources), object-path guessing, metadata row
 // policies, verification artifacts (start, the evidence reference check, one
-// finding per artifact, scoped access only), and the audit trail. No Supabase
+// finding per artifact, scoped access only), and the audit trail. S3 part 2
+// adds the three migrations that follow (20261119040000-060000) and their
+// probes: the Intake lifecycle guard (no deletion, legal transitions only),
+// expiry keyed on expires_at (set here by the owner role, as no application
+// path sets it) and evaluated by every command with no scheduler present,
+// the bounded sweep, the post-submission change seam answering
+// not_configured, AI suggestions recorded only as presented through the
+// service_role function (outcomes, bounds, abuse limit), the client's
+// one-time confirmation or rejection, proof by full-relation digests that AI
+// functions change only ai_suggestions, jurisdiction_assessments and
+// audit_events, the jurisdiction assessment constraints and integrity,
+// ambiguity surfaced without a choice, the staff review authorization matrix
+// (aal2, capability, jurisdiction scope, clients and attorneys refused), the
+// read functions' minimal disclosure, the counsel gate for attorneys, and the
+// privilege and definer inventory of every function involved. No Supabase
 // project, network service, or pre-existing cluster is contacted, nothing
 // persists after the run, and every value is synthetic test data. The JSON
 // report goes to stdout; exit 0 means PASS, 1 FAIL, 2 cleanup failure.
@@ -483,10 +497,12 @@ function newClient(db = DB) {
   return { ...ids, client };
 }
 
+// A closed Intake carries its closing time (S3 part 2: closed_at is set
+// exactly when the state is closed, intakes_closed_at_lifecycle_check).
 function newIntake(client, stateName = "draft", db = DB) {
   const id = uid();
   sql(
-    `insert into public.intakes (id, client_id, state) values ('${id}', '${client.client}', '${stateName}');`,
+    `insert into public.intakes (id, client_id, state, closed_at) values ('${id}', '${client.client}', '${stateName}', ${stateName === "closed" ? "now()" : "null"});`,
     db,
   );
   return id;
@@ -1933,11 +1949,1583 @@ async function auditChecks() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// S3 part 2: Intake lifecycle, AI Suggestions, jurisdiction assessment review
+// ---------------------------------------------------------------------------
+
+const V2_MIGRATIONS = Object.freeze([
+  "20261119040000_mvp_001_s3_intake_lifecycle.sql",
+  "20261119050000_mvp_001_s3_ai_suggestions.sql",
+  "20261119060000_mvp_001_s3_jurisdiction_assessment_review.sql",
+]);
+
+// The P1 columns of every relation S3 part 2 relies on (Packet rule 16).
+const V2_P1_COLUMNS = Object.freeze({
+  intakes:
+    "id,client_id,matter_reference,state,created_at,updated_at,expires_at,closed_at",
+  ai_suggestions:
+    "id,context_type,context_id,suggestion_type,suggestion_value,generated_at,model_reference,presented_at,confirmed_at,confirmed_by_user_id,rejected_at,created_at",
+  jurisdiction_assessments:
+    "id,intake_id,jurisdiction_id,assessment_basis,source_type,ai_suggestion_id,review_status,created_at,reviewed_at,reviewed_by_user_id",
+  intake_revisions:
+    "id,intake_id,revision_number,question_set_id,practice_area_id,description,structured_answers,created_at",
+  intake_question_sets: "id,version_key,definition,published_at",
+});
+
+// Every S3 part 2 function: its EXECUTE role (null: no API role) and whether
+// it is SECURITY DEFINER with search_path pg_catalog, pg_temp and a lock
+// timeout ("definer"), a definer read with that search_path ("reader"), an
+// internal invoker helper with that search_path ("helper"), or a replaced
+// earlier function keeping its earlier settings exactly ("kept:<config>").
+const V2_FUNCTIONS = Object.freeze([
+  ["intake_lifecycle_guard()", null, "helper"],
+  ["intake_expire_if_due(uuid)", null, "helper"],
+  ["intake_expiry_sweep()", null, "helper-timeout"],
+  ["client_request_intake_change(uuid, text)", "authenticated", "definer"],
+  [
+    "client_save_intake_revision(uuid, integer, uuid, uuid, text, jsonb)",
+    "authenticated",
+    "kept:search_path=pg_catalog",
+  ],
+  [
+    "client_submit_intake(uuid, integer)",
+    "authenticated",
+    "kept:search_path=pg_catalog",
+  ],
+  [
+    "client_close_intake(uuid)",
+    "authenticated",
+    "kept:search_path=pg_catalog",
+  ],
+  [
+    "resource_begin_voice_memo(uuid, text, bigint, text, integer)",
+    "authenticated",
+    "definer",
+  ],
+  ["resource_finalize_upload(uuid)", "authenticated", "definer"],
+  ["ai_suggestion_value_problem(text, jsonb)", null, "helper"],
+  ["ai_suggestion_integrity()", null, "helper"],
+  [
+    "ai_record_intake_suggestion(uuid, uuid, integer, text, jsonb, text, timestamp with time zone)",
+    "service_role",
+    "definer",
+  ],
+  ["client_confirm_ai_suggestion(uuid)", "authenticated", "definer"],
+  ["client_reject_ai_suggestion(uuid)", "authenticated", "definer"],
+  ["jurisdiction_assessment_integrity()", null, "helper"],
+  [
+    "staff_jurisdiction_review_intakes(text, integer, integer)",
+    "authenticated",
+    "reader",
+  ],
+  [
+    "staff_jurisdiction_review_assessments(uuid)",
+    "authenticated",
+    "reader",
+  ],
+  [
+    "staff_review_jurisdiction_assessment(uuid, text)",
+    "authenticated",
+    "definer",
+  ],
+]);
+
+const MODEL = "synthetic-model:1";
+const v2 = {};
+
+function seedV2() {
+  v2.area = uid();
+  v2.otherArea = uid();
+  v2.inactiveArea = uid();
+  sql(
+    `insert into public.practice_areas (id, code, name, active) values
+       ('${v2.area}', 'syn_s3v2_family', 'Synthetic family', true),
+       ('${v2.otherArea}', 'syn_s3v2_housing', 'Synthetic housing', true),
+       ('${v2.inactiveArea}', 'syn_s3v2_retired', 'Synthetic retired', false);`,
+  );
+  v2.globalReviewer = newStaff([{ capability: "manage_intake_configuration" }]);
+  v2.scopedReviewerA = newStaff([
+    {
+      capability: "manage_intake_configuration",
+      jurisdiction: world.jurisdiction,
+    },
+  ]);
+  v2.otherStaff = newStaff([{ capability: "manage_policy_configuration" }]);
+}
+
+const ANSWERED = (jurisdictions, area) => ({
+  court_case: "no",
+  assistance_type: "understand_options",
+  jurisdictions,
+  ...(area === "not_sure" ? { practice_area: "not_sure" } : {}),
+});
+
+function createIntake(client) {
+  const created = as(
+    "authenticated",
+    client.auth,
+    "select outcome || '|' || coalesce(intake_id::text, '') from public.client_create_intake();",
+  );
+  const [outcome, intake] = created.split("|");
+  assert.equal(outcome, "created", created);
+  return intake;
+}
+
+function saveRevision(client, intake, expected, content, options = {}) {
+  const area = content.area === "not_sure" ? null : (content.area ?? null);
+  return as(
+    "authenticated",
+    client.auth,
+    `select outcome || '|' || coalesce(revision_number::text, '') from public.client_save_intake_revision(${lit(intake)}::uuid, ${expected === null ? "null" : expected}::integer, '${world.questionSet}'::uuid, ${lit(area)}::uuid, ${lit(content.description ?? null)}, ${lit(content.answers)}::jsonb);`,
+    options,
+  );
+}
+
+// A new client with a draft Intake holding one complete revision, created
+// through the client functions.
+function draftThroughFunctions({
+  jurisdictions = [world.jurisdiction],
+  area = v2.area,
+} = {}) {
+  const client = newClient();
+  const intake = createIntake(client);
+  assert.equal(
+    saveRevision(client, intake, null, {
+      area,
+      description: "Synthetic words of the client",
+      answers: ANSWERED(jurisdictions, area),
+    }),
+    "saved|1",
+  );
+  return { client, intake };
+}
+
+function submitThroughFunctions(client, intake, expected = 1) {
+  return as(
+    "authenticated",
+    client.auth,
+    `select public.client_submit_intake(${lit(intake)}::uuid, ${expected}::integer);`,
+  );
+}
+
+function closeThroughFunctions(client, intake) {
+  return as(
+    "authenticated",
+    client.auth,
+    `select public.client_close_intake(${lit(intake)}::uuid);`,
+  );
+}
+
+function requestChange(principal, intake, change, options = {}) {
+  return as(
+    "authenticated",
+    principal === null ? null : principal.auth,
+    `select public.client_request_intake_change(${lit(intake)}::uuid, ${lit(change)});`,
+    options,
+  );
+}
+
+function intakeState(intake) {
+  return sql(`select state from public.intakes where id = '${intake}';`);
+}
+
+function expireNow(intake) {
+  sql(
+    `update public.intakes set expires_at = now() - interval '1 second' where id = '${intake}';`,
+  );
+}
+
+function recordSuggestion(
+  {
+    user,
+    intake,
+    revision = 1,
+    type = "practice_category",
+    value,
+    model = MODEL,
+    generated = "now() - interval '2 seconds'",
+  },
+  role = "service_role",
+) {
+  return as(
+    role,
+    null,
+    `select outcome || '|' || coalesce(suggestion_id::text, '') from public.ai_record_intake_suggestion(${lit(user)}::uuid, ${lit(intake)}::uuid, ${revision === null ? "null" : revision}::integer, ${lit(type)}, ${value === null ? "null" : lit(value)}::jsonb, ${lit(model)}, ${generated});`,
+  );
+}
+
+function recorded(answer) {
+  const [outcome, id] = answer.split("|");
+  assert.equal(outcome, "recorded", answer);
+  return id;
+}
+
+function decide(principal, kind, id, options = {}) {
+  return as(
+    "authenticated",
+    principal === null ? null : principal.auth,
+    `select public.client_${kind}_ai_suggestion(${lit(id)}::uuid);`,
+    options,
+  );
+}
+
+function review(principal, assessment, decision, options = {}) {
+  return as(
+    "authenticated",
+    principal === null ? null : principal.auth,
+    `select public.staff_review_jurisdiction_assessment(${lit(assessment)}::uuid, ${lit(decision)});`,
+    options,
+  );
+}
+
+function reviewQueue(principal, group, options = {}, bounds = [0, 101]) {
+  const answer = as(
+    "authenticated",
+    principal === null ? null : principal.auth,
+    `select coalesce(json_agg(json_build_object('intake', q.intake_id, 'state', q.intake_state, 'candidates', q.candidate_count, 'unreviewed', q.unreviewed_count) order by q.intake_created_at, q.intake_id), '[]')::text from public.staff_jurisdiction_review_intakes(${lit(group)}, ${bounds[0]}, ${bounds[1]}) as q;`,
+    options,
+  );
+  return answer.startsWith("ERROR") ? answer : JSON.parse(answer);
+}
+
+function reviewAssessments(principal, intake, options = {}) {
+  const answer = as(
+    "authenticated",
+    principal === null ? null : principal.auth,
+    `select coalesce(json_agg(row_to_json(a) order by a.created_at, a.assessment_id), '[]')::text from public.staff_jurisdiction_review_assessments(${lit(intake)}::uuid) as a;`,
+    options,
+  );
+  return answer.startsWith("ERROR") ? answer : JSON.parse(answer);
+}
+
+// The assessments of an Intake, in the order of the jurisdiction list of
+// the world (several written by one statement share their creation time).
+function assessmentsOf(intake) {
+  return JSON.parse(
+    sql(
+      `select coalesce(json_agg(json_build_object('id', id, 'j', jurisdiction_id, 'source', source_type, 'ai', ai_suggestion_id, 'review', review_status, 'basis', assessment_basis, 'reviewed_at', reviewed_at, 'reviewed_by', reviewed_by_user_id) order by (jurisdiction_id = '${world.jurisdiction}') desc, created_at, id), '[]')::text from public.jurisdiction_assessments where intake_id = '${intake}';`,
+    ),
+  );
+}
+
+function suggestionOf(id) {
+  return JSON.parse(
+    sql(
+      `select row_to_json(s)::text from public.ai_suggestions as s where s.id = '${id}';`,
+    ),
+  );
+}
+
+// An md5 of every row of every public relation, by relation name.
+function relationDigests() {
+  return JSON.parse(
+    sql(
+      `select json_object_agg(c.relname, (xpath('/row/d/text()', query_to_xml(format('select md5(coalesce(string_agg(to_jsonb(x)::text, ''|'' order by to_jsonb(x)::text), '''')) as d from public.%I as x', c.relname), false, true, '')))[1]::text)::text
+       from pg_class as c
+       where c.relnamespace = 'public'::regnamespace and c.relkind = 'r';`,
+    ),
+  );
+}
+
+function changedRelations(before, after) {
+  return Object.keys(after)
+    .filter((name) => before[name] !== after[name])
+    .sort();
+}
+
+async function v2MigrationChecks() {
+  await check(
+    "V2-MIG-1 the three S3 part 2 migrations follow the S3 part 1 migrations, in order, registered unreviewed (sequences 28 to 30) and applied nowhere; they add no relation, column, row policy, type, capability or policy type, and the columns of every relation they use are the P1 columns",
+    () => {
+      const files = migrationFiles();
+      const at = files.indexOf(S3_MIGRATIONS[S3_MIGRATIONS.length - 1]);
+      assert.deepEqual(files.slice(at + 1, at + 1 + V2_MIGRATIONS.length), [
+        ...V2_MIGRATIONS,
+      ]);
+      const registered = JSON.parse(
+        fs.readFileSync(
+          path.join(
+            REPOSITORY_ROOT,
+            "governance/migrations/reviewed-migrations.json",
+          ),
+          "utf8",
+        ),
+      ).migrations;
+      V2_MIGRATIONS.forEach((file, index) => {
+        const row = registered.find(
+          (m) => m.artifact_path === `supabase/migrations/${file}`,
+        );
+        assert.ok(row, file);
+        assert.equal(row.sequence, 28 + index);
+        assert.equal(row.reviewed, false);
+        assert.equal(row.applied_environment, "none");
+      });
+      for (const file of V2_MIGRATIONS) {
+        const text = fs.readFileSync(path.join(MIGRATIONS, file), "utf8");
+        assert.doesNotMatch(
+          text,
+          /\bcreate\s+(table|type|policy|view|materialized|sequence|schema)\b|\badd\s+column\b|\binsert\s+into\s+public\.(capability_definitions|policy_types|policy_versions|intake_question_sets|practice_areas|jurisdictions|capability_grants)\b/i,
+          file,
+        );
+      }
+      for (const [table, columns] of Object.entries(V2_P1_COLUMNS)) {
+        assert.equal(
+          sql(
+            `select string_agg(column_name, ',' order by ordinal_position) from information_schema.columns where table_schema = 'public' and table_name = '${table}';`,
+          ),
+          columns,
+          table,
+        );
+      }
+      assert.equal(
+        sql(
+          "select to_regnamespace('cron') is null and not exists (select 1 from pg_catalog.pg_available_extensions where name = 'pg_cron');",
+        ),
+        "t",
+      );
+      return { migrations: [...V2_MIGRATIONS], scheduler: "absent" };
+    },
+  );
+
+  await check(
+    "V2-PRIV-1 function inventory: each S3 part 2 function is executable only by its one API role (service_role for the AI recording function, authenticated for the client and staff functions, none for helpers and guards); definers use search_path pg_catalog, pg_temp and a lock timeout, reads that search_path, and replaced functions keep their earlier settings exactly",
+    () => {
+      const settings = {};
+      for (const [signature, role, kind] of V2_FUNCTIONS) {
+        for (const api of ["anon", "authenticated", "service_role"]) {
+          assert.equal(
+            sql(
+              `select has_function_privilege('${api}', 'public.${signature}', 'EXECUTE');`,
+            ),
+            api === role ? "t" : "f",
+            `${api} ${signature}`,
+          );
+        }
+        const actual = sql(
+          `select prosecdef::text || '|' || coalesce(array_to_string(proconfig, ';'), '') || '|' || pg_get_userbyid(proowner) from pg_proc where oid = 'public.${signature}'::regprocedure;`,
+        );
+        const expected = {
+          definer: "true|search_path=pg_catalog, pg_temp;lock_timeout=3s",
+          reader: "true|search_path=pg_catalog, pg_temp",
+          helper: "false|search_path=pg_catalog, pg_temp",
+          "helper-timeout":
+            "false|search_path=pg_catalog, pg_temp;lock_timeout=3s",
+        }[kind] ?? `true|${kind.slice("kept:".length)}`;
+        assert.equal(actual, `${expected}|postgres`, signature);
+        settings[signature] = actual;
+      }
+      return settings;
+    },
+  );
+
+  await check(
+    "V2-PRIV-2 table privileges: service_role holds no privilege at all on ai_suggestions (the P1 SELECT, INSERT and column UPDATE grants are gone) and no write on intakes or jurisdiction_assessments; authenticated keeps only SELECT under the own-row policies; anon holds nothing; direct writes fail with 42501",
+    () => {
+      for (const table of ["ai_suggestions", "intakes", "jurisdiction_assessments"]) {
+        for (const role of ["anon", "authenticated", "service_role"]) {
+          for (const privilege of [
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "TRUNCATE",
+            "REFERENCES",
+            "TRIGGER",
+          ]) {
+            const columnLevel = ["INSERT", "UPDATE", "REFERENCES"].includes(
+              privilege,
+            )
+              ? ` or has_any_column_privilege('${role}', 'public.${table}', '${privilege}')`
+              : "";
+            assert.equal(
+              sql(
+                `select has_table_privilege('${role}', 'public.${table}', '${privilege}')${columnLevel};`,
+              ),
+              "f",
+              `${role} ${privilege} ${table}`,
+            );
+          }
+        }
+        assert.equal(
+          sql(`select has_table_privilege('anon', 'public.${table}', 'SELECT');`),
+          "f",
+        );
+        assert.equal(
+          sql(
+            `select has_table_privilege('authenticated', 'public.${table}', 'SELECT');`,
+          ),
+          "t",
+        );
+      }
+      assert.equal(
+        sql(
+          "select has_table_privilege('service_role', 'public.ai_suggestions', 'SELECT') or has_any_column_privilege('service_role', 'public.ai_suggestions', 'SELECT');",
+        ),
+        "f",
+      );
+      const intake = newIntake(world.owner);
+      const statements = {
+        service_insert: `insert into public.ai_suggestions (context_type, context_id, suggestion_type, suggestion_value, generated_at, model_reference, presented_at) values ('intake', '${intake}', 'practice_category', '{}', now(), 'x', now());`,
+        service_read: "select count(*) from public.ai_suggestions;",
+        service_update_intake: `update public.intakes set expires_at = now() where id = '${intake}';`,
+      };
+      const outcomes = {};
+      for (const [name, statement] of Object.entries(statements)) {
+        outcomes[name] = as("service_role", null, statement);
+        assert.equal(outcomes[name], "ERROR 42501", name);
+      }
+      outcomes.authenticated_update_suggestion = as(
+        "authenticated",
+        world.owner.auth,
+        "update public.ai_suggestions set rejected_at = now();",
+      );
+      assert.equal(outcomes.authenticated_update_suggestion, "ERROR 42501");
+      return outcomes;
+    },
+  );
+}
+
+async function v2LifecycleChecks() {
+  await check(
+    "V2-LC-1 lifecycle integrity for every role including the owner: an Intake is never deleted or truncated, keeps its identity, client and creation time, moves only along draft -> submitted | closed | expired, submitted -> active | closed | expired | superseded, active -> closed | expired | superseded, never leaves expired, superseded or closed, carries closed_at exactly when closed, and fixes expires_at once ended",
+    () => {
+      const draft = newIntake(world.owner);
+      const submitted = newIntake(world.owner, "submitted");
+      const active = newIntake(world.owner, "active");
+      const closed = newIntake(world.owner, "closed");
+      const expired = newIntake(world.owner, "expired");
+      const superseded = newIntake(world.owner, "superseded");
+      const refusedOutcomes = {
+        delete: refused(`delete from public.intakes where id = '${draft}';`),
+        truncate: refused("truncate public.intakes cascade;"),
+        client_change: refused(
+          `update public.intakes set client_id = '${world.otherClient.client}' where id = '${draft}';`,
+        ),
+        created_at_change: refused(
+          `update public.intakes set created_at = now() - interval '1 day' where id = '${draft}';`,
+        ),
+        draft_to_active: refused(
+          `update public.intakes set state = 'active' where id = '${draft}';`,
+        ),
+        draft_to_superseded: refused(
+          `update public.intakes set state = 'superseded' where id = '${draft}';`,
+        ),
+        submitted_to_draft: refused(
+          `update public.intakes set state = 'draft' where id = '${submitted}';`,
+        ),
+        active_to_submitted: refused(
+          `update public.intakes set state = 'submitted' where id = '${active}';`,
+        ),
+        closed_to_draft: refused(
+          `update public.intakes set state = 'draft', closed_at = null where id = '${closed}';`,
+        ),
+        expired_to_active: refused(
+          `update public.intakes set state = 'active' where id = '${expired}';`,
+        ),
+        superseded_to_active: refused(
+          `update public.intakes set state = 'active' where id = '${superseded}';`,
+        ),
+        closed_without_time: refused(
+          `update public.intakes set state = 'closed' where id = '${draft}';`,
+        ),
+        time_without_closed: refused(
+          `update public.intakes set closed_at = now() where id = '${draft}';`,
+        ),
+        closing_time_change: refused(
+          `update public.intakes set closed_at = now() - interval '1 day' where id = '${closed}';`,
+        ),
+        expiry_after_end: refused(
+          `update public.intakes set expires_at = now() where id = '${closed}';`,
+        ),
+      };
+      for (const [name, code] of Object.entries(refusedOutcomes)) {
+        assert.ok(["55000", "23514"].includes(code), `${name}: ${code}`);
+      }
+      assert.equal(refusedOutcomes.delete, "55000");
+      assert.equal(refusedOutcomes.truncate, "55000");
+      assert.equal(refusedOutcomes.closed_without_time, "23514");
+      for (const statement of [
+        `update public.intakes set state = 'submitted' where id = '${draft}';`,
+        `update public.intakes set state = 'closed', closed_at = now() where id = '${draft}';`,
+        `update public.intakes set state = 'expired' where id = '${draft}';`,
+        `update public.intakes set state = 'active' where id = '${submitted}';`,
+        `update public.intakes set state = 'superseded' where id = '${submitted}';`,
+        `update public.intakes set state = 'expired' where id = '${active}';`,
+        `update public.intakes set state = 'superseded' where id = '${active}';`,
+        `update public.intakes set state = 'closed', closed_at = now() where id = '${active}';`,
+        `update public.intakes set expires_at = now() + interval '1 day' where id = '${submitted}';`,
+      ]) {
+        acceptedThenRolledBack(statement);
+      }
+      return refusedOutcomes;
+    },
+  );
+
+  await check(
+    "V2-LC-2 expiry is keyed on expires_at alone and evaluated by every command itself, with no scheduler in this database: with expires_at set in the past by the owner role, the save, submit, close, voice memo and change commands move the open Intake to expired once (one system audit event), answer exactly as for an Intake already expired, and leave every revision as it was; expires_at in the future changes nothing",
+    () => {
+      const outcomes = {};
+      const run = (name, command) => {
+        const { client, intake } = draftThroughFunctions();
+        const revisions = sql(
+          `select string_agg(to_jsonb(r)::text, '|' order by r.revision_number) from public.intake_revisions as r where r.intake_id = '${intake}';`,
+        );
+        expireNow(intake);
+        outcomes[name] = command(client, intake);
+        assert.equal(intakeState(intake), "expired", name);
+        assert.equal(
+          sql(
+            `select string_agg(to_jsonb(r)::text, '|' order by r.revision_number) from public.intake_revisions as r where r.intake_id = '${intake}';`,
+          ),
+          revisions,
+          name,
+        );
+        assert.equal(
+          sql(
+            `select string_agg(actor_type || ':' || coalesce(actor_user_id::text, '') || ':' || action_code || ':' || (before_snapshot ->> 'state') || ':' || (after_snapshot ->> 'state') || ':' || reason_code, ',') from public.audit_events where resource_type = 'intake' and resource_id = '${intake}' and action_code = 'intake_expired';`,
+          ),
+          "system::intake_expired:draft:expired:expires_at_reached",
+          name,
+        );
+        // A second command finds it expired and writes nothing more.
+        outcomes[`${name}_again`] = command(client, intake);
+        assert.equal(
+          count(
+            "audit_events",
+            `resource_id = '${intake}' and action_code = 'intake_expired'`,
+          ),
+          1,
+        );
+        return { client, intake };
+      };
+      run("save", (client, intake) =>
+        saveRevision(client, intake, 1, {
+          area: v2.area,
+          answers: ANSWERED([world.otherJurisdiction]),
+        }),
+      );
+      run("submit", (client, intake) => submitThroughFunctions(client, intake));
+      run("close", (client, intake) => closeThroughFunctions(client, intake));
+      run(
+        "voice_memo",
+        (client, intake) => beginVoiceMemo(client, intake).outcome,
+      );
+      run("change_revise", (client, intake) =>
+        requestChange(client, intake, "revise"),
+      );
+      assert.deepEqual(outcomes, {
+        save: "not_editable|",
+        save_again: "not_editable|",
+        submit: "not_editable",
+        submit_again: "not_editable",
+        close: "unavailable",
+        close_again: "unavailable",
+        voice_memo: "not_editable",
+        voice_memo_again: "not_editable",
+        change_revise: "expired",
+        change_revise_again: "expired",
+      });
+      // A submitted Intake expires the same way.
+      const { client, intake } = draftThroughFunctions();
+      assert.equal(submitThroughFunctions(client, intake), "submitted");
+      expireNow(intake);
+      outcomes.submitted_resume = requestChange(client, intake, "resume");
+      assert.equal(outcomes.submitted_resume, "not_configured");
+      assert.equal(intakeState(intake), "expired");
+      // A future expiry changes nothing.
+      const future = draftThroughFunctions();
+      sql(
+        `update public.intakes set expires_at = now() + interval '1 day' where id = '${future.intake}';`,
+      );
+      outcomes.future_save = saveRevision(future.client, future.intake, 1, {
+        area: v2.otherArea,
+        answers: ANSWERED([world.jurisdiction]),
+      });
+      assert.equal(outcomes.future_save, "saved|2");
+      assert.equal(intakeState(future.intake), "draft");
+      return outcomes;
+    },
+  );
+
+  await check(
+    "V2-LC-3 the database-only sweep expires every due open Intake once (skip-locked, bounded), leaves not-due, unset and ended Intakes as they are, and is idempotent; no API role may run it",
+    () => {
+      const due = [newIntake(world.owner), newIntake(world.owner, "submitted")];
+      const notDue = newIntake(world.owner, "active");
+      const unset = newIntake(world.owner);
+      for (const intake of due) {
+        expireNow(intake);
+      }
+      sql(
+        `update public.intakes set expires_at = now() + interval '1 hour' where id = '${notDue}';`,
+      );
+      const first = JSON.parse(sql("select public.intake_expiry_sweep()::text;"));
+      assert.ok(first.expired >= 2);
+      for (const intake of due) {
+        assert.equal(intakeState(intake), "expired");
+      }
+      assert.equal(intakeState(notDue), "active");
+      assert.equal(intakeState(unset), "draft");
+      const second = JSON.parse(
+        sql("select public.intake_expiry_sweep()::text;"),
+      );
+      assert.equal(second.expired, 0);
+      const api = {};
+      for (const role of ["anon", "authenticated", "service_role"]) {
+        api[role] = as(role, null, "select public.intake_expiry_sweep();");
+        assert.equal(api[role], "ERROR 42501");
+      }
+      return { first, second, api };
+    },
+  );
+
+  await check(
+    "V2-LC-4 post-submission changes are refused with the fixed outcome not_configured until gate D-3 is configured: a revision or replacement of a submitted or active Intake, and a returning client's confirmation of an expired one; other states are not applicable; other principals see not_found; nothing is written; no application path sets expires_at",
+    () => {
+      const { client, intake } = draftThroughFunctions();
+      const draftOutcomes = {
+        draft_revise: requestChange(client, intake, "revise"),
+        draft_replace: requestChange(client, intake, "replace"),
+        draft_resume: requestChange(client, intake, "resume"),
+      };
+      assert.equal(submitThroughFunctions(client, intake), "submitted");
+      const before = intakeSnapshot(intake);
+      const outcomes = {
+        ...draftOutcomes,
+        submitted_revise: requestChange(client, intake, "revise"),
+        submitted_replace: requestChange(client, intake, "replace"),
+        submitted_resume: requestChange(client, intake, "resume"),
+        invalid_change: requestChange(client, intake, "supersede"),
+        null_change: requestChange(client, intake, null),
+        other_client: requestChange(world.otherClient, intake, "revise"),
+        staff: requestChange(v2.globalReviewer, intake, "revise"),
+        attorney: requestChange(world.attorney, intake, "revise"),
+        no_subject: requestChange(null, intake, "revise"),
+        unknown_intake: requestChange(client, uid(), "revise"),
+        anon: as(
+          "anon",
+          null,
+          `select public.client_request_intake_change('${intake}'::uuid, 'revise');`,
+        ),
+      };
+      assert.equal(intakeSnapshot(intake), before);
+      const active = newIntake(client, "active");
+      outcomes.active_revise = requestChange(client, active, "revise");
+      const closed = newIntake(client, "closed");
+      outcomes.closed_revise = requestChange(client, closed, "revise");
+      outcomes.closed_resume = requestChange(client, closed, "resume");
+      const expired = newIntake(client, "expired");
+      outcomes.expired_resume = requestChange(client, expired, "resume");
+      outcomes.expired_replace = requestChange(client, expired, "replace");
+      assert.deepEqual(outcomes, {
+        draft_revise: "not_applicable",
+        draft_replace: "not_applicable",
+        draft_resume: "not_applicable",
+        submitted_revise: "not_configured",
+        submitted_replace: "not_configured",
+        submitted_resume: "not_applicable",
+        invalid_change: "invalid",
+        null_change: "invalid",
+        other_client: "not_found",
+        staff: "not_found",
+        attorney: "not_found",
+        no_subject: "not_found",
+        unknown_intake: "not_found",
+        anon: "ERROR 42501",
+        active_revise: "not_configured",
+        closed_revise: "not_applicable",
+        closed_resume: "not_applicable",
+        expired_resume: "not_configured",
+        expired_replace: "expired",
+      });
+      assert.equal(intakeState(intake), "submitted");
+      // The ordinary save still refuses a submitted Intake, as before.
+      assert.equal(
+        saveRevision(client, intake, 1, {
+          area: v2.area,
+          answers: ANSWERED([world.jurisdiction]),
+        }),
+        "not_editable|",
+      );
+      // No function sets expires_at: every Intake the client functions
+      // created and moved through its lifecycle has none.
+      const lived = draftThroughFunctions();
+      assert.equal(submitThroughFunctions(lived.client, lived.intake), "submitted");
+      assert.equal(closeThroughFunctions(lived.client, lived.intake), "closed");
+      assert.equal(
+        sql(
+          `select expires_at is null and closed_at is not null from public.intakes where id = '${lived.intake}';`,
+        ),
+        "t",
+      );
+      assert.equal(
+        sql(
+          "select count(*) from pg_proc where pronamespace = 'public'::regnamespace and prosrc ~* 'expires_at\\s*(:=|=\\s*(now|statement_timestamp|clock_timestamp|current_timestamp|\\(|''|[0-9]))' and prosrc ~* 'intakes';",
+        ),
+        "0",
+      );
+      return outcomes;
+    },
+  );
+}
+
+async function v2AiChecks() {
+  await check(
+    "V2-AI-1 presented-only persistence through the service_role function: a valid suggestion for the verified client's own current draft is recorded with generated_at, presented_at (not before generated_at), its model reference and the revision it came from, with one system audit event naming the model and requester and never the suggested value; nothing is stored for any refused call",
+    () => {
+      const { client, intake } = draftThroughFunctions();
+      const before = count("ai_suggestions");
+      const id = recorded(
+        recordSuggestion({
+          user: client.user,
+          intake,
+          value: { practice_area_id: v2.area },
+        }),
+      );
+      const row = suggestionOf(id);
+      assert.equal(row.context_type, "intake");
+      assert.equal(row.context_id, intake);
+      assert.equal(row.suggestion_type, "practice_category");
+      assert.deepEqual(row.suggestion_value, {
+        practice_area_id: v2.area,
+        revision_number: 1,
+      });
+      assert.equal(row.model_reference, MODEL);
+      assert.ok(row.generated_at !== null && row.presented_at !== null);
+      assert.ok(Date.parse(row.presented_at) >= Date.parse(row.generated_at));
+      assert.equal(row.confirmed_at, null);
+      assert.equal(row.rejected_at, null);
+      assert.equal(count("ai_suggestions"), before + 1);
+      const audit = JSON.parse(
+        sql(
+          `select json_agg(json_build_object('actor', actor_user_id, 'type', actor_type, 'action', action_code, 'after', after_snapshot))::text from public.audit_events where resource_type = 'ai_suggestion' and resource_id = '${id}';`,
+        ),
+      );
+      assert.equal(audit.length, 1);
+      assert.equal(audit[0].actor, null);
+      assert.equal(audit[0].type, "system");
+      assert.equal(audit[0].action, "ai_suggestion_presented");
+      assert.equal(audit[0].after.model_reference, MODEL);
+      assert.equal(audit[0].after.requested_by_user_id, client.user);
+      assert.equal(audit[0].after.revision_number, 1);
+      assert.match(audit[0].after.value_sha256, /^[0-9a-f]{64}$/);
+      assert.doesNotMatch(JSON.stringify(audit), new RegExp(v2.area));
+      // A jurisdictions suggestion of two distinct known jurisdictions.
+      const jurisdictions = recorded(
+        recordSuggestion({
+          user: client.user,
+          intake,
+          type: "potentially_relevant_jurisdictions",
+          value: {
+            jurisdiction_ids: [world.jurisdiction, world.otherJurisdiction],
+          },
+        }),
+      );
+      // Refused calls, each storing nothing.
+      const submitted = draftThroughFunctions();
+      assert.equal(
+        submitThroughFunctions(submitted.client, submitted.intake),
+        "submitted",
+      );
+      const expiring = draftThroughFunctions();
+      expireNow(expiring.intake);
+      const suspended = draftThroughFunctions();
+      sql(
+        `update public.users set account_state = 'suspended' where id = '${suspended.client.user}';`,
+      );
+      const profileLess = newAccount();
+      const base = { user: client.user, intake, value: { practice_area_id: v2.area } };
+      const stored = count("ai_suggestions");
+      const outcomes = {
+        unknown_type: recordSuggestion({ ...base, type: "best_attorney" }),
+        value_with_extra_key: recordSuggestion({
+          ...base,
+          value: { practice_area_id: v2.area, rank: 1 },
+        }),
+        value_with_revision: recordSuggestion({
+          ...base,
+          value: { practice_area_id: v2.area, revision_number: 1 },
+        }),
+        malformed_id: recordSuggestion({
+          ...base,
+          value: { practice_area_id: "family" },
+        }),
+        inactive_area: recordSuggestion({
+          ...base,
+          value: { practice_area_id: v2.inactiveArea },
+        }),
+        unknown_area: recordSuggestion({
+          ...base,
+          value: { practice_area_id: uid() },
+        }),
+        unknown_jurisdiction: recordSuggestion({
+          ...base,
+          type: "potentially_relevant_jurisdictions",
+          value: { jurisdiction_ids: [uid()] },
+        }),
+        duplicate_jurisdictions: recordSuggestion({
+          ...base,
+          type: "potentially_relevant_jurisdictions",
+          value: { jurisdiction_ids: [world.jurisdiction, world.jurisdiction] },
+        }),
+        eleven_jurisdictions: recordSuggestion({
+          ...base,
+          type: "potentially_relevant_jurisdictions",
+          value: { jurisdiction_ids: Array.from({ length: 11 }, () => uid()) },
+        }),
+        empty_jurisdictions: recordSuggestion({
+          ...base,
+          type: "potentially_relevant_jurisdictions",
+          value: { jurisdiction_ids: [] },
+        }),
+        null_value: recordSuggestion({ ...base, value: null }),
+        bad_model: recordSuggestion({ ...base, model: "not a model ref" }),
+        null_model: recordSuggestion({ ...base, model: null }),
+        future_generation: recordSuggestion({
+          ...base,
+          generated: "now() + interval '2 minutes'",
+        }),
+        stale_generation: recordSuggestion({
+          ...base,
+          generated: "now() - interval '11 minutes'",
+        }),
+        null_revision: recordSuggestion({ ...base, revision: null }),
+        other_client_intake: recordSuggestion({
+          ...base,
+          user: world.otherClient.user,
+        }),
+        unknown_intake: recordSuggestion({ ...base, intake: uid() }),
+        unknown_user: recordSuggestion({ ...base, user: uid() }),
+        suspended_user: recordSuggestion({
+          ...base,
+          user: suspended.client.user,
+          intake: suspended.intake,
+        }),
+        user_without_client_profile: recordSuggestion({
+          ...base,
+          user: profileLess.user,
+        }),
+        submitted_intake: recordSuggestion({
+          ...base,
+          user: submitted.client.user,
+          intake: submitted.intake,
+        }),
+        expired_by_time: recordSuggestion({
+          ...base,
+          user: expiring.client.user,
+          intake: expiring.intake,
+        }),
+        stale_revision: recordSuggestion({ ...base, revision: 2 }),
+        authenticated_caller: recordSuggestion(base, "authenticated"),
+        anon_caller: recordSuggestion(base, "anon"),
+      };
+      assert.deepEqual(outcomes, {
+        unknown_type: "invalid|",
+        value_with_extra_key: "invalid|",
+        value_with_revision: "invalid|",
+        malformed_id: "invalid|",
+        inactive_area: "invalid|",
+        unknown_area: "invalid|",
+        unknown_jurisdiction: "invalid|",
+        duplicate_jurisdictions: "invalid|",
+        eleven_jurisdictions: "invalid|",
+        empty_jurisdictions: "invalid|",
+        null_value: "invalid|",
+        bad_model: "invalid|",
+        null_model: "invalid|",
+        future_generation: "invalid|",
+        stale_generation: "invalid|",
+        null_revision: "invalid|",
+        other_client_intake: "not_found|",
+        unknown_intake: "not_found|",
+        unknown_user: "not_found|",
+        suspended_user: "not_found|",
+        user_without_client_profile: "not_found|",
+        submitted_intake: "not_editable|",
+        expired_by_time: "not_editable|",
+        stale_revision: "stale|",
+        authenticated_caller: "ERROR 42501",
+        anon_caller: "ERROR 42501",
+      });
+      assert.equal(count("ai_suggestions"), stored);
+      // The AI function never writes the Intake, even when it recognises
+      // its expiry: the expired-by-time draft is still a draft.
+      assert.equal(intakeState(expiring.intake), "draft");
+      // A suggestion that was not presented cannot be stored at all, even by
+      // the owner role; nor can any other context.
+      outcomes.owner_unpresented = refused(
+        `insert into public.ai_suggestions (context_type, context_id, suggestion_type, suggestion_value, generated_at, model_reference) values ('intake', '${intake}', 'practice_category', '{"practice_area_id": "${v2.area}", "revision_number": 1}', now(), '${MODEL}');`,
+      );
+      outcomes.owner_other_context = refused(
+        `insert into public.ai_suggestions (context_type, context_id, suggestion_type, suggestion_value, generated_at, model_reference, presented_at) values ('jurisdiction_assessment', '${uid()}', 'practice_category', '{"practice_area_id": "${v2.area}", "revision_number": 1}', now(), '${MODEL}', now());`,
+      );
+      outcomes.owner_without_model = refused(
+        `insert into public.ai_suggestions (context_type, context_id, suggestion_type, suggestion_value, generated_at, presented_at) values ('intake', '${intake}', 'practice_category', '{"practice_area_id": "${v2.area}", "revision_number": 1}', now(), now());`,
+      );
+      for (const name of [
+        "owner_unpresented",
+        "owner_other_context",
+        "owner_without_model",
+      ]) {
+        assert.equal(outcomes[name], "23514", name);
+      }
+      // The fixed abuse bound: at most 50 suggestions per Intake.
+      const bounded = draftThroughFunctions();
+      for (let index = 0; index < 50; index += 1) {
+        recorded(
+          recordSuggestion({
+            user: bounded.client.user,
+            intake: bounded.intake,
+            value: { practice_area_id: v2.area },
+          }),
+        );
+      }
+      outcomes.fifty_first = recordSuggestion({
+        user: bounded.client.user,
+        intake: bounded.intake,
+        value: { practice_area_id: v2.area },
+      });
+      assert.equal(outcomes.fifty_first, "rate_limited|");
+      v2.presented = { client, intake, practice: id, jurisdictions };
+      return outcomes;
+    },
+  );
+
+  await check(
+    "V2-AI-2 the client confirms or rejects a presented suggestion once, on their own draft: confirmation and rejection are mutually exclusive and final, other principals see not_found, and a confirmation writes no canonical Intake state (the Intake row, its row version and every revision are unchanged); a confirmed jurisdiction suggestion records one unreviewed ai_suggestion-sourced assessment per suggested jurisdiction, linked to it",
+    () => {
+      const { client, intake, practice, jurisdictions } = v2.presented;
+      const snapshot = intakeSnapshot(intake);
+      const outcomes = {
+        other_client: decide(world.otherClient, "confirm", practice),
+        attorney: decide(world.attorney, "confirm", practice),
+        staff: decide(v2.globalReviewer, "confirm", practice),
+        no_subject: decide(null, "confirm", practice),
+        unknown: decide(client, "confirm", uid()),
+        anon: as(
+          "anon",
+          null,
+          `select public.client_confirm_ai_suggestion('${practice}'::uuid);`,
+        ),
+        confirm: decide(client, "confirm", practice),
+        confirm_again: decide(client, "confirm", practice),
+        reject_confirmed: decide(client, "reject", practice),
+      };
+      const confirmed = suggestionOf(practice);
+      assert.equal(confirmed.confirmed_by_user_id, client.user);
+      assert.ok(confirmed.confirmed_at !== null);
+      assert.equal(confirmed.rejected_at, null);
+      // The practice area is applied only through the ordinary save: the
+      // revision keeps the client's own statement.
+      assert.equal(intakeSnapshot(intake), snapshot);
+      assert.equal(assessmentsOf(intake).length, 0);
+      outcomes.confirm_jurisdictions = decide(client, "confirm", jurisdictions);
+      assert.equal(intakeSnapshot(intake), snapshot);
+      const recordedAssessments = assessmentsOf(intake);
+      assert.deepEqual(
+        recordedAssessments.map((a) => [a.j, a.source, a.ai, a.review, a.basis]),
+        [world.jurisdiction, world.otherJurisdiction].map((j) => [
+          j,
+          "ai_suggestion",
+          jurisdictions,
+          "unreviewed",
+          "ai_suggestion:confirmed_by_client:intake_revision:1",
+        ]),
+      );
+      // A rejection.
+      const rejectable = recorded(
+        recordSuggestion({
+          user: client.user,
+          intake,
+          value: { practice_area_id: v2.otherArea },
+        }),
+      );
+      outcomes.reject = decide(client, "reject", rejectable);
+      outcomes.reject_again = decide(client, "reject", rejectable);
+      outcomes.confirm_rejected = decide(client, "confirm", rejectable);
+      const rejected = suggestionOf(rejectable);
+      assert.ok(rejected.rejected_at !== null);
+      assert.equal(rejected.confirmed_at, null);
+      assert.equal(rejected.confirmed_by_user_id, null);
+      // A pending suggestion cannot be decided once the Intake is submitted
+      // or past its expires_at.
+      const pending = recorded(
+        recordSuggestion({
+          user: client.user,
+          intake,
+          value: { practice_area_id: v2.area },
+        }),
+      );
+      const expiring = draftThroughFunctions();
+      const expiringSuggestion = recorded(
+        recordSuggestion({
+          user: expiring.client.user,
+          intake: expiring.intake,
+          value: { practice_area_id: v2.area },
+        }),
+      );
+      expireNow(expiring.intake);
+      outcomes.expired_by_time = decide(
+        expiring.client,
+        "confirm",
+        expiringSuggestion,
+      );
+      assert.equal(intakeState(expiring.intake), "draft");
+      assert.equal(submitThroughFunctions(client, intake), "submitted");
+      outcomes.after_submission = decide(client, "confirm", pending);
+      outcomes.reject_after_submission = decide(client, "reject", pending);
+      assert.deepEqual(outcomes, {
+        other_client: "not_found",
+        attorney: "not_found",
+        staff: "not_found",
+        no_subject: "not_found",
+        unknown: "not_found",
+        anon: "ERROR 42501",
+        confirm: "confirmed",
+        confirm_again: "already_confirmed",
+        reject_confirmed: "already_confirmed",
+        confirm_jurisdictions: "confirmed",
+        reject: "rejected",
+        reject_again: "already_rejected",
+        confirm_rejected: "already_rejected",
+        expired_by_time: "not_editable",
+        after_submission: "not_editable",
+        reject_after_submission: "not_editable",
+      });
+      const decisions = sql(
+        `select string_agg(actor_type || ':' || (actor_user_id = '${client.user}')::text || ':' || action_code, ',' order by occurred_at, action_code) from public.audit_events where resource_type = 'ai_suggestion' and resource_id in ('${practice}', '${jurisdictions}', '${rejectable}') and action_code <> 'ai_suggestion_presented';`,
+      );
+      assert.equal(
+        decisions,
+        "client:true:ai_suggestion_confirmed,client:true:ai_suggestion_confirmed,client:true:ai_suggestion_rejected",
+      );
+      v2.aiSourcedIntake = intake;
+      return outcomes;
+    },
+  );
+
+  await check(
+    "V2-AI-3 AI output cannot alter protected state: across recording, confirming and rejecting suggestions (and every refusal), the only relations whose rows change are ai_suggestions, jurisdiction_assessments and audit_events; the AI functions name no other relation in a write; a stored suggestion is never deleted or truncated and changes only by one decision",
+    () => {
+      const { client, intake } = draftThroughFunctions({
+        jurisdictions: "not_sure",
+        area: "not_sure",
+      });
+      const before = relationDigests();
+      const practice = recorded(
+        recordSuggestion({
+          user: client.user,
+          intake,
+          value: { practice_area_id: v2.area },
+        }),
+      );
+      const jurisdictions = recorded(
+        recordSuggestion({
+          user: client.user,
+          intake,
+          type: "potentially_relevant_jurisdictions",
+          value: { jurisdiction_ids: [world.jurisdiction] },
+        }),
+      );
+      const other = recorded(
+        recordSuggestion({
+          user: client.user,
+          intake,
+          value: { practice_area_id: v2.otherArea },
+        }),
+      );
+      assert.equal(decide(client, "confirm", practice), "confirmed");
+      assert.equal(decide(client, "confirm", jurisdictions), "confirmed");
+      assert.equal(decide(client, "reject", other), "rejected");
+      assert.equal(
+        recordSuggestion({
+          user: client.user,
+          intake,
+          revision: 9,
+          value: { practice_area_id: v2.area },
+        }),
+        "stale|",
+      );
+      assert.equal(decide(world.otherClient, "confirm", practice), "not_found");
+      const after = relationDigests();
+      const changed = changedRelations(before, after);
+      assert.deepEqual(changed, [
+        "ai_suggestions",
+        "audit_events",
+        "jurisdiction_assessments",
+      ]);
+      // The client's own statements stay "not sure": no category and no
+      // jurisdiction was written for them.
+      assert.equal(
+        sql(
+          `select practice_area_id is null and structured_answers ->> 'practice_area' = 'not_sure' and structured_answers ->> 'jurisdictions' = 'not_sure' from public.intake_revisions where intake_id = '${intake}';`,
+        ),
+        "t",
+      );
+      const writes = JSON.parse(
+        sql(
+          `select json_agg(distinct m[1] order by m[1])::text from pg_proc as p, regexp_matches(p.prosrc, '(?:insert\\s+into|update|delete\\s+from)\\s+public\\.([a-z_]+)', 'gi') as m where p.oid in ('public.ai_record_intake_suggestion(uuid, uuid, integer, text, jsonb, text, timestamptz)'::regprocedure, 'public.client_confirm_ai_suggestion(uuid)'::regprocedure, 'public.client_reject_ai_suggestion(uuid)'::regprocedure);`,
+        ),
+      );
+      assert.deepEqual(writes, [
+        "ai_suggestions",
+        "audit_events",
+        "jurisdiction_assessments",
+      ]);
+      const integrity = {
+        delete: refused(`delete from public.ai_suggestions where id = '${practice}';`),
+        truncate: refused("truncate public.ai_suggestions cascade;"),
+        value_change: refused(
+          `update public.ai_suggestions set suggestion_value = suggestion_value || '{"rank": 1}' where id = '${other}';`,
+        ),
+        second_decision: refused(
+          `update public.ai_suggestions set rejected_at = now() where id = '${practice}';`,
+        ),
+        undecide: refused(
+          `update public.ai_suggestions set confirmed_at = null, confirmed_by_user_id = null where id = '${practice}';`,
+        ),
+      };
+      for (const [name, code] of Object.entries(integrity)) {
+        assert.ok(["55000", "23514"].includes(code), `${name}: ${code}`);
+      }
+      assert.equal(integrity.delete, "55000");
+      assert.equal(integrity.truncate, "55000");
+      return { changed, writes, integrity };
+    },
+  );
+
+  await check(
+    "V2-AI-4 suggestions are visible only to the Intake's own client: another client, an attorney, staff holding the intake configuration capability, and a caller without a subject see no row; anon has no access",
+    () => {
+      const { client, intake } = v2.presented;
+      const where = `context_type = 'intake' and context_id = '${intake}'`;
+      const seen = (principal, options = {}) =>
+        as(
+          "authenticated",
+          principal === null ? null : principal.auth,
+          `select count(*) from public.ai_suggestions where ${where};`,
+          options,
+        );
+      const outcomes = {
+        owner: seen(client),
+        other_client: seen(world.otherClient),
+        attorney: seen(world.attorney),
+        staff_global: seen(v2.globalReviewer),
+        no_subject: seen(null),
+        anon: as("anon", null, `select count(*) from public.ai_suggestions;`),
+      };
+      assert.ok(Number(outcomes.owner) >= 3);
+      assert.deepEqual(
+        { ...outcomes, owner: "n" },
+        {
+          owner: "n",
+          other_client: "0",
+          attorney: "0",
+          staff_global: "0",
+          no_subject: "0",
+          anon: "ERROR 42501",
+        },
+      );
+      return outcomes;
+    },
+  );
+}
+
+async function v2ReviewChecks() {
+  await check(
+    "V2-JR-1 assessment constraints and integrity: the source is a client statement without an AI link or an AI suggestion with one; the review status is unreviewed without a review time or confirmed / not_confirmed with one; a basis is recorded; an assessment is never deleted or truncated and changes only by one review",
+    () => {
+      const intake = newIntake(world.owner, "submitted");
+      const insert = (columns, values) =>
+        refused(
+          `insert into public.jurisdiction_assessments (intake_id, jurisdiction_id, ${columns}) values ('${intake}', '${world.jurisdiction}', ${values});`,
+        );
+      const suggestion = v2.presented.jurisdictions;
+      const outcomes = {
+        ai_without_link: insert(
+          "assessment_basis, source_type, review_status",
+          "'b', 'ai_suggestion', 'unreviewed'",
+        ),
+        statement_with_link: insert(
+          "assessment_basis, source_type, ai_suggestion_id, review_status",
+          `'b', 'client_statement', '${suggestion}', 'unreviewed'`,
+        ),
+        unknown_source: insert(
+          "assessment_basis, source_type, review_status",
+          "'b', 'staff_choice', 'unreviewed'",
+        ),
+        unknown_review: insert(
+          "assessment_basis, source_type, review_status",
+          "'b', 'client_statement', 'governing_law'",
+        ),
+        confirmed_without_time: insert(
+          "assessment_basis, source_type, review_status",
+          "'b', 'client_statement', 'confirmed'",
+        ),
+        missing_basis: insert(
+          "source_type, review_status",
+          "'client_statement', 'unreviewed'",
+        ),
+      };
+      for (const [name, code] of Object.entries(outcomes)) {
+        assert.equal(code, "23514", name);
+      }
+      const id = uid();
+      sql(
+        `insert into public.jurisdiction_assessments (id, intake_id, jurisdiction_id, assessment_basis, source_type, review_status) values ('${id}', '${intake}', '${world.jurisdiction}', 'synthetic basis', 'client_statement', 'unreviewed');`,
+      );
+      outcomes.jurisdiction_change = refused(
+        `update public.jurisdiction_assessments set jurisdiction_id = '${world.otherJurisdiction}' where id = '${id}';`,
+      );
+      outcomes.delete = refused(
+        `delete from public.jurisdiction_assessments where id = '${id}';`,
+      );
+      outcomes.truncate = refused(
+        "truncate public.jurisdiction_assessments cascade;",
+      );
+      sql(
+        `update public.jurisdiction_assessments set review_status = 'confirmed', reviewed_at = now(), reviewed_by_user_id = '${v2.globalReviewer.user}' where id = '${id}';`,
+      );
+      outcomes.second_review = refused(
+        `update public.jurisdiction_assessments set review_status = 'not_confirmed' where id = '${id}';`,
+      );
+      for (const name of [
+        "jurisdiction_change",
+        "delete",
+        "truncate",
+        "second_review",
+      ]) {
+        assert.equal(outcomes[name], "55000", name);
+      }
+      return outcomes;
+    },
+  );
+
+  await check(
+    "V2-JR-2 ambiguous jurisdiction is surfaced rather than guessed: a submission naming several jurisdictions records each as its own unreviewed client-statement assessment (none chosen) and the review queue shows the candidate count; a submission naming none ('not sure') records no assessment and is listed only to global reviewers in the unnamed group, with nothing to choose",
+    () => {
+      const several = draftThroughFunctions({
+        jurisdictions: [world.jurisdiction, world.otherJurisdiction],
+      });
+      assert.equal(
+        submitThroughFunctions(several.client, several.intake),
+        "submitted",
+      );
+      const none = draftThroughFunctions({ jurisdictions: "not_sure" });
+      assert.equal(submitThroughFunctions(none.client, none.intake), "submitted");
+      const one = draftThroughFunctions({ jurisdictions: [world.jurisdiction] });
+      assert.equal(submitThroughFunctions(one.client, one.intake), "submitted");
+      const recordedSeveral = assessmentsOf(several.intake);
+      assert.deepEqual(
+        recordedSeveral.map((a) => [a.j, a.source, a.ai, a.review]),
+        [world.jurisdiction, world.otherJurisdiction].map((j) => [
+          j,
+          "client_statement",
+          null,
+          "unreviewed",
+        ]),
+      );
+      assert.equal(assessmentsOf(none.intake).length, 0);
+      const pick = (queue, intake) => queue.find((q) => q.intake === intake);
+      const globalUnreviewed = reviewQueue(v2.globalReviewer, "unreviewed");
+      const globalUnnamed = reviewQueue(v2.globalReviewer, "unnamed");
+      const scopedUnreviewed = reviewQueue(v2.scopedReviewerA, "unreviewed");
+      const scopedUnnamed = reviewQueue(v2.scopedReviewerA, "unnamed");
+      assert.deepEqual(pick(globalUnreviewed, several.intake), {
+        intake: several.intake,
+        state: "submitted",
+        candidates: 2,
+        unreviewed: 2,
+      });
+      assert.deepEqual(pick(scopedUnreviewed, several.intake), {
+        intake: several.intake,
+        state: "submitted",
+        candidates: 2,
+        unreviewed: 1,
+      });
+      assert.deepEqual(pick(globalUnreviewed, one.intake)?.candidates, 1);
+      assert.equal(pick(globalUnreviewed, none.intake), undefined);
+      assert.deepEqual(pick(globalUnnamed, none.intake), {
+        intake: none.intake,
+        state: "submitted",
+        candidates: 0,
+        unreviewed: 0,
+      });
+      assert.equal(pick(globalUnnamed, several.intake), undefined);
+      assert.deepEqual(scopedUnnamed, []);
+      // The scoped reviewer sees only its jurisdiction's assessment.
+      assert.deepEqual(
+        reviewAssessments(v2.scopedReviewerA, several.intake).map(
+          (a) => a.jurisdiction_id,
+        ),
+        [world.jurisdiction],
+      );
+      v2.several = several;
+      v2.none = none;
+      return {
+        several: recordedSeveral.length,
+        none: 0,
+        global_unnamed_includes_none: true,
+        scoped_unnamed: scopedUnnamed.length,
+      };
+    },
+  );
+
+  await check(
+    "V2-JR-3 the staff review needs manage_intake_configuration at aal2 for the assessment's jurisdiction: global and in-scope reviewers record confirmed or not_confirmed once (audited, the Intake and the client's statements untouched); aal1, staff without the capability, clients, attorneys and a caller without a subject are denied; an out-of-scope assessment looks unknown; drafts and ended or expired Intakes are not reviewable",
+    () => {
+      const several = v2.several;
+      const [inA, inB] = assessmentsOf(several.intake);
+      const snapshot = intakeSnapshot(several.intake);
+      const outcomes = {
+        aal1: review(v2.globalReviewer, inA.id, "confirmed", { aal: "aal1" }),
+        no_claims: review(v2.globalReviewer, inA.id, "confirmed", { aal: null }),
+        other_capability: review(v2.otherStaff, inA.id, "confirmed"),
+        verification_staff: review(world.verifier, inA.id, "confirmed"),
+        client: review(several.client, inA.id, "confirmed"),
+        attorney: review(world.attorney, inA.id, "confirmed"),
+        no_subject: review(null, inA.id, "confirmed"),
+        anon: as(
+          "anon",
+          null,
+          `select public.staff_review_jurisdiction_assessment('${inA.id}'::uuid, 'confirmed');`,
+        ),
+        scoped_out_of_scope: review(v2.scopedReviewerA, inB.id, "confirmed"),
+        invalid_decision: review(v2.globalReviewer, inA.id, "governing_law"),
+        null_decision: review(v2.globalReviewer, inA.id, null),
+        unknown: review(v2.globalReviewer, uid(), "confirmed"),
+        scoped_in_scope: review(v2.scopedReviewerA, inA.id, "confirmed"),
+        again: review(v2.globalReviewer, inA.id, "not_confirmed"),
+        global: review(v2.globalReviewer, inB.id, "not_confirmed"),
+      };
+      const reviewed = assessmentsOf(several.intake);
+      assert.deepEqual(
+        reviewed.map((a) => [a.review, a.reviewed_by, a.reviewed_at !== null]),
+        [
+          ["confirmed", v2.scopedReviewerA.user, true],
+          ["not_confirmed", v2.globalReviewer.user, true],
+        ],
+      );
+      assert.equal(intakeSnapshot(several.intake), snapshot);
+      const audit = sql(
+        `select string_agg(actor_type || ':' || action_code || ':' || (jurisdiction_id = '${world.jurisdiction}')::text || ':' || (after_snapshot ->> 'review_status'), ',' order by occurred_at) from public.audit_events where resource_type = 'jurisdiction_assessment' and resource_id in ('${inA.id}', '${inB.id}');`,
+      );
+      assert.equal(
+        audit,
+        "staff:jurisdiction_assessment.reviewed:true:confirmed,staff:jurisdiction_assessment.reviewed:false:not_confirmed",
+      );
+      // Not reviewable: an AI-sourced assessment of a draft, a closed Intake,
+      // and an Intake past its expires_at (which the review never writes).
+      const draft = draftThroughFunctions({ jurisdictions: "not_sure" });
+      const suggestion = recorded(
+        recordSuggestion({
+          user: draft.client.user,
+          intake: draft.intake,
+          type: "potentially_relevant_jurisdictions",
+          value: { jurisdiction_ids: [world.jurisdiction] },
+        }),
+      );
+      assert.equal(decide(draft.client, "confirm", suggestion), "confirmed");
+      const [draftAssessment] = assessmentsOf(draft.intake);
+      outcomes.draft = review(v2.globalReviewer, draftAssessment.id, "confirmed");
+      assert.deepEqual(reviewAssessments(v2.globalReviewer, draft.intake), []);
+      assert.equal(
+        reviewQueue(v2.globalReviewer, "unreviewed").some(
+          (q) => q.intake === draft.intake,
+        ),
+        false,
+      );
+      const closing = draftThroughFunctions();
+      assert.equal(
+        submitThroughFunctions(closing.client, closing.intake),
+        "submitted",
+      );
+      assert.equal(closeThroughFunctions(closing.client, closing.intake), "closed");
+      outcomes.closed = review(
+        v2.globalReviewer,
+        assessmentsOf(closing.intake)[0].id,
+        "confirmed",
+      );
+      const expiring = draftThroughFunctions();
+      assert.equal(
+        submitThroughFunctions(expiring.client, expiring.intake),
+        "submitted",
+      );
+      expireNow(expiring.intake);
+      outcomes.expired_by_time = review(
+        v2.globalReviewer,
+        assessmentsOf(expiring.intake)[0].id,
+        "confirmed",
+      );
+      assert.equal(intakeState(expiring.intake), "submitted");
+      // Once the draft is submitted, its AI-sourced assessment is reviewable.
+      assert.equal(
+        submitThroughFunctions(draft.client, draft.intake),
+        "submitted",
+      );
+      outcomes.after_submission = review(
+        v2.globalReviewer,
+        draftAssessment.id,
+        "confirmed",
+      );
+      assert.deepEqual(outcomes, {
+        aal1: "denied",
+        no_claims: "denied",
+        other_capability: "denied",
+        verification_staff: "denied",
+        client: "denied",
+        attorney: "denied",
+        no_subject: "denied",
+        anon: "ERROR 42501",
+        scoped_out_of_scope: "not_found",
+        invalid_decision: "invalid",
+        null_decision: "invalid",
+        unknown: "not_found",
+        scoped_in_scope: "applied",
+        again: "already_reviewed",
+        global: "applied",
+        draft: "not_reviewable",
+        closed: "not_reviewable",
+        expired_by_time: "not_reviewable",
+        after_submission: "applied",
+      });
+      return outcomes;
+    },
+  );
+
+  await check(
+    "V2-JR-4 the staff review reads disclose only what review needs (Intake id, state, creation time, counts; jurisdiction, source, basis and status) and nothing to anyone else: aal1, staff without the capability, clients, attorneys and a caller without a subject read nothing, anon has no access, and out-of-range pages answer nothing",
+    () => {
+      assert.equal(
+        sql(
+          "select pg_get_function_result('public.staff_jurisdiction_review_intakes(text, integer, integer)'::regprocedure);",
+        ),
+        "TABLE(intake_id uuid, intake_state text, intake_created_at timestamp with time zone, candidate_count integer, unreviewed_count integer)",
+      );
+      assert.equal(
+        sql(
+          "select pg_get_function_result('public.staff_jurisdiction_review_assessments(uuid)'::regprocedure);",
+        ),
+        "TABLE(assessment_id uuid, jurisdiction_id uuid, jurisdiction_code text, jurisdiction_name text, source_type text, assessment_basis text, review_status text, created_at timestamp with time zone, reviewed_at timestamp with time zone, reviewed_by_user_id uuid)",
+      );
+      const intake = v2.several.intake;
+      const nothing = {
+        aal1_queue: reviewQueue(v2.globalReviewer, "unreviewed", { aal: "aal1" }),
+        aal1_unnamed: reviewQueue(v2.globalReviewer, "unnamed", { aal: "aal1" }),
+        aal1_assessments: reviewAssessments(v2.globalReviewer, intake, {
+          aal: "aal1",
+        }),
+        other_capability: reviewQueue(v2.otherStaff, "unreviewed"),
+        other_capability_assessments: reviewAssessments(v2.otherStaff, intake),
+        client: reviewQueue(v2.several.client, "unreviewed"),
+        client_assessments: reviewAssessments(v2.several.client, intake),
+        attorney: reviewQueue(world.attorney, "unnamed"),
+        attorney_assessments: reviewAssessments(world.attorney, intake),
+        no_subject: reviewQueue(null, "unreviewed"),
+        unknown_group: reviewQueue(v2.globalReviewer, "everything"),
+        zero_count: reviewQueue(v2.globalReviewer, "unnamed", {}, [0, 0]),
+        over_count: reviewQueue(v2.globalReviewer, "unnamed", {}, [0, 102]),
+        negative_offset: reviewQueue(v2.globalReviewer, "unnamed", {}, [-1, 10]),
+      };
+      for (const [name, value] of Object.entries(nothing)) {
+        assert.deepEqual(value, [], name);
+      }
+      const anon = as(
+        "anon",
+        null,
+        "select count(*) from public.staff_jurisdiction_review_intakes('unnamed', 0, 10);",
+      );
+      assert.equal(anon, "ERROR 42501");
+      const rows = reviewAssessments(v2.globalReviewer, intake);
+      assert.equal(rows.length, 2);
+      assert.deepEqual(Object.keys(rows[0]).sort(), [
+        "assessment_basis",
+        "assessment_id",
+        "created_at",
+        "jurisdiction_code",
+        "jurisdiction_id",
+        "jurisdiction_name",
+        "review_status",
+        "reviewed_at",
+        "reviewed_by_user_id",
+        "source_type",
+      ]);
+      return { anon, global_rows: rows.length };
+    },
+  );
+
+  await check(
+    "V2-JR-5 attorneys see nothing of any Intake before acceptance (counsel gate): no Intake, revision, assessment or suggestion row, no review queue entry, and every client function answers not_found",
+    () => {
+      const intake = v2.several.intake;
+      const reads = {};
+      for (const [table, where] of [
+        ["intakes", `id = '${intake}'`],
+        ["intake_revisions", `intake_id = '${intake}'`],
+        ["jurisdiction_assessments", `intake_id = '${intake}'`],
+        ["ai_suggestions", `context_id = '${v2.presented.intake}'`],
+      ]) {
+        reads[table] = as(
+          "authenticated",
+          world.attorney.auth,
+          `select count(*) from public.${table} where ${where};`,
+        );
+        assert.equal(reads[table], "0", table);
+      }
+      reads.queue = reviewQueue(world.attorney, "unreviewed");
+      assert.deepEqual(reads.queue, []);
+      reads.change = requestChange(world.attorney, intake, "revise");
+      assert.equal(reads.change, "not_found");
+      return reads;
+    },
+  );
+
+  await check(
+    "V2-AUD-1 the S3 part 2 audit trail is data-minimized: expiry, suggestion and review events carry states, decisions, types, model references, digests and identifiers only, never a description, an answer, a practice area or jurisdiction suggested, or any intake content",
+    () => {
+      const rows = JSON.parse(
+        sql(
+          "select coalesce(json_agg(json_build_object('action', action_code, 'before', before_snapshot, 'after', after_snapshot)), '[]')::text from public.audit_events where action_code in ('intake_expired', 'ai_suggestion_presented', 'ai_suggestion_confirmed', 'ai_suggestion_rejected', 'jurisdiction_assessment.reviewed');",
+        ),
+      );
+      const actions = [...new Set(rows.map((r) => r.action))].sort();
+      assert.deepEqual(actions, [
+        "ai_suggestion_confirmed",
+        "ai_suggestion_presented",
+        "ai_suggestion_rejected",
+        "intake_expired",
+        "jurisdiction_assessment.reviewed",
+      ]);
+      for (const row of rows) {
+        const text = JSON.stringify(row);
+        assert.doesNotMatch(
+          text,
+          new RegExp(
+            `Synthetic words|court_case|assistance_type|${v2.area}|${v2.otherArea}|practice_area_id|jurisdiction_ids`,
+          ),
+        );
+        if (row.action === "ai_suggestion_presented") {
+          assert.deepEqual(Object.keys(row.after).sort(), [
+            "context_id",
+            "context_type",
+            "model_reference",
+            "requested_by_user_id",
+            "revision_number",
+            "suggestion_type",
+            "value_sha256",
+          ]);
+        }
+      }
+      return { events: rows.length, actions };
+    },
+  );
+}
+
 async function main() {
   try {
     startCluster();
     applyMigrations();
     seed();
+    seedV2();
     await migrationChecks();
     await constraintChecks();
     await privilegeChecks();
@@ -1946,6 +3534,11 @@ async function main() {
     await artifactChecks();
     await storageChecks();
     await auditChecks();
+    // S3 part 2.
+    await v2MigrationChecks();
+    await v2LifecycleChecks();
+    await v2AiChecks();
+    await v2ReviewChecks();
   } catch (error) {
     report.error = String(error?.stack ?? error);
     failed = true;

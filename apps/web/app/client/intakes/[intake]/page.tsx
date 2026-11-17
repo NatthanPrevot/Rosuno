@@ -14,6 +14,13 @@
 // the same Intake: the saved memo (played through a short-lived link the
 // server issues after authorizing it), the recorder while the Intake is a
 // draft and the configured limit is set, or why no memo can be added.
+// MVP-001 S3 part 2: the page also shows the routing category as the
+// client's own choice (an unresolved one as unresolved), the AI suggestions
+// presented on the Intake with their decisions (a draft can ask for one and
+// confirm or dismiss each; a confirmed one is filled in on the form until
+// the client saves), and, after submission or expiry, the post-submission
+// changes the client may ask about, which the server answers as not yet
+// available.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -22,6 +29,7 @@ import type { ReactNode } from "react";
 import {
   resolveIntake,
   type QuestionView,
+  type SuggestionView,
 } from "../../../../src/application/client-intake.ts";
 import {
   resolveVoiceMemo,
@@ -44,16 +52,25 @@ import {
   Text,
 } from "../../../../src/presentation/design-system.tsx";
 import {
+  AI_SUGGESTION_NOTE,
+  CHANGE_NOTE,
   INTAKE_STATE_LABELS,
   jurisdictionSuggestion,
   PRACTICE_AREA_NOT_SURE_SUMMARY,
+  PREFILL_NOTE,
+  routingText,
   SUGGESTION_NOTE,
+  SUGGESTION_STATUS_LABELS,
+  suggestionText,
 } from "../../../../src/presentation/client-intake-labels.ts";
 import { VOICE_MEMO_NOT_CONFIGURED } from "../../../../src/presentation/voice-memo-labels.ts";
 import {
   CloseIntakeForm,
+  IntakeChangeForm,
   IntakeForm,
   SubmitIntakeForm,
+  SuggestionDecisionForms,
+  SuggestionRequestForm,
   VoiceMemoPlayer,
   VoiceMemoRecorder,
 } from "./forms.tsx";
@@ -143,6 +160,44 @@ function VoiceMemoSection({ view }: { readonly view: VoiceMemoView }) {
   );
 }
 
+// MVP-001 S3 part 2: the presented suggestions, newest first, each with its
+// decision; an undecided one of a draft offers the two decision forms.
+function SuggestionList({
+  intakeId,
+  suggestions,
+}: {
+  readonly intakeId: string;
+  readonly suggestions: readonly SuggestionView[];
+}) {
+  if (suggestions.length === 0) {
+    return null;
+  }
+  return (
+    <Stack>
+      {suggestions.map((suggestion) => {
+        const status = SUGGESTION_STATUS_LABELS[suggestion.status];
+        return (
+          <Stack key={suggestion.id}>
+            <Cluster>
+              <Status tone={status.tone}>{status.label}</Status>
+              {suggestion.current ? null : (
+                <Text tone="muted">Made from an earlier saved version.</Text>
+              )}
+            </Cluster>
+            <Text>{suggestionText(suggestion.type, suggestion.names)}</Text>
+            {suggestion.decidable ? (
+              <SuggestionDecisionForms
+                intakeId={intakeId}
+                suggestionId={suggestion.id}
+              />
+            ) : null}
+          </Stack>
+        );
+      })}
+    </Stack>
+  );
+}
+
 const BACK = (
   <Cluster>
     <ButtonLink variant="tertiary" href="/client">
@@ -213,6 +268,11 @@ export default async function ClientIntakePage({
                 until you save, and your earlier versions are kept.
               </Alert>
             ) : null}
+            {view.prefilled.length > 0 ? (
+              <Alert tone="information" title="Filled in from a suggestion">
+                {PREFILL_NOTE}
+              </Alert>
+            ) : null}
             <IntakeForm
               intakeId={view.intakeId}
               latestRevision={view.latestRevision}
@@ -226,6 +286,29 @@ export default async function ClientIntakePage({
                 latestRevision={view.latestRevision}
               />
             ) : null}
+            <Heading as="h2" size="md">
+              Category
+            </Heading>
+            <Text>{routingText(view.routing)}</Text>
+            <Heading as="h2" size="md">
+              Suggestions (optional)
+            </Heading>
+            <Text tone="muted">{AI_SUGGESTION_NOTE}</Text>
+            <SuggestionList
+              intakeId={view.intakeId}
+              suggestions={view.suggestions}
+            />
+            {view.canRequestSuggestions && view.latestRevision !== null ? (
+              <SuggestionRequestForm
+                intakeId={view.intakeId}
+                latestRevision={view.latestRevision}
+              />
+            ) : (
+              <Text tone="muted">
+                Save your answers first; suggestions are made from your saved
+                answers.
+              </Text>
+            )}
           </>
         ) : (
           <>
@@ -262,6 +345,36 @@ export default async function ClientIntakePage({
                 : jurisdictionSuggestion(view.jurisdiction)}{" "}
               {SUGGESTION_NOTE}
             </Alert>
+            <Heading as="h2" size="md">
+              Category
+            </Heading>
+            <Text>{routingText(view.routing)}</Text>
+            {view.suggestions.length === 0 ? null : (
+              <>
+                <Heading as="h2" size="md">
+                  Suggestions
+                </Heading>
+                <SuggestionList
+                  intakeId={view.intakeId}
+                  suggestions={view.suggestions}
+                />
+              </>
+            )}
+            {view.changes.length === 0 ? null : (
+              <>
+                <Heading as="h2" size="md">
+                  Changes after submission
+                </Heading>
+                <Text tone="muted">{CHANGE_NOTE}</Text>
+                {view.changes.map((change) => (
+                  <IntakeChangeForm
+                    key={change}
+                    intakeId={view.intakeId}
+                    change={change}
+                  />
+                ))}
+              </>
+            )}
           </>
         )}
         <VoiceMemoSection view={memo} />

@@ -12,13 +12,24 @@
 // unknown outcome also writes one log line naming the action and the
 // outcome, with nothing the client submitted. MVP-001 S3: the voice memo
 // actions receive a recording's bytes or a voice memo id; the server decides
-// everything else, and a refused or failed upload changes nothing.
+// everything else, and a refused or failed upload changes nothing. MVP-001
+// S3 part 2: the suggestion request receives only the Intake id and the
+// revision the page showed (the production AI provider is unavailable while
+// gate D-4 is open, and the client continues without it); a decision names a
+// suggestion the page showed; a change request names one of the fixed
+// post-submission changes, which the database answers as not yet available.
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import {
+  requestIntakeSuggestions,
+  type SuggestionActionState,
+} from "../../src/application/ai-suggestion.ts";
+import {
   closeIntake,
+  decideSuggestion,
+  requestIntakeChange,
   saveIntakeRevision,
   startIntake,
   submitIntake,
@@ -32,13 +43,20 @@ import {
   type VoiceMemoPlaybackState,
 } from "../../src/application/voice-memo.ts";
 import { CLIENT_INTAKE_SOURCES } from "../../src/infrastructure/client/client-intake-adapter.ts";
+import { INTAKE_SUGGESTION_SOURCES } from "../../src/infrastructure/client/intake-suggestion-adapter.ts";
 import { logRequestEvent } from "../../src/infrastructure/observability/request-log.ts";
 import { VOICE_MEMO_SOURCES } from "../../src/infrastructure/resources/protected-resource-adapter.ts";
 
+// MVP-001 S3 part 2: a decision, and any refusal that may follow an expiry
+// the database has just recorded, also refresh the pages.
 const CHANGED = new Set<ClientIntakeActionState["status"]>([
   "saved",
   "submitted",
   "closed",
+  "suggestion-confirmed",
+  "suggestion-rejected",
+  "expired",
+  "not-editable",
 ]);
 
 const NOT_COMPLETED = new Set<ClientIntakeActionState["status"]>([
@@ -176,4 +194,61 @@ export async function playVoiceMemoAction(
   const state = await voiceMemoPlayback(VOICE_MEMO_SOURCES, formData);
   await observedVoiceMemo("playVoiceMemo", state.status);
   return state;
+}
+
+// MVP-001 S3 part 2: a suggestion request that did not complete writes one
+// warning line, and an unavailable provider one information line, each
+// naming only the action and the fixed outcome.
+export async function requestSuggestionsAction(
+  _previous: SuggestionActionState,
+  formData: FormData,
+): Promise<SuggestionActionState> {
+  const state = await requestIntakeSuggestions(
+    INTAKE_SUGGESTION_SOURCES,
+    formData,
+  );
+  if (state.status === "unavailable" || state.status === "outcome-unknown") {
+    await logRequestEvent("warn", "client_intake.action_not_completed", {
+      operation: "requestIntakeSuggestions",
+      outcome: state.status,
+    });
+  } else if (state.status === "ai-unavailable") {
+    await logRequestEvent("info", "ai_suggestion.unavailable", {
+      operation: "requestIntakeSuggestions",
+      outcome: state.status,
+    });
+  }
+  if (state.status === "suggested") {
+    const intake = formData.get("intake");
+    if (isUuid(intake)) {
+      revalidatePath(`/client/intakes/${intake}`);
+    }
+  }
+  return state;
+}
+
+export async function decideSuggestionAction(
+  _previous: ClientIntakeActionState,
+  formData: FormData,
+): Promise<ClientIntakeActionState> {
+  return refreshed(
+    formData,
+    await observed(
+      "decideSuggestion",
+      await decideSuggestion(CLIENT_INTAKE_SOURCES, formData),
+    ),
+  );
+}
+
+export async function requestIntakeChangeAction(
+  _previous: ClientIntakeActionState,
+  formData: FormData,
+): Promise<ClientIntakeActionState> {
+  return refreshed(
+    formData,
+    await observed(
+      "requestIntakeChange",
+      await requestIntakeChange(CLIENT_INTAKE_SOURCES, formData),
+    ),
+  );
 }

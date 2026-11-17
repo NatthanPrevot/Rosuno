@@ -28,11 +28,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 
 import {
+  addAssessment,
   addGate,
   addJob,
   addJurisdiction,
   addPolicyType,
   addPolicyVersion,
+  addReviewIntake,
   addStaff,
   configurationSources,
   createWorld,
@@ -83,6 +85,9 @@ const CONFIGURATION_FILES = [
   // MVP-001 S2: the operational job view and its forms.
   "app/staff/jobs/forms.tsx",
   "app/staff/jobs/page.tsx",
+  // MVP-001 S3 part 2: the jurisdiction assessment review and its forms.
+  "app/staff/jurisdiction-review/forms.tsx",
+  "app/staff/jurisdiction-review/page.tsx",
   "app/staff/jurisdictions/[jurisdiction]/page.tsx",
   "app/staff/jurisdictions/forms.tsx",
   "app/staff/jurisdictions/page.tsx",
@@ -131,7 +136,7 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
     CONFIGURATION_FILES,
   );
   const pages = CONFIGURATION_FILES.filter((f) => f.endsWith("page.tsx"));
-  assert.equal(pages.length, 12);
+  assert.equal(pages.length, 13);
   for (const file of pages) {
     const source = read(file);
     const code = codeOf(source);
@@ -185,6 +190,25 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
     /const view = await resolveOperationalJobs\( ?STAFF_CONFIGURATION_SOURCES, state, page,? ?\);/,
   );
   assert.doesNotMatch(jobs, /\bparams\b|last_error_message|lastErrorMessage/);
+  // MVP-001 S3 part 2: the review reads exactly two query values, group and
+  // page, in exactly these three places, and hands both unread to its use
+  // case, which checks them; it shows no client identity or intake content.
+  const review = codeOf(read("app/staff/jurisdiction-review/page.tsx"));
+  assert.equal(review.match(/\bsearchParams\b/g)?.length, 3);
+  assert.ok(
+    review.includes(
+      "readonly searchParams: Promise<{\n    readonly group?: string | string[];\n    readonly page?: string | string[];\n  }>;",
+    ),
+  );
+  assert.ok(review.includes("const { group, page } = await searchParams;"));
+  assert.match(
+    review.replace(/\s+/g, " "),
+    /const view = await resolveJurisdictionReview\( ?STAFF_CONFIGURATION_SOURCES, group, page,? ?\);/,
+  );
+  assert.doesNotMatch(
+    review,
+    /\bparams\b|client_id|clientId|description|structured_answers|answers|voice/,
+  );
   for (const [file, [segment, resolver]] of Object.entries(DETAIL_PAGES)) {
     const code = codeOf(read(file));
     assert.equal(code.match(/\bparams\b/g)?.length, 3, file);
@@ -233,8 +257,9 @@ test("SR-2. the server actions hand the form and the trusted sources to the use 
     (m) => m[1],
   );
   // MVP-001 S2: eighteen configuration actions and the two job actions.
-  assert.equal(exported.length, 20);
-  assert.equal(code.match(/^export /gm).length, 20);
+  // MVP-001 S3 part 2: and the one jurisdiction assessment review action.
+  assert.equal(exported.length, 21);
+  assert.equal(code.match(/^export /gm).length, 21);
   for (const name of exported) {
     assert.match(name, /^[a-z][A-Za-z]+Action$/);
     const operation = name.replace(/Action$/, "");
@@ -457,6 +482,8 @@ test("SR-4. the staff home links only to the surfaces the caller holds, and refu
     "/staff/catalog",
     "/staff/capabilities",
     "/staff/intake-configuration",
+    // MVP-001 S3 part 2: the review, for a manage_intake_configuration grant.
+    "/staff/jurisdiction-review",
   ]);
   assert.equal(home.html.includes("<form"), false);
   assert.ok(
@@ -506,6 +533,8 @@ test("SR-5. every surface refuses a caller without its capability with no form a
     ["app/staff/intake-configuration/page.tsx", firstPage],
     // MVP-001 S2.
     ["app/staff/jobs/page.tsx", firstPage],
+    // MVP-001 S3 part 2.
+    ["app/staff/jurisdiction-review/page.tsx", firstPage],
   ];
   for (const [path, props] of pages) {
     const denied = await render(path, sources(w, plain), props);
@@ -843,4 +872,79 @@ test("SR-11. waiting and running jobs show that they wait for a worker run, fini
   );
   assert.ok(denied.text.includes("No access"));
   assert.equal(denied.html.includes("synthetic.check"), false);
+});
+
+test("SR-12. MVP-001 S3 part 2: the jurisdiction assessment review lists the Intakes awaiting review with each in-scope assessment and its two decisions, shows several jurisdictions as several, and never a client, description or answer", async () => {
+  const { w, a, admin, plain } = world();
+  const b = addJurisdiction(w, 2, "SYN_B");
+  const several = addReviewIntake(w);
+  const inA = addAssessment(w, several.id, a);
+  addAssessment(w, several.id, b, {
+    review_status: "not_confirmed",
+    reviewed_at: stamp(w.now - 1000),
+    reviewed_by_user_id: admin.userId,
+  });
+  const none = addReviewIntake(w);
+  const view = await render(
+    "app/staff/jurisdiction-review/page.tsx",
+    sources(w, admin),
+    firstPage,
+  );
+  assert.deepEqual(view.log, ["connection"]);
+  assert.ok(view.metadata.robots.index === false);
+  assert.ok(view.text.includes(`Intake ${several.id}`));
+  assert.ok(view.text.includes("Several jurisdictions named; none is chosen"));
+  assert.ok(view.text.includes("Synthetic SYN_A (SYN_A)"));
+  assert.ok(view.text.includes("Not reviewed"));
+  assert.ok(view.text.includes("Not confirmed"));
+  assert.ok(view.text.includes("By you at"));
+  assert.ok(view.text.includes("never decides which law applies"));
+  // Exactly the two decision forms of the one unreviewed assessment.
+  assert.equal(view.html.match(/<form/g).length, 2);
+  assert.equal(
+    view.html.match(new RegExp(`name="assessment" value="${inA.id}"`, "g"))
+      .length,
+    2,
+  );
+  assert.ok(view.html.includes('name="decision" value="confirmed"'));
+  assert.ok(view.html.includes('name="decision" value="not_confirmed"'));
+  assert.ok(view.text.includes("Confirm: may be relevant"));
+  assert.equal(view.text.includes(none.id), false);
+  assert.doesNotMatch(
+    view.text,
+    /description|answer|voice|client_id|governing law is|best match|recommended/i,
+  );
+  assert.deepEqual(view.hrefs, [
+    "/staff",
+    "/staff/jurisdiction-review",
+    "/staff/jurisdiction-review?group=unnamed",
+  ]);
+  // The unnamed group: the Intake that names none, with nothing to choose.
+  const unnamed = await render(
+    "app/staff/jurisdiction-review/page.tsx",
+    sources(w, admin),
+    { searchParams: Promise.resolve({ group: "unnamed" }) },
+  );
+  assert.ok(unnamed.text.includes(`Intake ${none.id}`));
+  assert.ok(unnamed.text.includes("No jurisdiction named"));
+  assert.ok(unnamed.text.includes("there is nothing to review"));
+  assert.equal(unnamed.html.includes("<form"), false);
+  // A scoped reviewer: its own jurisdiction only, and no unnamed group.
+  const scoped = addStaff(w, 13);
+  grant(w, scoped.userId, "manage_intake_configuration", {
+    jurisdiction_id: b,
+  });
+  const scopedView = await render(
+    "app/staff/jurisdiction-review/page.tsx",
+    sources(w, scoped),
+    firstPage,
+  );
+  assert.ok(scopedView.text.includes("No assessment waits for your review."));
+  assert.deepEqual(scopedView.hrefs, ["/staff", "/staff/jurisdiction-review"]);
+  const refused = await render(
+    "app/staff/jurisdiction-review/page.tsx",
+    sources(w, plain),
+    firstPage,
+  );
+  assert.ok(refused.text.includes("No access"));
 });

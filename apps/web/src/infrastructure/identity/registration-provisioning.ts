@@ -23,7 +23,10 @@
 // PS-A4: reserve, record a failure, record a success, and report an
 // unavailable protection; no table read or write). Another (MVP-001 S3)
 // only stores new bytes at, and signs, the one opaque path it derives from a
-// resource id in the one private bucket. A further
+// resource id in the one private bucket. Another (MVP-001 S3 part 2) makes
+// only the one fixed AI suggestion recording call for the verified client's
+// own Intake (PS section 13), so no browser can forge a suggestion; it reads
+// and writes no table. A further
 // client, built from
 // the publishable key alone and never given the privileged credential, only
 // requests signup confirmation emails. No client receives a request cookie or
@@ -35,6 +38,12 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+import {
+  isRecordInput,
+  recordAnswerOf,
+  UNKNOWN_RECORD,
+  type SuggestionRecorder,
+} from "../../application/ai-suggestion.ts";
 import type { AttorneyApplicationRecords } from "../../application/attorney-application.ts";
 import type { AttorneyProfessionalProvisioning } from "../../application/attorney-professional.ts";
 import {
@@ -440,6 +449,54 @@ export function hasPrivilegedProjectBinding(
   environment: RegistrationEnvironment = runtimeEnvironment(),
 ): boolean {
   return readProjectBinding(environment) !== null;
+}
+
+// MVP-001 S3 part 2 (PS section 13; TA section 30): the AI suggestion
+// recording port, through its own cookie-free privileged client. It makes
+// only the one fixed call of ai_record_intake_suggestion (service_role
+// only), a literal call with exactly its named arguments, after checking
+// every argument against the database's own bounds, under a deadline. The
+// caller passes the verified client's User id and Intake, the revision the
+// suggestion was generated from, one permitted suggestion, the model
+// reference and the server's time of the provider answer; the database
+// decides again and stores the suggestion as presented, with its audit
+// event. Its answer is read strictly; anything else, including a failed,
+// refused, aborted, or thrown call, is unknown, so nothing is presented that
+// the database did not record.
+const AI_RECORD_DEADLINE_MS = 5000;
+
+export async function createAiSuggestionRecorder(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<SuggestionRecorder | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    record: async (input) => {
+      try {
+        if (!isRecordInput(input)) {
+          return UNKNOWN_RECORD;
+        }
+        const { data, error } = await admin
+          .rpc("ai_record_intake_suggestion", {
+            p_user_id: input.userId,
+            p_intake_id: input.intakeId,
+            p_revision_number: input.revisionNumber,
+            p_suggestion_type: input.type,
+            p_suggestion_value: input.value,
+            p_model_reference: input.modelReference,
+            p_generated_at: input.generatedAt,
+          })
+          .abortSignal(AbortSignal.timeout(AI_RECORD_DEADLINE_MS));
+        return error === null ? recordAnswerOf(data) : UNKNOWN_RECORD;
+      } catch {
+        return UNKNOWN_RECORD;
+      }
+    },
+  } satisfies SuggestionRecorder);
 }
 
 // MVP-001 S3 (IMP section 13; PS section 29): the protected storage port,
