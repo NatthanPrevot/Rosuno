@@ -42,7 +42,14 @@
 // conversion, lazy expiry with no scheduler, the bounded sweep, Hold expiry
 // expiring its Request atomically); the seven IMP section 20 concurrency
 // tests under real concurrency with persistent sessions; MBS section 9
-// invariants 1-6 each explicitly; and audit minimization. No Supabase
+// invariants 1-6 each explicitly; and audit minimization.
+//
+// MVP-001 S5 update: the three S5 migrations follow S4 (S4 stays contiguous
+// and in order right after S3), and a Referral now commits only with its
+// point-in-time evidence (20261121010000), so the synthetic Requests' owner
+// fixture also writes, with each Referral, its allocation method, an
+// eligible Eligibility Evaluation, a pool entry, a presentation and a
+// bookable referral-context Bookability Evaluation. No Supabase
 // project, network service, or pre-existing cluster is contacted, nothing
 // persists after the run, and every value is synthetic test data. The JSON
 // report goes to stdout; exit 0 means PASS, 1 FAIL, 2 cleanup failure.
@@ -383,11 +390,19 @@ function applyMigrations() {
       "utf8",
     ),
   ).migrations;
-  // S4 follows S3, contiguous and in order, last, and every S4 migration is
-  // registered unreviewed and applied nowhere.
+  // S4 follows S3, contiguous and in order, and every S4 migration is
+  // registered unreviewed and applied nowhere. MVP-001 S5: only the three S5
+  // migrations, contiguous and in order, follow S4.
   const s3 = files.indexOf(S3_LAST);
   assert.ok(s3 >= 0, "the last S3 migration is present");
-  assert.deepEqual(files.slice(s3 + 1), [...S4_MIGRATIONS]);
+  assert.deepEqual(files.slice(s3 + 1, s3 + 1 + S4_MIGRATIONS.length), [
+    ...S4_MIGRATIONS,
+  ]);
+  assert.deepEqual(files.slice(s3 + 1 + S4_MIGRATIONS.length), [
+    "20261121010000_mvp_001_s5_referral_integrity.sql",
+    "20261121020000_mvp_001_s5_discovery.sql",
+    "20261121030000_mvp_001_s5_referral.sql",
+  ]);
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),
@@ -710,8 +725,19 @@ function requestSql({
   deadline = null,
 }) {
   ordinal += 1;
-  return `insert into public.referrals (id, intake_id, attorney_id, jurisdiction_id, attempt_ordinal)
-    values ('${referral}', '${client.intake}', '${attorney.profile}', '${jurisdiction}', ${ordinal});
+  // MVP-001 S5: the Referral's point-in-time evidence, in the same
+  // transaction (20261121010000).
+  const evaluation = uid();
+  return `insert into public.referrals (id, intake_id, attorney_id, jurisdiction_id, attempt_ordinal, allocation_method)
+    values ('${referral}', '${client.intake}', '${attorney.profile}', '${jurisdiction}', ${ordinal}, 'client_selected');
+  insert into public.eligibility_evaluations (id, attorney_id, jurisdiction_id, context_type, context_id, evaluated_at, policy_references, result, factor_results, evidence_references, as_of)
+    values ('${evaluation}', '${attorney.profile}', '${jurisdiction}', 'jurisdiction', null, now(), '[]'::jsonb, 'eligible', '[]'::jsonb, '{}'::jsonb, now());
+  insert into public.referral_eligible_pool_entries (referral_id, attorney_id, eligibility_evaluation_id, eligible_as_of)
+    values ('${referral}', '${attorney.profile}', '${evaluation}', now());
+  insert into public.referral_presentations (referral_id, attorney_id, display_position, narrowing_actor, shown_at)
+    values ('${referral}', '${attorney.profile}', 1, 'platform', now());
+  insert into public.bookability_evaluations (attorney_id, eligibility_evaluation_id, context_type, context_id, evaluated_at, as_of, modality, constraint_results, result)
+    values ('${attorney.profile}', '${evaluation}', 'referral', '${referral}', now(), now(), 'synthetic', '[]'::jsonb, 'bookable');
   insert into public.consultation_requests (id, intake_id, client_id, selected_attorney_id, referral_id, request_path, referral_policy_version_id, requested_modality, state, response_deadline_at)
     values ('${request}', '${client.intake}', '${client.client}', '${attorney.profile}', '${referral}', '${requestPath}', '${world.referralPolicy}', 'video', 'pending', ${deadline === null ? "null" : lit(deadline)});`;
 }

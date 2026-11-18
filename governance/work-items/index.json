@@ -2421,8 +2421,8 @@
     },
     {
       "work_item_id": "WI-P2-MVP-001-TECHNICAL-COMPLETION",
-      "title": "MVP-001 Technical Completion Program (S1 to S11); slices S1 platform controls, S2 durable jobs and session assurance, S3 M5 remainder and protected Storage (merged); slice S4 M6 scheduling foundation",
-      "objective": "Register entry of the MVP-001 Program Packet (register name recorded under this priority-prefixed identifier because the register format requires WI-P0, WI-P1 or WI-P2). Under the owner-adopted Packet (blob 8117636923918a482ed580ef0408ae72bc2f9e96), DL-ENG-3 and PS-A2, reach the technical-complete MVP through eleven bounded slices delivered one PR at a time. S1 (PR #96, b7dc44758db05f4492a7d87d17448fcd062e853c): environment identity, immutable policy history, the policy-type catalog, the environment-anchored resolver, configuration administration and conformance corrections. S2 (PR #97, 3490dbdf6618e11e0d6a4a74a66292a32990bd80): durable jobs, the pg_cron sweeper, the protected worker and job view, system-actor recording, aal2 step-up for attorneys and staff, and PS-A4 sign-in and recovery abuse control; break-glass moves to S11. S3 (PR #98, f7f6bbdffc78a28748a5bcb8b889a2ae198a3eef): private Storage with signed URLs after database authorization and legal-hold checks, the server-enforced voice memo, verification-evidence upload, AI Suggestions unavailable until gate D-4, jurisdiction suggestions with scoped staff review, practice-category routing, the Intake lifecycle with expiry unconfigured (gate D-3), and Privacy and Help entry points without content. S4: availability rules and blackouts with IANA time zones and UTC instants (daylight-saving gaps and overlaps never offered), Instant mode bound to the server-observed application session and ended at sign-out, presence as a server lease, bookability evaluation persistence, slot-hold acquisition, release and expiry with the request, hold-to-booking conversion, the booking lifecycle and acceptance precondition, the expiry sweep, the attorney Schedule page, and hold, notice, cap and presence values from owner policy only.",
+      "title": "MVP-001 Technical Completion Program (S1 to S11); slices S1 platform controls, S2 jobs and session assurance, S3 M5 remainder, S4 M6 scheduling (merged); slice S5 discovery, referral and public site",
+      "objective": "Register entry of the MVP-001 Program Packet (register name recorded under this priority-prefixed identifier because the register format requires WI-P0, WI-P1 or WI-P2). Under the owner-adopted Packet (blob 8117636923918a482ed580ef0408ae72bc2f9e96), DL-ENG-3 and PS-A2, reach the technical-complete MVP through eleven bounded slices delivered one PR at a time. Merged: S1 (PR #96, b7dc44758db05f4492a7d87d17448fcd062e853c) environment identity, immutable policy history, the policy-type catalog, the environment-anchored resolver and configuration administration; S2 (PR #97, 3490dbdf6618e11e0d6a4a74a66292a32990bd80) durable jobs, the pg_cron sweeper, the protected worker, aal2 step-up and PS-A4 abuse control; S3 (PR #98, f7f6bbdffc78a28748a5bcb8b889a2ae198a3eef) private Storage, the voice memo, evidence upload, AI Suggestions gated (D-4), jurisdiction review, routing and the Intake lifecycle with expiry unconfigured (D-3); S4 (PR #99, e4ee0837d7c3af7536a29937edd3c7b9ad6dc01e) availability rules, blackouts, Instant mode bound to the server-observed session, presence as a server lease, bookability persistence, slot holds, hold-to-booking conversion and the attorney Schedule page. S5: public pages that state only that their information is not yet available; public attorney profiles limited to the PS field allowlist; discovery by jurisdiction, practice area and availability in a neutral name order (ranking gated); decision-point eligibility recording; client selection with the sign-in handoff; Referral creation with fresh eligibility and bookability evaluations, the eligible-pool snapshot, the presented set re-derived at selection and the attempt ordinal, uncommittable without that evidence; an outcome seam that refuses until the referral outcome taxonomy is configured; and the client's attempt list.",
       "in_scope": [
         "S1 forward-only migrations: environment identity and development-configuration designation (PS-A2); professional write-boundary conformance (server-generated keys, eligibility type code); configuration administration; availability checks.",
         "S1 application changes, tests, disposable PostgreSQL proofs and records within the Packet ALLOWED_SCOPE."
@@ -2471,7 +2471,9 @@
         "S3: the MVP-001 S3 disposable PostgreSQL proof passes on the final head: guessing or reusing an object path yields no access, access needs the database's authorization and is refused under legal hold, the voice-memo limit is enforced on the server, AI functions change no protected state (only suggestions, unreviewed assessments and audit rows), an Intake survives decline and retry and is never deleted, ambiguous jurisdiction is surfaced and never guessed, and jurisdiction review requires aal2 and the grant's scope.",
         "S3: the earlier proofs, the application tests (protected resources, voice memo, AI suggestion, jurisdiction review, public entry points), p0:validate, the P0 suite, typecheck and build pass on the final head, and the guard self-check prints ROSUNO-GUARD PASS.",
         "S4: the MVP-001 S4 disposable PostgreSQL proof passes on the final head, including the seven IMP section 20 concurrency tests under real concurrency (two clients for one slot, overlapping holds, hold versus current booking, overlapping confirmed bookings, hold expiration race, booking currentness, timezone boundary) and MBS section 9 invariants 1 to 6; Instant mode never survives sign-out and a new session starts with it off; unset policy values refuse holds and Instant mode.",
-        "S4: the earlier proofs, the application tests (attorney schedule), p0:validate, the P0 suite, typecheck and build pass on the final head, and the guard self-check prints ROSUNO-GUARD PASS."
+        "S4: the earlier proofs, the application tests (attorney schedule), p0:validate, the P0 suite, typecheck and build pass on the final head, and the guard self-check prints ROSUNO-GUARD PASS.",
+        "S5: the MVP-001 S5 disposable PostgreSQL proof passes on the final head, including the MBS section 10 failure tests: an ineligible attorney is never listed, presented or referred; a Referral cannot commit without point-in-time eligibility, bookability, pool and presentation evidence; an unbookable attorney is never shown as bookable for the selected path; banned recommendation claims are never shown; an unknown and an unlisted attorney answer alike; anon executes only the three public reads and holds no table privilege; concurrent selections for one Intake get distinct attempt ordinals; and outcomes refuse until the taxonomy is configured.",
+        "S5: the earlier proofs, the application tests (discovery, public site, sign-in continuation), p0:validate, the P0 suite, typecheck and build pass on the final head, and the guard self-check prints ROSUNO-GUARD PASS."
       ],
       "validation_commands": [
         "pnpm install --frozen-lockfile",
@@ -2486,6 +2488,7 @@
         "node apps/web/tests/mvp-001-s2-db-proof.mjs",
         "node apps/web/tests/mvp-001-s3-db-proof.mjs",
         "node apps/web/tests/mvp-001-s4-db-proof.mjs",
+        "node apps/web/tests/mvp-001-s5-db-proof.mjs",
         "node apps/web/tests/p5-001-db-proof.mjs",
         "node apps/web/tests/p3-904-db-proof.mjs",
         "node apps/web/tests/m4-db-proof.mjs",
@@ -2511,11 +2514,14 @@
         "20261119070000_mvp_001_s3_intake_lifecycle_correction",
         "20261120010000_mvp_001_s4_scheduling_integrity",
         "20261120020000_mvp_001_s4_availability_instant",
-        "20261120030000_mvp_001_s4_holds_bookability"
+        "20261120030000_mvp_001_s4_holds_bookability",
+        "20261121010000_mvp_001_s5_referral_integrity",
+        "20261121020000_mvp_001_s5_discovery",
+        "20261121030000_mvp_001_s5_referral"
       ],
       "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",
-      "updated_at": "2026-11-17T07:02:44Z"
+      "updated_at": "2026-11-18T01:09:59Z"
     },
     {
       "work_item_id": "WI-P2-005-EXISTING-ACCOUNT-AUTHENTICATION-ENTRY",

@@ -46,6 +46,14 @@
 // functions and the session observation and sign-out), as exact assertions;
 // none writes an M4 relation.
 //
+// MVP-001 S5 update: the three S5 migrations follow. SEC-1 lists exactly the
+// seven S5 definer functions, as exact assertions: the three public
+// discovery reads and the client's attempt list (stable, writing nothing),
+// the two deferred referral evidence checks (read only), and referral_create,
+// the one S5 write path to an M4 relation: it appends decision-point
+// eligibility_evaluations rows (never an update or delete; S5 makes that
+// relation append-only for every role) together with its Referral.
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -1436,6 +1444,9 @@ function probes() {
           "client_create_intake:v",
           "client_intake_jurisdictions:s",
           "client_intake_practice_areas:s",
+          // MVP-001 S5 re-pin (20261121030000): the client's own attempt
+          // list (authenticated only), which writes nothing.
+          "client_referrals:s",
           // MVP-001 S3 part 2 re-pin (20261119050000, 20261119040000): the
           // rejection, and the post-submission change seam, which writes
           // nothing but an expiry transition; no M4 relation.
@@ -1459,6 +1470,22 @@ function probes() {
           // definers executable by no API role.
           "policy_select_version:s",
           "production_financial_gate:s",
+          // MVP-001 S5 re-pin (20261121020000): the three public discovery
+          // reads (anon and authenticated), stable, which write nothing.
+          "public_attorney_directory:s",
+          "public_attorney_profile:s",
+          "public_discovery_filters:s",
+          // MVP-001 S5 re-pin (20261121030000): the client's selection
+          // (authenticated only), which writes Referral evidence, audit
+          // events and, of the M4 relations, only appends decision-point
+          // eligibility_evaluations rows (append-only for every role since
+          // 20261121010000).
+          "referral_create:v",
+          // MVP-001 S5 re-pin (20261121010000): the two deferred referral
+          // evidence checks (trigger functions, executable by no API role),
+          // which only read.
+          "referral_evidence_with_referral:v",
+          "referral_point_in_time_evidence:v",
           // MVP-001 S3 re-pin (20261119010000-030000): the protected resource
           // functions (authenticated only), which write only resources, voice
           // memos and audit events; no M4 relation (an evidence row refers to
@@ -1544,17 +1571,26 @@ function probes() {
       // MVP-001 S3 admits exactly one more trigger on an M4 relation: the
       // check of an evidence row's reference to an uploaded artifact, which
       // only refuses (it writes nothing), on verification_evidence only.
+      // MVP-001 S5 admits exactly two more, on eligibility_evaluations: the
+      // append-only guard for every role (row update or delete, and
+      // truncate), which only refuses. The list is now read in a fixed order.
       assert.equal(
         sql(
-          `select coalesce(string_agg(c.relname || ':' || t.tgname, ','), '') from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in (${m4}, 'audit_events') and not t.tgisinternal and t.tgname not like '%set_updated_at' and t.tgname <> 'audit_events_immutable';`,
+          `select coalesce(string_agg(c.relname || ':' || t.tgname, ',' order by c.relname, t.tgname), '') from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in (${m4}, 'audit_events') and not t.tgisinternal and t.tgname not like '%set_updated_at' and t.tgname <> 'audit_events_immutable';`,
         ),
-        "verification_evidence:verification_evidence_artifact_guard",
+        "eligibility_evaluations:eligibility_evaluations_append_only,eligibility_evaluations:eligibility_evaluations_no_truncate,verification_evidence:verification_evidence_artifact_guard",
       );
       assert.equal(
         sql(
           "select p.prosecdef::text || '|' || p.provolatile::text from pg_trigger t join pg_proc p on p.oid = t.tgfoid where t.tgname = 'verification_evidence_artifact_guard';",
         ),
         "false|v",
+      );
+      assert.equal(
+        sql(
+          "select string_agg(t.tgname || '|' || p.proname || '|' || p.prosecdef::text || '|' || t.tgtype::text, ',' order by t.tgname) from pg_trigger t join pg_proc p on p.oid = t.tgfoid where t.tgname in ('eligibility_evaluations_append_only', 'eligibility_evaluations_no_truncate');",
+        ),
+        "eligibility_evaluations_append_only|eligibility_evaluation_append_only|false|27,eligibility_evaluations_no_truncate|eligibility_evaluation_append_only|false|34",
       );
       assert.equal(
         sql(
