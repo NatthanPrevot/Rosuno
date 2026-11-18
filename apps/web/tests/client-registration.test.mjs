@@ -2887,6 +2887,25 @@ const DISCOVERY_RPCS = Object.freeze([
   "client_referrals",
   "referral_create",
 ]);
+// MVP-001 S6: the consultation request adapter calls the database's own six
+// request reads (review, options, slot starts, quote preview, the client's
+// Request and the Intake's Requests), the two request functions (creation
+// and withdrawal) and the PS-A2 environment accessor (checked before a
+// write), each exactly once and each as a literal call through the request's
+// own unprivileged session; it builds or receives no privileged client, and
+// no other file names any of the eight S6 functions.
+const REQUEST_ADAPTER =
+  "src/infrastructure/requests/consultation-request-adapter.ts";
+const REQUEST_RPCS = Object.freeze([
+  "client_request_review",
+  "request_options",
+  "request_slot_starts",
+  "request_quote_preview",
+  "client_request",
+  "client_intake_requests",
+  "request_create",
+  "request_withdraw",
+]);
 const CAPABILITY_PREDICATE_RPC =
   'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';
 const CONFIGURATION_REQUEST_CLIENT =
@@ -2915,6 +2934,8 @@ const RPC_OCCURRENCES = Object.freeze({
   // MVP-001 S5: the five discovery and referral functions, plus the
   // environment accessor.
   [DISCOVERY_ADAPTER]: DISCOVERY_RPCS.length + 1,
+  // MVP-001 S6: the eight request functions, plus the environment accessor.
+  [REQUEST_ADAPTER]: REQUEST_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -3002,6 +3023,31 @@ function assertQuotaRpcContract(codes) {
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
       );
     }
+    for (const name of REQUEST_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === REQUEST_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== REQUEST_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === REQUEST_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        REQUEST_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
     assert.equal(
       code.match(/\brpc\b/gi)?.length ?? 0,
       RPC_OCCURRENCES[file] ?? 0,
@@ -3017,7 +3063,8 @@ function assertQuotaRpcContract(codes) {
         0,
       file === STAFF_ADAPTER ||
         file === CONFIGURATION_ADAPTER ||
-        file === DISCOVERY_ADAPTER
+        file === DISCOVERY_ADAPTER ||
+        file === REQUEST_ADAPTER
         ? 1
         : 0,
       file,

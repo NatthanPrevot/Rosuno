@@ -700,8 +700,11 @@ test("S5-8. confirming a selection checks every field once, the client's own Int
     page: "1",
   };
   const { sources, calls } = harness();
+  // MVP-001 S6: a recorded selection answers its Referral id (for the
+  // request review link).
   assert.deepEqual(await createReferral(sources, form(valid)), {
     status: "created",
+    referralId: REFERRAL,
   });
   assert.deepEqual(calls.at(-1), [
     "createReferral",
@@ -920,7 +923,9 @@ test("S5-11. banned claims: no S5 label, message, navigation entry, content stat
     "denied",
     "unavailable",
   ]) {
-    const message = labels.selectionMessage({ status });
+    const message = labels.selectionMessage(
+      status === "created" ? { status, referralId: REFERRAL } : { status },
+    );
     assert.ok(message !== null, status);
     texts.push(message.title, message.body);
   }
@@ -951,11 +956,18 @@ test("S5-11. banned claims: no S5 label, message, navigation entry, content stat
       text.slice(0, 120),
     );
   }
-  // The selection confirms only that the choice is recorded, and that
-  // requesting a consultation is not yet available.
+  // The selection confirms only that the choice is recorded and (MVP-001 S6)
+  // that the client can now review and request a consultation from it, which
+  // the form links to for exactly the recorded Referral.
   assert.equal(
-    labels.selectionMessage({ status: "created" }).body,
-    "Your selection is recorded for your Intake. Requesting a consultation is not yet available.",
+    labels.selectionMessage({ status: "created", referralId: REFERRAL }).body,
+    "Your selection is recorded for your Intake. You can now review the consultation options for this attorney and request a consultation.",
+  );
+  assert.equal(labels.REQUEST_REVIEW_LINK, "Review and request a consultation");
+  assert.ok(
+    codeOf(read("app/find-an-attorney/select/forms.tsx")).includes(
+      "href={requestReviewPathFor(state.referralId)}",
+    ),
   );
   assert.equal(labels.ORDER_LABEL, "Sorted by name");
   // A recorded outcome is shown only as recorded.

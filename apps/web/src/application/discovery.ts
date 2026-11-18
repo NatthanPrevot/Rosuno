@@ -26,6 +26,8 @@
 // the environment binding is checked (PS-A2 section 6; Packet rule 7), and a
 // mismatched or unrecorded environment refuses the selection. Nothing here
 // changes an Intake, and nothing chooses an attorney for the client.
+// MVP-001 S6: a recorded selection answers its Referral id, so the page can
+// offer the request review for exactly that Referral.
 
 import {
   bindEnvironment,
@@ -772,7 +774,7 @@ function refusalView(refusal: Refusal, selection: Selection): SelectionView {
 
 export type SelectionActionState =
   | { readonly status: "idle" }
-  | { readonly status: "created" }
+  | { readonly status: "created"; readonly referralId: string }
   | { readonly status: "invalid" }
   | { readonly status: "not-found" }
   | { readonly status: "intake-not-ready" }
@@ -787,7 +789,7 @@ export const INITIAL_SELECTION_STATE: SelectionActionState = Object.freeze({
   status: "idle",
 });
 
-const STATE = (status: SelectionActionState["status"]) =>
+const STATE = (status: Exclude<SelectionActionState["status"], "created">) =>
   Object.freeze({ status }) as SelectionActionState;
 
 const SELECTION_FIELDS = Object.freeze([
@@ -909,7 +911,7 @@ export async function createReferral(
     switch (answer.outcome) {
       case "created":
         return isUuid(answer.value)
-          ? STATE("created")
+          ? Object.freeze({ status: "created", referralId: answer.value })
           : STATE("outcome-unknown");
       case "invalid":
         return STATE("invalid");

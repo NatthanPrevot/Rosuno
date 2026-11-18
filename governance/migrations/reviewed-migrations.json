@@ -941,6 +941,84 @@
       "drift_check": "clean",
       "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions; no Referral, pool entry, presentation, evaluation or audit row is removed.",
       "depends_on": ["20261121020000_mvp_001_s5_discovery"]
+    },
+    {
+      "migration_id": "20261122010000_mvp_001_s6_request_integrity",
+      "migration_kind": "product",
+      "sequence": 38,
+      "artifact_path": "supabase/migrations/20261122010000_mvp_001_s6_request_integrity.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the constraints, index or guard functions; no Consultation Request, Fee Calculation, evaluation or audit row is removed.",
+      "depends_on": ["20261121030000_mvp_001_s5_referral"]
+    },
+    {
+      "migration_id": "20261122020000_mvp_001_s6_pricing",
+      "migration_kind": "product",
+      "sequence": 39,
+      "artifact_path": "supabase/migrations/20261122020000_mvp_001_s6_pricing.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions (the price-source seam bodies are replaced forward once PS-A3 is adopted); nothing is persisted by this migration's functions.",
+      "depends_on": ["20261122010000_mvp_001_s6_request_integrity"]
+    },
+    {
+      "migration_id": "20261122030000_mvp_001_s6_requests",
+      "migration_kind": "product",
+      "sequence": 40,
+      "artifact_path": "supabase/migrations/20261122030000_mvp_001_s6_requests.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions or the schedule; no Consultation Request, Fee Calculation, Hold, evaluation or audit row is removed.",
+      "depends_on": ["20261122020000_mvp_001_s6_pricing"]
     }
   ]
 }

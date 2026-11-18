@@ -79,8 +79,12 @@ export function utcText(timestamp: string): string {
 export const SELECTION_NOTE =
   "You choose which attorney to select. Selecting records your choice for one of your Intakes; nothing is sent to the attorney yet.";
 
-export const CONSULTATION_NOT_AVAILABLE =
-  "Requesting a consultation is not yet available.";
+// MVP-001 S6: after a recorded selection the client can review and request
+// a consultation from it.
+export const REQUEST_NEXT_STEP =
+  "You can now review the consultation options for this attorney and request a consultation.";
+
+export const REQUEST_REVIEW_LINK = "Review and request a consultation";
 
 export const NO_OPEN_INTAKES =
   "You have no submitted Intake to select an attorney for. Submit an Intake in your client workspace first.";
@@ -108,7 +112,7 @@ export function selectionMessage(state: SelectionActionState): {
       return {
         tone: "success",
         title: "Your selection is recorded",
-        body: `Your selection is recorded for your Intake. ${CONSULTATION_NOT_AVAILABLE}`,
+        body: `Your selection is recorded for your Intake. ${REQUEST_NEXT_STEP}`,
       };
     case "invalid":
       return {

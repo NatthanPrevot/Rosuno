@@ -385,11 +385,19 @@ function applyMigrations() {
       "utf8",
     ),
   ).migrations;
-  // S5 follows S4, contiguous and in order, last, and every S5 migration is
-  // registered unreviewed and applied nowhere.
+  // S5 follows S4, contiguous and in order, and every S5 migration is
+  // registered unreviewed and applied nowhere. MVP-001 S6: then exactly the
+  // three S6 migrations, contiguous and in order.
   const s4 = files.indexOf(S4_LAST);
   assert.ok(s4 >= 0, "the last S4 migration is present");
-  assert.deepEqual(files.slice(s4 + 1), [...S5_MIGRATIONS]);
+  assert.deepEqual(files.slice(s4 + 1, s4 + 1 + S5_MIGRATIONS.length), [
+    ...S5_MIGRATIONS,
+  ]);
+  assert.deepEqual(files.slice(s4 + 1 + S5_MIGRATIONS.length), [
+    "20261122010000_mvp_001_s6_request_integrity.sql",
+    "20261122020000_mvp_001_s6_pricing.sql",
+    "20261122030000_mvp_001_s6_requests.sql",
+  ]);
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),
@@ -1079,7 +1087,7 @@ async function unrecordedChecks() {
 
 async function inventoryChecks() {
   await check(
-    "MIG-1 the three S5 migrations follow S4 last and in order, are registered unreviewed and applied nowhere, are Program migration refs, and apply on plain PostgreSQL",
+    "MIG-1 the three S5 migrations follow S4 in order (MVP-001 S6: then only the three S6 migrations), are registered unreviewed and applied nowhere, are Program migration refs, and apply on plain PostgreSQL",
     () => {
       for (const file of S5_MIGRATIONS) {
         assert.deepEqual(report.migrations.notices[file], [], file);

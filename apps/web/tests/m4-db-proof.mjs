@@ -54,6 +54,17 @@
 // eligibility_evaluations rows (never an update or delete; S5 makes that
 // relation append-only for every role) together with its Referral.
 //
+// MVP-001 S6 update: the three S6 migrations follow. SEC-1 lists exactly the
+// twelve further definer functions, as exact assertions: the client's
+// request review, options, slot starts, quote preview, Request detail and
+// Intake attempt reads (stable, writing nothing); the two deferred request
+// and Fee Calculation evidence checks and the two P1 deferred Request/Hold
+// and Request/payment consistency checks S6 makes security definer (trigger
+// functions, executable by no API role, read only); request_withdraw, which
+// writes no M4 relation; and request_create, the one S6 write path to an M4
+// relation: it appends decision-point eligibility_evaluations rows (never an
+// update or delete) together with its Request.
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -1444,6 +1455,10 @@ function probes() {
           "client_create_intake:v",
           "client_intake_jurisdictions:s",
           "client_intake_practice_areas:s",
+          // MVP-001 S6 re-pin (20261122030000): the client's own Intake
+          // attempts with their Requests (authenticated only), which write
+          // nothing.
+          "client_intake_requests:s",
           // MVP-001 S5 re-pin (20261121030000): the client's own attempt
           // list (authenticated only), which writes nothing.
           "client_referrals:s",
@@ -1451,12 +1466,28 @@ function probes() {
           // rejection, and the post-submission change seam, which writes
           // nothing but an expiry transition; no M4 relation.
           "client_reject_ai_suggestion:v",
+          // MVP-001 S6 re-pin (20261122030000): the client's own Request
+          // (authenticated only), which writes nothing.
+          "client_request:s",
           "client_request_intake_change:v",
+          // MVP-001 S6 re-pin (20261122020000): the client's request review
+          // read (authenticated only), which writes nothing.
+          "client_request_review:s",
           "client_save_intake_revision:v",
           "client_submit_intake:v",
           // MVP-001 S1 re-pin (20261117010000): the environment identity
           // accessors and the environment-anchored policy resolver.
           "deployment_environment_identity:s",
+          // MVP-001 S6 re-pin (20261122010000): the two P1 deferred
+          // Request/payment and Request/Hold consistency checks, now security
+          // definer (trigger functions, executable by no API role), which
+          // only read.
+          "enforce_payment_request_consistency:v",
+          "enforce_request_hold_consistency:v",
+          // MVP-001 S6 re-pin (20261122010000): the deferred Fee Calculation
+          // evidence check (a trigger function, executable by no API role),
+          // which only reads.
+          "fee_calculation_with_request:v",
           "has_manage_attorney_verification_scope:s",
           "has_resource_metadata_access:s",
           // MVP-001 S1 re-pin (20261117030000).
@@ -1486,6 +1517,27 @@ function probes() {
           // which only read.
           "referral_evidence_with_referral:v",
           "referral_point_in_time_evidence:v",
+          // MVP-001 S6 re-pin (20261122030000): the client's Request creation
+          // (authenticated only), which writes the Request, its evidence, Fee
+          // Calculation, Hold and audit event and, of the M4 relations, only
+          // appends decision-point eligibility_evaluations rows (append-only
+          // for every role since 20261121010000).
+          "request_create:v",
+          // MVP-001 S6 re-pin (20261122020000): the request options read
+          // (authenticated only), which writes nothing.
+          "request_options:s",
+          // MVP-001 S6 re-pin (20261122010000): the deferred request evidence
+          // check (a trigger function, executable by no API role), which only
+          // reads.
+          "request_point_in_time_evidence:v",
+          // MVP-001 S6 re-pin (20261122020000): the quote preview and slot
+          // start reads (authenticated only), which write nothing.
+          "request_quote_preview:s",
+          "request_slot_starts:s",
+          // MVP-001 S6 re-pin (20261122030000): the client's withdrawal
+          // (authenticated only), which writes the Request's state, its Hold's
+          // end and an audit event; no M4 relation.
+          "request_withdraw:v",
           // MVP-001 S3 re-pin (20261119010000-030000): the protected resource
           // functions (authenticated only), which write only resources, voice
           // memos and audit events; no M4 relation (an evidence row refers to
