@@ -451,8 +451,22 @@ test("J-I6. a drain without a binding claims nothing; with a port it uses its ow
   );
   // The deployed wiring, unconfigured here, builds no port at all.
   assert.equal(await JOB_WORKER_WIRING.port(), null);
-  // The production registry is empty in S2.
-  assert.equal(PRODUCTION_JOB_HANDLERS.size, 0);
+  // The production registry was empty in S2; MVP-001 S7 registers exactly
+  // the five payment job types, and no other.
+  assert.deepEqual(
+    [...PRODUCTION_JOB_HANDLERS.keys()],
+    [
+      "payment.checkout",
+      "payment.capture",
+      "payment.release",
+      "payment.refund",
+      "payment.reconcile",
+    ],
+  );
+  assert.ok(
+    [...PRODUCTION_JOB_HANDLERS.values()].every((h) => typeof h === "function"),
+  );
+  assert.equal(PRODUCTION_JOB_HANDLERS.has("synthetic.check"), false);
   const calls = [];
   let claims = 0;
   const port = {
@@ -631,13 +645,14 @@ test("J-I8. an after-commit drain is scheduled after the response, bounded to on
   // Without the runtime (plain Node.js here), nothing is scheduled.
   assert.equal(await scheduleJobDrainAfterCommit(undefined, drain), false);
   assert.equal(drains.length, 1);
-  // S2 has no action that enqueues a job, so nothing wires it yet.
+  // S2 had no action that enqueues a job. MVP-001 S7: exactly one module
+  // wires it, the Stripe webhook adapter, after an event is recorded.
   const importers = [...filesIn("app/"), ...filesIn("src/")].filter(
     (file) =>
       /\.tsx?$/.test(file) &&
       importsOf(read(file)).some((s) => /(?:^|\/)after-commit\.ts$/.test(s)),
   );
-  assert.deepEqual(importers, []);
+  assert.deepEqual(importers, ["src/infrastructure/payments/stripe-webhook.ts"]);
   const source = read("src/infrastructure/jobs/after-commit.ts");
   assert.deepEqual(importsOf(source), ["./job-worker-adapter.ts"]);
   assert.deepEqual(
@@ -857,18 +872,23 @@ test("J-I12. the route and the adapter stay narrow: exact imports, no cookie, se
     "../environment/provider-configuration.ts",
     "../identity/registration-provisioning.ts",
     "../observability/request-log.ts",
+    // MVP-001 S7: the payment job handlers, and nothing else.
+    "../payments/payment-jobs.ts",
   ]);
   assert.doesNotMatch(
     adapter,
     /process\.env|\bconsole\b|ROSUNO_SUPABASE|NEXT_PUBLIC|service_role|sb_secret_|createClient\b|adminKey|\.rpc\(|\.from\(|cookies|next\/headers|\.set\(/,
   );
-  // The registry holds no handler in S2.
+  // The registry held no handler in S2; MVP-001 S7: it holds exactly the
+  // payment job handlers.
   assert.match(
     adapter,
-    /export const PRODUCTION_JOB_HANDLERS: JobHandlers = new Map<\n {2}string,\n {2}JobHandler\n>\(\);/,
+    /export const PRODUCTION_JOB_HANDLERS: JobHandlers = new Map<string, JobHandler>\(\n {2}PAYMENT_JOB_HANDLERS,\n\);/,
   );
-  // Only the worker route loads the adapter (the after-commit helper too,
-  // which nothing loads yet).
+  assert.equal(adapter.match(/PAYMENT_JOB_HANDLERS/g).length, 2);
+  // Only the worker route loads the adapter (the after-commit helper too),
+  // and (MVP-001 S7) the payment adapter, for one bounded drain after a
+  // payment attempt is created.
   const importers = [...filesIn("app/"), ...filesIn("src/")].filter(
     (file) =>
       /\.tsx?$/.test(file) &&
@@ -879,12 +899,17 @@ test("J-I12. the route and the adapter stay narrow: exact imports, no cookie, se
   assert.deepEqual(importers, [
     "app/api/jobs/run/route.ts",
     "src/infrastructure/jobs/after-commit.ts",
+    "src/infrastructure/payments/payment-adapter.ts",
   ]);
   assert.deepEqual(filesIn("src/infrastructure/jobs/"), [
     "src/infrastructure/jobs/after-commit.ts",
     "src/infrastructure/jobs/job-worker-adapter.ts",
   ]);
-  assert.deepEqual(filesIn("app/api/"), ["app/api/jobs/run/route.ts"]);
+  // MVP-001 S7: and the Stripe webhook route, its own exact path.
+  assert.deepEqual(filesIn("app/api/"), [
+    "app/api/jobs/run/route.ts",
+    "app/api/payments/stripe/route.ts",
+  ]);
   // No page links to or calls the worker route.
   for (const file of [...filesIn("app/"), ...filesIn("src/")].filter(
     (f) => /\.tsx?$/.test(f) && f !== "app/api/jobs/run/route.ts",

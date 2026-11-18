@@ -50,13 +50,15 @@ const P5_MODULES = Object.freeze([
 test("1. the client routes are exactly the workspace, the Intake page, their forms and the server actions", () => {
   // MVP-001 S6: plus exactly the request review page, the request page,
   // their two forms and the request actions (MBS section 11), each server or
-  // client module as declared.
+  // client module as declared. MVP-001 S7: plus exactly the payment receipt
+  // page, a server page.
   assert.deepEqual(filesIn("app/client/"), [
     "app/client/actions.ts",
     "app/client/forms.tsx",
     "app/client/intakes/[intake]/forms.tsx",
     "app/client/intakes/[intake]/page.tsx",
     "app/client/page.tsx",
+    "app/client/payments/[payment]/page.tsx",
     "app/client/requests/[request]/forms.tsx",
     "app/client/requests/[request]/page.tsx",
     "app/client/requests/actions.ts",
@@ -76,6 +78,7 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
   for (const file of [
     "app/client/requests/[request]/page.tsx",
     "app/client/requests/new/page.tsx",
+    "app/client/payments/[payment]/page.tsx",
   ]) {
     assert.doesNotMatch(read(file), /["']use (?:client|server)["']/, file);
   }

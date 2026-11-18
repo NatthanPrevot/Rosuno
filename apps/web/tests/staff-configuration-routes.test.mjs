@@ -129,11 +129,50 @@ const FORBIDDEN_IN_PAGES =
   /headers\(|cookies\(|process\.env|\bconsole\b|dangerouslySetInnerHTML|\.from\(|getUser|\.insert\(|\.update\(|\.rpc\(|\bstyle=|registration-provisioning|staff-verification-adapter/;
 
 test("SR-1. the staff configuration routes are exactly these files: server pages rendered per request and unindexed, client forms, and one server action module", () => {
+  // MVP-001 S7: the finance workspace is its own staff surface (its own
+  // sources and use cases, like verification), admitted by its exact files:
+  // three server pages rendered per request and unindexed, one client form
+  // module and one server action module, none of them reading the
+  // configuration sources or anything this list forbids.
   assert.deepEqual(
     filesIn("app/staff/").filter(
-      (f) => !f.startsWith("app/staff/verification/"),
+      (f) =>
+        !f.startsWith("app/staff/verification/") &&
+        !f.startsWith("app/staff/finance/"),
     ),
     CONFIGURATION_FILES,
+  );
+  assert.deepEqual(filesIn("app/staff/finance/"), [
+    "app/staff/finance/[payment]/page.tsx",
+    "app/staff/finance/actions.ts",
+    "app/staff/finance/exceptions/page.tsx",
+    "app/staff/finance/forms.tsx",
+    "app/staff/finance/page.tsx",
+  ]);
+  for (const file of [
+    "app/staff/finance/[payment]/page.tsx",
+    "app/staff/finance/exceptions/page.tsx",
+    "app/staff/finance/page.tsx",
+  ]) {
+    const source = read(file);
+    const code = codeOf(source);
+    assert.doesNotMatch(source, /["']use (?:client|server)["']/, file);
+    assert.match(code, /robots: \{ index: false, follow: false \},/, file);
+    assert.ok(code.indexOf("await connection();") > 0, file);
+    assert.doesNotMatch(code, FORBIDDEN_IN_PAGES, file);
+    assert.doesNotMatch(code, /STAFF_CONFIGURATION_SOURCES/, file);
+    assert.match(
+      code,
+      /import \{ FINANCE_SOURCES \} from "(?:\.\.\/)+src\/infrastructure\/payments\/payment-adapter\.ts";/,
+      file,
+    );
+  }
+  assert.match(read("app/staff/finance/actions.ts"), /^"use server";\n/);
+  assert.match(read("app/staff/finance/forms.tsx"), /^"use client";\n/);
+  assert.ok(
+    importsOf(read("app/staff/finance/forms.tsx")).every(
+      (specifier) => !/infrastructure/.test(specifier),
+    ),
   );
   const pages = CONFIGURATION_FILES.filter((f) => f.endsWith("page.tsx"));
   assert.equal(pages.length, 13);

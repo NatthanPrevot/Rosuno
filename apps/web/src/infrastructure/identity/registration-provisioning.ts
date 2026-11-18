@@ -26,7 +26,10 @@
 // resource id in the one private bucket. Another (MVP-001 S3 part 2) makes
 // only the one fixed AI suggestion recording call for the verified client's
 // own Intake (PS section 13), so no browser can forge a suggestion; it reads
-// and writes no table. A further
+// and writes no table. Another (MVP-001 S7) makes only the three fixed
+// payment recording calls of the worker and the webhook route (the payment
+// job context, a provider call's result, and one authenticated provider
+// event); it reads and writes no table. A further
 // client, built from
 // the publishable key alone and never given the privileged credential, only
 // requests signup confirmation emails. No client receives a request cookie or
@@ -79,6 +82,14 @@ import {
   UNKNOWN_CLAIM,
   type JobWorkerPort,
 } from "../../application/job-worker.ts";
+import {
+  eventAnswerOf,
+  isObservation,
+  isProviderReference,
+  recordOutcomeOf,
+  type EventAnswer,
+  type PaymentRecorder,
+} from "../../application/payments.ts";
 import {
   AUTHORITY_REFERENCE_COLUMNS,
   ELIGIBILITY_POLICY_TYPE,
@@ -449,6 +460,97 @@ export function hasPrivilegedProjectBinding(
   environment: RegistrationEnvironment = runtimeEnvironment(),
 ): boolean {
   return readProjectBinding(environment) !== null;
+}
+
+// MVP-001 S7: the payment recording port (Packet S7 outbound reliability and
+// webhooks; IMP section 23), through its own cookie-free privileged client.
+// It makes only the three fixed service_role calls, each a literal call of
+// one database function with exactly its named arguments, after checking
+// every argument against the database's own bounds, under a deadline:
+// payment_job_context (what a running payment job is to do), and
+// payment_record_operation and payment_record_provider_event (a provider
+// call's result, and one provider event whose signature the webhook route
+// verified first). Each answer is read strictly; anything else, including a
+// failed, refused, aborted, or thrown call, is unknown, so nothing is taken
+// as recorded that the database did not answer. It decides nothing: the
+// database owns every payment transition, ledger posting, receipt and
+// exception.
+const PAYMENT_CALL_DEADLINE_MS = 10_000;
+const UNKNOWN_EVENT: EventAnswer = Object.freeze({ kind: "unknown" });
+const EVENT_TYPE = /^[a-z][a-z0-9_.]{2,99}$/;
+const PROVIDER_CODE = /^[a-z][a-z0-9_]{1,31}$/;
+const PAYLOAD_DIGEST = /^sha256:[0-9a-f]{64}$/;
+const EVENT_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/;
+
+export async function createPaymentRecorder(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<PaymentRecorder | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    jobContext: async (jobId) => {
+      if (!isUuid(jobId)) {
+        return null;
+      }
+      try {
+        const { data, error } = await admin
+          .rpc("payment_job_context", { p_job_id: jobId })
+          .abortSignal(AbortSignal.timeout(PAYMENT_CALL_DEADLINE_MS));
+        return error === null && Array.isArray(data)
+          ? Object.freeze(data.slice())
+          : null;
+      } catch {
+        return null;
+      }
+    },
+    recordOperation: async (jobId, observation) => {
+      if (!isUuid(jobId) || !isObservation(observation)) {
+        return "unknown";
+      }
+      try {
+        const { data, error } = await admin
+          .rpc("payment_record_operation", {
+            p_job_id: jobId,
+            p_observation: observation,
+          })
+          .abortSignal(AbortSignal.timeout(PAYMENT_CALL_DEADLINE_MS));
+        return error === null ? recordOutcomeOf(data) : "unknown";
+      } catch {
+        return "unknown";
+      }
+    },
+    recordEvent: async (event) => {
+      if (
+        !PROVIDER_CODE.test(event.providerCode) ||
+        !isProviderReference(event.eventReference) ||
+        !EVENT_TYPE.test(event.eventType) ||
+        !EVENT_TIME.test(event.occurredAt) ||
+        !PAYLOAD_DIGEST.test(event.payloadDigest) ||
+        !isObservation(event.observation)
+      ) {
+        return UNKNOWN_EVENT;
+      }
+      try {
+        const { data, error } = await admin
+          .rpc("payment_record_provider_event", {
+            p_provider_code: event.providerCode,
+            p_event_reference: event.eventReference,
+            p_event_type: event.eventType,
+            p_occurred_at: event.occurredAt,
+            p_payload_digest: event.payloadDigest,
+            p_observation: event.observation,
+          })
+          .abortSignal(AbortSignal.timeout(PAYMENT_CALL_DEADLINE_MS));
+        return error === null ? eventAnswerOf(data) : UNKNOWN_EVENT;
+      } catch {
+        return UNKNOWN_EVENT;
+      }
+    },
+  } satisfies PaymentRecorder);
 }
 
 // MVP-001 S3 part 2 (PS section 13; TA section 30): the AI suggestion

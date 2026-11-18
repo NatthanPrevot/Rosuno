@@ -99,6 +99,8 @@ export const STAFF_CAPABILITIES = Object.freeze([
   "manage_staff_capabilities",
   "manage_intake_configuration",
   "manage_operational_jobs",
+  // MVP-001 S7: the finance workspace.
+  "manage_financial_operations",
 ] as const);
 export type StaffCapability = (typeof STAFF_CAPABILITIES)[number];
 
@@ -113,6 +115,8 @@ export const STAFF_SURFACES = Object.freeze([
   // MVP-001 S3 part 2.
   "jurisdiction-review",
   "jobs",
+  // MVP-001 S7.
+  "finance",
 ] as const);
 export type StaffSurface = (typeof STAFF_SURFACES)[number];
 
@@ -1458,6 +1462,29 @@ async function environmentOf(
   );
 }
 
+// MVP-001 S7: the caller's verified staff identity holding one capability in
+// the global scope, for a staff surface outside this module (the finance
+// workspace), or the fixed refusal. The same checks as every surface here.
+export async function verifiedStaffWith(
+  sources: ConfigurationSources,
+  capability: StaffCapability,
+): Promise<{ readonly userId: string } | Refusal> {
+  try {
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE;
+    }
+    const staff = await staffOf(sources, reads);
+    if (!("userId" in staff)) {
+      return staff;
+    }
+    const refusal = await required(reads, capability, null);
+    return refusal ?? { userId: staff.userId };
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
 // Who recorded something, as far as the caller needs to know.
 export type Who = "you" | "another staff member";
 function whoOf(userId: string | null, me: string): Who | null {
@@ -1507,6 +1534,8 @@ export async function resolveStaffHome(
       ["manage_operational_jobs", false],
       // MVP-001 S3 part 2: the review, in any scope.
       ["manage_intake_configuration", true],
+      // MVP-001 S7: the finance workspace (global grant only).
+      ["manage_financial_operations", false],
     ];
     const answers: boolean[] = [];
     for (const [capability, anyJurisdiction] of asked) {
@@ -1526,6 +1555,7 @@ export async function resolveStaffHome(
       intake,
       jobs,
       review,
+      finance,
     ] = answers;
     const held: Readonly<Record<StaffSurface, boolean>> = {
       verification: verify,
@@ -1537,6 +1567,7 @@ export async function resolveStaffHome(
       intake,
       "jurisdiction-review": review,
       jobs,
+      finance,
     };
     return Object.freeze({
       status: "ready",

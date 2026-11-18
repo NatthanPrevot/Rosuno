@@ -760,6 +760,13 @@ const MVP001_STAFF_APP = [
   "app/staff/capabilities/page.tsx",
   "app/staff/catalog/forms.tsx",
   "app/staff/catalog/page.tsx",
+  // MVP-001 S7: the finance workspace (payments, one payment, exceptions),
+  // its forms and its one server action module.
+  "app/staff/finance/[payment]/page.tsx",
+  "app/staff/finance/actions.ts",
+  "app/staff/finance/exceptions/page.tsx",
+  "app/staff/finance/forms.tsx",
+  "app/staff/finance/page.tsx",
   "app/staff/frame.tsx",
   "app/staff/intake-configuration/forms.tsx",
   "app/staff/intake-configuration/page.tsx",

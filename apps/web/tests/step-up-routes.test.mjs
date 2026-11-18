@@ -82,6 +82,8 @@ const GATED_ACTIONS = {
   // MVP-001 S6 PS-A3: the attorney's offer price and withdrawal changes.
   "app/attorney/offers/actions.ts": "attorney",
   "app/staff/actions.ts": "staff",
+  // MVP-001 S7: the finance workspace changes.
+  "app/staff/finance/actions.ts": "staff",
   "app/staff/verification/actions.ts": "staff",
 };
 
@@ -171,8 +173,17 @@ test("S2-R2. no setup picture, embedded markup, or image is ever rendered, and t
 test("S2-R3. every attorney page and every staff page asks the step-up gate first, right after opting out of prerendering", () => {
   // MVP-001 S2: sixteen pages, and the operational job view. MVP-001 S3
   // part 2: and the jurisdiction assessment review. MVP-001 S4: and the
-  // attorney schedule. MVP-001 S6 PS-A3: and the attorney's offers.
-  assert.equal(GATED_PAGES.length, 20);
+  // attorney schedule. MVP-001 S6 PS-A3: and the attorney's offers. MVP-001
+  // S7: and the attorney's earnings and the three finance pages.
+  assert.equal(GATED_PAGES.length, 24);
+  for (const file of [
+    "app/attorney/earnings/page.tsx",
+    "app/staff/finance/page.tsx",
+    "app/staff/finance/[payment]/page.tsx",
+    "app/staff/finance/exceptions/page.tsx",
+  ]) {
+    assert.ok(GATED_PAGES.includes(file), file);
+  }
   assert.ok(GATED_PAGES.includes("app/attorney/offers/page.tsx"));
   assert.ok(GATED_PAGES.includes("app/staff/jurisdiction-review/page.tsx"));
   assert.ok(GATED_PAGES.includes("app/attorney/schedule/page.tsx"));
@@ -220,6 +231,22 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
         ),
         file,
       );
+      continue;
+    }
+    // MVP-001 S7: every finance action goes through the one guarded helper
+    // with the finance sources: four changes (refund, assignment,
+    // resolution and reconciliation).
+    if (file === "app/staff/finance/actions.ts") {
+      assert.ok(
+        after.startsWith(
+          "  const state = await operation(FINANCE_SOURCES, formData);",
+        ),
+        file,
+      );
+      const exported = [...code.matchAll(/^export async function (\w+)\(/gm)];
+      assert.equal(exported.length, 4, file);
+      assert.equal(code.match(/ {2}return gated\("/g).length, 4, file);
+      assert.doesNotMatch(code, /return (?!gated|refusal|state)\w/, file);
       continue;
     }
     assert.ok(after.startsWith("  const state = await operation();"), file);

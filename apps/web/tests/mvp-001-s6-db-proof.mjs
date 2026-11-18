@@ -95,6 +95,12 @@ const S6_MIGRATIONS = Object.freeze([
 ]);
 // MVP-001 S6 PS-A3: the one PS-A3 migration follows the three S6 migrations.
 const PS_A3_MIGRATION = "20261122040000_mvp_001_s6_consultation_offers.sql";
+// MVP-001 S7: the two S7 migrations follow the PS-A3 migration (applied by
+// this proof as later registered migrations; they change no S6 outcome).
+const S7_MIGRATIONS = Object.freeze([
+  "20261123010000_mvp_001_s7_payment_integrity.sql",
+  "20261123020000_mvp_001_s7_payment_engine.sql",
+]);
 
 const report = {
   proof: "MVP-001 S6 disposable local PostgreSQL proof",
@@ -412,10 +418,15 @@ function applyMigrations() {
   ).migrations;
   // S6 follows S5, contiguous and in order, and every S6 migration is
   // registered unreviewed and applied nowhere. MVP-001 S6 PS-A3: then exactly
-  // the PS-A3 migration, last, registered the same way.
+  // the PS-A3 migration, registered the same way. MVP-001 S7: then exactly the
+  // two S7 migrations (registered and checked by the S7 proof).
   const s5 = files.indexOf(S5_LAST);
   assert.ok(s5 >= 0, "the last S5 migration is present");
-  assert.deepEqual(files.slice(s5 + 1), [...S6_MIGRATIONS, PS_A3_MIGRATION]);
+  assert.deepEqual(files.slice(s5 + 1), [
+    ...S6_MIGRATIONS,
+    PS_A3_MIGRATION,
+    ...S7_MIGRATIONS,
+  ]);
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),
@@ -1336,7 +1347,7 @@ async function unrecordedChecks() {
 
 async function inventoryChecks() {
   await check(
-    "MIG-1 the three S6 migrations follow S5 in order (MVP-001 S6 PS-A3: then only the PS-A3 migration, last), are registered unreviewed and applied nowhere, are Program migration refs, and apply on plain PostgreSQL with the pg_cron step skipped",
+    "MIG-1 the three S6 migrations follow S5 in order (MVP-001 S6 PS-A3: then only the PS-A3 migration; MVP-001 S7: then only the two S7 migrations), are registered unreviewed and applied nowhere, are Program migration refs, and apply on plain PostgreSQL with the pg_cron step skipped",
     () => {
       assert.deepEqual(report.migrations.notices[PS_A3_MIGRATION], []);
       assert.deepEqual(report.migrations.notices[S6_MIGRATIONS[0]], []);

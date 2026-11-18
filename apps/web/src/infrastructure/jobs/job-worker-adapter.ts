@@ -44,16 +44,18 @@ import {
 } from "../environment/provider-configuration.ts";
 import { createJobWorkerPort } from "../identity/registration-provisioning.ts";
 import { logRequestEvent } from "../observability/request-log.ts";
+import { PAYMENT_JOB_HANDLERS } from "../payments/payment-jobs.ts";
 
-// The production handler registry: job type -> handler. It is EMPTY in S2.
-// The provider job types (Storage, scheduling and communications side
-// effects) and their handlers arrive with the slices that introduce them
-// (S3, S4, S10). Until then every claimed job is reported unknown_job_type,
-// retried with backoff, and escalated visibly when its attempts are used up.
-export const PRODUCTION_JOB_HANDLERS: JobHandlers = new Map<
-  string,
-  JobHandler
->();
+// The production handler registry: job type -> handler. It was empty in S2;
+// MVP-001 S7 registers exactly the five payment job types (payment.checkout,
+// payment.capture, payment.release, payment.refund, payment.reconcile), whose
+// handlers make the provider calls the payment functions enqueued. Every
+// other job type is still reported unknown_job_type, retried with backoff,
+// and escalated visibly when its attempts are used up (the Storage,
+// scheduling and communications job types arrive with their slices).
+export const PRODUCTION_JOB_HANDLERS: JobHandlers = new Map<string, JobHandler>(
+  PAYMENT_JOB_HANDLERS,
+);
 
 // The one setting that protects the worker route.
 export const JOB_WORKER_SETTING: ProviderSetting = Object.freeze({

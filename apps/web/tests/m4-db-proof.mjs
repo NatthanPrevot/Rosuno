@@ -73,6 +73,14 @@
 // relation. request_create, client_request and client_request_review are
 // replaced under their own names (already listed).
 //
+// MVP-001 S7 update: the two S7 migrations follow. SEC-1 lists exactly the
+// nineteen further definer functions, as exact assertions: the client's
+// payment authorization, payment step, checkout link and receipt; the
+// attorney's earnings read; the finance workspace's five reads and four
+// writes; the payment worker and webhook recording functions; and the two
+// payment trigger functions. None writes an M4 relation; request_create is
+// replaced under its own name (already listed).
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -1438,6 +1446,9 @@ function probes() {
           "attorney_create_blackout:v",
           "attorney_deactivate_availability_rule:v",
           "attorney_instant_status:s",
+          // MVP-001 S7 re-pin (20261123020000): the attorney's own ledger-derived
+          // earnings read (authenticated, aal2), which writes nothing.
+          "attorney_payment_earnings:s",
           "attorney_remove_blackout:v",
           "attorney_request_practice_area:v",
           "attorney_save_insurance_claim:v",
@@ -1466,6 +1477,10 @@ function probes() {
           // MVP-001 S1 re-pin (20261117030000): the staff read predicates for
           // the configuration row policies, which write nothing.
           "capability_admin_may_read_user:s",
+          // MVP-001 S7 re-pin (20261123020000): the client's payment
+          // authorization (authenticated only), which writes only the payment
+          // attempt, an operational job and audit events; no M4 relation.
+          "client_authorize_payment:v",
           // P5-001 re-pin: the client intake and configuration-publication
           // functions, which write no M4 relation.
           "client_close_intake:v",
@@ -1480,6 +1495,10 @@ function probes() {
           // attempts with their Requests (authenticated only), which write
           // nothing.
           "client_intake_requests:s",
+          // MVP-001 S7 re-pin (20261123020000): the client's own checkout link
+          // and receipt reads (authenticated only), which write nothing.
+          "client_payment_checkout:s",
+          "client_payment_receipt:s",
           // MVP-001 S5 re-pin (20261121030000): the client's own attempt
           // list (authenticated only), which writes nothing.
           "client_referrals:s",
@@ -1491,6 +1510,9 @@ function probes() {
           // (authenticated only), which writes nothing.
           "client_request:s",
           "client_request_intake_change:v",
+          // MVP-001 S7 re-pin (20261123020000): the client's own payment step
+          // read (authenticated only), which writes nothing.
+          "client_request_payment:s",
           // MVP-001 S6 re-pin (20261122020000): the client's request review
           // read (authenticated only), which writes nothing.
           "client_request_review:s",
@@ -1518,6 +1540,17 @@ function probes() {
           "job_claim:v",
           "job_complete:v",
           "job_fail:v",
+          // MVP-001 S7 re-pin (20261123020000): the payment worker and webhook
+          // recording functions (service_role only) and the two payment
+          // trigger functions (executable by no API role), which write only
+          // payment attempts, ledger entries, reconciliation exceptions,
+          // event receipts, Request states, operational jobs and audit
+          // events; no M4 relation.
+          "payment_job_context:s",
+          "payment_job_escalated:v",
+          "payment_record_operation:v",
+          "payment_record_provider_event:v",
+          "payment_request_terminated:v",
           // MVP-001 S1 re-pin (20261117010000, 20261117030000): read-only
           // definers executable by no API role.
           "policy_select_version:s",
@@ -1545,7 +1578,9 @@ function probes() {
           // (authenticated only), which writes the Request, its evidence, Fee
           // Calculation, Hold and audit event and, of the M4 relations, only
           // appends decision-point eligibility_evaluations rows (append-only
-          // for every role since 20261121010000).
+          // for every role since 20261121010000). MVP-001 S7 re-pin
+          // (20261123020000): replaced under its own name (the payment flow
+          // policy joins its evidence); the same writes.
           "request_create:v",
           // MVP-001 S6 re-pin (20261122020000): the request options read
           // (authenticated only), which writes nothing.
@@ -1581,6 +1616,12 @@ function probes() {
           // MVP-001 S1 re-pin (20261117030000): the configuration
           // administration functions, which write no M4 relation.
           "staff_add_policy_authority_reference:v",
+          // MVP-001 S7 re-pin (20261123020000): the finance workspace functions
+          // (authenticated, aal2, manage_financial_operations): the reads
+          // write nothing; the refund, reconciliation and exception functions
+          // write only payment attempts, reconciliation exceptions,
+          // operational jobs and audit events; no M4 relation.
+          "staff_assign_reconciliation_exception:v",
           // MVP-001 S2 re-pin (20261118010000): the staff job functions,
           // which write no M4 relation.
           "staff_cancel_job:v",
@@ -1594,6 +1635,12 @@ function probes() {
           "staff_decide_practice_area:v",
           "staff_define_launch_gate:v",
           "staff_end_policy_version:v",
+          // MVP-001 S7 re-pin (20261123020000): finance reads, as above.
+          "staff_finance_exceptions:s",
+          "staff_finance_ledger:s",
+          "staff_finance_payment:s",
+          "staff_finance_payments:s",
+          "staff_finance_receipts:s",
           "staff_grant_capability:v",
           "staff_grant_launch_authorization:v",
           // MVP-001 S3 part 2 re-pin (20261119060000): the jurisdiction
@@ -1606,6 +1653,10 @@ function probes() {
           "staff_record_launch_gate_evaluation:v",
           "staff_record_source_unavailable:v",
           "staff_record_verification_finding:v",
+          // MVP-001 S7 re-pin (20261123020000): finance writes, as above.
+          "staff_request_reconciliation:v",
+          "staff_request_refund:v",
+          "staff_resolve_reconciliation_exception:v",
           "staff_retry_job:v",
           // MVP-001 S3 part 2 re-pin (20261119060000): the review, which
           // writes only a jurisdiction assessment's review and its audit
