@@ -347,16 +347,26 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // MVP-001 S3 part 2: the AI suggestion sources (a late or failed provider
   // answer or recording, with the call name and how it failed only; never a
   // description, answer, suggestion or model output) write lines too.
+  // MVP-001 S5: the public profile, directory and selection pages (a view
+  // unavailable, with the route and outcome only), the selection action (an
+  // action not completed, with its fixed outcome only) and the discovery
+  // adapter (a failed call, with the call name and how it failed only) write
+  // lines too.
   assert.deepEqual(callers, [
+    "app/attorneys/[attorney]/page.tsx",
     "app/client/actions.ts",
     "app/client/intakes/[intake]/page.tsx",
     "app/client/page.tsx",
+    "app/find-an-attorney/page.tsx",
+    "app/find-an-attorney/select/actions.ts",
+    "app/find-an-attorney/select/page.tsx",
     "app/sign-in/actions.ts",
     "app/staff/actions.ts",
     "app/staff/frame.tsx",
     "app/staff/verification/actions.ts",
     "src/infrastructure/client/client-intake-adapter.ts",
     "src/infrastructure/client/intake-suggestion-adapter.ts",
+    "src/infrastructure/discovery/discovery-adapter.ts",
     "src/infrastructure/identity/authentication-abuse-control.ts",
     "src/infrastructure/identity/authenticator-provider.ts",
     "src/infrastructure/jobs/job-worker-adapter.ts",

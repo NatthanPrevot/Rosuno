@@ -1051,11 +1051,14 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
   // provider is unconfigured or the provider's HTTP status, nothing else.
   // MVP-001 S2 adds only the server-only authentication-abuse control.
   // MVP-001 S4 adds only the scheduling adapter, for its one best-effort
-  // sign-out step (pinned below).
+  // sign-out step (pinned below). MVP-001 S5 adds only the pure sign-in
+  // continuation module, for the one checked destination after sign-in
+  // (pinned below).
   assert.deepEqual(importsOf(source), [
     "next/cache",
     "next/navigation",
     "../../src/application/authentication-entry.ts",
+    "../../src/application/sign-in-continuation.ts",
     "../../src/infrastructure/identity/authentication-abuse-control.ts",
     "../../src/infrastructure/identity/server-session-source.ts",
     "../../src/infrastructure/identity/supabase-server.ts",
@@ -1082,17 +1085,26 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
       "export async function signOut(): Promise<void> {",
     ],
   );
-  // The only destination is the fixed home page, and only after success.
+  // The only destinations are the fixed home page and, after a confirmed
+  // sign-in only, the destination the pure continuation module derives from
+  // the submitted form (MVP-001 S5): the fixed home page, or the attorney
+  // selection path rebuilt from its checked parameters (every case pinned in
+  // tests/discovery.test.mjs). Sign-out still goes only to the home page.
   assert.deepEqual(
     [...code.matchAll(/\b(?:permanentRedirect|redirect)\([^)]*\)/g)].map(
       (match) => match[0],
     ),
-    ['redirect("/")', 'redirect("/")'],
+    ["redirect(signInDestinationOf(formData)", 'redirect("/")'],
   );
+  assert.match(
+    code,
+    /^import \{ signInDestinationOf \} from "\.\.\/\.\.\/src\/application\/sign-in-continuation\.ts";$/m,
+  );
+  assert.equal(code.match(/signInDestinationOf/g)?.length, 2);
   assert.equal(code.match(/revalidatePath\("\/"\);/g)?.length, 2);
   assert.match(
     code,
-    /if \(state\.status === "signed-in"\) \{\n {4}revalidatePath\("\/"\);\n {4}redirect\("\/"\);\n {2}\}\n {2}return state;/,
+    /if \(state\.status === "signed-in"\) \{\n {4}revalidatePath\("\/"\);\n {4}redirect\(signInDestinationOf\(formData\)\);\n {2}\}\n {2}return state;/,
   );
   assert.match(
     code,
@@ -1233,10 +1245,12 @@ test("10. the sign-in page is an accessible design-system form that shows only f
   const source = read(file);
   const code = codeOf(source);
   assert.match(source, /^"use client";\n/);
+  // MVP-001 S5 adds only the pure sign-in continuation module.
   assert.deepEqual(importsOf(source), [
     "react",
     "../../src/application/authentication-entry.ts",
     "../../src/application/form-operation.ts",
+    "../../src/application/sign-in-continuation.ts",
     "../../src/presentation/design-system.tsx",
     "../../src/presentation/form-entries.ts",
     "./actions.ts",
@@ -1255,8 +1269,25 @@ test("10. the sign-in page is an accessible design-system form that shows only f
   const keptForm =
     '<form action={formAction} onReset={keepEntries(["email"])}>';
   assert.equal(code.split(keptForm).length, 2);
+  // MVP-001 S5: the one value the page posts besides the typed fields is the
+  // continuation, and only when its one query value names a selection the
+  // pure continuation module accepts (it rebuilds the path from checked
+  // parameters; the server checks it again before redirecting). This exact
+  // hidden field, first in the form, is the one value attribute admitted.
+  const continuationField =
+    '{continuation === null ? null : (\n              <input\n                type="hidden"\n                name={CONTINUATION_FIELD}\n                value={continuation}\n              />\n            )}';
+  assert.equal(code.split(continuationField).length, 2);
+  assert.ok(code.includes(`${keptForm}\n            ${continuationField}`));
+  assert.match(
+    code,
+    /\n {2}const continuation = continuationOf\(use\(searchParams\)\.continuation\);\n/,
+  );
+  assert.equal(code.match(/\bcontinuation\b/g)?.length, 6);
+  assert.equal(code.match(/\bsearchParams\b/g)?.length, 3);
   assert.doesNotMatch(
-    code.replace(keptForm, "<form action={formAction}>"),
+    code
+      .replace(keptForm, "<form action={formAction}>")
+      .replace(continuationField, ""),
     /\bmethod=|\bonSubmit\b|\bon[A-Z]\w*=|\bfetch\s*\(|localStorage|sessionStorage|document\.cookie|indexedDB|useEffect|\bdefaultValue\b|\bvalue=|dangerouslySetInnerHTML/,
   );
   // Labelled email and password controls with matching input types,
@@ -1321,10 +1352,13 @@ test("10. the sign-in page is an accessible design-system form that shows only f
     ...new Set([...code.matchAll(/<([A-Z]\w*)/g)].map((match) => match[1])),
   ].sort();
   assert.deepEqual(used, imported);
+  // MVP-001 S5: besides the form, the one native element is the hidden
+  // continuation field pinned above.
   assert.deepEqual(
     [...new Set([...code.matchAll(/<([a-z]\w*)/g)].map((match) => match[1]))],
-    ["form"],
+    ["form", "input"],
   );
+  assert.equal(code.match(/<input\b/g)?.length, 1);
   assert.doesNotMatch(
     code,
     /className|\bstyle=|#[0-9a-f]{3,8}\b|rgb\(|hsl\(|\.css|<style\b|https?:/i,

@@ -1,9 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
+import { use, useActionState } from "react";
 
 import { INITIAL_SIGN_IN_STATE } from "../../src/application/authentication-entry.ts";
 import type { FieldErrors } from "../../src/application/form-operation.ts";
+import {
+  CONTINUATION_FIELD,
+  continuationOf,
+} from "../../src/application/sign-in-continuation.ts";
 import {
   Alert,
   Button,
@@ -24,7 +28,18 @@ import { signIn } from "./actions.ts";
 // outcome; this page shows only the fixed message for the state it returns.
 // After each submission the email address stays as typed and the password
 // is cleared.
-export default function SignInPage() {
+// MVP-001 S5: the one query value read, continuation, may name the attorney
+// selection page with its own checked parameters; only that rebuilt path is
+// posted back with the form, and the server checks it again before it
+// continues there after sign-in (anything else returns to the home page).
+export default function SignInPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{
+    readonly continuation?: string | string[];
+  }>;
+}) {
+  const continuation = continuationOf(use(searchParams).continuation);
   const [state, formAction, pending] = useActionState(
     signIn,
     INITIAL_SIGN_IN_STATE,
@@ -76,6 +91,13 @@ export default function SignInPage() {
             </Alert>
           ) : null}
           <form action={formAction} onReset={keepEntries(["email"])}>
+            {continuation === null ? null : (
+              <input
+                type="hidden"
+                name={CONTINUATION_FIELD}
+                value={continuation}
+              />
+            )}
             <Stack>
               <TextField
                 id="sign-in-email"

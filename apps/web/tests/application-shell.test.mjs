@@ -149,6 +149,12 @@ const trustedSourceVocabulary = new Map([
 const registrationEntry =
   '<Cluster> <ButtonLink variant="tertiary" href="/auth/confirm"> Finish account confirmation </ButtonLink> <ButtonLink variant="tertiary" href="/help"> Help </ButtonLink> <ButtonLink variant="tertiary" href="/privacy"> Privacy </ButtonLink> </Cluster>';
 
+// MVP-001 S5 (MBS section 18.1): the page also renders the fixed public
+// navigation (fixed first-party links to the public pages), imported by this
+// exact line; it adds no state, expression, attribute or text to the page.
+const publicNavigationImport =
+  'import { PublicNavigation } from "../src/presentation/public-site.tsx";';
+
 // Import or export syntax without the spacing Prettier writes, or with a
 // comment inside it, would hide its specifier from importsOf.
 const unspacedImport = /\b(?:import|export|from)(?:["'{*]|\s*\/[*/])/;
@@ -998,6 +1004,11 @@ test("12. presentation reaches application state only through application module
   assert.equal(page.split(`const view = await ${trustedShellView};`).length, 2);
   assert.equal(page.split(`\n${trustedSessionImport}\n`).length, 2);
   assert.equal(page.split(`\n${sessionEntryImport}\n`).length, 2);
+  // MVP-001 S5: the public navigation is imported once, by name, from its
+  // presentation module, and rendered once, without attributes, as the
+  // page's first element (pinned by the shape below).
+  assert.equal(page.split(`\n${publicNavigationImport}\n`).length, 2);
+  assert.equal(page.match(/<PublicNavigation \/>/g)?.length, 1);
   assert.equal(codeOf(page).match(/\bview\b/g)?.length, 3);
   // The registration navigation appears once, right after the session entry,
   // and is fixed links only: no condition, expression, or form of its own.
@@ -1025,6 +1036,8 @@ test("12. presentation reaches application state only through application module
     arrows: 0,
     tags: [
       "Page",
+      // MVP-001 S5: the fixed public navigation, first on the page.
+      "PublicNavigation",
       "Surface",
       "Stack",
       "Eyebrow",
@@ -1364,12 +1377,15 @@ test("12. presentation reaches application state only through application module
       // Only the root layout loads the global stylesheet, and only the page
       // uses the design system. Authoritative state still reaches app modules
       // through the application layer, except that the page also takes the
-      // trusted server session source and the sign-out server action (P2-005).
+      // trusted server session source and the sign-out server action (P2-005)
+      // and (MVP-001 S5) the fixed public navigation, which holds only fixed
+      // first-party links.
       if (
         (file === "app/layout.tsx" && specifier === "./globals.css") ||
         (file === "app/page.tsx" &&
           [
             "../src/presentation/design-system.tsx",
+            "../src/presentation/public-site.tsx",
             "../src/infrastructure/identity/server-session-source.ts",
             "./sign-in/actions.ts",
           ].includes(specifier))

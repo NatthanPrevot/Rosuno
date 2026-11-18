@@ -2873,6 +2873,20 @@ const SCHEDULE_RPCS = Object.freeze([
   "scheduling_touch_session",
   "scheduling_end_session",
 ]);
+// MVP-001 S5: the discovery adapter calls the database's own three public
+// discovery reads, the client's attempt list, the referral function and the
+// PS-A2 environment accessor (checked before a selection), each exactly once
+// and each as a literal call through the request's own unprivileged session;
+// it builds or receives no privileged client, and no other file names any of
+// the five S5 functions.
+const DISCOVERY_ADAPTER = "src/infrastructure/discovery/discovery-adapter.ts";
+const DISCOVERY_RPCS = Object.freeze([
+  "public_discovery_filters",
+  "public_attorney_directory",
+  "public_attorney_profile",
+  "client_referrals",
+  "referral_create",
+]);
 const CAPABILITY_PREDICATE_RPC =
   'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';
 const CONFIGURATION_REQUEST_CLIENT =
@@ -2898,6 +2912,9 @@ const RPC_OCCURRENCES = Object.freeze({
   [PROTECTED_RESOURCE_ADAPTER]: PROTECTED_RESOURCE_RPCS.length,
   // MVP-001 S4: the nine schedule functions.
   [SCHEDULE_ADAPTER]: SCHEDULE_RPCS.length,
+  // MVP-001 S5: the five discovery and referral functions, plus the
+  // environment accessor.
+  [DISCOVERY_ADAPTER]: DISCOVERY_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -2960,6 +2977,31 @@ function assertQuotaRpcContract(codes) {
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning/i,
       );
     }
+    for (const name of DISCOVERY_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === DISCOVERY_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== DISCOVERY_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === DISCOVERY_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        DISCOVERY_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
     assert.equal(
       code.match(/\brpc\b/gi)?.length ?? 0,
       RPC_OCCURRENCES[file] ?? 0,
@@ -2973,7 +3015,11 @@ function assertQuotaRpcContract(codes) {
     assert.equal(
       code.match(/client\.rpc\("deployment_environment_identity"\)/g)?.length ??
         0,
-      file === STAFF_ADAPTER || file === CONFIGURATION_ADAPTER ? 1 : 0,
+      file === STAFF_ADAPTER ||
+        file === CONFIGURATION_ADAPTER ||
+        file === DISCOVERY_ADAPTER
+        ? 1
+        : 0,
       file,
     );
     assert.equal(

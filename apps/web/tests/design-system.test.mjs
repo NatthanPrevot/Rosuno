@@ -2646,9 +2646,26 @@ test("22. the page shows the foundation through the design system and the server
     .map((name) => name.trim())
     .filter(Boolean);
   assert.deepEqual(imported, [...imported].sort());
+  // MVP-001 S5 (MBS section 18.1): the one other component is the fixed
+  // public navigation, imported by name from its presentation module and
+  // rendered once, without attributes, first inside the page.
+  assert.equal(
+    pageSource.split(
+      '\nimport { PublicNavigation } from "../src/presentation/public-site.tsx";\n',
+    ).length,
+    2,
+  );
+  assert.equal(markup.split("<PublicNavigation />").length, 2);
+  assert.ok(
+    markup.includes(
+      '<Page density="public">\n      <PublicNavigation />\n      <Surface as="header"',
+    ),
+  );
   const used = [
     ...new Set([...markup.matchAll(/<([A-Z]\w*)/g)].map((match) => match[1])),
-  ].sort();
+  ]
+    .filter((name) => name !== "PublicNavigation")
+    .sort();
   assert.deepEqual(used, imported);
   for (const name of imported) {
     assert.ok(exportedComponents.includes(name), name);

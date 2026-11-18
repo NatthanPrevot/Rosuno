@@ -12,6 +12,12 @@
 // attempted or the provider answers with anything but a rejection, one log
 // line records only that fact and the provider's HTTP status.
 //
+// MVP-001 S5: after a confirmed sign-in, the one exception to the fixed home
+// page is the discovery handoff: the form's one continuation field may name
+// the attorney selection page, and the application rebuilds that path from
+// its checked parameters (signInDestinationOf); any other value, or none,
+// returns to the home page. No other destination exists.
+//
 // MVP-001 S4: a sign-out first ends this session's application session and
 // Instant mode on the server, best effort, through the same request-scoped
 // client (scheduling_end_session), so Instant mode never survives sign-out.
@@ -33,6 +39,7 @@ import {
   type SessionRead,
   type SignInState,
 } from "../../src/application/authentication-entry.ts";
+import { signInDestinationOf } from "../../src/application/sign-in-continuation.ts";
 import { createAuthenticationAbuseControl } from "../../src/infrastructure/identity/authentication-abuse-control.ts";
 import { SUPABASE_SERVER_SESSION_SOURCE } from "../../src/infrastructure/identity/server-session-source.ts";
 import { createSupabaseServerClient } from "../../src/infrastructure/identity/supabase-server.ts";
@@ -123,7 +130,7 @@ export async function signIn(
   const state = await signInExistingAccount(requestProvider, formData);
   if (state.status === "signed-in") {
     revalidatePath("/");
-    redirect("/");
+    redirect(signInDestinationOf(formData));
   }
   return state;
 }

@@ -29,6 +29,7 @@ import {
   TextAreaField,
   TextField,
 } from "../src/presentation/design-system.tsx";
+import { PublicNavigation } from "../src/presentation/public-site.tsx";
 import { signOut } from "./sign-in/actions.ts";
 
 export default async function HomePage() {
@@ -37,6 +38,7 @@ export default async function HomePage() {
   const view = await getShellView(SUPABASE_SERVER_SESSION_SOURCE);
   return (
     <Page density="public">
+      <PublicNavigation />
       <Surface as="header" tone="dark" emphasis="raised">
         <Stack>
           <Eyebrow>Interface foundation</Eyebrow>

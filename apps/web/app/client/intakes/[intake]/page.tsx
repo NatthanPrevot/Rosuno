@@ -21,6 +21,11 @@
 // the client saves), and, after submission or expiry, the post-submission
 // changes the client may ask about, which the server answers as not yet
 // available.
+// MVP-001 S5: the page also lists the Intake's attorney selections (Referral
+// attempts) as the database reports them for the client's own Intake, and,
+// while the Intake is submitted or active, offers the public directory to
+// select an attorney. A recorded outcome is shown only as recorded: the
+// outcome taxonomy is gated configuration, so no outcome wording is shown.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -32,10 +37,15 @@ import {
   type SuggestionView,
 } from "../../../../src/application/client-intake.ts";
 import {
+  resolveIntakeReferrals,
+  type IntakeReferralsView,
+} from "../../../../src/application/discovery.ts";
+import {
   resolveVoiceMemo,
   type VoiceMemoView,
 } from "../../../../src/application/voice-memo.ts";
 import { CLIENT_INTAKE_SOURCES } from "../../../../src/infrastructure/client/client-intake-adapter.ts";
+import { DISCOVERY_SOURCES } from "../../../../src/infrastructure/discovery/discovery-adapter.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
 import { VOICE_MEMO_SOURCES } from "../../../../src/infrastructure/resources/protected-resource-adapter.ts";
 import {
@@ -63,6 +73,14 @@ import {
   SUGGESTION_STATUS_LABELS,
   suggestionText,
 } from "../../../../src/presentation/client-intake-labels.ts";
+import {
+  ATTEMPT_PATH_LABELS,
+  ATTEMPTS_NOTE,
+  NO_ATTEMPTS,
+  NO_OUTCOME,
+  OUTCOME_RECORDED,
+  utcText,
+} from "../../../../src/presentation/discovery-labels.ts";
 import { VOICE_MEMO_NOT_CONFIGURED } from "../../../../src/presentation/voice-memo-labels.ts";
 import {
   CloseIntakeForm,
@@ -160,6 +178,69 @@ function VoiceMemoSection({ view }: { readonly view: VoiceMemoView }) {
   );
 }
 
+// MVP-001 S5: the Intake's attorney selections, in order, and the way to the
+// directory while the Intake can still be used.
+function ReferralSection({ view }: { readonly view: IntakeReferralsView }) {
+  if (view.status !== "ready") {
+    return view.status === "unavailable" ? (
+      <Alert tone="error" title="Attorney selections unavailable" role="alert">
+        Your attorney selections could not be shown right now. Please try again
+        later.
+      </Alert>
+    ) : null;
+  }
+  if (view.attempts.length === 0 && !view.canSelect) {
+    return null;
+  }
+  return (
+    <Stack>
+      <Heading as="h2" size="md">
+        Attorney selections
+      </Heading>
+      <Text tone="muted">{ATTEMPTS_NOTE}</Text>
+      {view.attempts.length === 0 ? (
+        <Text>{NO_ATTEMPTS}</Text>
+      ) : (
+        <Table id="client-intake-referrals" caption="Your attorney selections">
+          <thead>
+            <tr>
+              <th scope="col">Selection</th>
+              <th scope="col">Attorney</th>
+              <th scope="col">How soon</th>
+              <th scope="col">Selected</th>
+              <th scope="col">Outcome</th>
+            </tr>
+          </thead>
+          <tbody>
+            {view.attempts.map((attempt) => (
+              <tr key={attempt.ordinal}>
+                <th scope="row">{attempt.ordinal}</th>
+                <td>{attempt.attorneyName ?? "Not shown"}</td>
+                <td>
+                  {attempt.path === null
+                    ? "Not shown"
+                    : ATTEMPT_PATH_LABELS[attempt.path]}
+                </td>
+                <td>{utcText(attempt.createdAt)}</td>
+                <td>
+                  {attempt.outcomeRecorded ? OUTCOME_RECORDED : NO_OUTCOME}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+      {view.canSelect ? (
+        <Cluster>
+          <ButtonLink variant="secondary" href="/find-an-attorney">
+            Find an attorney
+          </ButtonLink>
+        </Cluster>
+      ) : null}
+    </Stack>
+  );
+}
+
 // MVP-001 S3 part 2: the presented suggestions, newest first, each with its
 // decision; an undecided one of a draft offers the two decision forms.
 function SuggestionList({
@@ -230,6 +311,14 @@ export default async function ClientIntakePage({
         route: "/client/intakes/[intake]",
         operation: "resolveVoiceMemo",
         outcome: memo.status,
+      });
+    }
+    const referrals = await resolveIntakeReferrals(DISCOVERY_SOURCES, intake);
+    if (referrals.status === "unavailable") {
+      await logRequestEvent("warn", "client_intake.view_unavailable", {
+        route: "/client/intakes/[intake]",
+        operation: "resolveIntakeReferrals",
+        outcome: referrals.status,
       });
     }
     return (
@@ -377,6 +466,7 @@ export default async function ClientIntakePage({
             )}
           </>
         )}
+        <ReferralSection view={referrals} />
         <VoiceMemoSection view={memo} />
         {view.closable ? <CloseIntakeForm intakeId={view.intakeId} /> : null}
         {BACK}
