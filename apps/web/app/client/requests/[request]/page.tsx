@@ -39,6 +39,7 @@ import { connection } from "next/server";
 import type { ReactNode } from "react";
 
 import { resolveRequestPayment } from "../../../../src/application/client-payments.ts";
+import { clientConsultationPathFor } from "../../../../src/application/consultations.ts";
 import {
   resolveConsultationRequest,
   resolveRequestDecision,
@@ -292,6 +293,16 @@ export default async function RequestPage({
                   )}
                 </tbody>
               </Table>
+              {decision.consultationId === null ? null : (
+                <Cluster>
+                  <ButtonLink
+                    variant="primary"
+                    href={clientConsultationPathFor(decision.consultationId)}
+                  >
+                    Go to your consultation
+                  </ButtonLink>
+                </Cluster>
+              )}
             </>
           )}
         </Stack>

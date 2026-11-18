@@ -1180,6 +1180,8 @@ export type RequestDecision = {
   readonly state: RequestState;
   readonly decidedAt: string | null;
   readonly endedReason: EndedReason | null;
+  // MVP-001 S9: the Consultation, to open the client's consultation page.
+  readonly consultationId: string | null;
   readonly consultationState: ConsultationState | null;
   readonly bookingStart: string | null;
   readonly bookingEnd: string | null;
@@ -1229,6 +1231,7 @@ function readDecision(row: unknown): RequestDecision | null {
     state,
     decidedAt,
     endedReason: endedReason as EndedReason | null,
+    consultationId: consultationId as string | null,
     consultationState: consultationState as ConsultationState | null,
     bookingStart,
     bookingEnd,

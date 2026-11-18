@@ -35,6 +35,19 @@ function mediaSource(url: string | undefined): string {
   return SUPABASE_ORIGIN.test(origin) ? origin : "'none'";
 }
 
+// MVP-001 S9: the consultation room is the media provider's prebuilt page in
+// a frame, so frames load only from exactly the configured provider origin,
+// https://<label>.daily.co, where <label> is the server-side
+// ROSUNO_DAILY_DOMAIN setting (read when the configuration loads) when it is
+// a strict DNS label. Any other value, or none, admits no frame at all.
+const DAILY_DOMAIN_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+function frameSource(label: string | undefined): string {
+  return typeof label === "string" && DAILY_DOMAIN_LABEL.test(label)
+    ? `https://${label}.daily.co`
+    : "'none'";
+}
+
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
@@ -43,6 +56,7 @@ const CONTENT_SECURITY_POLICY = [
   "font-src 'self'",
   "connect-src 'self'",
   `media-src ${mediaSource(process.env.NEXT_PUBLIC_SUPABASE_URL)}`,
+  `frame-src ${frameSource(process.env.ROSUNO_DAILY_DOMAIN)}`,
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'self'",

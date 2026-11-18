@@ -367,13 +367,22 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // attorney request queue and request pages (a view unavailable, with the
   // route and outcome only) and the attorney request adapter (a failed call,
   // with the call name and how it failed only) write lines too; the client
-  // request page already did (now also a decision read unavailable).
+  // request page already did (now also a decision read unavailable). MVP-001
+  // S9: the attorney consultation list and page and the client consultation
+  // page (a view unavailable, with the route and outcome only), the
+  // consultation adapter (a failed call, with the call name and how it failed
+  // only) and the Daily webhook adapter (each refused, checked or recorded
+  // delivery, with a fixed outcome only; never a header, signature, body or
+  // identifier) write lines too.
   assert.deepEqual(callers, [
+    "app/attorney/consultations/[consultation]/page.tsx",
+    "app/attorney/consultations/page.tsx",
     "app/attorney/earnings/page.tsx",
     "app/attorney/requests/[request]/page.tsx",
     "app/attorney/requests/page.tsx",
     "app/attorneys/[attorney]/page.tsx",
     "app/client/actions.ts",
+    "app/client/consultations/[consultation]/page.tsx",
     "app/client/intakes/[intake]/page.tsx",
     "app/client/page.tsx",
     "app/client/payments/[payment]/page.tsx",
@@ -390,10 +399,12 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/staff/verification/actions.ts",
     "src/infrastructure/client/client-intake-adapter.ts",
     "src/infrastructure/client/intake-suggestion-adapter.ts",
+    "src/infrastructure/consultations/consultation-adapter.ts",
     "src/infrastructure/discovery/discovery-adapter.ts",
     "src/infrastructure/identity/authentication-abuse-control.ts",
     "src/infrastructure/identity/authenticator-provider.ts",
     "src/infrastructure/jobs/job-worker-adapter.ts",
+    "src/infrastructure/media/daily-webhook.ts",
     "src/infrastructure/offers/consultation-offer-adapter.ts",
     "src/infrastructure/payments/payment-adapter.ts",
     "src/infrastructure/payments/stripe-webhook.ts",

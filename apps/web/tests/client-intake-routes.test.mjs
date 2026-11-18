@@ -51,9 +51,14 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
   // MVP-001 S6: plus exactly the request review page, the request page,
   // their two forms and the request actions (MBS section 11), each server or
   // client module as declared. MVP-001 S7: plus exactly the payment receipt
-  // page, a server page.
+  // page, a server page. MVP-001 S9: plus exactly the consultation page (a
+  // server page), its form (a client module) and the consultation action (a
+  // server action module).
   assert.deepEqual(filesIn("app/client/"), [
     "app/client/actions.ts",
+    "app/client/consultations/[consultation]/forms.tsx",
+    "app/client/consultations/[consultation]/page.tsx",
+    "app/client/consultations/actions.ts",
     "app/client/forms.tsx",
     "app/client/intakes/[intake]/forms.tsx",
     "app/client/intakes/[intake]/page.tsx",
@@ -67,7 +72,12 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
   ]);
   assert.match(read("app/client/actions.ts"), /^"use server";\n/);
   assert.match(read("app/client/requests/actions.ts"), /^"use server";\n/);
+  assert.match(
+    read("app/client/consultations/actions.ts"),
+    /^"use server";\n/,
+  );
   for (const file of [
+    "app/client/consultations/[consultation]/forms.tsx",
     "app/client/forms.tsx",
     "app/client/intakes/[intake]/forms.tsx",
     "app/client/requests/[request]/forms.tsx",
@@ -79,6 +89,7 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     "app/client/requests/[request]/page.tsx",
     "app/client/requests/new/page.tsx",
     "app/client/payments/[payment]/page.tsx",
+    "app/client/consultations/[consultation]/page.tsx",
   ]) {
     assert.doesNotMatch(read(file), /["']use (?:client|server)["']/, file);
   }

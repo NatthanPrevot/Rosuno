@@ -29,7 +29,10 @@
 // and writes no table. Another (MVP-001 S7) makes only the three fixed
 // payment recording calls of the worker and the webhook route (the payment
 // job context, a provider call's result, and one authenticated provider
-// event); it reads and writes no table. A further
+// event); it reads and writes no table. Another (MVP-001 S9) makes only the
+// three fixed media recording calls of the worker and the Daily webhook route
+// (the media job context, a provider call's result, and one authenticated
+// media event); it reads and writes no table. A further
 // client, built from
 // the publishable key alone and never given the privileged credential, only
 // requests signup confirmation emails. No client receives a request cookie or
@@ -82,6 +85,14 @@ import {
   UNKNOWN_CLAIM,
   type JobWorkerPort,
 } from "../../application/job-worker.ts";
+import {
+  isMediaObservation,
+  isProviderCode,
+  mediaEventAnswerOf,
+  mediaRecordOutcomeOf,
+  type MediaEventAnswer,
+  type MediaRecorder,
+} from "../../application/media-provider.ts";
 import {
   eventAnswerOf,
   isObservation,
@@ -551,6 +562,101 @@ export async function createPaymentRecorder(
       }
     },
   } satisfies PaymentRecorder);
+}
+
+// MVP-001 S9: the media recording port (Packet S9 Daily adapter, provider
+// sessions and participation evidence; IMP section 23; TA section 53), through
+// its own cookie-free privileged client. It makes only the three fixed
+// service_role calls, each a literal call of one database function with
+// exactly its named arguments, after checking every argument against the
+// database's own bounds, under a deadline: media_job_context (what a running
+// media job is to do), and media_record_operation and
+// media_record_provider_event (a provider call's result, and one provider
+// event whose signature the webhook route verified first). Each answer is
+// read strictly; anything else, including a failed, refused, aborted, or
+// thrown call, is unknown, so nothing is taken as recorded that the database
+// did not answer. It decides nothing: the database owns every Media Room
+// transition, provider session, participation record, receipt and exception,
+// and never a Consultation state.
+const MEDIA_CALL_DEADLINE_MS = 10_000;
+const UNKNOWN_MEDIA_EVENT: MediaEventAnswer = Object.freeze({
+  kind: "unknown",
+});
+
+export async function createMediaRecorder(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<MediaRecorder | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    jobContext: async (jobId) => {
+      if (!isUuid(jobId)) {
+        return null;
+      }
+      try {
+        const { data, error } = await admin
+          .rpc("media_job_context", { p_job_id: jobId })
+          .abortSignal(AbortSignal.timeout(MEDIA_CALL_DEADLINE_MS));
+        return error === null && Array.isArray(data)
+          ? Object.freeze(data.slice())
+          : null;
+      } catch {
+        return null;
+      }
+    },
+    recordOperation: async (jobId, providerCode, observation) => {
+      if (
+        !isUuid(jobId) ||
+        !isProviderCode(providerCode) ||
+        !isMediaObservation(observation)
+      ) {
+        return "unknown";
+      }
+      try {
+        const { data, error } = await admin
+          .rpc("media_record_operation", {
+            p_job_id: jobId,
+            p_provider_code: providerCode,
+            p_observation: observation,
+          })
+          .abortSignal(AbortSignal.timeout(MEDIA_CALL_DEADLINE_MS));
+        return error === null ? mediaRecordOutcomeOf(data) : "unknown";
+      } catch {
+        return "unknown";
+      }
+    },
+    recordEvent: async (event) => {
+      if (
+        !isProviderCode(event.providerCode) ||
+        !isProviderReference(event.eventReference) ||
+        !EVENT_TYPE.test(event.eventType) ||
+        !EVENT_TIME.test(event.occurredAt) ||
+        !PAYLOAD_DIGEST.test(event.payloadDigest) ||
+        !isMediaObservation(event.observation)
+      ) {
+        return UNKNOWN_MEDIA_EVENT;
+      }
+      try {
+        const { data, error } = await admin
+          .rpc("media_record_provider_event", {
+            p_provider_code: event.providerCode,
+            p_event_reference: event.eventReference,
+            p_event_type: event.eventType,
+            p_occurred_at: event.occurredAt,
+            p_payload_digest: event.payloadDigest,
+            p_observation: event.observation,
+          })
+          .abortSignal(AbortSignal.timeout(MEDIA_CALL_DEADLINE_MS));
+        return error === null ? mediaEventAnswerOf(data) : UNKNOWN_MEDIA_EVENT;
+      } catch {
+        return UNKNOWN_MEDIA_EVENT;
+      }
+    },
+  } satisfies MediaRecorder);
 }
 
 // MVP-001 S3 part 2 (PS section 13; TA section 30): the AI suggestion

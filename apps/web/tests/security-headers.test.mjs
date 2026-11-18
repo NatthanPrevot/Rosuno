@@ -8,7 +8,10 @@
 // MVP-001 S3: the one value read when the configuration loads is the public
 // project URL, for the CSP media-src origin. The configuration is therefore
 // loaded afresh for each URL case below, with exactly that variable set or
-// removed, and the fixed rules are checked with it removed.
+// removed, and the fixed rules are checked with it removed. MVP-001 S9: the
+// one other value is the server-side Daily domain label, for the CSP
+// frame-src origin; it is set or removed the same way, and removed for every
+// other case.
 
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -18,14 +21,24 @@ import * as confirmRoute from "../app/auth/confirm/route.ts";
 
 let loads = 0;
 
-// next.config.ts as Next.js would load it with this public project URL (or
-// none), in a fresh module instance; the variable is restored afterwards.
-async function configWith(url) {
-  const previous = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (url === undefined) {
-    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-  } else {
-    process.env.NEXT_PUBLIC_SUPABASE_URL = url;
+// next.config.ts as Next.js would load it with this public project URL and
+// this Daily domain label (or none of either), in a fresh module instance;
+// the variables are restored afterwards.
+async function configWith(url, dailyDomain = undefined) {
+  const previous = {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    ROSUNO_DAILY_DOMAIN: process.env.ROSUNO_DAILY_DOMAIN,
+  };
+  const wanted = {
+    NEXT_PUBLIC_SUPABASE_URL: url,
+    ROSUNO_DAILY_DOMAIN: dailyDomain,
+  };
+  for (const [name, value] of Object.entries(wanted)) {
+    if (value === undefined) {
+      delete process.env[name];
+    } else {
+      process.env[name] = value;
+    }
   }
   try {
     loads += 1;
@@ -34,10 +47,12 @@ async function configWith(url) {
     );
     return module.default;
   } finally {
-    if (previous === undefined) {
-      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    } else {
-      process.env.NEXT_PUBLIC_SUPABASE_URL = previous;
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
     }
   }
 }
@@ -50,9 +65,10 @@ const { getPathMatch } = requireHere(
 );
 const { modifyRouteRegex } = requireHere("next/dist/lib/redirect-status.js");
 
-const policyWithMedia = (media) =>
-  `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; media-src ${media}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`;
-// Without a configured project URL no media source is admitted at all.
+const policyWithMedia = (media, frame = "'none'") =>
+  `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; media-src ${media}; frame-src ${frame}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`;
+// Without a configured project URL no media source is admitted at all, and
+// (MVP-001 S9) without a configured Daily domain no frame source at all.
 const EXPECTED_POLICY = policyWithMedia("'none'");
 const TRANSPORT = {
   key: "Strict-Transport-Security",
@@ -118,6 +134,7 @@ test("2. the policy allows only this origin, no eval, no inline style, no plugin
       "font-src",
       "connect-src",
       "media-src",
+      "frame-src",
       "object-src",
       "base-uri",
       "form-action",
@@ -137,6 +154,7 @@ test("2. the policy allows only this origin, no eval, no inline style, no plugin
   assert.deepEqual(policy.get("style-src"), ["'self'"]);
   assert.deepEqual(policy.get("connect-src"), ["'self'"]);
   assert.deepEqual(policy.get("media-src"), ["'none'"]);
+  assert.deepEqual(policy.get("frame-src"), ["'none'"]);
   assert.deepEqual(policy.get("object-src"), ["'none'"]);
   assert.deepEqual(policy.get("base-uri"), ["'none'"]);
   assert.deepEqual(policy.get("form-action"), ["'self'"]);
@@ -179,6 +197,11 @@ test("3. every route gets the full set, and the confirmation handler gets only t
     "/privacy",
     "/staff/jurisdiction-review",
     "/staff/jurisdiction-review?group=unnamed",
+    // MVP-001 S9: the consultation workspaces and the Daily webhook route.
+    "/client/consultations/00000000-0000-4000-8000-000000000901",
+    "/attorney/consultations",
+    "/attorney/consultations/00000000-0000-4000-8000-000000000901",
+    "/api/media/daily",
     "/_next/static/chunks/synthetic.js",
     "/no-such-page",
     "/auth",
@@ -282,5 +305,65 @@ test("5. MVP-001 S3: media-src admits exactly the configured Supabase origin (a 
   for (const url of refused) {
     const config = await configWith(url);
     assert.deepEqual(await config.headers(), EXPECTED_RULES, String(url));
+  }
+});
+
+test("6. MVP-001 S9: frame-src admits exactly https://<label>.daily.co for a configured Daily domain that is a strict DNS label, and nothing for any other value; every other header and directive stays fixed", async () => {
+  const admitted = [
+    ["acme", "https://acme.daily.co"],
+    ["rosuno-test-1", "https://rosuno-test-1.daily.co"],
+    ["a", "https://a.daily.co"],
+    ["0x9", "https://0x9.daily.co"],
+    [`a${"b".repeat(61)}c`, `https://a${"b".repeat(61)}c.daily.co`],
+  ];
+  const refused = [
+    undefined,
+    "",
+    "*",
+    "'self'",
+    "https:",
+    "Acme",
+    "-acme",
+    "acme-",
+    "ac_me",
+    "acme.daily.co",
+    "https://acme.daily.co",
+    "acme evil",
+    "acme;script-src *",
+    "acme/",
+    `a${"b".repeat(62)}c`,
+    "data:",
+  ];
+  for (const [label, origin] of admitted) {
+    const config = await configWith(undefined, label);
+    const rules = await config.headers();
+    assert.deepEqual(
+      rules,
+      [
+        {
+          ...EXPECTED_RULES[0],
+          headers: [
+            {
+              key: "Content-Security-Policy",
+              value: policyWithMedia("'none'", origin),
+            },
+            ...EXPECTED_RULES[0].headers.slice(1),
+          ],
+        },
+        EXPECTED_RULES[1],
+      ],
+      label,
+    );
+    const policy = directives(policyWithMedia("'none'", origin));
+    assert.deepEqual(policy.get("frame-src"), [origin], label);
+    for (const [name, values] of policy) {
+      if (name !== "frame-src") {
+        assert.deepEqual(values, directives(EXPECTED_POLICY).get(name), name);
+      }
+    }
+  }
+  for (const label of refused) {
+    const config = await configWith(undefined, label);
+    assert.deepEqual(await config.headers(), EXPECTED_RULES, String(label));
   }
 });
