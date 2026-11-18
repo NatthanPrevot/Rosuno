@@ -48,19 +48,36 @@ const P5_MODULES = Object.freeze([
 ]);
 
 test("1. the client routes are exactly the workspace, the Intake page, their forms and the server actions", () => {
+  // MVP-001 S6: plus exactly the request review page, the request page,
+  // their two forms and the request actions (MBS section 11), each server or
+  // client module as declared.
   assert.deepEqual(filesIn("app/client/"), [
     "app/client/actions.ts",
     "app/client/forms.tsx",
     "app/client/intakes/[intake]/forms.tsx",
     "app/client/intakes/[intake]/page.tsx",
     "app/client/page.tsx",
+    "app/client/requests/[request]/forms.tsx",
+    "app/client/requests/[request]/page.tsx",
+    "app/client/requests/actions.ts",
+    "app/client/requests/new/forms.tsx",
+    "app/client/requests/new/page.tsx",
   ]);
   assert.match(read("app/client/actions.ts"), /^"use server";\n/);
+  assert.match(read("app/client/requests/actions.ts"), /^"use server";\n/);
   for (const file of [
     "app/client/forms.tsx",
     "app/client/intakes/[intake]/forms.tsx",
+    "app/client/requests/[request]/forms.tsx",
+    "app/client/requests/new/forms.tsx",
   ]) {
     assert.match(read(file), /^"use client";\n/, file);
+  }
+  for (const file of [
+    "app/client/requests/[request]/page.tsx",
+    "app/client/requests/new/page.tsx",
+  ]) {
+    assert.doesNotMatch(read(file), /["']use (?:client|server)["']/, file);
   }
 });
 

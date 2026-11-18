@@ -12,7 +12,8 @@
 // the referral function's answer is read strictly against its own fixed
 // outcomes; a malformed referral input is refused before anything is sent. Each such failure writes one log line naming the call and how it
 // failed (the error code and HTTP status only, MVP-001 D-8), and nothing the
-// call carried or answered.
+// call carried or answered. MVP-001 S6 PS-A3: and the public offer read
+// (public_attorney_offers), called the same way.
 
 import {
   REFERRAL_OUTCOMES,
@@ -250,6 +251,16 @@ export function createDiscoveryReads(
           isId(attorneyId) && isOptionalId(jurisdictionId)
             ? observedRead("public_attorney_profile", deadlineMs, () =>
                 client.rpc("public_attorney_profile", {
+                  p_attorney_id: attorneyId,
+                  p_jurisdiction_id: jurisdictionId,
+                }),
+              )
+            : UNREADABLE_ROWS,
+        // MVP-001 S6 PS-A3: the listed attorney's public offers.
+        offers: async (attorneyId: string, jurisdictionId: string | null) =>
+          isId(attorneyId) && isOptionalId(jurisdictionId)
+            ? observedRead("public_attorney_offers", deadlineMs, () =>
+                client.rpc("public_attorney_offers", {
                   p_attorney_id: attorneyId,
                   p_jurisdiction_id: jurisdictionId,
                 }),

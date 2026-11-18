@@ -285,6 +285,8 @@ export const TRANSITION_POLICY_OUTCOMES = Object.freeze([
   "invalid_transition",
   "authority_unverified",
   "effective_period_required",
+  // MVP-001 S6 PS-A3 section 3.4: approval validates the parameters.
+  "parameters_invalid",
   ...ENVIRONMENT,
 ]);
 export const END_POLICY_OUTCOMES = Object.freeze([
@@ -435,6 +437,7 @@ export const REFUSAL_REASONS = Object.freeze([
   "invalid_transition",
   "authority_unverified",
   "effective_period_required",
+  "parameters_invalid",
   "already_ended",
   "launch_gates_unmet",
   "launch_authorization_required",

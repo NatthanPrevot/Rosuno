@@ -49,7 +49,26 @@
 // point-in-time evidence (20261121010000), so the synthetic Requests' owner
 // fixture also writes, with each Referral, its allocation method, an
 // eligible Eligibility Evaluation, a pool entry, a presentation and a
-// bookable referral-context Bookability Evaluation. No Supabase
+// bookable referral-context Bookability Evaluation.
+//
+// MVP-001 S6 update: the three S6 migrations follow S5. A Consultation
+// Request is now created in state created and moves only along the DM
+// section 9 paths, and it commits only with its own same-transaction
+// evidence and root Fee Calculation (20261122010000). The synthetic Requests'
+// owner fixture therefore writes, with each Request, a bookable
+// consultation_request Bookability Evaluation (for a scheduled Request, for
+// the slot it then holds) and a root Fee Calculation (no quote validity, so
+// it never bounds the Hold's expiry); a held scheduled Request moves to
+// slot_held; and acceptance walks slot_held (scheduled) or payment_authorized
+// (instant) -> awaiting_attorney -> accepted.
+//
+// MVP-001 S6 PS-A3 update: the PS-A3 migration (20261122040000) follows the
+// S6 migrations. consultation_requests gains exactly the two PS-A3 columns
+// (requested_duration_minutes and client_message), and a Request commits only
+// with its duration, a scheduled one only with a Hold of exactly that length.
+// The synthetic Requests' owner fixture therefore records the duration: the
+// length of the slot it is evaluated for (and then holds), or 60 minutes for
+// a Request with no slot. No Supabase
 // project, network service, or pre-existing cluster is contacted, nothing
 // persists after the run, and every value is synthetic test data. The JSON
 // report goes to stdout; exit 0 means PASS, 1 FAIL, 2 cleanup failure.
@@ -391,8 +410,10 @@ function applyMigrations() {
     ),
   ).migrations;
   // S4 follows S3, contiguous and in order, and every S4 migration is
-  // registered unreviewed and applied nowhere. MVP-001 S5: only the three S5
-  // migrations, contiguous and in order, follow S4.
+  // registered unreviewed and applied nowhere. MVP-001 S5: the three S5
+  // migrations, contiguous and in order, follow S4; MVP-001 S6: then exactly
+  // the three S6 migrations, contiguous and in order; MVP-001 S6 PS-A3: then
+  // exactly the PS-A3 migration.
   const s3 = files.indexOf(S3_LAST);
   assert.ok(s3 >= 0, "the last S3 migration is present");
   assert.deepEqual(files.slice(s3 + 1, s3 + 1 + S4_MIGRATIONS.length), [
@@ -402,6 +423,10 @@ function applyMigrations() {
     "20261121010000_mvp_001_s5_referral_integrity.sql",
     "20261121020000_mvp_001_s5_discovery.sql",
     "20261121030000_mvp_001_s5_referral.sql",
+    "20261122010000_mvp_001_s6_request_integrity.sql",
+    "20261122020000_mvp_001_s6_pricing.sql",
+    "20261122030000_mvp_001_s6_requests.sql",
+    "20261122040000_mvp_001_s6_consultation_offers.sql",
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -723,11 +748,21 @@ function requestSql({
   jurisdiction,
   path: requestPath = "scheduled",
   deadline = null,
+  start = null,
+  end = null,
 }) {
   ordinal += 1;
   // MVP-001 S5: the Referral's point-in-time evidence, in the same
-  // transaction (20261121010000).
+  // transaction (20261121010000). MVP-001 S6: the Request's own evidence (the
+  // same eligible evaluation, a consultation_request Bookability Evaluation
+  // for its slot) and its root Fee Calculation, also in that transaction
+  // (20261122010000). MVP-001 S6 PS-A3: the Request records its duration,
+  // the length of its slot (60 minutes without one) (20261122040000).
   const evaluation = uid();
+  const duration =
+    start === null || end === null
+      ? "60"
+      : `(extract(epoch from (${lit(end)}::timestamptz - ${lit(start)}::timestamptz)) / 60)::integer`;
   return `insert into public.referrals (id, intake_id, attorney_id, jurisdiction_id, attempt_ordinal, allocation_method)
     values ('${referral}', '${client.intake}', '${attorney.profile}', '${jurisdiction}', ${ordinal}, 'client_selected');
   insert into public.eligibility_evaluations (id, attorney_id, jurisdiction_id, context_type, context_id, evaluated_at, policy_references, result, factor_results, evidence_references, as_of)
@@ -738,9 +773,17 @@ function requestSql({
     values ('${referral}', '${attorney.profile}', 1, 'platform', now());
   insert into public.bookability_evaluations (attorney_id, eligibility_evaluation_id, context_type, context_id, evaluated_at, as_of, modality, constraint_results, result)
     values ('${attorney.profile}', '${evaluation}', 'referral', '${referral}', now(), now(), 'synthetic', '[]'::jsonb, 'bookable');
-  insert into public.consultation_requests (id, intake_id, client_id, selected_attorney_id, referral_id, request_path, referral_policy_version_id, requested_modality, state, response_deadline_at)
-    values ('${request}', '${client.intake}', '${client.client}', '${attorney.profile}', '${referral}', '${requestPath}', '${world.referralPolicy}', 'video', 'pending', ${deadline === null ? "null" : lit(deadline)});`;
+  insert into public.consultation_requests (id, intake_id, client_id, selected_attorney_id, referral_id, request_path, referral_policy_version_id, requested_modality, requested_duration_minutes, state, response_deadline_at)
+    values ('${request}', '${client.intake}', '${client.client}', '${attorney.profile}', '${referral}', '${requestPath}', '${world.referralPolicy}', 'video', ${duration}, 'created', ${deadline === null ? "null" : lit(deadline)});
+  insert into public.bookability_evaluations (attorney_id, eligibility_evaluation_id, context_type, context_id, evaluated_at, as_of, modality, slot_start_at, slot_end_at, constraint_results, result)
+    values ('${attorney.profile}', '${evaluation}', 'consultation_request', '${request}', now(), now(), 'video', ${start === null ? "null" : `${lit(start)}::timestamptz`}, ${end === null ? "null" : `${lit(end)}::timestamptz`}, '[]'::jsonb, 'bookable');
+  insert into public.fee_calculations (consultation_request_id, fee_policy_version_id, attorney_listed_price_minor, platform_fee_minor, client_fee_minor, tax_or_other_required_fee_minor, total_client_amount_minor, currency_code, calculated_at, calculation_snapshot)
+    values ('${request}', '${world.feePolicy}', 1000, 0, 0, 0, 1000, 'XTS', now(), '{}'::jsonb);`;
 }
+
+// MVP-001 S6: a held scheduled Request moves to slot_held (DM section 9).
+const SLOT_HELD = (request) =>
+  `update public.consultation_requests set state = 'slot_held' where id = '${request}' and state = 'created' and exists (select 1 from public.slot_holds as h where h.consultation_request_id = '${request}' and h.released_at is null);`;
 
 const ACQUIRE = (request, start, end) =>
   `select outcome || '|' || coalesce(hold_id::text, '') || '|' || coalesce(problem, '') from public.scheduling_acquire_hold('${request}', ${lit(start)}, ${lit(end)});`;
@@ -774,8 +817,11 @@ function scheduledHold({
         client,
         jurisdiction,
         deadline,
+        start,
+        end,
       }),
       ACQUIRE(request, start, end),
+      SLOT_HELD(request),
       commit ? "commit;" : "rollback;",
     ].join("\n"),
   );
@@ -789,8 +835,13 @@ function scheduledHold({
   };
 }
 
+// MVP-001 S6: acceptance walks the DM section 9 path (20261122010000):
+// scheduled slot_held, instant payment_authorized, then awaiting_attorney,
+// then accepted.
 const ACCEPT = (request) =>
-  `update public.consultation_requests set state = 'accepted', accepted_at = clock_timestamp() where id = '${request}';`;
+  `update public.consultation_requests set state = 'payment_authorized' where id = '${request}' and state = 'created' and request_path = 'instant';
+   update public.consultation_requests set state = 'awaiting_attorney' where id = '${request}' and state in ('slot_held', 'payment_authorized');
+   update public.consultation_requests set state = 'accepted', accepted_at = clock_timestamp() where id = '${request}';`;
 
 const CONSULTATION = (consultation, request, attorney, client, requestPath) =>
   `insert into public.consultations (id, consultation_request_id, client_id, attorney_id, request_path, referral_policy_version_id, modality, state)
@@ -870,6 +921,9 @@ function seed() {
   };
   // FK target for synthetic Requests (any policy version satisfies it).
   world.referralPolicy = policy("referral", world.J.A, {});
+  // MVP-001 S6: FK target for the synthetic Requests' root Fee Calculations
+  // (any fee policy version satisfies it; its parameters are never read).
+  world.feePolicy = policy("fee", world.J.A, {});
   world.scheduling = {
     A: policy("scheduling", world.J.A, SCHEDULING()),
     // Short Holds for expiry probes.
@@ -924,7 +978,9 @@ function seed() {
 // Inventory and privileges
 // ---------------------------------------------------------------------------
 
-// The P1 columns of every relation S4 uses (Packet rule 16: no column added).
+// The P1 columns of every relation S4 uses (Packet rule 16: no column added;
+// MVP-001 S6 PS-A3: consultation_requests gains exactly the two PS-A3
+// columns, last).
 const P1_COLUMNS = Object.freeze({
   availability_rules:
     "id,attorney_id,rule_kind,timezone_name,weekday,specific_date,local_start_time,local_end_time,effective_from,effective_until,active,created_at,updated_at",
@@ -941,7 +997,7 @@ const P1_COLUMNS = Object.freeze({
   application_sessions:
     "id,user_id,auth_session_reference,expires_at,revoked_at,created_at,started_at,ended_at",
   consultation_requests:
-    "id,intake_id,client_id,selected_attorney_id,referral_id,request_path,referral_policy_version_id,engagement_policy_version_id,requested_modality,state,response_deadline_at,created_at,accepted_at,declined_at,expired_at,cancelled_at",
+    "id,intake_id,client_id,selected_attorney_id,referral_id,request_path,referral_policy_version_id,engagement_policy_version_id,requested_modality,state,response_deadline_at,created_at,accepted_at,declined_at,expired_at,cancelled_at,requested_duration_minutes,client_message",
 });
 
 const S4_RELATIONS = Object.freeze([
@@ -1015,7 +1071,7 @@ async function inventoryChecks() {
     },
   );
   await check(
-    "MIG-2 no relation, column, enum type, policy type, capability or seed row is added: the P1 columns are unchanged and the S4 migration texts create none",
+    "MIG-2 no relation, column, enum type, policy type, capability or seed row is added: the P1 columns are unchanged (MVP-001 S6 PS-A3: but for exactly the two PS-A3 request columns) and the S4 migration texts create none",
     () => {
       for (const [table, columns] of Object.entries(P1_COLUMNS)) {
         assert.equal(
@@ -2267,7 +2323,8 @@ async function holdChecks() {
       assert.equal(row.consultation_request_id, held.request);
       assert.equal(ms(row.expires_at) - ms(row.held_at), 900000);
       assert.equal(row.released_at, null);
-      assert.equal(requestRow(held.request).state, "pending");
+      // MVP-001 S6: a held scheduled Request is slot_held (DM section 9).
+      assert.equal(requestRow(held.request).state, "slot_held");
       assert.equal(
         slotProblem(holder, at(2, 10), at(2, 11), world.J.A),
         "hold_conflict",
@@ -2695,12 +2752,29 @@ function activeOverlap(attorney, start, end) {
   );
 }
 
-async function openRequest(sessionObj, attorney, client, jurisdiction) {
+// MVP-001 S6: the slot the Request is evaluated for (its Bookability
+// Evaluation's), which the Hold it then acquires must match to commit.
+async function openRequest(
+  sessionObj,
+  attorney,
+  client,
+  jurisdiction,
+  start = null,
+  end = null,
+) {
   const request = uid();
   const referral = uid();
   await sessionObj.ok("begin;");
   await sessionObj.ok(
-    requestSql({ request, referral, attorney, client, jurisdiction }),
+    requestSql({
+      request,
+      referral,
+      attorney,
+      client,
+      jurisdiction,
+      start,
+      end,
+    }),
   );
   return request;
 }
@@ -2713,13 +2787,20 @@ async function concurrencyChecks() {
       const [start, end] = [at(6, 10), at(6, 11)];
       const a = await session("cc1a");
       const b = await session("cc1b");
-      await openRequest(a, racer, world.client1, world.J.A).then(
+      await openRequest(a, racer, world.client1, world.J.A, start, end).then(
         async (request) => {
           const rows = await a.ok(ACQUIRE(request, start, end));
           assert.equal(parseHold(rows[0]).outcome, "held");
         },
       );
-      const requestB = await openRequest(b, racer, world.client2, world.J.A);
+      const requestB = await openRequest(
+        b,
+        racer,
+        world.client2,
+        world.J.A,
+        start,
+        end,
+      );
       const pending = b.send(ACQUIRE(requestB, start, end));
       const blocked = await blockedOnLock(b.pid);
       await a.ok("commit;");
@@ -2734,11 +2815,11 @@ async function concurrencyChecks() {
       assert.equal(count("consultation_requests", `id = '${requestB}'`), 0);
       // Direct inserts (owner role, no function): the P1 trigger serializes.
       const [s2, e2] = [at(6, 6), at(6, 7)];
-      const ra = await openRequest(a, racer, world.client1, world.J.A);
+      const ra = await openRequest(a, racer, world.client1, world.J.A, s2, e2);
       await a.ok(
         `insert into public.slot_holds (consultation_request_id, attorney_id, slot_start_at, slot_end_at, held_at, expires_at) values ('${ra}', '${racer.profile}', ${lit(s2)}, ${lit(e2)}, clock_timestamp(), clock_timestamp() + interval '10 minutes');`,
       );
-      const rb = await openRequest(b, racer, world.client2, world.J.A);
+      const rb = await openRequest(b, racer, world.client2, world.J.A, s2, e2);
       const direct = b.send(
         `insert into public.slot_holds (consultation_request_id, attorney_id, slot_start_at, slot_end_at, held_at, expires_at) values ('${rb}', '${racer.profile}', ${lit(s2)}, ${lit(e2)}, clock_timestamp(), clock_timestamp() + interval '10 minutes');`,
       );
@@ -2764,7 +2845,14 @@ async function concurrencyChecks() {
     async () => {
       const a = await session("cc2a");
       const b = await session("cc2b");
-      const ra = await openRequest(a, racer, world.client1, world.J.A);
+      const ra = await openRequest(
+        a,
+        racer,
+        world.client1,
+        world.J.A,
+        at(6, 13),
+        at(6, 14),
+      );
       assert.equal(
         parseHold((await a.ok(ACQUIRE(ra, at(6, 13), at(6, 14))))[0]).outcome,
         "held",
@@ -2834,7 +2922,14 @@ async function concurrencyChecks() {
         racer,
         world.client3,
       );
-      const ra = await openRequest(a, racer, world.client1, world.J.A);
+      const ra = await openRequest(
+        a,
+        racer,
+        world.client1,
+        world.J.A,
+        at(6, 19),
+        at(6, 20),
+      );
       assert.equal(
         parseHold((await a.ok(ACQUIRE(ra, at(6, 19), at(6, 20))))[0]).outcome,
         "held",
@@ -2987,8 +3082,10 @@ async function concurrencyChecks() {
       const lockBlocked = await blockedOnLock(b.pid);
       await a.ok("commit;");
       assert.equal((await lock).sqlstate, "00000");
+      // MVP-001 S6: the acceptance's first step (slot_held ->
+      // awaiting_attorney) finds the Request no longer open.
       const accepted = await b.ok(
-        `update public.consultation_requests set state = 'accepted', accepted_at = clock_timestamp() where id = '${two.request}' and state = 'pending' returning id;`,
+        `update public.consultation_requests set state = 'awaiting_attorney' where id = '${two.request}' and state = 'slot_held' returning id;`,
       );
       assert.deepEqual(accepted, []);
       await b.send("rollback;");
@@ -3155,7 +3252,15 @@ async function concurrencyChecks() {
       const b = await session("cc7b");
       await a.ok("set time zone 'Asia/Tokyo';");
       await b.ok("set time zone 'America/New_York';");
-      const ra = await openRequest(a, tokyo, world.client1, world.J.A);
+      // MVP-001 S6: the Request is evaluated for the same instant (in UTC).
+      const ra = await openRequest(
+        a,
+        tokyo,
+        world.client1,
+        world.J.A,
+        utcStart,
+        utcEnd,
+      );
       const held = parseHold(
         (
           await a.ok(ACQUIRE(ra, `${localDate} 08:30`, `${localDate} 09:30`))
@@ -3313,7 +3418,9 @@ async function invariantChecks() {
       const held = world.bookerHold;
       for (const change of [
         `update public.consultation_requests set state = 'cancelled', cancelled_at = clock_timestamp() where id = '${held.request}';`,
-        `update public.consultation_requests set state = 'declined', declined_at = clock_timestamp() where id = '${held.request}';`,
+        // MVP-001 S6: a decline comes from awaiting_attorney (DM section 9).
+        `update public.consultation_requests set state = 'awaiting_attorney' where id = '${held.request}';
+         update public.consultation_requests set state = 'declined', declined_at = clock_timestamp() where id = '${held.request}';`,
         ACCEPT(held.request),
       ]) {
         assert.equal(refused(change), "23514", change);
@@ -3328,11 +3435,11 @@ async function invariantChecks() {
         ),
         "55000",
       );
-      assert.equal(requestRow(world.heldA.request).state, "pending");
+      assert.equal(requestRow(world.heldA.request).state, "slot_held");
     },
   );
   await check(
-    "INV-5 no Booking before acceptance: a Booking needs an existing Consultation (23503) whose Request is accepted (a Request moved off accepted cannot get a Booking, 23514), for exactly its attorney and client (23514), and is created confirmed (23514); conversion requires the accepted Request's Consultation",
+    "INV-5 no Booking before acceptance: a Booking needs an existing Consultation (23503) whose Request is accepted (MVP-001 S6: a Request never leaves accepted, 55000, and a Request that is not accepted cannot get a Consultation, 23514), for exactly its attorney and client (23514), and is created confirmed (23514); conversion requires the accepted Request's Consultation",
     () => {
       const { request, consultation } = instantConsultation(
         booker,
@@ -3367,10 +3474,25 @@ async function invariantChecks() {
         ),
         "23514",
       );
+      // MVP-001 S6: a Request never leaves accepted (20261122010000), so
+      // moving it off accepted is itself refused (55000); and a Request that
+      // is not accepted cannot get the Consultation a Booking needs (23514).
       assert.equal(
         refused(
-          `update public.consultation_requests set state = 'pending', accepted_at = null where id = '${request}';
+          `update public.consultation_requests set state = 'awaiting_attorney', accepted_at = null where id = '${request}';
            ${BOOKING(consultation, booker, world.client2, at(11, 10), at(11, 11))}`,
+        ),
+        "55000",
+      );
+      const waiting = uid();
+      const waitingConsultation = uid();
+      assert.equal(
+        refused(
+          `${requestSql({ request: waiting, referral: uid(), attorney: booker, client: world.client2, jurisdiction: world.J.A, path: "instant" })}
+           update public.consultation_requests set state = 'payment_authorized' where id = '${waiting}';
+           update public.consultation_requests set state = 'awaiting_attorney' where id = '${waiting}';
+           ${CONSULTATION(waitingConsultation, waiting, booker, world.client2, "instant")}
+           ${BOOKING(waitingConsultation, booker, world.client2, at(11, 10), at(11, 11))}`,
         ),
         "23514",
       );

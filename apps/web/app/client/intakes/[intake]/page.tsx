@@ -26,6 +26,10 @@
 // while the Intake is submitted or active, offers the public directory to
 // select an attorney. A recorded outcome is shown only as recorded: the
 // outcome taxonomy is gated configuration, so no outcome wording is shown.
+// MVP-001 S6: each attempt also shows the state of the Request made from it
+// (expired when the server reports its deadline passed) with a link to it,
+// or, while a Request can still be made from it, a link to the request
+// review.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -37,6 +41,12 @@ import {
   type SuggestionView,
 } from "../../../../src/application/client-intake.ts";
 import {
+  requestPathFor,
+  requestReviewPathFor,
+  resolveIntakeRequests,
+  type IntakeRequestsView,
+} from "../../../../src/application/consultation-request.ts";
+import {
   resolveIntakeReferrals,
   type IntakeReferralsView,
 } from "../../../../src/application/discovery.ts";
@@ -47,6 +57,7 @@ import {
 import { CLIENT_INTAKE_SOURCES } from "../../../../src/infrastructure/client/client-intake-adapter.ts";
 import { DISCOVERY_SOURCES } from "../../../../src/infrastructure/discovery/discovery-adapter.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
+import { REQUEST_SOURCES } from "../../../../src/infrastructure/requests/consultation-request-adapter.ts";
 import { VOICE_MEMO_SOURCES } from "../../../../src/infrastructure/resources/protected-resource-adapter.ts";
 import {
   Alert,
@@ -81,6 +92,7 @@ import {
   OUTCOME_RECORDED,
   utcText,
 } from "../../../../src/presentation/discovery-labels.ts";
+import { REQUEST_STATE_LABELS } from "../../../../src/presentation/request-labels.ts";
 import { VOICE_MEMO_NOT_CONFIGURED } from "../../../../src/presentation/voice-memo-labels.ts";
 import {
   CloseIntakeForm,
@@ -180,7 +192,13 @@ function VoiceMemoSection({ view }: { readonly view: VoiceMemoView }) {
 
 // MVP-001 S5: the Intake's attorney selections, in order, and the way to the
 // directory while the Intake can still be used.
-function ReferralSection({ view }: { readonly view: IntakeReferralsView }) {
+function ReferralSection({
+  view,
+  requests,
+}: {
+  readonly view: IntakeReferralsView;
+  readonly requests: IntakeRequestsView;
+}) {
   if (view.status !== "ready") {
     return view.status === "unavailable" ? (
       <Alert tone="error" title="Attorney selections unavailable" role="alert">
@@ -209,6 +227,7 @@ function ReferralSection({ view }: { readonly view: IntakeReferralsView }) {
               <th scope="col">How soon</th>
               <th scope="col">Selected</th>
               <th scope="col">Outcome</th>
+              <th scope="col">Request</th>
             </tr>
           </thead>
           <tbody>
@@ -225,6 +244,12 @@ function ReferralSection({ view }: { readonly view: IntakeReferralsView }) {
                 <td>
                   {attempt.outcomeRecorded ? OUTCOME_RECORDED : NO_OUTCOME}
                 </td>
+                <td>
+                  <AttemptRequest
+                    requests={requests}
+                    ordinal={attempt.ordinal}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -239,6 +264,42 @@ function ReferralSection({ view }: { readonly view: IntakeReferralsView }) {
       ) : null}
     </Stack>
   );
+}
+
+// MVP-001 S6: the Request made from one attempt (its state and a link), the
+// way to request one while that is still possible, or nothing.
+function AttemptRequest({
+  requests,
+  ordinal,
+}: {
+  readonly requests: IntakeRequestsView;
+  readonly ordinal: number;
+}) {
+  if (requests.status !== "ready") {
+    return <>Not shown</>;
+  }
+  const entry = requests.attempts.find((item) => item.ordinal === ordinal);
+  if (entry === undefined) {
+    return <>Not shown</>;
+  }
+  if (entry.requestId !== null && entry.displayState !== null) {
+    return (
+      <ButtonLink variant="tertiary" href={requestPathFor(entry.requestId)}>
+        {REQUEST_STATE_LABELS[entry.displayState].label}
+      </ButtonLink>
+    );
+  }
+  if (entry.requestable) {
+    return (
+      <ButtonLink
+        variant="tertiary"
+        href={requestReviewPathFor(entry.referralId)}
+      >
+        Request a consultation
+      </ButtonLink>
+    );
+  }
+  return <>No request</>;
 }
 
 // MVP-001 S3 part 2: the presented suggestions, newest first, each with its
@@ -319,6 +380,14 @@ export default async function ClientIntakePage({
         route: "/client/intakes/[intake]",
         operation: "resolveIntakeReferrals",
         outcome: referrals.status,
+      });
+    }
+    const requests = await resolveIntakeRequests(REQUEST_SOURCES, intake);
+    if (requests.status === "unavailable") {
+      await logRequestEvent("warn", "client_intake.view_unavailable", {
+        route: "/client/intakes/[intake]",
+        operation: "resolveIntakeRequests",
+        outcome: requests.status,
       });
     }
     return (
@@ -466,7 +535,7 @@ export default async function ClientIntakePage({
             )}
           </>
         )}
-        <ReferralSection view={referrals} />
+        <ReferralSection view={referrals} requests={requests} />
         <VoiceMemoSection view={memo} />
         {view.closable ? <CloseIntakeForm intakeId={view.intakeId} /> : null}
         {BACK}

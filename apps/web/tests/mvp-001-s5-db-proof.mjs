@@ -385,11 +385,21 @@ function applyMigrations() {
       "utf8",
     ),
   ).migrations;
-  // S5 follows S4, contiguous and in order, last, and every S5 migration is
-  // registered unreviewed and applied nowhere.
+  // S5 follows S4, contiguous and in order, and every S5 migration is
+  // registered unreviewed and applied nowhere. MVP-001 S6: then exactly the
+  // three S6 migrations, contiguous and in order; MVP-001 S6 PS-A3: then
+  // exactly the PS-A3 migration.
   const s4 = files.indexOf(S4_LAST);
   assert.ok(s4 >= 0, "the last S4 migration is present");
-  assert.deepEqual(files.slice(s4 + 1), [...S5_MIGRATIONS]);
+  assert.deepEqual(files.slice(s4 + 1, s4 + 1 + S5_MIGRATIONS.length), [
+    ...S5_MIGRATIONS,
+  ]);
+  assert.deepEqual(files.slice(s4 + 1 + S5_MIGRATIONS.length), [
+    "20261122010000_mvp_001_s6_request_integrity.sql",
+    "20261122020000_mvp_001_s6_pricing.sql",
+    "20261122030000_mvp_001_s6_requests.sql",
+    "20261122040000_mvp_001_s6_consultation_offers.sql",
+  ]);
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),
@@ -1079,7 +1089,7 @@ async function unrecordedChecks() {
 
 async function inventoryChecks() {
   await check(
-    "MIG-1 the three S5 migrations follow S4 last and in order, are registered unreviewed and applied nowhere, are Program migration refs, and apply on plain PostgreSQL",
+    "MIG-1 the three S5 migrations follow S4 in order (MVP-001 S6: then only the three S6 migrations and, MVP-001 S6 PS-A3, the PS-A3 migration), are registered unreviewed and applied nowhere, are Program migration refs, and apply on plain PostgreSQL",
     () => {
       for (const file of S5_MIGRATIONS) {
         assert.deepEqual(report.migrations.notices[file], [], file);
@@ -1173,12 +1183,17 @@ async function inventoryChecks() {
     },
   );
   await check(
-    "PRIV-2 anon may execute exactly the three public read functions and holds no privilege on any table, view or sequence of the public schema",
+    "PRIV-2 anon may execute exactly the three public read functions (MVP-001 S6 PS-A3: and the PS-A3 public offer read, public_attorney_offers) and holds no privilege on any table, view or sequence of the public schema",
     () => {
       const executable = sql(
         "select string_agg(p.oid::regprocedure::text, ';' order by p.oid::regprocedure::text) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'EXECUTE');",
       ).split(";");
-      const expected = Object.keys(PUBLIC_FUNCTIONS)
+      // MVP-001 S6 PS-A3 (20261122040000): the public offer read is the one
+      // further anon function (inventoried by the S6 proofs).
+      const expected = [
+        ...Object.keys(PUBLIC_FUNCTIONS),
+        "public_attorney_offers(uuid, uuid)",
+      ]
         .map((signature) =>
           sql(`select 'public.${signature}'::regprocedure::text;`),
         )
