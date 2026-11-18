@@ -363,9 +363,15 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // payment adapter (a failed call, with the call name and how it failed
   // only) and the webhook adapter (each refused or recorded delivery, with a
   // fixed outcome only; never a header, signature, body or identifier) write
-  // lines too; the request page and actions already did.
+  // lines too; the request page and actions already did. MVP-001 S8: the
+  // attorney request queue and request pages (a view unavailable, with the
+  // route and outcome only) and the attorney request adapter (a failed call,
+  // with the call name and how it failed only) write lines too; the client
+  // request page already did (now also a decision read unavailable).
   assert.deepEqual(callers, [
     "app/attorney/earnings/page.tsx",
+    "app/attorney/requests/[request]/page.tsx",
+    "app/attorney/requests/page.tsx",
     "app/attorneys/[attorney]/page.tsx",
     "app/client/actions.ts",
     "app/client/intakes/[intake]/page.tsx",
@@ -391,6 +397,7 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "src/infrastructure/offers/consultation-offer-adapter.ts",
     "src/infrastructure/payments/payment-adapter.ts",
     "src/infrastructure/payments/stripe-webhook.ts",
+    "src/infrastructure/requests/attorney-request-adapter.ts",
     "src/infrastructure/requests/consultation-request-adapter.ts",
     "src/infrastructure/resources/protected-resource-adapter.ts",
     // MVP-001 S4: the schedule adapter (a failed schedule call, with the

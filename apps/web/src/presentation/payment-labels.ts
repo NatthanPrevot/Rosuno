@@ -47,6 +47,8 @@ export const PAYMENT_STEP_TEXT: Readonly<Record<PaymentStep, string>> =
     not_required_now: "No payment step is needed at this stage of the request.",
     unavailable: "Payment is not available for this request right now.",
     not_applicable: "There is no payment step to take on this request now.",
+    authorization_after_acceptance:
+      "The attorney accepted this request. It now waits for your payment authorization. You complete the authorization on the payment provider's secure page; your card details are not shared with Rosuno.",
   });
 
 export const PAYMENT_STATUS_NOTE =

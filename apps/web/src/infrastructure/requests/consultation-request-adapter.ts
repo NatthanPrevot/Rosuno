@@ -5,7 +5,9 @@
 // request's own cookie session): the client's request review, options, slot
 // starts and quote preview reads, the client's own Request and Intake
 // requests reads, the PS-A2 environment accessor, and the two request
-// functions (creation and withdrawal). Each function is called by its literal
+// functions (creation and withdrawal); MVP-001 S8: also the client's own
+// decision read (the attorney's outcome, the Consultation's state and the
+// Booking's times). Each function is called by its literal
 // name, exactly once in this module. No privileged credential or client is
 // used or seen here, and nothing reads a table directly. Every call is
 // bounded in time; anything that fails, throws, or is too slow is reported as
@@ -345,6 +347,14 @@ export function createRequestReads(
           observedRead("deployment_environment_identity", deadlineMs, () =>
             client.rpc("deployment_environment_identity"),
           ),
+        decision: async (requestId: string) =>
+          isId(requestId)
+            ? observedRead("client_request_decision", deadlineMs, () =>
+                client.rpc("client_request_decision", {
+                  p_request_id: requestId,
+                }),
+              )
+            : UNREADABLE_ROWS,
       },
       deadlineMs,
     );

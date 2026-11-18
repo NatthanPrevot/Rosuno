@@ -2921,6 +2921,8 @@ const REQUEST_RPCS = Object.freeze([
   "client_intake_requests",
   "request_create",
   "request_withdraw",
+  // MVP-001 S8: the client's own decision read, called the same way.
+  "client_request_decision",
 ]);
 // MVP-001 S6 PS-A3: the consultation offer adapter calls the database's own
 // two offer reads (the attorney's options and offer list), the two offer
@@ -2942,6 +2944,20 @@ const OFFER_RPCS = Object.freeze([
 // an attempt or a refund), each exactly once and each as a literal call
 // through the request's own unprivileged session; it builds or receives no
 // privileged client, and no other file names any of the fourteen functions.
+// MVP-001 S8: the attorney request adapter calls the database's own two
+// attorney request reads (the queue and one Request), the two decision
+// functions (accepting and declining) and the PS-A2 environment accessor
+// (checked before a decision), each exactly once and each as a literal call
+// through the request's own unprivileged session; it builds or receives no
+// privileged client, and no other file names any of the four functions.
+const ATTORNEY_REQUEST_ADAPTER =
+  "src/infrastructure/requests/attorney-request-adapter.ts";
+const ATTORNEY_REQUEST_RPCS = Object.freeze([
+  "attorney_requests",
+  "attorney_request",
+  "attorney_accept_request",
+  "attorney_decline_request",
+]);
 const PAYMENT_ADAPTER = "src/infrastructure/payments/payment-adapter.ts";
 const PAYMENT_RPCS = Object.freeze([
   "client_request_payment",
@@ -2997,6 +3013,9 @@ const RPC_OCCURRENCES = Object.freeze({
   // MVP-001 S7: the fourteen payment functions, plus the environment
   // accessor.
   [PAYMENT_ADAPTER]: PAYMENT_RPCS.length + 1,
+  // MVP-001 S8: the four attorney request functions, plus the environment
+  // accessor.
+  [ATTORNEY_REQUEST_ADAPTER]: ATTORNEY_REQUEST_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -3135,6 +3154,32 @@ function assertQuotaRpcContract(codes) {
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
       );
     }
+    // MVP-001 S8: the attorney request functions, as for the offer functions.
+    for (const name of ATTORNEY_REQUEST_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === ATTORNEY_REQUEST_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== ATTORNEY_REQUEST_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === ATTORNEY_REQUEST_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        ATTORNEY_REQUEST_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
     // MVP-001 S7: the payment functions, as for the offer functions.
     for (const name of PAYMENT_RPCS) {
       assert.equal(
@@ -3179,7 +3224,8 @@ function assertQuotaRpcContract(codes) {
         file === DISCOVERY_ADAPTER ||
         file === REQUEST_ADAPTER ||
         file === OFFER_ADAPTER ||
-        file === PAYMENT_ADAPTER
+        file === PAYMENT_ADAPTER ||
+        file === ATTORNEY_REQUEST_ADAPTER
         ? 1
         : 0,
       file,

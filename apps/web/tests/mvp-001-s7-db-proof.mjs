@@ -84,6 +84,14 @@ const S7_MIGRATIONS = Object.freeze([
   "20261123010000_mvp_001_s7_payment_integrity.sql",
   "20261123020000_mvp_001_s7_payment_engine.sql",
 ]);
+// MVP-001 S8: the three S8 migrations follow the S7 migrations (applied by
+// this proof as later registered migrations; registered and checked by the S8
+// proof).
+const S8_MIGRATIONS = Object.freeze([
+  "20261124010000_mvp_001_s8_decision_integrity.sql",
+  "20261124020000_mvp_001_s8_attorney_decision.sql",
+  "20261124030000_mvp_001_s8_change_review.sql",
+]);
 
 const report = {
   proof: "MVP-001 S7 disposable local PostgreSQL proof",
@@ -433,9 +441,10 @@ function applyMigrations() {
   ).migrations;
   // S7 follows S6 PS-A3, contiguous and in order, and every S7 migration is
   // registered unreviewed (sequences 42 and 43) and applied nowhere.
+  // MVP-001 S8: then exactly the three S8 migrations.
   const s6 = files.indexOf(S6_LAST);
   assert.ok(s6 >= 0, "the S6 PS-A3 migration is present");
-  assert.deepEqual(files.slice(s6 + 1), [...S7_MIGRATIONS]);
+  assert.deepEqual(files.slice(s6 + 1), [...S7_MIGRATIONS, ...S8_MIGRATIONS]);
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),

@@ -10,8 +10,10 @@
 // instants come from the database and are shown in UTC. The server decides
 // every expiry; these labels only show what it reports. MVP-001 S6 PS-A3: the
 // optional message's wording, its maximum (from the database) and its count.
+// MVP-001 S8: the attorney's decision, the Consultation's state and its time.
 
 import type {
+  ConsultationState,
   RequestActionState,
   RequestPath,
   RequestState,
@@ -124,6 +126,40 @@ export const YOUR_MESSAGE = "Your message";
 
 export const EXPIRED_NOTE =
   "This request has expired. Its price cannot be used again. To try again, select an attorney again from your Intake.";
+
+// MVP-001 S8: the attorney's decision as the client sees it. No attorney
+// contact detail is shown; after a decline Rosuno names no other attorney.
+export const COULD_NOT_PROCEED_LABEL: {
+  readonly label: string;
+  readonly tone: Tone;
+} = Object.freeze({ label: "Could not go ahead", tone: "warning" });
+
+export const DECISION_ACCEPTED =
+  "The attorney accepted this request. Your consultation is shown below as Rosuno recorded it.";
+
+export const DECISION_CONSULTATION_PENDING =
+  "The attorney accepted this request. Your consultation is set up once the payment step is complete.";
+
+export const DECISION_DECLINED =
+  "The attorney did not accept this request. Your Intake is kept, and you can select an attorney again from it.";
+
+export const DECISION_COULD_NOT_PROCEED =
+  "This request could not go ahead. Your Intake is kept, and you can select an attorney again from it.";
+
+export const SELECT_AGAIN_LABEL = "Back to your Intake";
+
+export const CONSULTATION_STATE_TEXT: Readonly<
+  Record<ConsultationState, string>
+> = Object.freeze({
+  created: "Being set up",
+  scheduled: "Scheduled",
+  ready: "Ready",
+  live: "In progress",
+  completed: "Completed",
+  cancelled: "Cancelled",
+  no_show: "Did not take place",
+  technical_failure: "Could not take place",
+});
 
 export function quoteStatusText(
   status:
