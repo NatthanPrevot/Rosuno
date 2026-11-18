@@ -1127,6 +1127,9 @@ test("S7-12. the payment step is read strictly for the client's own Request: the
     ).status,
     "sign-in-required",
   );
+  // MVP-001 S8: exactly one more step, the authorization of an accepted
+  // Request whose flow authorizes at the attorney's acceptance; it is the
+  // only other step with which an attempt can start.
   assert.deepEqual(
     [...PAYMENT_STEPS],
     [
@@ -1134,8 +1137,33 @@ test("S7-12. the payment step is read strictly for the client's own Request: the
       "not_required_now",
       "unavailable",
       "not_applicable",
+      "authorization_after_acceptance",
     ],
   );
+  const afterAcceptance = await resolveRequestPayment(
+    clientWorld({
+      payment: [paymentRow({ payment_step: "authorization_after_acceptance" })],
+    }).sources,
+    REQUEST,
+  );
+  assert.deepEqual(
+    [afterAcceptance.payment.step, afterAcceptance.payment.payable],
+    ["authorization_after_acceptance", true],
+  );
+  for (const step of ["unavailable", "not_applicable"]) {
+    assert.equal(
+      (
+        await resolveRequestPayment(
+          clientWorld({
+            payment: [paymentRow({ payable: true, payment_step: step })],
+          }).sources,
+          REQUEST,
+        )
+      ).status,
+      "unavailable",
+      step,
+    );
+  }
 });
 
 test("S7-13. (Packet rule 7; MBS section 12) authorizing: with payments unconfigured the client gets the fixed unavailable outcome and nothing is sent; an unbound environment refuses before the database is asked; otherwise the database's attempt, one bounded worker run and the provider's hosted page (read by the server) answer a redirect", async () => {

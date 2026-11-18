@@ -227,6 +227,8 @@ export type RequestReads = {
   readonly intakeRequests: (intakeId: string) => Promise<RowsResult>;
   // deployment_environment_identity()
   readonly environmentIdentity: () => Promise<RowsResult>;
+  // MVP-001 S8: client_request_decision(request)
+  readonly decision: (requestId: string) => Promise<RowsResult>;
 };
 
 export type CreateAnswer =
@@ -1128,6 +1130,152 @@ export async function resolveConsultationRequest(
       withdrawable:
         !request.expiredDue && isOneOf(UNDECIDED_STATES, request.state),
     });
+  } catch {
+    return UNAVAILABLE_VIEW;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The attorney's decision, as the client sees it (MVP-001 S8)
+// ---------------------------------------------------------------------------
+
+export const DECISION_COLUMNS = Object.freeze([
+  "request_id",
+  "state",
+  "decided_at",
+  "ended_reason",
+  "consultation_id",
+  "consultation_state",
+  "booking_starts_at",
+  "booking_ends_at",
+  "intake_id",
+]);
+
+// How a Request ended, for the client: declined by the attorney, expired at
+// its server deadline, withdrawn by the client, or could not go ahead (the
+// attorney could not take it at the decision point; PM row 38).
+export const ENDED_REASONS = Object.freeze([
+  "declined",
+  "expired",
+  "withdrawn",
+  "could_not_proceed",
+] as const);
+export type EndedReason = (typeof ENDED_REASONS)[number];
+
+// The Consultation lifecycle (DM section 2.4).
+export const CONSULTATION_STATES = Object.freeze([
+  "created",
+  "scheduled",
+  "ready",
+  "live",
+  "completed",
+  "cancelled",
+  "no_show",
+  "technical_failure",
+] as const);
+export type ConsultationState = (typeof CONSULTATION_STATES)[number];
+
+export type RequestDecision = {
+  readonly id: string;
+  readonly state: RequestState;
+  readonly decidedAt: string | null;
+  readonly endedReason: EndedReason | null;
+  readonly consultationState: ConsultationState | null;
+  readonly bookingStart: string | null;
+  readonly bookingEnd: string | null;
+  // The client's own Intake, to select an attorney again after a decline.
+  readonly intakeId: string;
+};
+
+function readDecision(row: unknown): RequestDecision | null {
+  const fields = readExact(row, DECISION_COLUMNS);
+  if (fields === null) {
+    return null;
+  }
+  const id = fields.get("request_id");
+  const state = fields.get("state");
+  const decidedAt = fields.get("decided_at");
+  const endedReason = fields.get("ended_reason");
+  const consultationId = fields.get("consultation_id");
+  const consultationState = fields.get("consultation_state");
+  const bookingStart = fields.get("booking_starts_at");
+  const bookingEnd = fields.get("booking_ends_at");
+  const intakeId = fields.get("intake_id");
+  if (
+    !isUuid(id) ||
+    !isOneOf(REQUEST_STATES, state) ||
+    !(decidedAt === null || isTimestamp(decidedAt)) ||
+    (decidedAt !== null) !== (state === "accepted" || state === "declined") ||
+    !(endedReason === null || isOneOf(ENDED_REASONS, endedReason)) ||
+    (endedReason !== null) !==
+      (state === "declined" || state === "expired" || state === "cancelled") ||
+    !(consultationId === null || isUuid(consultationId)) ||
+    (consultationId !== null && state !== "accepted") ||
+    !(
+      consultationState === null ||
+      isOneOf(CONSULTATION_STATES, consultationState)
+    ) ||
+    (consultationState === null) !== (consultationId === null) ||
+    !(bookingStart === null || isTimestamp(bookingStart)) ||
+    !(bookingEnd === null || isTimestamp(bookingEnd)) ||
+    (bookingStart === null) !== (bookingEnd === null) ||
+    (bookingStart !== null && consultationId === null) ||
+    !isUuid(intakeId)
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    id,
+    state,
+    decidedAt,
+    endedReason: endedReason as EndedReason | null,
+    consultationState: consultationState as ConsultationState | null,
+    bookingStart,
+    bookingEnd,
+    intakeId,
+  });
+}
+
+export type RequestDecisionView =
+  | { readonly status: "ready"; readonly decision: RequestDecision }
+  | { readonly status: "not-found" }
+  | { readonly status: "unavailable" };
+
+// The decision on one of the client's own Requests. Called after the Request
+// itself was shown, for the same request id; another client's or an unknown
+// Request is not found.
+export async function resolveRequestDecision(
+  sources: Pick<RequestSources, "session" | "clientIntake" | "reads">,
+  requestId: unknown,
+): Promise<RequestDecisionView> {
+  try {
+    if (!isUuid(requestId)) {
+      return NOT_FOUND;
+    }
+    const session = await resolveSession(sources.session);
+    if (session.status !== "authenticated") {
+      return UNAVAILABLE_VIEW;
+    }
+    const client = await verifiedClientOf(sources.clientIntake);
+    if (!("clientId" in client)) {
+      return UNAVAILABLE_VIEW;
+    }
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE_VIEW;
+    }
+    const rows = rowsOf(await attempt(() => reads.decision(requestId)));
+    if (rows === null || rows.length > 1) {
+      return UNAVAILABLE_VIEW;
+    }
+    if (rows.length === 0) {
+      return NOT_FOUND;
+    }
+    const decision = readDecision(rows[0]);
+    if (decision === null || decision.id !== requestId) {
+      return UNAVAILABLE_VIEW;
+    }
+    return Object.freeze({ status: "ready", decision });
   } catch {
     return UNAVAILABLE_VIEW;
   }

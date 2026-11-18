@@ -1432,6 +1432,13 @@ function probes() {
           // recording function (service_role only), which writes only
           // ai_suggestions and audit events; no M4 relation.
           "ai_record_intake_suggestion:v",
+          // MVP-001 S8 (20261124020000): the attorney's decision functions
+          // (authenticated, aal2), which write only Consultation Requests,
+          // Eligibility and Bookability Evaluations (appended), Consultations,
+          // Engagements, Bookings, Holds, payment transitions through the S7
+          // functions, jobs and audit events; no M4 relation (eligibility is
+          // read FOR SHARE by the S5 recorder).
+          "attorney_accept_request:v",
           "attorney_change_practice_area_request:v",
           // MVP-001 S6 PS-A3 re-pin (20261122040000): the attorney's own offer
           // options and offer list reads (authenticated, aal2), which write
@@ -1445,12 +1452,17 @@ function probes() {
           "attorney_create_availability_rule:v",
           "attorney_create_blackout:v",
           "attorney_deactivate_availability_rule:v",
+          "attorney_decline_request:v",
           "attorney_instant_status:s",
           // MVP-001 S7 re-pin (20261123020000): the attorney's own ledger-derived
           // earnings read (authenticated, aal2), which writes nothing.
           "attorney_payment_earnings:s",
           "attorney_remove_blackout:v",
+          // MVP-001 S8 (20261124020000): the attorney's own request reads
+          // (authenticated, aal2), which write nothing.
+          "attorney_request:s",
           "attorney_request_practice_area:v",
+          "attorney_requests:s",
           "attorney_save_insurance_claim:v",
           "attorney_save_license_claim:v",
           "attorney_save_profile_details:v",
@@ -1509,6 +1521,9 @@ function probes() {
           // MVP-001 S6 re-pin (20261122030000): the client's own Request
           // (authenticated only), which writes nothing.
           "client_request:s",
+          // MVP-001 S8 (20261124020000): the client's own decision read
+          // (authenticated), which writes nothing.
+          "client_request_decision:s",
           "client_request_intake_change:v",
           // MVP-001 S7 re-pin (20261123020000): the client's own payment step
           // read (authenticated only), which writes nothing.
@@ -1518,9 +1533,28 @@ function probes() {
           "client_request_review:s",
           "client_save_intake_revision:v",
           "client_submit_intake:v",
+          // MVP-001 S8 (20261124020000): the capture trigger (no API role),
+          // which writes only Consultations, Engagements, payment associations
+          // and audit events; no M4 relation.
+          "decision_payment_captured:v",
+          // MVP-001 S8 (20261124030000): the deferred review triggers (no API
+          // role), which read eligibility facts and write only Reconciliation
+          // Exceptions and audit events; no M4 relation.
+          "decision_review_attorney_fact:v",
+          "decision_review_attorney_profile:v",
+          "decision_review_attorney_user:v",
+          "decision_review_authority_reference:v",
+          "decision_review_eligibility_policy:v",
+          "decision_review_evidence:v",
+          "decision_review_evidence_subject:v",
+          "decision_review_jurisdiction_state:v",
           // MVP-001 S1 re-pin (20261117010000): the environment identity
           // accessors and the environment-anchored policy resolver.
           "deployment_environment_identity:s",
+          // MVP-001 S8 re-pin (20261124010000): the P1 deferred
+          // Consultation/payment check, now security definer like the S6
+          // Request checks; read only.
+          "enforce_payment_consultation_consistency:v",
           // MVP-001 S6 re-pin (20261122010000): the two P1 deferred
           // Request/payment and Request/Hold consistency checks, now security
           // definer (trigger functions, executable by no API role), which
@@ -1574,6 +1608,9 @@ function probes() {
           // which only read.
           "referral_evidence_with_referral:v",
           "referral_point_in_time_evidence:v",
+          // MVP-001 S8 (20261124010000): the deferred acceptance evidence check
+          // (no API role); read only.
+          "request_acceptance_evidence:v",
           // MVP-001 S6 re-pin (20261122030000): the client's Request creation
           // (authenticated only), which writes the Request, its evidence, Fee
           // Calculation, Hold and audit event and, of the M4 relations, only
@@ -1701,11 +1738,24 @@ function probes() {
       // MVP-001 S5 admits exactly two more, on eligibility_evaluations: the
       // append-only guard for every role (row update or delete, and
       // truncate), which only refuses. The list is now read in a fixed order.
+      // MVP-001 S8 admits exactly seven more, one per eligibility fact relation
+      // the review reads (attorney_profiles, discipline_records,
+      // insurance_records, licenses, practice_area_authorisations,
+      // verification_evidence, verification_evidence_subjects): deferred
+      // constraint triggers that never write an M4 relation (they read the
+      // facts and open review Reconciliation Exceptions, 20261124030000),
+      // pinned below to their function, deferral and timing.
       assert.equal(
         sql(
           `select coalesce(string_agg(c.relname || ':' || t.tgname, ',' order by c.relname, t.tgname), '') from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in (${m4}, 'audit_events') and not t.tgisinternal and t.tgname not like '%set_updated_at' and t.tgname <> 'audit_events_immutable';`,
         ),
-        "eligibility_evaluations:eligibility_evaluations_append_only,eligibility_evaluations:eligibility_evaluations_no_truncate,verification_evidence:verification_evidence_artifact_guard",
+        "attorney_profiles:attorney_profiles_decision_review,discipline_records:discipline_records_decision_review,eligibility_evaluations:eligibility_evaluations_append_only,eligibility_evaluations:eligibility_evaluations_no_truncate,insurance_records:insurance_records_decision_review,licenses:licenses_decision_review,practice_area_authorisations:practice_area_authorisations_decision_review,verification_evidence:verification_evidence_artifact_guard,verification_evidence:verification_evidence_decision_review,verification_evidence_subjects:verification_evidence_subjects_decision_review",
+      );
+      assert.equal(
+        sql(
+          "select string_agg(t.tgname || '|' || p.proname || '|' || p.prosecdef::text || '|' || t.tgdeferrable::text || '|' || t.tginitdeferred::text || '|' || t.tgtype::text, ',' order by t.tgname) from pg_trigger t join pg_proc p on p.oid = t.tgfoid where t.tgname like '%_decision_review' and t.tgrelid in ('public.attorney_profiles'::regclass, 'public.discipline_records'::regclass, 'public.insurance_records'::regclass, 'public.licenses'::regclass, 'public.practice_area_authorisations'::regclass, 'public.verification_evidence'::regclass, 'public.verification_evidence_subjects'::regclass);",
+        ),
+        "attorney_profiles_decision_review|decision_review_attorney_profile|true|true|true|17,discipline_records_decision_review|decision_review_attorney_fact|true|true|true|29,insurance_records_decision_review|decision_review_attorney_fact|true|true|true|29,licenses_decision_review|decision_review_attorney_fact|true|true|true|29,practice_area_authorisations_decision_review|decision_review_attorney_fact|true|true|true|29,verification_evidence_decision_review|decision_review_evidence|true|true|true|17,verification_evidence_subjects_decision_review|decision_review_evidence_subject|true|true|true|29",
       );
       assert.equal(
         sql(

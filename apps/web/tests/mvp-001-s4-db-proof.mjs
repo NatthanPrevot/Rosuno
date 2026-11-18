@@ -414,7 +414,7 @@ function applyMigrations() {
   // migrations, contiguous and in order, follow S4; MVP-001 S6: then exactly
   // the three S6 migrations, contiguous and in order; MVP-001 S6 PS-A3: then
   // exactly the PS-A3 migration; MVP-001 S7: then exactly the two S7
-  // migrations.
+  // migrations; MVP-001 S8: then exactly the three S8 migrations.
   const s3 = files.indexOf(S3_LAST);
   assert.ok(s3 >= 0, "the last S3 migration is present");
   assert.deepEqual(files.slice(s3 + 1, s3 + 1 + S4_MIGRATIONS.length), [
@@ -430,6 +430,9 @@ function applyMigrations() {
     "20261122040000_mvp_001_s6_consultation_offers.sql",
     "20261123010000_mvp_001_s7_payment_integrity.sql",
     "20261123020000_mvp_001_s7_payment_engine.sql",
+    "20261124010000_mvp_001_s8_decision_integrity.sql",
+    "20261124020000_mvp_001_s8_attorney_decision.sql",
+    "20261124030000_mvp_001_s8_change_review.sql",
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -840,15 +843,41 @@ function scheduledHold({
 
 // MVP-001 S6: acceptance walks the DM section 9 path (20261122010000):
 // scheduled slot_held, instant payment_authorized, then awaiting_attorney,
-// then accepted.
+// then accepted. MVP-001 S8: an acceptance commits only with its own fresh
+// decision-point evidence (20261124010000: an eligible Eligibility
+// Evaluation of the attorney in the Referral's jurisdiction and a bookable
+// consultation_request Bookability Evaluation for the Request's modality and,
+// when scheduled, its Hold's slot, written by the acceptance's transaction),
+// so the fixture records that evidence first, derived from the Request.
 const ACCEPT = (request) =>
-  `update public.consultation_requests set state = 'payment_authorized' where id = '${request}' and state = 'created' and request_path = 'instant';
+  `with r as (
+     select q.id, q.selected_attorney_id, f.jurisdiction_id, q.requested_modality, h.slot_start_at, h.slot_end_at
+     from public.consultation_requests as q
+     join public.referrals as f on f.id = q.referral_id
+     left join public.slot_holds as h on h.consultation_request_id = q.id
+     where q.id = '${request}'
+   ), e as (
+     insert into public.eligibility_evaluations (attorney_id, jurisdiction_id, context_type, context_id, evaluated_at, policy_references, result, factor_results, evidence_references, as_of)
+     select r.selected_attorney_id, r.jurisdiction_id, 'jurisdiction', null, now(), '[]'::jsonb, 'eligible', '[]'::jsonb, '{}'::jsonb, now() from r
+     returning id, attorney_id
+   )
+   insert into public.bookability_evaluations (attorney_id, eligibility_evaluation_id, context_type, context_id, evaluated_at, as_of, modality, slot_start_at, slot_end_at, constraint_results, result)
+   select e.attorney_id, e.id, 'consultation_request', r.id, now(), now(), r.requested_modality, r.slot_start_at, r.slot_end_at, '[]'::jsonb, 'bookable' from e cross join r;
+   update public.consultation_requests set state = 'payment_authorized' where id = '${request}' and state = 'created' and request_path = 'instant';
    update public.consultation_requests set state = 'awaiting_attorney' where id = '${request}' and state in ('slot_held', 'payment_authorized');
    update public.consultation_requests set state = 'accepted', accepted_at = clock_timestamp() where id = '${request}';`;
 
+// MVP-001 S8: a Consultation is created in state created with its Request's
+// current fee policy (20261124010000); a scheduled one then moves to
+// scheduled (DM section 2.4: an instant one never does).
 const CONSULTATION = (consultation, request, attorney, client, requestPath) =>
-  `insert into public.consultations (id, consultation_request_id, client_id, attorney_id, request_path, referral_policy_version_id, modality, state)
-   values ('${consultation}', '${request}', '${client.client}', '${attorney.profile}', '${requestPath}', '${world.referralPolicy}', 'video', 'scheduled');`;
+  `insert into public.consultations (id, consultation_request_id, client_id, attorney_id, request_path, referral_policy_version_id, fee_policy_version_id, modality, state)
+   values ('${consultation}', '${request}', '${client.client}', '${attorney.profile}', '${requestPath}', '${world.referralPolicy}', '${world.feePolicy}', 'video', 'created');${
+     requestPath === "scheduled"
+       ? `
+   update public.consultations set state = 'scheduled' where id = '${consultation}';`
+       : ""
+   }`;
 
 const CONVERT = (hold, consultation) =>
   `select outcome || '|' || coalesce(booking_id::text, '') from public.scheduling_convert_hold_to_booking('${hold}', '${consultation}');`;

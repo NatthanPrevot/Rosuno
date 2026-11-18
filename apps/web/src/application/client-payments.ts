@@ -65,6 +65,9 @@ export const PAYMENT_STEPS = Object.freeze([
   "not_required_now",
   "unavailable",
   "not_applicable",
+  // MVP-001 S8: the Request is accepted and its payment flow authorizes at
+  // the attorney's acceptance (configuration decides).
+  "authorization_after_acceptance",
 ] as const);
 export type PaymentStep = (typeof PAYMENT_STEPS)[number];
 
@@ -243,7 +246,9 @@ function readRequestPayment(
     f.get("consultation_request_id") !== requestId ||
     !isOneOf(PAYMENT_STEPS, step) ||
     typeof payable !== "boolean" ||
-    (payable && step !== "authorization_required") ||
+    (payable &&
+      step !== "authorization_required" &&
+      step !== "authorization_after_acceptance") ||
     !nullableAmount(total) ||
     !(currency === null || isCurrencyCode(currency)) ||
     !(id === null || isUuid(id)) ||

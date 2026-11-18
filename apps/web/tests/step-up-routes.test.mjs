@@ -81,6 +81,8 @@ const GATED_ACTIONS = {
   "app/attorney/schedule/actions.ts": "attorney",
   // MVP-001 S6 PS-A3: the attorney's offer price and withdrawal changes.
   "app/attorney/offers/actions.ts": "attorney",
+  // MVP-001 S8: the attorney's acceptance and decline of a request.
+  "app/attorney/requests/actions.ts": "attorney",
   "app/staff/actions.ts": "staff",
   // MVP-001 S7: the finance workspace changes.
   "app/staff/finance/actions.ts": "staff",
@@ -174,8 +176,15 @@ test("S2-R3. every attorney page and every staff page asks the step-up gate firs
   // MVP-001 S2: sixteen pages, and the operational job view. MVP-001 S3
   // part 2: and the jurisdiction assessment review. MVP-001 S4: and the
   // attorney schedule. MVP-001 S6 PS-A3: and the attorney's offers. MVP-001
-  // S7: and the attorney's earnings and the three finance pages.
-  assert.equal(GATED_PAGES.length, 24);
+  // S7: and the attorney's earnings and the three finance pages. MVP-001 S8:
+  // and the attorney's request queue and request page.
+  assert.equal(GATED_PAGES.length, 26);
+  for (const file of [
+    "app/attorney/requests/page.tsx",
+    "app/attorney/requests/[request]/page.tsx",
+  ]) {
+    assert.ok(GATED_PAGES.includes(file), file);
+  }
   for (const file of [
     "app/attorney/earnings/page.tsx",
     "app/staff/finance/page.tsx",
@@ -255,9 +264,11 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
     // MVP-001 S4: the schedule's five changes and its heartbeat, the
     // heartbeat answering the gate's refusal unchanged like every change.
     // MVP-001 S6 PS-A3: the offers' two changes (price and withdrawal).
+    // MVP-001 S8: the request decision's two changes (accept and decline).
     const verification = file === "app/staff/verification/actions.ts";
     const offers = file === "app/attorney/offers/actions.ts";
-    const expected = verification ? 7 : offers ? 2 : 6;
+    const requests = file === "app/attorney/requests/actions.ts";
+    const expected = verification ? 7 : offers || requests ? 2 : 6;
     const exported = [...code.matchAll(/^export async function (\w+)\(/gm)];
     assert.equal(exported.length, expected, file);
     assert.equal(

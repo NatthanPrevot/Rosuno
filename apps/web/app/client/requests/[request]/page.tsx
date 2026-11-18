@@ -23,6 +23,15 @@
 // payment provider's hosted page returns the client: the status shown is
 // always the one Rosuno recorded, never what the browser or the provider page
 // said. The wording is fixed and neutral.
+//
+// MVP-001 S8: the page also shows the attorney's decision the database
+// reports: after an acceptance, the Consultation's state and, for a scheduled
+// Request, its Booking's time (no attorney contact detail); after a decline
+// or a Request that could not go ahead, a link back to the client's own
+// Intake, from which the client selects an attorney again (a new Referral and
+// a new Request; Rosuno names no other attorney). An accepted Request whose
+// payment flow authorizes at the attorney's acceptance shows the
+// authorization step (configuration decides).
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -30,7 +39,10 @@ import { connection } from "next/server";
 import type { ReactNode } from "react";
 
 import { resolveRequestPayment } from "../../../../src/application/client-payments.ts";
-import { resolveConsultationRequest } from "../../../../src/application/consultation-request.ts";
+import {
+  resolveConsultationRequest,
+  resolveRequestDecision,
+} from "../../../../src/application/consultation-request.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
 import { CLIENT_PAYMENT_SOURCES } from "../../../../src/infrastructure/payments/payment-adapter.ts";
 import { REQUEST_SOURCES } from "../../../../src/infrastructure/requests/consultation-request-adapter.ts";
@@ -48,12 +60,19 @@ import {
   Text,
 } from "../../../../src/presentation/design-system.tsx";
 import {
+  CONSULTATION_STATE_TEXT,
+  COULD_NOT_PROCEED_LABEL,
+  DECISION_ACCEPTED,
+  DECISION_CONSULTATION_PENDING,
+  DECISION_COULD_NOT_PROCEED,
+  DECISION_DECLINED,
   durationText,
   EXPIRED_NOTE,
   modalityText,
   moneyText,
   REQUEST_PATH_LABELS,
   REQUEST_STATE_LABELS,
+  SELECT_AGAIN_LABEL,
   SERVER_TIME_NOTE,
   utcText,
   YOUR_MESSAGE,
@@ -150,7 +169,19 @@ export default async function RequestPage({
     );
   }
   const record = view.request;
-  const state = REQUEST_STATE_LABELS[view.displayState];
+  const decisionView = await resolveRequestDecision(REQUEST_SOURCES, record.id);
+  if (decisionView.status !== "ready") {
+    await logRequestEvent("warn", "consultation_request.view_unavailable", {
+      route: "/client/requests/[request]",
+      outcome: `decision-${decisionView.status}`,
+    });
+  }
+  const decision =
+    decisionView.status === "ready" ? decisionView.decision : null;
+  const state =
+    decision?.endedReason === "could_not_proceed"
+      ? COULD_NOT_PROCEED_LABEL
+      : REQUEST_STATE_LABELS[view.displayState];
   const amounts = record.amounts;
   const paymentView = await resolveRequestPayment(
     CLIENT_PAYMENT_SOURCES,
@@ -234,6 +265,56 @@ export default async function RequestPage({
           </tbody>
         </Table>
       )}
+      {decision !== null && decision.state === "accepted" ? (
+        <Stack gap="tight">
+          <Heading as="h2" size="md">
+            Consultation
+          </Heading>
+          {decision.consultationState === null ? (
+            <Text>{DECISION_CONSULTATION_PENDING}</Text>
+          ) : (
+            <>
+              <Text>{DECISION_ACCEPTED}</Text>
+              <Table id="request-consultation" caption="Your consultation">
+                <tbody>
+                  <tr>
+                    <th scope="row">Status</th>
+                    <td>
+                      {CONSULTATION_STATE_TEXT[decision.consultationState]}
+                    </td>
+                  </tr>
+                  {decision.bookingStart === null ||
+                  decision.bookingEnd === null ? null : (
+                    <tr>
+                      <th scope="row">Time</th>
+                      <td>{`${utcText(decision.bookingStart)} to ${utcText(decision.bookingEnd)}`}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </Table>
+            </>
+          )}
+        </Stack>
+      ) : null}
+      {decision !== null &&
+      (decision.endedReason === "declined" ||
+        decision.endedReason === "could_not_proceed") ? (
+        <Stack gap="tight">
+          <Text>
+            {decision.endedReason === "declined"
+              ? DECISION_DECLINED
+              : DECISION_COULD_NOT_PROCEED}
+          </Text>
+          <Cluster>
+            <ButtonLink
+              variant="secondary"
+              href={`/client/intakes/${decision.intakeId}`}
+            >
+              {SELECT_AGAIN_LABEL}
+            </ButtonLink>
+          </Cluster>
+        </Stack>
+      ) : null}
       {record.message === null ? null : (
         <Stack gap="tight">
           <Heading as="h2" size="md">

@@ -11,7 +11,10 @@
 // resolution notes. An open exception can be assigned to oneself, have its
 // assignment cleared, or be resolved once with notes; each change is audited.
 // The two query values read, status and page, only choose the list and the
-// page; the server checks both.
+// page; the server checks both. MVP-001 S8: review items about a Request or a
+// Consultation (eligibility and jurisdiction changes, PM rows 37-45) are
+// listed the same way; the payment link is offered only for an exception
+// whose canonical object is a payment transaction.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -113,7 +116,8 @@ export default async function ReconciliationExceptionsPage({
                   </Status>
                 </Cluster>
                 <Text size="small">{`Detected ${utcText(exception.detectedAt)} from ${exception.sourceType.replaceAll("_", " ")}`}</Text>
-                {exception.canonicalId === null ? null : (
+                {exception.canonicalId === null ||
+                exception.canonicalType !== "payment_transaction" ? null : (
                   <Cluster>
                     <ButtonLink
                       variant="tertiary"
