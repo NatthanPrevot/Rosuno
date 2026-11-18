@@ -11,7 +11,9 @@
 // soon as the server reports a deadline passed, even before the expiry is
 // recorded: the browser never decides it), the consultation asked for, how
 // soon, the held time, the attorney-side price and platform fee, the server
-// deadlines in UTC and, after acceptance, the consultation's state and time.
+// deadlines in UTC and, after acceptance, the consultation's state and time
+// (MVP-001 S9: with one link to the consultation's own page, which decides
+// its own access).
 // While the Request awaits the attorney and is not past its deadline, the
 // accept and decline forms are offered; the database decides again, with
 // fresh evaluations, at the moment of the decision. Nothing of the client,
@@ -23,6 +25,7 @@ import { connection } from "next/server";
 import type { ReactNode } from "react";
 
 import { resolveAttorneyRequest } from "../../../../src/application/attorney-requests.ts";
+import { attorneyConsultationPathFor } from "../../../../src/application/consultations.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
 import { ATTORNEY_REQUEST_SOURCES } from "../../../../src/infrastructure/requests/attorney-request-adapter.ts";
 import {
@@ -215,6 +218,16 @@ export default async function AttorneyRequestPage({
                 )}
               </tbody>
             </Table>
+            {record.consultationId === null ? null : (
+              <Cluster>
+                <ButtonLink
+                  variant="secondary"
+                  href={attorneyConsultationPathFor(record.consultationId)}
+                >
+                  Open the consultation
+                </ButtonLink>
+              </Cluster>
+            )}
           </Stack>
         )
       ) : null}

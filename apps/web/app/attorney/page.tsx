@@ -14,8 +14,9 @@
 // eligibility, and points to the professional setup (P3-003), which shows
 // claims, evidence status, and recorded determinations separately, to the
 // schedule (MVP-001 S4), to the offers (MVP-001 S6, PS-A3), to the
-// ledger-derived earnings (MVP-001 S7) and to the request queue (MVP-001 S8),
-// each of which decides its own access. Refused
+// ledger-derived earnings (MVP-001 S7), to the request queue (MVP-001 S8)
+// and to the consultations (MVP-001 S9), each of which decides its own
+// access. Refused
 // and unavailable requests each see one fixed message and no profile data;
 // every refusal also offers the same fixed link to the attorney application
 // entry (P3-002), which decides afresh on its own.
@@ -157,6 +158,9 @@ export default async function AttorneyWorkspacePage() {
           </ButtonLink>
           <ButtonLink variant="secondary" href="/attorney/requests">
             Requests
+          </ButtonLink>
+          <ButtonLink variant="secondary" href="/attorney/consultations">
+            Consultations
           </ButtonLink>
           <ButtonLink variant="tertiary" href="/">
             Return to the home page

@@ -81,6 +81,13 @@
 // payment trigger functions. None writes an M4 relation; request_create is
 // replaced under its own name (already listed).
 //
+// MVP-001 S9 update: the three S9 migrations follow. SEC-1 lists exactly the
+// ten further definer functions, as exact assertions: the participants'
+// Consultation reads (three), media access, start and end, the Media Room
+// lifecycle trigger, and the media worker and webhook recording functions
+// (three). None writes an M4 relation (the start reads eligibility through the
+// S5 recorder, FOR SHARE).
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -1440,11 +1447,15 @@ function probes() {
           // read FOR SHARE by the S5 recorder).
           "attorney_accept_request:v",
           "attorney_change_practice_area_request:v",
+          // MVP-001 S9 (20261125030000): the attorney's own Consultation reads
+          // (authenticated, aal2), which write nothing.
+          "attorney_consultation:s",
           // MVP-001 S6 PS-A3 re-pin (20261122040000): the attorney's own offer
           // options and offer list reads (authenticated, aal2), which write
           // nothing.
           "attorney_consultation_offer_options:s",
           "attorney_consultation_offers:s",
+          "attorney_consultations:s",
           // MVP-001 S4 re-pin (20261120020000): the attorney's own schedule
           // functions (authenticated, aal2), which write only availability
           // rules, Blackouts, application sessions, Instant intents and
@@ -1500,6 +1511,9 @@ function probes() {
           // suggestion decision, which writes only ai_suggestions,
           // unreviewed jurisdiction assessments and audit events.
           "client_confirm_ai_suggestion:v",
+          // MVP-001 S9 (20261125030000): the client's own Consultation read
+          // (authenticated), which writes nothing.
+          "client_consultation:s",
           "client_create_intake:v",
           "client_intake_jurisdictions:s",
           "client_intake_practice_areas:s",
@@ -1533,6 +1547,17 @@ function probes() {
           "client_request_review:s",
           "client_save_intake_revision:v",
           "client_submit_intake:v",
+          // MVP-001 S9 (20261125020000): the participants' media access and the
+          // attorney's start and end (authenticated), which write only
+          // Consultations, Media Rooms, Engagements, appended Eligibility
+          // Evaluations, payment transitions through the S7 functions, jobs,
+          // Reconciliation Exceptions and audit events; and the Media Room
+          // lifecycle trigger (no API role), which writes only Media Rooms,
+          // jobs and audit events; no M4 relation.
+          "consultation_end:v",
+          "consultation_media_access:v",
+          "consultation_media_lifecycle:v",
+          "consultation_start:v",
           // MVP-001 S8 (20261124020000): the capture trigger (no API role),
           // which writes only Consultations, Engagements, payment associations
           // and audit events; no M4 relation.
@@ -1574,6 +1599,13 @@ function probes() {
           "job_claim:v",
           "job_complete:v",
           "job_fail:v",
+          // MVP-001 S9 (20261125030000): the media worker and webhook recording
+          // functions (service_role only), which write only Media Rooms, Media
+          // Sessions, participation records, receipts, jobs, Reconciliation
+          // Exceptions and audit events; no M4 relation.
+          "media_job_context:s",
+          "media_record_operation:v",
+          "media_record_provider_event:v",
           // MVP-001 S7 re-pin (20261123020000): the payment worker and webhook
           // recording functions (service_role only) and the two payment
           // trigger functions (executable by no API role), which write only

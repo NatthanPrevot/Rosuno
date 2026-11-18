@@ -2850,6 +2850,16 @@ const PAYMENT_RECORDING_RPCS = Object.freeze({
   payment_record_provider_event:
     'await admin\n          .rpc("payment_record_provider_event", {\n            p_provider_code: event.providerCode,\n            p_event_reference: event.eventReference,\n            p_event_type: event.eventType,\n            p_occurred_at: event.occurredAt,\n            p_payload_digest: event.payloadDigest,\n            p_observation: event.observation,\n          })\n          .abortSignal(AbortSignal.timeout(PAYMENT_CALL_DEADLINE_MS));',
 });
+// MVP-001 S9: the media recording port's three fixed calls, as the payment
+// recording port's.
+const MEDIA_RECORDING_RPCS = Object.freeze({
+  media_job_context:
+    'await admin\n          .rpc("media_job_context", { p_job_id: jobId })\n          .abortSignal(AbortSignal.timeout(MEDIA_CALL_DEADLINE_MS));',
+  media_record_operation:
+    'await admin\n          .rpc("media_record_operation", {\n            p_job_id: jobId,\n            p_provider_code: providerCode,\n            p_observation: observation,\n          })\n          .abortSignal(AbortSignal.timeout(MEDIA_CALL_DEADLINE_MS));',
+  media_record_provider_event:
+    'await admin\n          .rpc("media_record_provider_event", {\n            p_provider_code: event.providerCode,\n            p_event_reference: event.eventReference,\n            p_event_type: event.eventType,\n            p_occurred_at: event.occurredAt,\n            p_payload_digest: event.payloadDigest,\n            p_observation: event.observation,\n          })\n          .abortSignal(AbortSignal.timeout(MEDIA_CALL_DEADLINE_MS));',
+});
 const AI_SUGGESTION_RPCS = Object.freeze({
   ai_record_intake_suggestion:
     'await admin\n          .rpc("ai_record_intake_suggestion", {\n            p_user_id: input.userId,\n            p_intake_id: input.intakeId,\n            p_revision_number: input.revisionNumber,\n            p_suggestion_type: input.type,\n            p_suggestion_value: input.value,\n            p_model_reference: input.modelReference,\n            p_generated_at: input.generatedAt,\n          })\n          .abortSignal(AbortSignal.timeout(AI_RECORD_DEADLINE_MS));',
@@ -2958,6 +2968,23 @@ const ATTORNEY_REQUEST_RPCS = Object.freeze([
   "attorney_accept_request",
   "attorney_decline_request",
 ]);
+// MVP-001 S9: the consultation adapter calls the database's own three
+// Consultation reads (the client's, the attorney's and the attorney's list),
+// media access, the attorney's start and end, and the PS-A2 environment
+// accessor (checked before an action), each exactly once and each as a
+// literal call through the request's own unprivileged session; it builds or
+// receives no privileged client, and no other file names any of the six
+// functions.
+const CONSULTATION_ADAPTER =
+  "src/infrastructure/consultations/consultation-adapter.ts";
+const CONSULTATION_RPCS = Object.freeze([
+  "client_consultation",
+  "attorney_consultation",
+  "attorney_consultations",
+  "consultation_media_access",
+  "consultation_start",
+  "consultation_end",
+]);
 const PAYMENT_ADAPTER = "src/infrastructure/payments/payment-adapter.ts";
 const PAYMENT_RPCS = Object.freeze([
   "client_request_payment",
@@ -2989,7 +3016,9 @@ const RPC_OCCURRENCES = Object.freeze({
     Object.keys(AUTHENTICATION_ABUSE_RPCS).length +
     Object.keys(AI_SUGGESTION_RPCS).length +
     // MVP-001 S7: the three payment recording calls.
-    Object.keys(PAYMENT_RECORDING_RPCS).length,
+    Object.keys(PAYMENT_RECORDING_RPCS).length +
+    // MVP-001 S9: the three media recording calls.
+    Object.keys(MEDIA_RECORDING_RPCS).length,
   // MVP-001 S1: the staff adapter's second RPC is exactly the PS-A2
   // environment accessor, pinned by name below.
   [STAFF_ADAPTER]: 2,
@@ -3016,6 +3045,9 @@ const RPC_OCCURRENCES = Object.freeze({
   // MVP-001 S8: the four attorney request functions, plus the environment
   // accessor.
   [ATTORNEY_REQUEST_ADAPTER]: ATTORNEY_REQUEST_RPCS.length + 1,
+  // MVP-001 S9: the six Consultation functions, plus the environment
+  // accessor.
+  [CONSULTATION_ADAPTER]: CONSULTATION_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -3180,6 +3212,32 @@ function assertQuotaRpcContract(codes) {
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
       );
     }
+    // MVP-001 S9: the Consultation functions, as for the offer functions.
+    for (const name of CONSULTATION_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === CONSULTATION_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== CONSULTATION_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === CONSULTATION_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        CONSULTATION_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
     // MVP-001 S7: the payment functions, as for the offer functions.
     for (const name of PAYMENT_RPCS) {
       assert.equal(
@@ -3225,7 +3283,8 @@ function assertQuotaRpcContract(codes) {
         file === REQUEST_ADAPTER ||
         file === OFFER_ADAPTER ||
         file === PAYMENT_ADAPTER ||
-        file === ATTORNEY_REQUEST_ADAPTER
+        file === ATTORNEY_REQUEST_ADAPTER ||
+        file === CONSULTATION_ADAPTER
         ? 1
         : 0,
       file,
@@ -3240,6 +3299,7 @@ function assertQuotaRpcContract(codes) {
       ...Object.entries(AUTHENTICATION_ABUSE_RPCS),
       ...Object.entries(AI_SUGGESTION_RPCS),
       ...Object.entries(PAYMENT_RECORDING_RPCS),
+      ...Object.entries(MEDIA_RECORDING_RPCS),
     ]) {
       assert.equal(
         code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
@@ -3315,18 +3375,19 @@ function assertQuotaRpcContract(codes) {
   // verification provisioning, the quota decision, the MVP-001 S2
   // operational job worker, the MVP-001 S2 authentication-abuse decisions,
   // the MVP-001 S3 protected storage port, the MVP-001 S3 part 2 AI
-  // suggestion recording port, and the MVP-001 S7 payment recording port)
-  // and one publishable client (the confirmation request), each built only
-  // from the verified binding.
+  // suggestion recording port, and the MVP-001 S7 payment recording port;
+  // MVP-001 S9: eleven with the media recording port) and one publishable
+  // client (the confirmation request), each built only from the verified
+  // binding.
   assert.equal(
     provisioning.match(
       /\bcreate\(binding\.url, binding\.adminKey, clientOptions\(\)\)/g,
     ).length,
-    10,
+    11,
   );
-  assert.equal(provisioning.match(/\bcreate\(/g).length, 11);
+  assert.equal(provisioning.match(/\bcreate\(/g).length, 12);
   assert.equal(provisioning.match(/\bbinding\.publishableKey\b/g).length, 1);
-  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 10);
+  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 11);
   // The worker port is built exactly like the other ports: the verified
   // binding first, then its one cookie-free privileged client, never
   // returned; it offers exactly the three worker calls and nothing else.
@@ -3452,8 +3513,15 @@ function assertQuotaRpcContract(codes) {
   const paymentStart = provisioning.indexOf(
     "export async function createPaymentRecorder(",
   );
-  assert.ok(paymentStart > 0 && paymentStart < recorderStart);
-  const payment = provisioning.slice(paymentStart, recorderStart);
+  // MVP-001 S9: the media recording port sits in its own section between the
+  // payment recording port and the AI suggestion recording port, pinned the
+  // same way below.
+  const mediaStart = provisioning.indexOf(
+    "export async function createMediaRecorder(",
+  );
+  assert.ok(paymentStart > 0 && paymentStart < mediaStart);
+  assert.ok(mediaStart < recorderStart);
+  const payment = provisioning.slice(paymentStart, mediaStart);
   assert.match(
     payment,
     /\): Promise<PaymentRecorder \| null> \{\n {2}const binding = readProjectBinding\(environment\);\n {2}if \(binding === null\) \{\n {4}return null;\n {2}\}\n {2}const admin = create\(binding\.url, binding\.adminKey, clientOptions\(\)\);\n {2}return Object\.freeze\(\{\n {4}jobContext: async /,
@@ -3481,6 +3549,40 @@ function assertQuotaRpcContract(codes) {
   assert.doesNotMatch(
     payment,
     /\.from\(|\.storage\b|\.insert\(|\.update\(|\.upsert\(|\.delete\(|auth\.admin|payment_transactions|ledger_entries|external_event_receipts|reconciliation_exceptions|audit_events|return admin\b|admin[,;)]|process\.env|\.\.\./,
+  );
+  // MVP-001 S9: the media recording port, exactly as the payment recording
+  // port: built the same way, offering exactly its three calls, checking
+  // every argument before each literal call under a deadline, reading each
+  // answer strictly, and reading or writing no table, Auth account, Media
+  // Room or Consultation row directly and calling nothing else.
+  const media = provisioning.slice(mediaStart, recorderStart);
+  assert.match(
+    media,
+    /\): Promise<MediaRecorder \| null> \{\n {2}const binding = readProjectBinding\(environment\);\n {2}if \(binding === null\) \{\n {4}return null;\n {2}\}\n {2}const admin = create\(binding\.url, binding\.adminKey, clientOptions\(\)\);\n {2}return Object\.freeze\(\{\n {4}jobContext: async /,
+  );
+  assert.deepEqual(
+    [...media.matchAll(/^ {4}(\w+): async /gm)].map((match) => match[1]),
+    ["jobContext", "recordOperation", "recordEvent"],
+  );
+  assert.equal(media.match(/\.rpc\(/g).length, 3);
+  assert.equal(
+    media.match(
+      /\.abortSignal\(AbortSignal\.timeout\(MEDIA_CALL_DEADLINE_MS\)\)/g,
+    ).length,
+    3,
+  );
+  assert.match(provisioning, /^const MEDIA_CALL_DEADLINE_MS = 10_000;$/m);
+  assert.match(
+    media,
+    /return error === null \? mediaRecordOutcomeOf\(data\) : "unknown";/,
+  );
+  assert.match(
+    media,
+    /return error === null \? mediaEventAnswerOf\(data\) : UNKNOWN_MEDIA_EVENT;/,
+  );
+  assert.doesNotMatch(
+    media,
+    /\.from\(|\.storage\b|\.insert\(|\.update\(|\.upsert\(|\.delete\(|auth\.admin|media_rooms|media_sessions|session_participation_records|consultations|external_event_receipts|reconciliation_exceptions|audit_events|return admin\b|admin[,;)]|process\.env|\.\.\./,
   );
   const recorder = provisioning.slice(recorderStart, storageStart);
   assert.match(
@@ -3529,6 +3631,8 @@ function assertPrivilegedExports(provisioning) {
       "hasPrivilegedProjectBinding",
       // MVP-001 S7: the one narrow payment recording capability.
       "createPaymentRecorder",
+      // MVP-001 S9: the one narrow media recording capability.
+      "createMediaRecorder",
       // MVP-001 S3 part 2: the one narrow AI suggestion recording capability.
       "createAiSuggestionRecorder",
       // MVP-001 S3: the one narrow protected storage capability.
@@ -3542,7 +3646,8 @@ function assertPrivilegedExports(provisioning) {
       "decideQuotaRpc",
     ],
   );
-  assert.equal(provisioning.match(/\bexport\b/g).length, 13);
+  // MVP-001 S9: fourteen with the media recording capability.
+  assert.equal(provisioning.match(/\bexport\b/g).length, 14);
   // The binding check returns only whether a binding exists.
   assert.match(
     provisioning,
@@ -3622,6 +3727,11 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
           // recording port to the payment handlers and the event recording.
           "src/infrastructure/payments/payment-jobs.ts",
           "src/infrastructure/payments/stripe-webhook.ts",
+          // MVP-001 S9: the server-only media job wiring and the server-only
+          // Daily webhook adapter, which only hand the media recording port to
+          // the media handlers and the event recording.
+          "src/infrastructure/media/media-jobs.ts",
+          "src/infrastructure/media/daily-webhook.ts",
         ].includes(file),
         file,
       );
@@ -3659,6 +3769,9 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
       "../../application/client-registration.ts",
       // MVP-001 S2: the worker port's type and its strict answer readers.
       "../../application/job-worker.ts",
+      // MVP-001 S9: the media recording port's type, its argument checks,
+      // and its strict answer readers.
+      "../../application/media-provider.ts",
       // MVP-001 S7: the payment recording port's type, its argument checks,
       // and its strict answer readers.
       "../../application/payments.ts",

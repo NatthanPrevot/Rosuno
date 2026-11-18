@@ -1206,11 +1206,15 @@ textarea.rs-control {
 }
 
 .rs-media__content,
-.rs-media__content > :where(img, picture, video, canvas, svg) {
+.rs-media__content > :where(img, picture, video, canvas, svg, iframe) {
   position: absolute;
   inset: 0;
   inline-size: 100%;
   block-size: 100%;
+}
+
+.rs-media__content > iframe {
+  border: 0;
 }
 
 .rs-media__content > :where(img, video) {

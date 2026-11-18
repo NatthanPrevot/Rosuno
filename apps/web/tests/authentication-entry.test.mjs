@@ -1172,16 +1172,38 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
   );
   // GET cannot sign out. The only route handlers are the P2-006 email
   // confirmation handler, (MVP-001 S2) the protected operational job worker
-  // route and (MVP-001 S7) the Stripe webhook route, each admitted by its
-  // exact path and nothing broader, and the sign-out form is a POST server
-  // action on the home page.
+  // route, (MVP-001 S7) the Stripe webhook route and (MVP-001 S9) the Daily
+  // webhook route, each admitted by its exact path and nothing broader, and
+  // the sign-out form is a POST server action on the home page.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
     [
       "app/api/jobs/run/route.ts",
+      "app/api/media/daily/route.ts",
       "app/api/payments/stripe/route.ts",
       "app/auth/confirm/route.ts",
     ],
+  );
+  // MVP-001 S9: the Daily webhook route has no sign-out or session capability
+  // either, exactly as the Stripe webhook route below: it imports only its
+  // server-only webhook adapter, reads no cookie or session, never ends one,
+  // and its only non-405 method is POST.
+  const mediaSource = read("app/api/media/daily/route.ts");
+  const mediaWebhook = codeOf(mediaSource);
+  assert.deepEqual(importsOf(mediaSource), [
+    "../../../../src/infrastructure/media/daily-webhook.ts",
+  ]);
+  assert.doesNotMatch(
+    mediaWebhook,
+    /sign-in\/actions|signOut|sign-?out|\.auth\.|cookies|getSession|getClaims|getUser|supabase-server|server-session-source|next\/headers|\bimport\s*\(/i,
+  );
+  assert.deepEqual(
+    [
+      ...mediaWebhook.matchAll(
+        /^export (?:async function|function|const) (\w+)/gm,
+      ),
+    ].map((match) => match[1]),
+    ["dynamic", "POST", "GET", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"],
   );
   // MVP-001 S7: the webhook route has no sign-out or session capability
   // either: it imports only the server-only webhook adapter, reads no cookie

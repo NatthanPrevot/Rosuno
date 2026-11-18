@@ -109,6 +109,14 @@ const S8_MIGRATIONS = Object.freeze([
   "20261124020000_mvp_001_s8_attorney_decision.sql",
   "20261124030000_mvp_001_s8_change_review.sql",
 ]);
+// MVP-001 S9: the three S9 migrations follow the S8 migrations (applied by
+// this proof as later registered migrations; registered and checked by the S9
+// proof).
+const S9_MIGRATIONS = Object.freeze([
+  "20261125010000_mvp_001_s9_media_integrity.sql",
+  "20261125020000_mvp_001_s9_consultation_media.sql",
+  "20261125030000_mvp_001_s9_media_evidence.sql",
+]);
 
 const report = {
   proof: "MVP-001 S6 disposable local PostgreSQL proof",
@@ -429,7 +437,8 @@ function applyMigrations() {
   // the PS-A3 migration, registered the same way. MVP-001 S7: then exactly the
   // two S7 migrations (registered and checked by the S7 proof). MVP-001 S8:
   // then exactly the three S8 migrations (registered and checked by the S8
-  // proof).
+  // proof). MVP-001 S9: then exactly the three S9 migrations (registered and
+  // checked by the S9 proof).
   const s5 = files.indexOf(S5_LAST);
   assert.ok(s5 >= 0, "the last S5 migration is present");
   assert.deepEqual(files.slice(s5 + 1), [
@@ -437,6 +446,7 @@ function applyMigrations() {
     PS_A3_MIGRATION,
     ...S7_MIGRATIONS,
     ...S8_MIGRATIONS,
+    ...S9_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
