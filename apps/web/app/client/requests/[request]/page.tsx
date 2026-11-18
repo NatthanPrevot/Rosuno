@@ -12,16 +12,27 @@
 // the client may withdraw it; the database decides again. MVP-001 S6 PS-A3:
 // the option shows the duration the Request recorded, and the client's own
 // message is shown as plain text, line by line (React escapes it; it is
-// never rendered as markup). Nothing here shows
-// a payment step (S7) or anything of the attorney's side (S8).
+// never rendered as markup). Nothing here shows anything of the attorney's
+// side (S8).
+//
+// MVP-001 S7: the page also shows the payment step the database reports for
+// the Request (an authorization before the attorney decision when the
+// Request's payment flow asks for one; configuration decides), the latest
+// attempt's recorded state with a link to its receipt, and, while an attempt
+// can be started or continued, the authorization form. This page is where the
+// payment provider's hosted page returns the client: the status shown is
+// always the one Rosuno recorded, never what the browser or the provider page
+// said. The wording is fixed and neutral.
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 
+import { resolveRequestPayment } from "../../../../src/application/client-payments.ts";
 import { resolveConsultationRequest } from "../../../../src/application/consultation-request.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
+import { CLIENT_PAYMENT_SOURCES } from "../../../../src/infrastructure/payments/payment-adapter.ts";
 import { REQUEST_SOURCES } from "../../../../src/infrastructure/requests/consultation-request-adapter.ts";
 import {
   Alert,
@@ -47,7 +58,14 @@ import {
   utcText,
   YOUR_MESSAGE,
 } from "../../../../src/presentation/request-labels.ts";
-import { WithdrawRequestForm } from "./forms.tsx";
+import {
+  AUTHORIZE_LABEL,
+  CONTINUE_LABEL,
+  PAYMENT_STATE_LABELS,
+  PAYMENT_STATUS_NOTE,
+  PAYMENT_STEP_TEXT,
+} from "../../../../src/presentation/payment-labels.ts";
+import { AuthorizePaymentForm, WithdrawRequestForm } from "./forms.tsx";
 
 export const metadata: Metadata = {
   title: "Your request",
@@ -134,6 +152,18 @@ export default async function RequestPage({
   const record = view.request;
   const state = REQUEST_STATE_LABELS[view.displayState];
   const amounts = record.amounts;
+  const paymentView = await resolveRequestPayment(
+    CLIENT_PAYMENT_SOURCES,
+    record.id,
+  );
+  if (paymentView.status !== "ready") {
+    await logRequestEvent("warn", "payments.view_unavailable", {
+      route: "/client/requests/[request]",
+      outcome: paymentView.status,
+    });
+  }
+  const payment = paymentView.status === "ready" ? paymentView.payment : null;
+  const latest = payment?.latest ?? null;
   return (
     <RequestFrame title="Your request">
       <Cluster>
@@ -214,6 +244,66 @@ export default async function RequestPage({
           ))}
         </Stack>
       )}
+      <Stack gap="tight">
+        <Heading as="h2" size="md">
+          Payment
+        </Heading>
+        {payment === null ? (
+          <Alert tone="error" title="Payment status unavailable" role="alert">
+            The payment status could not be shown right now. Please try again
+            later.
+          </Alert>
+        ) : (
+          <>
+            <Text>{PAYMENT_STEP_TEXT[payment.step]}</Text>
+            {latest === null ? null : (
+              <Table id="request-payment" caption="Latest payment">
+                <tbody>
+                  <tr>
+                    <th scope="row">Status</th>
+                    <td>
+                      <Status tone={PAYMENT_STATE_LABELS[latest.state].tone}>
+                        {PAYMENT_STATE_LABELS[latest.state].label}
+                      </Status>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Started</th>
+                    <td>{utcText(latest.createdAt)}</td>
+                  </tr>
+                  {latest.authorizedAt === null ? null : (
+                    <tr>
+                      <th scope="row">Authorized</th>
+                      <td>{utcText(latest.authorizedAt)}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </Table>
+            )}
+            {latest === null ? null : (
+              <Cluster>
+                <ButtonLink
+                  variant="secondary"
+                  href={`/client/payments/${latest.id}`}
+                >
+                  View payment receipt
+                </ButtonLink>
+              </Cluster>
+            )}
+            {payment.payable ? (
+              <AuthorizePaymentForm
+                requestId={record.id}
+                label={
+                  latest?.state === "pending_authorization"
+                    ? CONTINUE_LABEL
+                    : AUTHORIZE_LABEL
+                }
+              />
+            ) : null}
+            <Text tone="muted">{PAYMENT_STATUS_NOTE}</Text>
+          </>
+        )}
+      </Stack>
       <Text tone="muted">{SERVER_TIME_NOTE}</Text>
       {view.withdrawable ? <WithdrawRequestForm requestId={record.id} /> : null}
       {BACK}

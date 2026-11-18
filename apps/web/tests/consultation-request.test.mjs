@@ -1212,14 +1212,21 @@ test("S6-11. the request routes are exactly the review page, the request page, t
   assert.ok(detail.includes("{view.withdrawable ? <WithdrawRequestForm"));
   const actions = read("app/client/requests/actions.ts");
   assert.match(actions, /^"use server";\n/);
-  assert.equal(codeOf(actions).match(/export async function \w+\(/g).length, 2);
+  // MVP-001 S7: exactly one more action, the payment authorization, which
+  // reaches the database only through the client payment use case and its
+  // production sources and redirects only to the address that use case
+  // answers (the provider's hosted page the server read itself).
+  assert.equal(codeOf(actions).match(/export async function \w+\(/g).length, 3);
   for (const call of [
     "const state = await createConsultationRequest(REQUEST_SOURCES, formData);",
     "const state = await withdrawConsultationRequest(REQUEST_SOURCES, formData);",
     "redirect(requestPathFor(state.requestId));",
+    "const state = await authorizeRequestPayment(CLIENT_PAYMENT_SOURCES, formData);",
+    'if (state.status === "redirect") {\n    redirect(state.url);\n  }',
   ]) {
     assert.ok(codeOf(actions).includes(call), call);
   }
+  assert.equal(codeOf(actions).match(/\bredirect\(/g).length, 2);
   const confirm = read("app/client/requests/new/forms.tsx");
   assert.match(confirm, /^"use client";\n/);
   // MVP-001 S6 PS-A3: and the optional message.
@@ -1229,9 +1236,11 @@ test("S6-11. the request routes are exactly the review page, the request page, t
   );
   const withdraw = read("app/client/requests/[request]/forms.tsx");
   assert.match(withdraw, /^"use client";\n/);
+  // MVP-001 S7: the payment authorization form posts exactly the Request id
+  // too, and nothing else.
   assert.deepEqual(
     [...codeOf(withdraw).matchAll(/\bname="([^"]+)"/g)].map((m) => m[1]),
-    ["request"],
+    ["request", "request"],
   );
   for (const file of [
     "app/client/requests/new/page.tsx",

@@ -1171,12 +1171,35 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
     /\bconsole\b|\bprocess\b|getSession|getUser|access_?token|refresh_?token|error\.message|\bdata\b|\.session\b(?!:)|session_id/,
   );
   // GET cannot sign out. The only route handlers are the P2-006 email
-  // confirmation handler and (MVP-001 S2) the protected operational job
-  // worker route, each admitted by its exact path and nothing broader, and
-  // the sign-out form is a POST server action on the home page.
+  // confirmation handler, (MVP-001 S2) the protected operational job worker
+  // route and (MVP-001 S7) the Stripe webhook route, each admitted by its
+  // exact path and nothing broader, and the sign-out form is a POST server
+  // action on the home page.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
-    ["app/api/jobs/run/route.ts", "app/auth/confirm/route.ts"],
+    [
+      "app/api/jobs/run/route.ts",
+      "app/api/payments/stripe/route.ts",
+      "app/auth/confirm/route.ts",
+    ],
+  );
+  // MVP-001 S7: the webhook route has no sign-out or session capability
+  // either: it imports only the server-only webhook adapter, reads no cookie
+  // or session, never ends one, and its only non-405 method is POST.
+  const webhookSource = read("app/api/payments/stripe/route.ts");
+  const webhook = codeOf(webhookSource);
+  assert.deepEqual(importsOf(webhookSource), [
+    "../../../../src/infrastructure/payments/stripe-webhook.ts",
+  ]);
+  assert.doesNotMatch(
+    webhook,
+    /sign-in\/actions|signOut|sign-?out|\.auth\.|cookies|getSession|getClaims|getUser|supabase-server|server-session-source|next\/headers|\bimport\s*\(/i,
+  );
+  assert.deepEqual(
+    [
+      ...webhook.matchAll(/^export (?:async function|function|const) (\w+)/gm),
+    ].map((match) => match[1]),
+    ["dynamic", "POST", "GET", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"],
   );
   // The job worker route has no sign-out or session capability: it imports
   // only the server-only worker adapter, reads no cookie or session, never

@@ -87,6 +87,13 @@ export const SURFACE_LINKS: Readonly<
     summary:
       "See escalated, waiting, and finished background jobs, and retry or cancel them.",
   },
+  // MVP-001 S7.
+  finance: {
+    href: "/staff/finance",
+    title: "Finance",
+    summary:
+      "See transactions, ledger entries and reconciliation exceptions, request refunds, and ask for reconciliation.",
+  },
 });
 
 // MVP-001 S2: the operational job states and the groups the job view lists.

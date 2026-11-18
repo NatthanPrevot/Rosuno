@@ -1025,9 +1025,12 @@ async function privilegeChecks() {
         // registered S1 configuration-administration migration follow.
         // MVP-001 S2 re-pin: and exactly the one code of the later registered
         // S2 operational-jobs migration (20261118010000).
+        // MVP-001 S7 re-pin: and exactly the one code of the later registered
+        // S7 payment-integrity migration (20261123010000).
         [
           "authorize_jurisdiction_launch",
           "manage_attorney_verification",
+          "manage_financial_operations",
           "manage_intake_configuration",
           "manage_jurisdiction_configuration",
           "manage_operational_jobs",
@@ -1046,7 +1049,7 @@ async function privilegeChecks() {
       ]) {
         assert.equal(count(table), 0, `${table} is empty after migration`);
       }
-      return { capability_codes: 7 };
+      return { capability_codes: 8 };
     },
   );
 

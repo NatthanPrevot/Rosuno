@@ -66,9 +66,12 @@ const S2_MIGRATIONS = Object.freeze([
   // PS-A4: the authentication-abuse counters and decision functions.
   "20261118040000_mvp_001_s2_authentication_abuse_control.sql",
 ]);
+// MVP-001 S7 re-pin: the later registered S7 payment-integrity migration
+// (20261123010000) adds exactly manage_financial_operations.
 const CAPABILITIES = Object.freeze([
   "authorize_jurisdiction_launch",
   "manage_attorney_verification",
+  "manage_financial_operations",
   "manage_intake_configuration",
   "manage_jurisdiction_configuration",
   "manage_operational_jobs",
@@ -1844,7 +1847,7 @@ async function privilegeChecks() {
   );
 
   await check(
-    "PRIV-3 the capability catalog gains exactly manage_operational_jobs (seven codes); no grant, job or business row is created by the migrations; the triggers on operational_jobs are exactly the lifecycle and truncate guards",
+    "PRIV-3 the capability catalog gains exactly manage_operational_jobs (seven codes; MVP-001 S7 re-pin: eight with the later S7 manage_financial_operations); no grant, job or business row is created by the migrations; the triggers on operational_jobs are exactly the lifecycle and truncate guards (MVP-001 S7 re-pin: and the S7 payment escalation trigger)",
     () => {
       assert.equal(
         sql(
@@ -1856,7 +1859,11 @@ async function privilegeChecks() {
         sql(
           "select string_agg(tgname, ',' order by tgname) from pg_trigger where tgrelid = 'public.operational_jobs'::regclass and not tgisinternal;",
         ),
-        "operational_jobs_lifecycle,operational_jobs_no_truncate",
+        // MVP-001 S7 re-pin: and exactly the payment escalation trigger of
+        // the later registered S7 payment-engine migration (20261123020000),
+        // which opens a reconciliation exception when a payment job
+        // escalates.
+        "operational_jobs_lifecycle,operational_jobs_no_truncate,operational_jobs_payment_escalation",
       );
       assert.equal(
         sql(

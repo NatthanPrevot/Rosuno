@@ -2505,14 +2505,29 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
   ]);
   // MVP-001 S2: the protected operational job worker route is the one other
   // route handler, admitted by its exact path; it knows nothing of recovery.
+  // MVP-001 S7: and the Stripe webhook route, admitted by its exact path; it
+  // too knows nothing of recovery and imports only the webhook adapter.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
-    ["app/api/jobs/run/route.ts", "app/auth/confirm/route.ts"],
+    [
+      "app/api/jobs/run/route.ts",
+      "app/api/payments/stripe/route.ts",
+      "app/auth/confirm/route.ts",
+    ],
   );
-  assert.doesNotMatch(
-    codeOf(read("app/api/jobs/run/route.ts")),
-    /recovery|reset-password|forgot-password|exchangeCodeForSession|updateUser|verifyOtp|\.auth\./i,
-  );
+  for (const route of [
+    "app/api/jobs/run/route.ts",
+    "app/api/payments/stripe/route.ts",
+  ]) {
+    assert.doesNotMatch(
+      codeOf(read(route)),
+      /recovery|reset-password|forgot-password|exchangeCodeForSession|updateUser|verifyOtp|\.auth\./i,
+      route,
+    );
+  }
+  assert.deepEqual(importsOf(read("app/api/payments/stripe/route.ts")), [
+    "../../../../src/infrastructure/payments/stripe-webhook.ts",
+  ]);
   // The signup confirmation handler still verifies only signup links and
   // knows nothing of recovery.
   const confirmation = codeOf(read("app/auth/confirm/route.ts"));

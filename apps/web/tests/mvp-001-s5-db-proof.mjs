@@ -388,7 +388,8 @@ function applyMigrations() {
   // S5 follows S4, contiguous and in order, and every S5 migration is
   // registered unreviewed and applied nowhere. MVP-001 S6: then exactly the
   // three S6 migrations, contiguous and in order; MVP-001 S6 PS-A3: then
-  // exactly the PS-A3 migration.
+  // exactly the PS-A3 migration; MVP-001 S7: then exactly the two S7
+  // migrations.
   const s4 = files.indexOf(S4_LAST);
   assert.ok(s4 >= 0, "the last S4 migration is present");
   assert.deepEqual(files.slice(s4 + 1, s4 + 1 + S5_MIGRATIONS.length), [
@@ -399,6 +400,8 @@ function applyMigrations() {
     "20261122020000_mvp_001_s6_pricing.sql",
     "20261122030000_mvp_001_s6_requests.sql",
     "20261122040000_mvp_001_s6_consultation_offers.sql",
+    "20261123010000_mvp_001_s7_payment_integrity.sql",
+    "20261123020000_mvp_001_s7_payment_engine.sql",
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

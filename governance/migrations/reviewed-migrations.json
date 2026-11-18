@@ -1049,6 +1049,62 @@
       "drift_check": "clean",
       "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions; no consultation offer, Consultation Request, Fee Calculation or audit row is removed (PS-A3 section 8).",
       "depends_on": ["20261122030000_mvp_001_s6_requests"]
+    },
+    {
+      "migration_id": "20261123010000_mvp_001_s7_payment_integrity",
+      "migration_kind": "product",
+      "sequence": 42,
+      "artifact_path": "supabase/migrations/20261123010000_mvp_001_s7_payment_integrity.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+        "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the constraints, indexes or guard functions; no Payment Transaction, Ledger Entry, Reconciliation Exception, External Event Receipt or audit row is removed (PS sections 32-33).",
+      "depends_on": ["20261122040000_mvp_001_s6_consultation_offers"]
+    },
+    {
+      "migration_id": "20261123020000_mvp_001_s7_payment_engine",
+      "migration_kind": "product",
+      "sequence": 43,
+      "artifact_path": "supabase/migrations/20261123020000_mvp_001_s7_payment_engine.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+        "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": ["DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions or triggers; no Payment Transaction, Ledger Entry, Reconciliation Exception, External Event Receipt, operational job, Consultation Request, Fee Calculation or audit row is removed.",
+      "depends_on": ["20261123010000_mvp_001_s7_payment_integrity"]
     }
   ]
 }

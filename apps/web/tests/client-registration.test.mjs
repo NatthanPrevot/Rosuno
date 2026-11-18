@@ -2836,6 +2836,20 @@ const AUTHENTICATION_ABUSE_RPCS = Object.freeze({
 // literal call on its own privileged client, with exactly its named
 // arguments and a deadline; no other file names it, so no request-scoped or
 // browser path can record a suggestion.
+// MVP-001 S7: the privileged module's only further calls are the three fixed
+// payment recording functions (the job context, a provider call's result,
+// and one provider event), each exactly once, as a literal call on its own
+// privileged client, with exactly its named arguments and a deadline; no
+// other file names them, so no request-scoped or browser path can record a
+// provider observation.
+const PAYMENT_RECORDING_RPCS = Object.freeze({
+  payment_job_context:
+    'await admin\n          .rpc("payment_job_context", { p_job_id: jobId })\n          .abortSignal(AbortSignal.timeout(PAYMENT_CALL_DEADLINE_MS));',
+  payment_record_operation:
+    'await admin\n          .rpc("payment_record_operation", {\n            p_job_id: jobId,\n            p_observation: observation,\n          })\n          .abortSignal(AbortSignal.timeout(PAYMENT_CALL_DEADLINE_MS));',
+  payment_record_provider_event:
+    'await admin\n          .rpc("payment_record_provider_event", {\n            p_provider_code: event.providerCode,\n            p_event_reference: event.eventReference,\n            p_event_type: event.eventType,\n            p_occurred_at: event.occurredAt,\n            p_payload_digest: event.payloadDigest,\n            p_observation: event.observation,\n          })\n          .abortSignal(AbortSignal.timeout(PAYMENT_CALL_DEADLINE_MS));',
+});
 const AI_SUGGESTION_RPCS = Object.freeze({
   ai_record_intake_suggestion:
     'await admin\n          .rpc("ai_record_intake_suggestion", {\n            p_user_id: input.userId,\n            p_intake_id: input.intakeId,\n            p_revision_number: input.revisionNumber,\n            p_suggestion_type: input.type,\n            p_suggestion_value: input.value,\n            p_model_reference: input.modelReference,\n            p_generated_at: input.generatedAt,\n          })\n          .abortSignal(AbortSignal.timeout(AI_RECORD_DEADLINE_MS));',
@@ -2915,13 +2929,35 @@ const REQUEST_RPCS = Object.freeze([
 // as a literal call through the request's own unprivileged session; it
 // builds or receives no privileged client, and no other file names any of
 // the four offer functions.
-const OFFER_ADAPTER =
-  "src/infrastructure/offers/consultation-offer-adapter.ts";
+const OFFER_ADAPTER = "src/infrastructure/offers/consultation-offer-adapter.ts";
 const OFFER_RPCS = Object.freeze([
   "attorney_consultation_offer_options",
   "attorney_consultation_offers",
   "attorney_set_consultation_offer",
   "attorney_withdraw_consultation_offer",
+]);
+// MVP-001 S7: the payment adapter calls the database's own client payment
+// reads and authorization, the attorney's earnings read, and the finance
+// staff reads and changes, and the PS-A2 environment accessor (checked before
+// an attempt or a refund), each exactly once and each as a literal call
+// through the request's own unprivileged session; it builds or receives no
+// privileged client, and no other file names any of the fourteen functions.
+const PAYMENT_ADAPTER = "src/infrastructure/payments/payment-adapter.ts";
+const PAYMENT_RPCS = Object.freeze([
+  "client_request_payment",
+  "client_payment_receipt",
+  "client_payment_checkout",
+  "client_authorize_payment",
+  "attorney_payment_earnings",
+  "staff_finance_payments",
+  "staff_finance_payment",
+  "staff_finance_ledger",
+  "staff_finance_receipts",
+  "staff_finance_exceptions",
+  "staff_request_refund",
+  "staff_assign_reconciliation_exception",
+  "staff_resolve_reconciliation_exception",
+  "staff_request_reconciliation",
 ]);
 const CAPABILITY_PREDICATE_RPC =
   'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';
@@ -2935,7 +2971,9 @@ const RPC_OCCURRENCES = Object.freeze({
     1 +
     Object.keys(JOB_WORKER_RPCS).length +
     Object.keys(AUTHENTICATION_ABUSE_RPCS).length +
-    Object.keys(AI_SUGGESTION_RPCS).length,
+    Object.keys(AI_SUGGESTION_RPCS).length +
+    // MVP-001 S7: the three payment recording calls.
+    Object.keys(PAYMENT_RECORDING_RPCS).length,
   // MVP-001 S1: the staff adapter's second RPC is exactly the PS-A2
   // environment accessor, pinned by name below.
   [STAFF_ADAPTER]: 2,
@@ -2956,6 +2994,9 @@ const RPC_OCCURRENCES = Object.freeze({
   // MVP-001 S6 PS-A3: the four offer functions, plus the environment
   // accessor.
   [OFFER_ADAPTER]: OFFER_RPCS.length + 1,
+  // MVP-001 S7: the fourteen payment functions, plus the environment
+  // accessor.
+  [PAYMENT_ADAPTER]: PAYMENT_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -3094,6 +3135,32 @@ function assertQuotaRpcContract(codes) {
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
       );
     }
+    // MVP-001 S7: the payment functions, as for the offer functions.
+    for (const name of PAYMENT_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === PAYMENT_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== PAYMENT_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === PAYMENT_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        PAYMENT_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
     assert.equal(
       code.match(/\brpc\b/gi)?.length ?? 0,
       RPC_OCCURRENCES[file] ?? 0,
@@ -3111,7 +3178,8 @@ function assertQuotaRpcContract(codes) {
         file === CONFIGURATION_ADAPTER ||
         file === DISCOVERY_ADAPTER ||
         file === REQUEST_ADAPTER ||
-        file === OFFER_ADAPTER
+        file === OFFER_ADAPTER ||
+        file === PAYMENT_ADAPTER
         ? 1
         : 0,
       file,
@@ -3125,6 +3193,7 @@ function assertQuotaRpcContract(codes) {
       ...Object.entries(JOB_WORKER_RPCS),
       ...Object.entries(AUTHENTICATION_ABUSE_RPCS),
       ...Object.entries(AI_SUGGESTION_RPCS),
+      ...Object.entries(PAYMENT_RECORDING_RPCS),
     ]) {
       assert.equal(
         code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
@@ -3195,22 +3264,23 @@ function assertQuotaRpcContract(codes) {
     provisioning,
     /\nconst DIGEST = \/\^\[0-9a-f\]\{64\}\$\/;\n\nfunction isDigest\(value: unknown\): value is string \{\n {2}return typeof value === "string" && DIGEST\.test\(value\);\n\}\n\nfunction isMaximum\(value: unknown\): value is number \{\n {2}return Number\.isSafeInteger\(value\) && \(value as number\) >= 1;\n\}\n/,
   );
-  // Nine privileged clients (Admin provisioning, the P3-002
+  // Ten privileged clients (Admin provisioning, the P3-002
   // attorney-applicant provisioning, the P3-003 professional and staff
   // verification provisioning, the quota decision, the MVP-001 S2
   // operational job worker, the MVP-001 S2 authentication-abuse decisions,
-  // the MVP-001 S3 protected storage port, and the MVP-001 S3 part 2 AI
-  // suggestion recording port) and one publishable client (the confirmation
-  // request), each built only from the verified binding.
+  // the MVP-001 S3 protected storage port, the MVP-001 S3 part 2 AI
+  // suggestion recording port, and the MVP-001 S7 payment recording port)
+  // and one publishable client (the confirmation request), each built only
+  // from the verified binding.
   assert.equal(
     provisioning.match(
       /\bcreate\(binding\.url, binding\.adminKey, clientOptions\(\)\)/g,
     ).length,
-    9,
+    10,
   );
-  assert.equal(provisioning.match(/\bcreate\(/g).length, 10);
+  assert.equal(provisioning.match(/\bcreate\(/g).length, 11);
   assert.equal(provisioning.match(/\bbinding\.publishableKey\b/g).length, 1);
-  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 9);
+  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 10);
   // The worker port is built exactly like the other ports: the verified
   // binding first, then its one cookie-free privileged client, never
   // returned; it offers exactly the three worker calls and nothing else.
@@ -3328,6 +3398,44 @@ function assertQuotaRpcContract(codes) {
     "export async function createAiSuggestionRecorder(",
   );
   assert.ok(recorderStart > 0 && recorderStart < storageStart);
+  // MVP-001 S7: the payment recording port is built the same way, sits in
+  // its own section before the AI suggestion recording port, offers exactly
+  // its three calls, checks every argument before each literal call under a
+  // deadline, reads each answer strictly, and reads or writes no table, Auth
+  // account or payment row directly and calls nothing else.
+  const paymentStart = provisioning.indexOf(
+    "export async function createPaymentRecorder(",
+  );
+  assert.ok(paymentStart > 0 && paymentStart < recorderStart);
+  const payment = provisioning.slice(paymentStart, recorderStart);
+  assert.match(
+    payment,
+    /\): Promise<PaymentRecorder \| null> \{\n {2}const binding = readProjectBinding\(environment\);\n {2}if \(binding === null\) \{\n {4}return null;\n {2}\}\n {2}const admin = create\(binding\.url, binding\.adminKey, clientOptions\(\)\);\n {2}return Object\.freeze\(\{\n {4}jobContext: async /,
+  );
+  assert.deepEqual(
+    [...payment.matchAll(/^ {4}(\w+): async /gm)].map((match) => match[1]),
+    ["jobContext", "recordOperation", "recordEvent"],
+  );
+  assert.equal(payment.match(/\.rpc\(/g).length, 3);
+  assert.equal(
+    payment.match(
+      /\.abortSignal\(AbortSignal\.timeout\(PAYMENT_CALL_DEADLINE_MS\)\)/g,
+    ).length,
+    3,
+  );
+  assert.match(provisioning, /^const PAYMENT_CALL_DEADLINE_MS = 10_000;$/m);
+  assert.match(
+    payment,
+    /return error === null \? recordOutcomeOf\(data\) : "unknown";/,
+  );
+  assert.match(
+    payment,
+    /return error === null \? eventAnswerOf\(data\) : UNKNOWN_EVENT;/,
+  );
+  assert.doesNotMatch(
+    payment,
+    /\.from\(|\.storage\b|\.insert\(|\.update\(|\.upsert\(|\.delete\(|auth\.admin|payment_transactions|ledger_entries|external_event_receipts|reconciliation_exceptions|audit_events|return admin\b|admin[,;)]|process\.env|\.\.\./,
+  );
   const recorder = provisioning.slice(recorderStart, storageStart);
   assert.match(
     recorder,
@@ -3373,6 +3481,8 @@ function assertPrivilegedExports(provisioning) {
       "createRegistrationProvisioning",
       "createConfirmationDispatch",
       "hasPrivilegedProjectBinding",
+      // MVP-001 S7: the one narrow payment recording capability.
+      "createPaymentRecorder",
       // MVP-001 S3 part 2: the one narrow AI suggestion recording capability.
       "createAiSuggestionRecorder",
       // MVP-001 S3: the one narrow protected storage capability.
@@ -3386,7 +3496,7 @@ function assertPrivilegedExports(provisioning) {
       "decideQuotaRpc",
     ],
   );
-  assert.equal(provisioning.match(/\bexport\b/g).length, 12);
+  assert.equal(provisioning.match(/\bexport\b/g).length, 13);
   // The binding check returns only whether a binding exists.
   assert.match(
     provisioning,
@@ -3461,6 +3571,11 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
           // MVP-001 S3 part 2: the server-only AI suggestion sources, which
           // only bound the recording port in time.
           "src/infrastructure/client/intake-suggestion-adapter.ts",
+          // MVP-001 S7: the server-only payment job wiring and the
+          // server-only Stripe webhook adapter, which only hand the payment
+          // recording port to the payment handlers and the event recording.
+          "src/infrastructure/payments/payment-jobs.ts",
+          "src/infrastructure/payments/stripe-webhook.ts",
         ].includes(file),
         file,
       );
@@ -3498,6 +3613,9 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
       "../../application/client-registration.ts",
       // MVP-001 S2: the worker port's type and its strict answer readers.
       "../../application/job-worker.ts",
+      // MVP-001 S7: the payment recording port's type, its argument checks,
+      // and its strict answer readers.
+      "../../application/payments.ts",
       "../../application/policy-selection.ts",
       "../../application/professional-records.ts",
       // MVP-001 S3: the storage port's type, its path derivation, the bucket,

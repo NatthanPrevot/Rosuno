@@ -357,12 +357,20 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // request adapter (a failed call, with the call name and how it failed
   // only) write lines too. MVP-001 S6 PS-A3: the consultation offer adapter
   // (a failed offer call, with the call name and how it failed only) writes
-  // lines too.
+  // lines too. MVP-001 S7: the attorney earnings page and the payment receipt
+  // page (a view unavailable, with the route and outcome only), the finance
+  // actions (an action not completed, with its fixed outcome only), the
+  // payment adapter (a failed call, with the call name and how it failed
+  // only) and the webhook adapter (each refused or recorded delivery, with a
+  // fixed outcome only; never a header, signature, body or identifier) write
+  // lines too; the request page and actions already did.
   assert.deepEqual(callers, [
+    "app/attorney/earnings/page.tsx",
     "app/attorneys/[attorney]/page.tsx",
     "app/client/actions.ts",
     "app/client/intakes/[intake]/page.tsx",
     "app/client/page.tsx",
+    "app/client/payments/[payment]/page.tsx",
     "app/client/requests/[request]/page.tsx",
     "app/client/requests/actions.ts",
     "app/client/requests/new/page.tsx",
@@ -371,6 +379,7 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/find-an-attorney/select/page.tsx",
     "app/sign-in/actions.ts",
     "app/staff/actions.ts",
+    "app/staff/finance/actions.ts",
     "app/staff/frame.tsx",
     "app/staff/verification/actions.ts",
     "src/infrastructure/client/client-intake-adapter.ts",
@@ -380,6 +389,8 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "src/infrastructure/identity/authenticator-provider.ts",
     "src/infrastructure/jobs/job-worker-adapter.ts",
     "src/infrastructure/offers/consultation-offer-adapter.ts",
+    "src/infrastructure/payments/payment-adapter.ts",
+    "src/infrastructure/payments/stripe-webhook.ts",
     "src/infrastructure/requests/consultation-request-adapter.ts",
     "src/infrastructure/resources/protected-resource-adapter.ts",
     // MVP-001 S4: the schedule adapter (a failed schedule call, with the
