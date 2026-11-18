@@ -165,6 +165,17 @@
       "integrity": "sha256:15d4b3bea4143288d9c751313d0ae9e57a999c68aaba331a6d109d59d710e44e",
       "usage": "reference-only",
       "status": "active"
+    },
+    {
+      "authority_id": "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A3-LOCKED",
+      "title": "Rosuno Physical Specification Bounded Amendment PS-A3, revision 2 (attorney consultation offers, request duration and request message; platform-scope consultation options and configurable message maximum), rosuno-physical-specification-amendment-ps-a3.md",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "sha256:6ecdd02b45f4d9e2439b7e5d61b12f97ec72df0dcad6633c98e1fe0d10fa4ac1",
+      "usage": "reference-only",
+      "status": "pending_lock_condition"
     }
   ]
 }

@@ -1942,6 +1942,40 @@
         "Express owner direction 'S1/S2 DECISIONS' (approver NatthanPrevot) approving the four outcomes and the structured-logging fallback, received in the Builder session and processed at 2026-11-17T14:28:09Z (session clock), confirmed in the adoption statement processed at 2026-11-17T15:26:50Z (session clock)",
         "Optional independent review: not performed"
       ]
+    },
+    {
+      "status": "accepted",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-18T04:58:41Z",
+      "updated_at": "2026-11-18T04:58:41Z",
+      "supersedes": [],
+      "expiry": null,
+      "decision_id": "DEC-20261118-PS-A3-CONSULTATION-OFFERS",
+      "title": "Approve the exact text of Physical Specification amendment PS-A3, revision 2 (consultation offers, request duration and request message)",
+      "scope": "Physical model, bounded: one relation attorney_consultation_offers, the consultation_requests columns requested_duration_minutes and client_message, platform-scope consultation options and the request message maximum as policy configuration, approval-time parameter validation and public offer fields (PS-A3 sections 1 to 8; DL-ENG-1 R9; MVP-001 Packet S6 and the S5 profile part).",
+      "decision": "The owner expressly approves the complete, unchanged bytes of PS-A3 revision 2, rosuno-physical-specification-amendment-ps-a3.md, 18,200 bytes, SHA-256 6ecdd02b45f4d9e2439b7e5d61b12f97ec72df0dcad6633c98e1fe0d10fa4ac1 (Lock Condition element 1); revision 1 remains unadopted. Its registration in governance/authority-references.json (status pending_lock_condition) and this entry are carried by the S6 pull request; the Lock Condition completes when that pull request merges, after which the register status becomes active in the next records update. The owner's initial permitted consultation durations (30, 60 and 90 minutes) are business configuration applied through an authorized policy version, never by migration or seed; a 15-minute duration stays technically configurable and is not enabled; zero-price consultations are not authorized.",
+      "rationale": "A Fee Calculation needs the attorney's listed price for the chosen modality and duration, and a Request must record its own duration and optional message; no PS relation holds these facts (PS-A3 section 7). Durations and modalities are controlled centrally through the existing platform-scope policy selection, jurisdiction economics stay in each jurisdiction's Fee Policy (TA sections 15 and 31), and the message maximum is configuration within the PS-A1 client free-text ceiling, so business settings change without migrations while technical invariants stay in the schema.",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A1-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A3-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "impact": "Forward-only S6 migrations implement PS-A3: the offers relation and the attorney's offer functions, the two request columns, the price source reading current offers in the jurisdiction's currency, platform-scope duration and modality options, the configurable message maximum, approval-time parameter validation and public offer reads. Nothing is applied to a persistent environment by merge.",
+      "evidence": [
+        "Express owner adoption statement 'OWNER ADOPTION: PS-A3 REVISION 2 / S6 COMPLETION' (approver NatthanPrevot) naming revision 2, 18,200 bytes and SHA-256 6ecdd02b45f4d9e2439b7e5d61b12f97ec72df0dcad6633c98e1fe0d10fa4ac1, received in the Builder session and processed at 2026-11-18T04:58:41Z (session clock)",
+        "Preceding owner direction 'FINAL OWNER DIRECTION: PS-A3 REVISION 2 / S6 COMPLETION' setting the initial durations to 30, 60 and 90 minutes under central administrator control, a configurable message maximum with a separate technical ceiling, and reuse of the existing policy administration",
+        "Amendment file: rosuno-physical-specification-amendment-ps-a3.md, revision 2, 18,200 bytes, SHA-256 6ecdd02b45f4d9e2439b7e5d61b12f97ec72df0dcad6633c98e1fe0d10fa4ac1 (owner-held; not in the repository)",
+        "Optional independent review: not performed"
+      ]
     }
   ]
 }
