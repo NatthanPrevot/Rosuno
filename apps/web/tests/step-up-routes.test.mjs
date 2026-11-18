@@ -79,6 +79,8 @@ const GATED_ACTIONS = {
   "app/attorney/professional/actions.ts": "attorney",
   // MVP-001 S4: the attorney schedule changes and its heartbeat.
   "app/attorney/schedule/actions.ts": "attorney",
+  // MVP-001 S6 PS-A3: the attorney's offer price and withdrawal changes.
+  "app/attorney/offers/actions.ts": "attorney",
   "app/staff/actions.ts": "staff",
   "app/staff/verification/actions.ts": "staff",
 };
@@ -169,8 +171,9 @@ test("S2-R2. no setup picture, embedded markup, or image is ever rendered, and t
 test("S2-R3. every attorney page and every staff page asks the step-up gate first, right after opting out of prerendering", () => {
   // MVP-001 S2: sixteen pages, and the operational job view. MVP-001 S3
   // part 2: and the jurisdiction assessment review. MVP-001 S4: and the
-  // attorney schedule.
-  assert.equal(GATED_PAGES.length, 19);
+  // attorney schedule. MVP-001 S6 PS-A3: and the attorney's offers.
+  assert.equal(GATED_PAGES.length, 20);
+  assert.ok(GATED_PAGES.includes("app/attorney/offers/page.tsx"));
   assert.ok(GATED_PAGES.includes("app/staff/jurisdiction-review/page.tsx"));
   assert.ok(GATED_PAGES.includes("app/attorney/schedule/page.tsx"));
   for (const file of GATED_PAGES) {
@@ -224,12 +227,15 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
     // verification changes and (MVP-001 S3) opening an uploaded document.
     // MVP-001 S4: the schedule's five changes and its heartbeat, the
     // heartbeat answering the gate's refusal unchanged like every change.
+    // MVP-001 S6 PS-A3: the offers' two changes (price and withdrawal).
     const verification = file === "app/staff/verification/actions.ts";
+    const offers = file === "app/attorney/offers/actions.ts";
+    const expected = verification ? 7 : offers ? 2 : 6;
     const exported = [...code.matchAll(/^export async function (\w+)\(/gm)];
-    assert.equal(exported.length, verification ? 7 : 6, file);
+    assert.equal(exported.length, expected, file);
     assert.equal(
       code.match(/return gated\(\(\) =>/g).length,
-      verification ? 7 : 6,
+      expected,
       file,
     );
     assert.equal(

@@ -14,6 +14,7 @@ import {
   discoveryQueryOf,
   INITIAL_SELECTION_STATE,
   PROFILE_COLUMNS,
+  PUBLIC_OFFER_COLUMNS,
   REFERRAL_ATTEMPT_COLUMNS,
   resolveAttorneyProfile,
   resolveDirectory,
@@ -160,6 +161,8 @@ function harness(overrides = {}) {
     ],
     directory: [directoryRow(1), directoryRow(2)],
     profile: [profileRow()],
+    // MVP-001 S6 PS-A3: the listed attorney's public offers.
+    offers: [],
     referrals: [],
     environment: [{ environment_class: "development", project_ref: null }],
     configuredClass: "development",
@@ -215,6 +218,10 @@ function harness(overrides = {}) {
       profile: async (attorney, jurisdiction) => {
         calls.push(["profile", attorney, jurisdiction]);
         return rows(state.profile);
+      },
+      offers: async (attorney, jurisdiction) => {
+        calls.push(["offers", attorney, jurisdiction]);
+        return state.offers === null ? UNREADABLE : rows(state.offers);
       },
       clientReferrals: async (intake) => {
         calls.push(["clientReferrals", intake]);
@@ -581,7 +588,12 @@ test("S5-6. a profile shows only the allowlisted fields; a malformed, unknown or
       endsAt: "2026-11-20T00:00:00+00:00",
     },
   ]);
-  assert.deepEqual(calls, [["profile", ATTORNEY, J_A]]);
+  // MVP-001 S6 PS-A3: then the public offers for the same choice.
+  assert.deepEqual(calls, [
+    ["profile", ATTORNEY, J_A],
+    ["offers", ATTORNEY, J_A],
+  ]);
+  assert.deepEqual(view.offers, []);
   for (const [attorney, jurisdiction] of [
     ["not-a-uuid", J_A],
     [LETTERED.toUpperCase(), J_A],
@@ -1097,4 +1109,108 @@ test("S5-13. the public navigation is the fixed list of public pages, linked as 
     codeOf(read("app/page.tsx")),
     /<Page density="public">\n {6}<PublicNavigation \/>/,
   );
+});
+
+// ---------------------------------------------------------------------------
+// MVP-001 S6 PS-A3: public offers on the profile
+// ---------------------------------------------------------------------------
+
+test("S5-14. PS-A3: a profile carries the listed attorney's public offers exactly as the database answers them (modality, duration, listed price, currency, in its own order), read strictly; a duplicate pair, a second currency for a chosen jurisdiction, or an unreadable answer makes the profile unavailable; the page shows each offer in words with the currency's own decimal places and never ranks", async () => {
+  const offer = (overrides = {}) => ({
+    modality: "synthetic_video",
+    duration_minutes: 30,
+    listed_price_minor: 5000,
+    currency_code: "XTS",
+    ...overrides,
+  });
+  const offers = [
+    offer(),
+    offer({ modality: "synthetic_audio", listed_price_minor: 4000 }),
+  ];
+  const view = await resolveAttorneyProfile(
+    harness({ offers }).sources,
+    ATTORNEY,
+    J_A,
+  );
+  assert.equal(view.status, "ready");
+  assert.deepEqual(view.offers, [
+    {
+      modality: "synthetic_video",
+      durationMinutes: 30,
+      listedPriceMinor: 5000,
+      currency: "XTS",
+    },
+    {
+      modality: "synthetic_audio",
+      durationMinutes: 30,
+      listedPriceMinor: 4000,
+      currency: "XTS",
+    },
+  ]);
+  // Without a jurisdiction, several currencies may be shown.
+  const anywhere = await resolveAttorneyProfile(
+    harness({
+      offers: [
+        offer(),
+        offer({ currency_code: "XXX", listed_price_minor: 3000 }),
+      ],
+      profile: [profileRow({ upcoming_windows: [] })],
+    }).sources,
+    ATTORNEY,
+    undefined,
+  );
+  assert.equal(anywhere.status, "ready");
+  assert.equal(anywhere.offers.length, 2);
+  for (const bad of [
+    null,
+    [offer(), offer()],
+    [offer(), offer({ currency_code: "XXX" })],
+    [{ ...offer(), offer_id: "x" }],
+    [offer({ listed_price_minor: 0 })],
+    [offer({ duration_minutes: 1441 })],
+    [offer({ modality: "Video" })],
+    [offer({ currency_code: "xts" })],
+    Array.from({ length: 101 }, (_, i) => offer({ duration_minutes: i + 1 })),
+  ]) {
+    assert.deepEqual(
+      await resolveAttorneyProfile(
+        harness({ offers: bad }).sources,
+        ATTORNEY,
+        J_A,
+      ),
+      { status: "unavailable" },
+      JSON.stringify(bad)?.slice(0, 120),
+    );
+  }
+  assert.deepEqual(PUBLIC_OFFER_COLUMNS, [
+    "modality",
+    "duration_minutes",
+    "listed_price_minor",
+    "currency_code",
+  ]);
+  assert.equal(
+    labels.offerText({
+      modality: "synthetic_video",
+      durationMinutes: 30,
+      listedPriceMinor: 5000,
+      currency: "XTS",
+    }),
+    // Intl separates the code with a no-break space.
+    "Synthetic video, 30 minutes: XTS\u00a050.00",
+  );
+  for (const text of [
+    labels.NO_OFFERS,
+    labels.OFFERS_NOTE,
+    labels.OFFERS_JURISDICTION_NOTE,
+  ]) {
+    assert.doesNotMatch(
+      text,
+      /best|recommend|top|cheapest|lowest|ranked|match/i,
+      text,
+    );
+  }
+  const page = codeOf(read("app/attorneys/[attorney]/page.tsx"));
+  assert.ok(page.includes("const { profile, jurisdictionId, offers } = view;"));
+  assert.ok(page.includes("{offerText(offer)}"));
+  assert.doesNotMatch(page, /\.sort\(|\.reverse\(/);
 });

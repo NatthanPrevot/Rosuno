@@ -17,6 +17,18 @@
 // unrecorded environment refuses. Modalities are configuration: their codes
 // come from the database and are never enumerated here. No price is ever
 // shown that the database did not derive, and none is a default.
+//
+// MVP-001 S6 PS-A3: the options come from the attorney's current offers (the
+// database prices them), a Request records its duration, and the client may
+// add an optional plain-text message (PS-A3 sections 3.3 and 5). The review
+// carries the message maximum the database would apply now (none: no message
+// can be added). The server action checks a message against that maximum
+// itself, independently of the browser's count and before anything is
+// written, and the database checks it again against the referral policy the
+// Request records. A message is counted in Unicode code points, as the
+// database counts characters; the line breaks a browser submits as CRLF are
+// read back as the single line feed the client typed. The Request shows the
+// client's own message as plain text, never as markup.
 
 import {
   bindEnvironment,
@@ -78,6 +90,8 @@ export const REVIEW_COLUMNS = Object.freeze([
   "request_path",
   "request_id",
   "requestable",
+  // MVP-001 S6 PS-A3: the message maximum the Request would record now.
+  "message_maximum_characters",
 ]);
 export const OPTION_COLUMNS = Object.freeze(["modality", "duration_minutes"]);
 export const SLOT_START_COLUMNS = Object.freeze(["slot_start", "slot_end"]);
@@ -108,6 +122,8 @@ export const REQUEST_COLUMNS = Object.freeze([
   "total_client_amount_minor",
   "currency_code",
   "quote_valid_until",
+  // MVP-001 S6 PS-A3: the client's own message.
+  "client_message",
 ]);
 export const INTAKE_REQUEST_COLUMNS = Object.freeze([
   "attempt_ordinal",
@@ -143,6 +159,9 @@ export const CREATE_OUTCOMES = Object.freeze([
   "duration_not_permitted",
   "modality_not_permitted",
   "policy_unavailable",
+  // MVP-001 S6 PS-A3: the message refusals.
+  "message_not_permitted",
+  "message_too_long",
   "cap_reached",
   "too_late",
 ] as const);
@@ -172,6 +191,14 @@ const MODALITY = /^[a-z][a-z0-9_]{1,31}$/;
 const OPTION = /^([a-z][a-z0-9_]{1,31})-([1-9][0-9]{0,3})$/;
 // The largest amount, in minor units, the database can derive.
 const MAX_AMOUNT = 4_000_000_000_000;
+// The client free-text ceiling (PS-A1), the most any configured message
+// maximum can be (PS-A3 section 2).
+export const MESSAGE_CEILING = 20000;
+
+// A message's length as the database counts it: Unicode code points.
+export function messageLength(message: string): number {
+  return [...message].length;
+}
 
 export type QuoteInput = {
   readonly referralId: string;
@@ -217,8 +244,11 @@ export type WithdrawAnswer =
   | { readonly kind: "rejected" }
   | { readonly kind: "unreadable" };
 
+// A Request to create: the quote's choice and the client's optional message.
+export type RequestInput = QuoteInput & { readonly message: string | null };
+
 export type RequestWrites = {
-  readonly createRequest: (input: QuoteInput) => Promise<CreateAnswer>;
+  readonly createRequest: (input: RequestInput) => Promise<CreateAnswer>;
   readonly withdrawRequest: (requestId: string) => Promise<WithdrawAnswer>;
 };
 
@@ -457,6 +487,51 @@ export function optionValueOf(option: ConsultationOption): string {
   return `${option.modality}-${option.durationMinutes}`;
 }
 
+// One review row, read strictly, or null.
+type ReviewRecord = {
+  readonly name: string | null;
+  readonly path: RequestPath | null;
+  readonly requestId: string | null;
+  readonly requestable: boolean;
+  readonly messageMaximum: number | null;
+};
+
+function isMessageMaximum(value: unknown): value is number {
+  return (
+    Number.isSafeInteger(value) &&
+    (value as number) >= 1 &&
+    (value as number) <= MESSAGE_CEILING
+  );
+}
+
+function readReviewRow(row: unknown, referralId: string): ReviewRecord | null {
+  const review = readExact(row, REVIEW_COLUMNS);
+  const name = review?.get("attorney_display_name");
+  const path = review?.get("request_path");
+  const requestId = review?.get("request_id");
+  const requestable = review?.get("requestable");
+  const maximum = review?.get("message_maximum_characters");
+  if (
+    review === null ||
+    review.get("referral_id") !== referralId ||
+    !(name === null || isName(name)) ||
+    !(path === null || isOneOf(REQUEST_PATHS, path)) ||
+    !(requestId === null || isUuid(requestId)) ||
+    typeof requestable !== "boolean" ||
+    (requestable && (requestId !== null || path === null)) ||
+    !(maximum === null || isMessageMaximum(maximum))
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    name: name as string | null,
+    path: path as RequestPath | null,
+    requestId: requestId as string | null,
+    requestable,
+    messageMaximum: maximum as number | null,
+  });
+}
+
 export type RequestReviewView =
   | { readonly status: "not-found" }
   | { readonly status: "sign-in-required" }
@@ -470,6 +545,9 @@ export type RequestReviewView =
       readonly attorneyName: string | null;
       readonly path: RequestPath;
       readonly options: readonly ConsultationOption[];
+      // MVP-001 S6 PS-A3: the message maximum the database would apply now;
+      // null: no message can be added.
+      readonly messageMaximum: number | null;
       // invalid: a chosen value is malformed or not one of those offered.
       readonly choice: "none" | "invalid" | "option" | "complete";
       readonly option: ConsultationOption | null;
@@ -524,22 +602,11 @@ export async function resolveRequestReview(
     if (reviewRows.length === 0) {
       return NOT_FOUND;
     }
-    const review = readExact(reviewRows[0], REVIEW_COLUMNS);
-    const name = review?.get("attorney_display_name");
-    const path = review?.get("request_path");
-    const requestId = review?.get("request_id");
-    const requestable = review?.get("requestable");
-    if (
-      review === null ||
-      review.get("referral_id") !== referralId ||
-      !(name === null || isName(name)) ||
-      !(path === null || isOneOf(REQUEST_PATHS, path)) ||
-      !(requestId === null || isUuid(requestId)) ||
-      typeof requestable !== "boolean" ||
-      (requestable && (requestId !== null || path === null))
-    ) {
+    const review = readReviewRow(reviewRows[0], referralId);
+    if (review === null) {
       return UNAVAILABLE_VIEW;
     }
+    const { name, path, requestId, requestable } = review;
     if (requestId !== null) {
       return Object.freeze({
         status: "requested",
@@ -563,6 +630,7 @@ export async function resolveRequestReview(
       attorneyName: name,
       path,
       options,
+      messageMaximum: review.messageMaximum,
     };
     const chosen =
       query.option === null || query.option === "invalid"
@@ -690,6 +758,8 @@ export type RequestActionState =
   | { readonly status: "option-unavailable" }
   | { readonly status: "pricing-unavailable" }
   | { readonly status: "configuration-unavailable" }
+  | { readonly status: "message-not-permitted" }
+  | { readonly status: "message-too-long" }
   | { readonly status: "cap-reached" }
   | { readonly status: "outcome-unknown" }
   | { readonly status: "sign-in-required" }
@@ -760,10 +830,23 @@ async function environmentBound(
   return binding !== "unrecorded" && binding !== "mismatch";
 }
 
+// The optional message as the client typed it: a browser submits a
+// textarea's line breaks as CRLF, read back as LF; an empty or blank entry is
+// no message. Null for a message the form did not send.
+export function submittedMessage(value: string | undefined): string | null {
+  if (value === undefined) {
+    return null;
+  }
+  const message = value.replaceAll("\r\n", "\n");
+  return message.trim() === "" ? null : message;
+}
+
 // Creates a Consultation Request from one of the client's own Referrals
 // through the database's own function and reports only its fixed outcome.
 // The submitted values are checked first (each once, of its own form); the
-// database decides everything again, the price included.
+// database decides everything again, the price included. A message is
+// checked here against the maximum the database reports for the Referral
+// now, before anything is written (MVP-001 S6 PS-A3).
 export async function createConsultationRequest(
   sources: RequestSources,
   formData: unknown,
@@ -775,7 +858,7 @@ export async function createConsultationRequest(
     const fields = strictFields(
       formData,
       ["referral", "path", "modality", "duration"],
-      ["slot"],
+      ["slot", "message"],
     );
     if (fields === null) {
       return STATE("invalid");
@@ -785,6 +868,7 @@ export async function createConsultationRequest(
     const modality = fields.get("modality");
     const duration = fields.get("duration");
     const slot = fields.get("slot") ?? null;
+    const message = submittedMessage(fields.get("message"));
     const durationMinutes =
       duration !== undefined && /^[1-9][0-9]{0,3}$/.test(duration)
         ? Number(duration)
@@ -801,6 +885,9 @@ export async function createConsultationRequest(
     ) {
       return STATE("invalid");
     }
+    if (message !== null && messageLength(message) > MESSAGE_CEILING) {
+      return STATE("message-too-long");
+    }
     const client = await verifiedClientOf(sources.clientIntake);
     if (!("clientId" in client)) {
       return STATE(client.status);
@@ -809,6 +896,25 @@ export async function createConsultationRequest(
     const writes = await portFrom(sources.writes);
     if (reads === null || writes === null) {
       return STATE("unavailable");
+    }
+    if (message !== null) {
+      const reviewRows = rowsOf(await attempt(() => reads.review(referralId)));
+      if (reviewRows === null || reviewRows.length > 1) {
+        return STATE("unavailable");
+      }
+      if (reviewRows.length === 0) {
+        return STATE("not-found");
+      }
+      const review = readReviewRow(reviewRows[0], referralId);
+      if (review === null) {
+        return STATE("unavailable");
+      }
+      if (review.messageMaximum === null) {
+        return STATE("message-not-permitted");
+      }
+      if (messageLength(message) > review.messageMaximum) {
+        return STATE("message-too-long");
+      }
     }
     if (!(await environmentBound(sources, reads))) {
       return STATE("unavailable");
@@ -821,6 +927,7 @@ export async function createConsultationRequest(
           modality,
           durationMinutes,
           slotStart: slot,
+          message,
         }),
       ),
     );
@@ -857,6 +964,10 @@ export async function createConsultationRequest(
         return STATE("option-unavailable");
       case "policy_unavailable":
         return STATE("configuration-unavailable");
+      case "message_not_permitted":
+        return STATE("message-not-permitted");
+      case "message_too_long":
+        return STATE("message-too-long");
       case "cap_reached":
         return STATE("cap-reached");
       default:
@@ -887,6 +998,8 @@ export type ConsultationRequestRecord = {
   readonly createdAt: string;
   readonly amounts: QuoteAmounts | null;
   readonly quoteValidUntil: string | null;
+  // MVP-001 S6 PS-A3: the client's own message, plain text.
+  readonly message: string | null;
 };
 
 function readRequest(row: unknown): ConsultationRequestRecord | null {
@@ -906,6 +1019,7 @@ function readRequest(row: unknown): ConsultationRequestRecord | null {
   const deadline = fields.get("response_deadline_at");
   const createdAt = fields.get("created_at");
   const quoteValidUntil = fields.get("quote_valid_until");
+  const message = fields.get("client_message");
   const amountFields = [
     "attorney_listed_price_minor",
     "client_fee_minor",
@@ -932,7 +1046,13 @@ function readRequest(row: unknown): ConsultationRequestRecord | null {
     !(deadline === null || isTimestamp(deadline)) ||
     !isTimestamp(createdAt) ||
     !(quoteValidUntil === null || isTimestamp(quoteValidUntil)) ||
-    (!noQuote && amounts === null)
+    (!noQuote && amounts === null) ||
+    !(
+      message === null ||
+      (typeof message === "string" &&
+        message.trim() !== "" &&
+        messageLength(message) <= MESSAGE_CEILING)
+    )
   ) {
     return null;
   }
@@ -950,6 +1070,7 @@ function readRequest(row: unknown): ConsultationRequestRecord | null {
     createdAt,
     amounts: amounts === null ? null : Object.freeze(amounts),
     quoteValidUntil,
+    message: message as string | null,
   });
 }
 

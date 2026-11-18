@@ -27,7 +27,11 @@
 // mismatched or unrecorded environment refuses the selection. Nothing here
 // changes an Intake, and nothing chooses an attorney for the client.
 // MVP-001 S6: a recorded selection answers its Referral id, so the page can
-// offer the request review for exactly that Referral.
+// offer the request review for exactly that Referral. MVP-001 S6 PS-A3: a
+// profile also carries the attorney's current public offers (PS-A3 section
+// 6: modality, duration, listed price and currency, only pairs the platform
+// permits and, for a chosen jurisdiction, only the offers priced there), read
+// from the database's own public offer function as strictly as the profile.
 
 import {
   bindEnvironment,
@@ -102,6 +106,13 @@ export const PROFILE_COLUMNS = Object.freeze([
   "available_now",
   "upcoming_windows",
 ]);
+// MVP-001 S6 PS-A3: public_attorney_offers.
+export const PUBLIC_OFFER_COLUMNS = Object.freeze([
+  "modality",
+  "duration_minutes",
+  "listed_price_minor",
+  "currency_code",
+]);
 export const REFERRAL_ATTEMPT_COLUMNS = Object.freeze([
   "attempt_ordinal",
   "created_at",
@@ -129,6 +140,8 @@ export const MAX_REFERRAL_ATTEMPTS = 50;
 // The most windows and jurisdictions a public profile carries.
 const MAX_PROFILE_WINDOWS = 5;
 const MAX_PROFILE_JURISDICTIONS = 20;
+// The most public offers the database answers for one profile.
+const MAX_PUBLIC_OFFERS = 100;
 
 export type DirectoryQueryInput = {
   readonly jurisdictionId: string;
@@ -154,6 +167,11 @@ export type DiscoveryReads = {
   readonly directory: (query: DirectoryQueryInput) => Promise<RowsResult>;
   // public_attorney_profile(...)
   readonly profile: (
+    attorneyId: string,
+    jurisdictionId: string | null,
+  ) => Promise<RowsResult>;
+  // public_attorney_offers(...) (MVP-001 S6 PS-A3)
+  readonly offers: (
     attorneyId: string,
     jurisdictionId: string | null,
   ) => Promise<RowsResult>;
@@ -578,6 +596,42 @@ export async function resolveDirectory(
 // A public profile
 // ---------------------------------------------------------------------------
 
+// One public offer (MVP-001 S6 PS-A3).
+export type PublicOffer = {
+  readonly modality: string;
+  readonly durationMinutes: number;
+  readonly listedPriceMinor: number;
+  readonly currency: string;
+};
+
+function readPublicOffer(row: unknown): PublicOffer | null {
+  const fields = readExact(row, PUBLIC_OFFER_COLUMNS);
+  const modality = fields?.get("modality");
+  const duration = fields?.get("duration_minutes");
+  const price = fields?.get("listed_price_minor");
+  const currency = fields?.get("currency_code");
+  if (
+    typeof modality !== "string" ||
+    !/^[a-z][a-z0-9_]{1,31}$/.test(modality) ||
+    !Number.isSafeInteger(duration) ||
+    (duration as number) < 1 ||
+    (duration as number) > 1440 ||
+    !Number.isSafeInteger(price) ||
+    (price as number) < 1 ||
+    (price as number) > 1_000_000_000_000 ||
+    typeof currency !== "string" ||
+    !/^[A-Z]{3}$/.test(currency)
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    modality,
+    durationMinutes: duration as number,
+    listedPriceMinor: price as number,
+    currency,
+  });
+}
+
 export type ProfileView =
   | { readonly status: "not-found" }
   | { readonly status: "unavailable" }
@@ -585,6 +639,7 @@ export type ProfileView =
       readonly status: "ready";
       readonly profile: AttorneyProfile;
       readonly jurisdictionId: string | null;
+      readonly offers: readonly PublicOffer[];
     };
 
 const NOT_FOUND = Object.freeze({ status: "not-found" } as const);
@@ -626,7 +681,29 @@ export async function resolveAttorneyProfile(
     ) {
       return UNAVAILABLE_VIEW;
     }
-    return Object.freeze({ status: "ready", profile, jurisdictionId });
+    const offerRows = rowsOf(
+      await attempt(() => reads.offers(attorneyId, jurisdictionId)),
+    );
+    if (offerRows === null || offerRows.length > MAX_PUBLIC_OFFERS) {
+      return UNAVAILABLE_VIEW;
+    }
+    const offers = readRows(offerRows, readPublicOffer);
+    if (
+      offers === null ||
+      new Set(
+        offers.map((o) => `${o.modality}|${o.durationMinutes}|${o.currency}`),
+      ).size !== offers.length ||
+      (jurisdictionId !== null &&
+        new Set(offers.map((o) => o.currency)).size > 1)
+    ) {
+      return UNAVAILABLE_VIEW;
+    }
+    return Object.freeze({
+      status: "ready",
+      profile,
+      jurisdictionId,
+      offers,
+    });
   } catch {
     return UNAVAILABLE_VIEW;
   }

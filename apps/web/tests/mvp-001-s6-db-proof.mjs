@@ -23,14 +23,26 @@
 // Every attorney, client, Intake, licence, evidence item, price and outcome
 // code is synthetic test data.
 //
-// TEST-ONLY PRICE SOURCE. The shipped price-source seam
-// (pricing_attorney_offers and pricing_attorney_offer) answers no row until
-// PS-A3 is adopted, and the first checks prove that every preview and Request
-// creation then answers price_unavailable and writes nothing. To exercise the
-// rest of the pipeline, this proof then replaces the two seam bodies, inside
-// this disposable cluster only, with synthetic test bodies reading a
-// proof-only table (proof_s6.offers, outside the public schema). Nothing of
-// that is a migration, and nothing persists after the run.
+// MVP-001 S6 PS-A3 update: the PS-A3 migration (20261122040000) follows the
+// three S6 migrations. The price source now reads the attorneys' current
+// consultation offers (attorney_consultation_offers), so the synthetic
+// test-only seam bodies and proof table of the first S6 run are gone: the
+// first checks prove that an attorney without a current offer is not
+// bookable (every preview and Request creation answers price_unavailable and
+// writes nothing), and the offers are then written into the real relation,
+// by the owner role (an offer whose pair is no longer permitted, or whose
+// currency no jurisdiction uses, is stored exactly as such an offer would
+// remain after a configuration change) and, for price changes, through the
+// attorney's own function at aal2. The duration and modality options come
+// from a platform-scope fee policy version (no jurisdiction; development
+// configuration, test values only) and each jurisdiction's fee policy keeps
+// only the economics (PS-A3 section 3). Invalid prices that the first run fed
+// through the synthetic seam (zero, negative, ambiguous, malformed currency)
+// can no longer be stored: the seed proves each is refused at storage, so the
+// quote engine still never sees one. The PS-A3-specific probes (offers,
+// configuration, currency selection, approval validation, request duration
+// and message, public offers, offer concurrency) are in
+// mvp-001-s6-offers-db-proof.mjs.
 //
 // Request sessions are modelled as PostgREST sets them from a verified JWT:
 // request.jwt.claim.sub and the JSON request.jwt.claims; anonymous requests
@@ -81,6 +93,8 @@ const S6_MIGRATIONS = Object.freeze([
   "20261122020000_mvp_001_s6_pricing.sql",
   "20261122030000_mvp_001_s6_requests.sql",
 ]);
+// MVP-001 S6 PS-A3: the one PS-A3 migration follows the three S6 migrations.
+const PS_A3_MIGRATION = "20261122040000_mvp_001_s6_consultation_offers.sql";
 
 const report = {
   proof: "MVP-001 S6 disposable local PostgreSQL proof",
@@ -396,11 +410,12 @@ function applyMigrations() {
       "utf8",
     ),
   ).migrations;
-  // S6 follows S5, contiguous and in order, last, and every S6 migration is
-  // registered unreviewed and applied nowhere.
+  // S6 follows S5, contiguous and in order, and every S6 migration is
+  // registered unreviewed and applied nowhere. MVP-001 S6 PS-A3: then exactly
+  // the PS-A3 migration, last, registered the same way.
   const s5 = files.indexOf(S5_LAST);
   assert.ok(s5 >= 0, "the last S5 migration is present");
-  assert.deepEqual(files.slice(s5 + 1), [...S6_MIGRATIONS]);
+  assert.deepEqual(files.slice(s5 + 1), [...S6_MIGRATIONS, PS_A3_MIGRATION]);
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),
@@ -410,7 +425,7 @@ function applyMigrations() {
   const program = workItems.find(
     (item) => item.work_item_id === "WI-P2-MVP-001-TECHNICAL-COMPLETION",
   );
-  for (const file of S6_MIGRATIONS) {
+  for (const file of [...S6_MIGRATIONS, PS_A3_MIGRATION]) {
     const id = file.replace(/\.sql$/, "");
     const row = registered.find(
       (migration) => migration.artifact_path === `supabase/migrations/${file}`,
@@ -450,7 +465,7 @@ function applyMigrations() {
       fs.readFileSync(path.join(MIGRATIONS, file), "utf8"),
     );
     assert.equal(result.status, 0, `${file}: ${result.stderr}`);
-    if (S6_MIGRATIONS.includes(file)) {
+    if (S6_MIGRATIONS.includes(file) || file === PS_A3_MIGRATION) {
       notices[file] = [...result.stderr.matchAll(/NOTICE:\s+(.*)/g)].map(
         (match) => match[1],
       );
@@ -690,18 +705,27 @@ const COMPONENT = (basis, fixed = 0, minimum = null, maximum = null) => ({
   maximum_minor: maximum,
 });
 
-// A synthetic Fee Policy (test values; XTS is the ISO 4217 testing code).
+// A synthetic jurisdiction-scope Fee Policy (test values; XTS is the ISO
+// 4217 testing code). MVP-001 S6 PS-A3: the economics only; the duration and
+// modality lists moved to the platform scope (PLATFORM below).
 const FEE = (overrides = {}) => ({
   currency_code: "XTS",
   quote_validity_seconds: 900,
-  permitted_durations_minutes: [30, 60],
-  permitted_modalities: ["synthetic_video", "synthetic_audio"],
   listed_price_minimum_minor: 1000,
   listed_price_maximum_minor: 100000,
   rounding: "half_up",
   platform_fee: COMPONENT(1000),
   client_fee: COMPONENT(250, 50, 100, 2000),
   other_required_fee: COMPONENT(0),
+  ...overrides,
+});
+
+// MVP-001 S6 PS-A3: the synthetic platform-scope Fee Policy (no
+// jurisdiction): exactly the permitted durations and modalities (test values
+// only; the same options the first S6 run carried in each Fee Policy).
+const PLATFORM = (overrides = {}) => ({
+  permitted_durations_minutes: [30, 60],
+  permitted_modalities: ["synthetic_video", "synthetic_audio"],
   ...overrides,
 });
 
@@ -838,14 +862,16 @@ const asClient = (client, statement) =>
 
 const ts = (value) => (value === null ? "null" : `${lit(value)}::timestamptz`);
 
+// MVP-001 S6 PS-A3: request_create takes the optional client message last.
 const CREATE = ({
   referral,
   path: requestPath,
   modality = "synthetic_video",
   duration = 30,
   slot = null,
+  message = null,
 }) =>
-  `select outcome || '|' || coalesce(request_id::text, '') || '|' || coalesce(problem, '') from public.request_create(${lit(referral)}, ${lit(requestPath)}, ${lit(modality)}, ${duration === null ? "null" : duration}, ${ts(slot)});`;
+  `select outcome || '|' || coalesce(request_id::text, '') || '|' || coalesce(problem, '') from public.request_create(${lit(referral)}, ${lit(requestPath)}, ${lit(modality)}, ${duration === null ? "null" : duration}, ${ts(slot)}, ${message === null ? "null::text" : lit(message)});`;
 
 function create(client, options) {
   const line = asClient(client, CREATE(options));
@@ -965,12 +991,15 @@ function ownerRequestSql({
   deadline = "now() + interval '1 hour'",
   evaluation = uid(),
   state: requestState = "created",
+  duration = 30,
 }) {
   const end = slot === null ? null : plusMinutes(slot, 30);
   const holdEnd = holdSlot === null ? null : plusMinutes(holdSlot, 30);
   const lines = [
-    `insert into public.consultation_requests (id, intake_id, client_id, selected_attorney_id, referral_id, request_path, referral_policy_version_id, requested_modality, state, response_deadline_at)
-       values ('${request}', '${client.intake}', '${client.client}', '${lawyer.profile}', '${referral}', '${requestPath}', '${world.policies.referral[jurisdiction]}', ${lit(modality)}, '${requestState}', ${deadline});`,
+    // MVP-001 S6 PS-A3: the Request records its duration (30 minutes, the
+    // length of the fixture's Hold).
+    `insert into public.consultation_requests (id, intake_id, client_id, selected_attorney_id, referral_id, request_path, referral_policy_version_id, requested_modality, requested_duration_minutes, state, response_deadline_at)
+       values ('${request}', '${client.intake}', '${client.client}', '${lawyer.profile}', '${referral}', '${requestPath}', '${world.policies.referral[jurisdiction]}', ${lit(modality)}, ${duration === null ? "null" : duration}, '${requestState}', ${deadline});`,
   ];
   if (!omit.includes("eligibility")) {
     lines.push(
@@ -1001,51 +1030,17 @@ function ownerRequestSql({
   return lines.join("\n");
 }
 
-// The test-only price source (see the header): the two seam bodies replaced,
-// in this disposable cluster only, by synthetic bodies reading
-// proof_s6.offers.
-function installTestPriceSource() {
-  sql(`
-create schema proof_s6;
-create table proof_s6.offers (
-  attorney_id uuid not null,
-  modality text,
-  duration_minutes integer,
-  listed_price_minor bigint,
-  currency_code text,
-  offer_reference jsonb
-);
-create or replace function public.pricing_attorney_offers(p_attorney uuid)
-returns table (modality text, duration_minutes integer, listed_price_minor bigint, currency_code text, offer_reference jsonb)
-language sql stable security invoker set search_path = pg_catalog, pg_temp
-as $$
-  select o.modality, o.duration_minutes, o.listed_price_minor, o.currency_code, o.offer_reference
-  from proof_s6.offers as o where o.attorney_id = p_attorney
-  order by o.modality, o.duration_minutes;
-$$;
-create or replace function public.pricing_attorney_offer(p_attorney uuid, p_modality text, p_duration_minutes integer)
-returns table (modality text, duration_minutes integer, listed_price_minor bigint, currency_code text, offer_reference jsonb)
-language sql stable security invoker set search_path = pg_catalog, pg_temp
-as $$
-  select o.modality, o.duration_minutes, o.listed_price_minor, o.currency_code, o.offer_reference
-  from proof_s6.offers as o
-  where o.attorney_id = p_attorney and o.modality = p_modality and o.duration_minutes = p_duration_minutes;
-$$;
-`);
+// MVP-001 S6 PS-A3: one current offer written by the owner role into the
+// real relation (synthetic test price); answers its id.
+function offer(lawyer, modality, duration, price, currency = "XTS") {
+  return sql(
+    `insert into public.attorney_consultation_offers (attorney_id, modality, duration_minutes, listed_price_minor, currency_code) values ('${lawyer.profile}', ${lit(modality)}, ${duration}, ${price}, ${lit(currency)}) returning id;`,
+  );
 }
 
-function offer(lawyer, modality, duration, price, currency = "XTS", reference) {
-  const ref = lit(
-    JSON.stringify(
-      reference === undefined
-        ? { synthetic_offer: `${modality}-${duration}` }
-        : reference,
-    ),
-  );
-  sql(
-    `insert into proof_s6.offers (attorney_id, modality, duration_minutes, listed_price_minor, currency_code, offer_reference) values ('${lawyer.profile}', ${lit(modality)}, ${duration}, ${price}, ${lit(currency)}, ${ref}::jsonb);`,
-  );
-}
+// The same insert as a statement, for refusal probes.
+const OFFER_INSERT = (lawyer, modality, duration, price, currency = "XTS") =>
+  `insert into public.attorney_consultation_offers (attorney_id, modality, duration_minutes, listed_price_minor, currency_code) values ('${lawyer.profile}', ${lit(modality)}, ${duration}, ${price}, ${lit(currency)});`;
 
 function seed() {
   world.J = {
@@ -1127,6 +1122,8 @@ function seed() {
   for (const [id, parameters] of Object.entries(fees)) {
     world.policies.fee[id] = policy("fee", id, parameters);
   }
+  // MVP-001 S6 PS-A3: the one platform-scope Fee Policy (no jurisdiction).
+  world.policies.platform = policy("fee", null, PLATFORM());
   world.ada = attorney({
     name: "Ada Synthetic",
     jurisdictions: Object.values(J),
@@ -1151,26 +1148,64 @@ function seed() {
 }
 
 function seedOffers() {
+  world.offerIds = {};
   for (const lawyer of [world.ada, world.dot]) {
-    offer(lawyer, "synthetic_video", 30, 5000);
+    world.offerIds[`${lawyer.name}:synthetic_video-30`] = offer(
+      lawyer,
+      "synthetic_video",
+      30,
+      5000,
+    );
     offer(lawyer, "synthetic_video", 60, 9000);
     offer(lawyer, "synthetic_audio", 30, 4000);
-    // Offered, but not permitted by the policy (duration, modality), and
-    // offered in another currency.
+    // Stored offers the platform-scope policy does not permit (duration,
+    // modality), and an offer in a currency no jurisdiction here uses.
     offer(lawyer, "synthetic_video", 90, 12000);
     offer(lawyer, "synthetic_text", 30, 3000);
     offer(lawyer, "synthetic_audio", 60, 7000, "XXX");
   }
-  // Prices outside the policy bounds, and invalid prices.
+  // Prices outside the policy bounds.
   offer(world.bea, "synthetic_video", 30, 500);
   offer(world.bea, "synthetic_video", 60, 200000);
-  offer(world.bea, "synthetic_audio", 30, 0);
-  offer(world.bea, "synthetic_audio", 60, -100);
-  // Ambiguous or malformed offers.
-  offer(world.una, "synthetic_audio", 30, 4000);
-  offer(world.una, "synthetic_audio", 30, 4100);
-  offer(world.una, "synthetic_video", 30, 4000, "xts");
-  offer(world.una, "synthetic_video", 60, 4000, "XTS", "not-an-object");
+  // MVP-001 S6 PS-A3: the invalid prices the first run fed through the
+  // synthetic seam can no longer be stored, for any role: a zero or negative
+  // price (23514), an ambiguous second current offer for one pair and
+  // currency (23505, the whole attempt rolled back), and a malformed currency
+  // code (23514). So bea and una hold no audio offers and una no video ones.
+  const refusals = {
+    zero: refused(OFFER_INSERT(world.bea, "synthetic_audio", 30, 0)),
+    negative: refused(OFFER_INSERT(world.bea, "synthetic_audio", 60, -100)),
+    ambiguous: refused(
+      `${OFFER_INSERT(world.una, "synthetic_audio", 30, 4000)}\n${OFFER_INSERT(world.una, "synthetic_audio", 30, 4100)}`,
+    ),
+    lowercase: refused(
+      OFFER_INSERT(world.una, "synthetic_video", 30, 4000, "xts"),
+    ),
+    short: refused(OFFER_INSERT(world.una, "synthetic_video", 60, 4000, "XT")),
+  };
+  assert.deepEqual(refusals, {
+    zero: "23514",
+    negative: "23514",
+    ambiguous: "23505",
+    lowercase: "23514",
+    short: "23514",
+  });
+  for (const lawyer of [world.bea, world.una]) {
+    assert.equal(
+      count(
+        "attorney_consultation_offers",
+        `attorney_id = '${lawyer.profile}' and modality = 'synthetic_audio'`,
+      ),
+      0,
+    );
+  }
+  assert.equal(
+    count(
+      "attorney_consultation_offers",
+      `attorney_id = '${world.una.profile}'`,
+    ),
+    0,
+  );
   offer(world.cat, "synthetic_video", 30, 5000);
   offer(world.cy, "synthetic_video", 30, 5000);
 }
@@ -1179,9 +1214,11 @@ function seedOffers() {
 // Inventory and privileges
 // ---------------------------------------------------------------------------
 
+// MVP-001 S6 PS-A3: the request relation gains exactly the two PS-A3
+// columns, last; every other column is the P1 one.
 const P1_COLUMNS = Object.freeze({
   consultation_requests:
-    "id,intake_id,client_id,selected_attorney_id,referral_id,request_path,referral_policy_version_id,engagement_policy_version_id,requested_modality,state,response_deadline_at,created_at,accepted_at,declined_at,expired_at,cancelled_at",
+    "id,intake_id,client_id,selected_attorney_id,referral_id,request_path,referral_policy_version_id,engagement_policy_version_id,requested_modality,state,response_deadline_at,created_at,accepted_at,declined_at,expired_at,cancelled_at,requested_duration_minutes,client_message",
   fee_calculations:
     "id,consultation_request_id,fee_policy_version_id,attorney_listed_price_minor,platform_fee_minor,client_fee_minor,tax_or_other_required_fee_minor,total_client_amount_minor,currency_code,quote_valid_until,calculated_at,supersedes_fee_calculation_id,calculation_snapshot,created_at",
   slot_holds:
@@ -1197,20 +1234,24 @@ const REQUEST_RELATIONS = Object.freeze([
 
 // Client functions: authenticated only, security definer.
 const CLIENT_FUNCTIONS = Object.freeze({
+  // MVP-001 S6 PS-A3: with the message maximum the Request would record.
   "client_request_review(uuid)":
-    "s|search_path=pg_catalog, pg_temp|TABLE(referral_id uuid, attorney_display_name text, request_path text, request_id uuid, requestable boolean)",
+    "s|search_path=pg_catalog, pg_temp|TABLE(referral_id uuid, attorney_display_name text, request_path text, request_id uuid, requestable boolean, message_maximum_characters integer)",
   "request_options(uuid)":
     "s|search_path=pg_catalog, pg_temp|TABLE(modality text, duration_minutes integer)",
   "request_slot_starts(uuid, text, integer)":
     "s|search_path=pg_catalog, pg_temp|TABLE(slot_start timestamp with time zone, slot_end timestamp with time zone)",
   "request_quote_preview(uuid, text, text, integer, timestamptz)":
     "s|search_path=pg_catalog, pg_temp|TABLE(outcome text, attorney_listed_price_minor bigint, client_fee_minor bigint, tax_or_other_required_fee_minor bigint, total_client_amount_minor bigint, currency_code text, quote_validity_seconds integer)",
-  "request_create(uuid, text, text, integer, timestamptz)":
+  // MVP-001 S6 PS-A3: with the optional client message (the five-argument
+  // version is dropped; checked in PRIV-3).
+  "request_create(uuid, text, text, integer, timestamptz, text)":
     "v|search_path=pg_catalog, pg_temp;lock_timeout=3s|TABLE(outcome text, request_id uuid, problem text)",
   "request_withdraw(uuid)":
     "v|search_path=pg_catalog, pg_temp;lock_timeout=3s|TABLE(outcome text)",
+  // MVP-001 S6 PS-A3: with the client's own message, last.
   "client_request(uuid)":
-    "s|search_path=pg_catalog, pg_temp|TABLE(request_id uuid, state text, expired_due boolean, request_path text, attorney_display_name text, requested_modality text, duration_minutes integer, slot_start_at timestamp with time zone, slot_end_at timestamp with time zone, response_deadline_at timestamp with time zone, created_at timestamp with time zone, attorney_listed_price_minor bigint, client_fee_minor bigint, tax_or_other_required_fee_minor bigint, total_client_amount_minor bigint, currency_code text, quote_valid_until timestamp with time zone)",
+    "s|search_path=pg_catalog, pg_temp|TABLE(request_id uuid, state text, expired_due boolean, request_path text, attorney_display_name text, requested_modality text, duration_minutes integer, slot_start_at timestamp with time zone, slot_end_at timestamp with time zone, response_deadline_at timestamp with time zone, created_at timestamp with time zone, attorney_listed_price_minor bigint, client_fee_minor bigint, tax_or_other_required_fee_minor bigint, total_client_amount_minor bigint, currency_code text, quote_valid_until timestamp with time zone, client_message text)",
   "client_intake_requests(uuid)":
     "s|search_path=pg_catalog, pg_temp|TABLE(attempt_ordinal integer, referral_id uuid, request_id uuid, state text, expired_due boolean, requestable boolean)",
 });
@@ -1238,6 +1279,32 @@ const INTERNAL_FUNCTIONS = Object.freeze({
   "request_expired_due(uuid)": false,
   "request_expire_if_due(uuid, boolean)": false,
   "request_expiry_sweep()": false,
+  // MVP-001 S6 PS-A3 (20261122040000): the offer guard and the configuration
+  // readers, all security invoker.
+  "attorney_consultation_offer_integrity()": false,
+  "pricing_platform_parameters_valid(jsonb)": false,
+  "pricing_platform_policy(timestamptz)": false,
+  "policy_parameters_approvable(text, uuid, jsonb)": false,
+  "request_message_limit(uuid)": false,
+  "attorney_offer_allowed_currencies(uuid, timestamptz)": false,
+});
+
+// MVP-001 S6 PS-A3: the attorney's offer functions (authenticated only,
+// security definer) and the public offer read (anon and authenticated,
+// stable security definer), with their settings and result columns.
+const ATTORNEY_FUNCTIONS = Object.freeze({
+  "attorney_set_consultation_offer(text, integer, bigint, text)":
+    "v|search_path=pg_catalog, pg_temp;lock_timeout=3s|TABLE(outcome text, offer_id uuid)",
+  "attorney_withdraw_consultation_offer(uuid)":
+    "v|search_path=pg_catalog, pg_temp;lock_timeout=3s|text",
+  "attorney_consultation_offers()":
+    "s|search_path=pg_catalog, pg_temp|TABLE(offer_id uuid, modality text, duration_minutes integer, listed_price_minor bigint, currency_code text, created_at timestamp with time zone, withdrawn_at timestamp with time zone, permitted boolean)",
+  "attorney_consultation_offer_options()":
+    "s|search_path=pg_catalog, pg_temp|TABLE(options_configured boolean, permitted_durations_minutes integer[], permitted_modalities text[], allowed_currencies text[])",
+});
+const PUBLIC_FUNCTIONS = Object.freeze({
+  "public_attorney_offers(uuid, uuid)":
+    "s|search_path=pg_catalog, pg_temp|TABLE(modality text, duration_minutes integer, listed_price_minor bigint, currency_code text)",
 });
 
 // The P1 deferred consistency checks S6 makes security definer, and the S4
@@ -1269,8 +1336,9 @@ async function unrecordedChecks() {
 
 async function inventoryChecks() {
   await check(
-    "MIG-1 the three S6 migrations follow S5 last and in order, are registered unreviewed and applied nowhere, are Program migration refs, and apply on plain PostgreSQL with the pg_cron step skipped",
+    "MIG-1 the three S6 migrations follow S5 in order (MVP-001 S6 PS-A3: then only the PS-A3 migration, last), are registered unreviewed and applied nowhere, are Program migration refs, and apply on plain PostgreSQL with the pg_cron step skipped",
     () => {
+      assert.deepEqual(report.migrations.notices[PS_A3_MIGRATION], []);
       assert.deepEqual(report.migrations.notices[S6_MIGRATIONS[0]], []);
       assert.deepEqual(report.migrations.notices[S6_MIGRATIONS[1]], []);
       assert.deepEqual(report.migrations.notices[S6_MIGRATIONS[2]], [
@@ -1280,7 +1348,7 @@ async function inventoryChecks() {
     },
   );
   await check(
-    "MIG-2 no relation, column, enum type, policy type, capability, row policy or seed row is added: the P1 columns of the request, fee, Hold and Bookability relations are unchanged and the S6 migration texts create none",
+    "MIG-2 no relation, column, enum type, policy type, capability, row policy or seed row is added beyond PS-A3: the P1 columns of the fee, Hold and Bookability relations are unchanged, the request relation gains exactly the two PS-A3 columns, the S6 migration texts create none, and the PS-A3 migration text creates exactly the one PS-A3 relation and adds exactly the two PS-A3 columns (no type, row policy or seed)",
     () => {
       for (const [table, columns] of Object.entries(P1_COLUMNS)) {
         assert.equal(
@@ -1301,17 +1369,43 @@ async function inventoryChecks() {
           file,
         );
       }
+      // MVP-001 S6 PS-A3: exactly one table, two columns, no type, policy
+      // or seed in the PS-A3 migration text.
+      const psA3 = fs
+        .readFileSync(path.join(MIGRATIONS, PS_A3_MIGRATION), "utf8")
+        .replace(/--[^\n]*/g, "");
+      assert.deepEqual(
+        [...psA3.matchAll(/create\s+table\s+([a-z_.]+)/gi)].map((m) => m[1]),
+        ["public.attorney_consultation_offers"],
+      );
+      assert.deepEqual(
+        [...psA3.matchAll(/add\s+column\s+([a-z_]+)/gi)].map((m) => m[1]),
+        ["requested_duration_minutes", "client_message"],
+      );
+      assert.doesNotMatch(
+        psA3,
+        /create\s+type|create\s+policy|create\s+view|create\s+sequence|insert\s+into\s+public\.(policy_types|policy_versions|capability_definitions|capability_grants|deployment_environment|jurisdictions|practice_areas)/i,
+      );
+      // No seed offer: the relation is empty after the migrations (its only
+      // insert is inside the attorney's own function).
+      assert.equal(
+        sql(
+          "select string_agg(attname, ',' order by attnum) from pg_attribute where attrelid = 'public.attorney_consultation_offers'::regclass and attnum > 0 and not attisdropped;",
+        ),
+        "id,attorney_id,modality,duration_minutes,listed_price_minor,currency_code,created_at,withdrawn_at",
+      );
+      assert.equal(count("attorney_consultation_offers"), 0);
       assert.equal(count("policy_types"), 15);
       assert.equal(
         sql(
-          "select string_agg(tablename || '.' || policyname, ',' order by tablename, policyname) from pg_policies where schemaname = 'public' and tablename in ('consultation_requests', 'fee_calculations', 'slot_holds');",
+          "select string_agg(tablename || '.' || policyname, ',' order by tablename, policyname) from pg_policies where schemaname = 'public' and tablename in ('consultation_requests', 'fee_calculations', 'slot_holds', 'attorney_consultation_offers');",
         ),
         "consultation_requests.consultation_requests_select_own_client",
       );
     },
   );
   await check(
-    "PRIV-1 the request and fee relations are function-only: anon holds nothing, authenticated only the P1 SELECT on its own Requests (nothing on Fee Calculations), service_role only SELECT (no column-level write either); RLS stays enabled",
+    "PRIV-1 the request and fee relations are function-only: anon holds nothing, authenticated only the P1 SELECT on its own Requests (nothing on Fee Calculations), service_role only SELECT (no column-level write either; MVP-001 S6 PS-A3: on the request relation only column SELECT on every column but the client message); RLS stays enabled",
     () => {
       const privileges = [
         "SELECT",
@@ -1343,14 +1437,32 @@ async function inventoryChecks() {
           observed[`${role}:${table}`] = held.join(",");
         }
       }
+      // MVP-001 S6 PS-A3: service_role's table-level SELECT on the request
+      // relation became column SELECT on every column except client_message
+      // (only the client reads the message), asserted below.
       assert.deepEqual(observed, {
         "anon:consultation_requests": "",
         "authenticated:consultation_requests": "SELECT",
-        "service_role:consultation_requests": "SELECT",
+        "service_role:consultation_requests": "",
         "anon:fee_calculations": "",
         "authenticated:fee_calculations": "",
         "service_role:fee_calculations": "SELECT",
       });
+      assert.equal(
+        sql(
+          "select string_agg(attname, ',' order by attnum) from pg_attribute where attrelid = 'public.consultation_requests'::regclass and attnum > 0 and not attisdropped and has_column_privilege('service_role', attrelid, attnum, 'SELECT');",
+        ),
+        P1_COLUMNS.consultation_requests.replace(",client_message", ""),
+      );
+      for (const role of ["anon", "service_role"]) {
+        assert.equal(
+          sql(
+            `select has_column_privilege('${role}', 'public.consultation_requests', 'client_message', 'SELECT');`,
+          ),
+          "f",
+          role,
+        );
+      }
       for (const table of REQUEST_RELATIONS) {
         assert.equal(
           sql(
@@ -1363,13 +1475,14 @@ async function inventoryChecks() {
     },
   );
   await check(
-    "PRIV-2 anon executes nothing new: exactly the three S5 public reads remain executable by anon, and anon holds no privilege on any table, view or sequence of the public schema",
+    "PRIV-2 anon executes nothing new but the PS-A3 public offers: exactly the three S5 public reads and (MVP-001 S6 PS-A3) public_attorney_offers are executable by anon, and anon holds no privilege on any table, view or sequence of the public schema",
     () => {
       const executable = sql(
         "select string_agg(p.oid::regprocedure::text, ';' order by p.oid::regprocedure::text) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'EXECUTE');",
       ).split(";");
       assert.deepEqual(executable, [
         "public_attorney_directory(uuid,uuid,text,integer)",
+        "public_attorney_offers(uuid,uuid)",
         "public_attorney_profile(uuid,uuid)",
         "public_discovery_filters()",
       ]);
@@ -1384,10 +1497,43 @@ async function inventoryChecks() {
     },
   );
   await check(
-    "PRIV-3 function inventory: the eight client functions are security definer, owned by the owner role, search_path pinned (lock_timeout on the two writes), executable by authenticated only, with exactly their result columns; every internal building block and guard is executable by no API role nor a PUBLIC-only role, search_path pinned, security invoker except the two deferred evidence checks; the two P1 deferred consistency checks are now security definer with search_path pinned and executable by no API role; the replaced S4 hold function stays security invoker and internal; every function S6 comments as its own is listed",
+    "PRIV-3 function inventory: the eight client functions and (MVP-001 S6 PS-A3) the four attorney offer functions are security definer, owned by the owner role, search_path pinned (lock_timeout on the writes), executable by authenticated only, with exactly their result columns; the PS-A3 public offer read is stable security definer, executable by anon and authenticated only; the five-argument request_create no longer exists; every internal building block and guard is executable by no API role nor a PUBLIC-only role, search_path pinned, security invoker except the two deferred evidence checks; the two P1 deferred consistency checks are now security definer with search_path pinned and executable by no API role; the replaced S4 hold function stays security invoker and internal; every function S6 comments as its own is listed",
     () => {
       sql("create role s6_probe nologin;");
-      for (const [signature, settings] of Object.entries(CLIENT_FUNCTIONS)) {
+      assert.equal(
+        sql(
+          "select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname = 'request_create';",
+        ),
+        "1",
+      );
+      for (const [signature, settings] of Object.entries(PUBLIC_FUNCTIONS)) {
+        const [volatility, config, result] = settings.split("|");
+        assert.equal(
+          sql(
+            `select prosecdef::text || '|' || provolatile::text || '|' || array_to_string(proconfig, ';') || '|' || pg_get_userbyid(proowner) || '|' || pg_get_function_result(oid) from pg_proc where oid = 'public.${signature}'::regprocedure;`,
+          ),
+          `true|${volatility}|${config}|postgres|${result}`,
+          signature,
+        );
+        for (const [role, allowed] of [
+          ["anon", "t"],
+          ["authenticated", "t"],
+          ["service_role", "f"],
+          ["s6_probe", "f"],
+        ]) {
+          assert.equal(
+            sql(
+              `select has_function_privilege('${role}', 'public.${signature}', 'EXECUTE');`,
+            ),
+            allowed,
+            `${role} ${signature}`,
+          );
+        }
+      }
+      for (const [signature, settings] of Object.entries({
+        ...CLIENT_FUNCTIONS,
+        ...ATTORNEY_FUNCTIONS,
+      })) {
         const [volatility, config, result] = settings.split("|");
         assert.equal(
           sql(
@@ -1469,6 +1615,8 @@ async function inventoryChecks() {
       const listed = [
         ...Object.keys(CLIENT_FUNCTIONS),
         ...Object.keys(INTERNAL_FUNCTIONS),
+        ...Object.keys(ATTORNEY_FUNCTIONS),
+        ...Object.keys(PUBLIC_FUNCTIONS),
       ].map((signature) =>
         sql(`select 'public.${signature}'::regprocedure::text;`),
       );
@@ -1476,13 +1624,15 @@ async function inventoryChecks() {
       // The triggers S6 adds, with their timing and functions.
       assert.equal(
         sql(
-          "select string_agg(c.relname || ':' || t.tgname || ':' || p.proname || ':' || t.tgdeferrable::text, ',' order by c.relname, t.tgname) from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_proc p on p.oid = t.tgfoid where not t.tgisinternal and p.proname in ('consultation_request_integrity', 'request_point_in_time_evidence', 'fee_calculation_with_request', 'fee_calculation_no_truncate');",
+          "select string_agg(c.relname || ':' || t.tgname || ':' || p.proname || ':' || t.tgdeferrable::text, ',' order by c.relname, t.tgname) from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_proc p on p.oid = t.tgfoid where not t.tgisinternal and p.proname in ('consultation_request_integrity', 'request_point_in_time_evidence', 'fee_calculation_with_request', 'fee_calculation_no_truncate', 'attorney_consultation_offer_integrity');",
         ),
-        "consultation_requests:consultation_requests_change_guard:consultation_request_integrity:false,consultation_requests:consultation_requests_no_truncate:consultation_request_integrity:false,consultation_requests:consultation_requests_point_in_time_evidence:request_point_in_time_evidence:true,fee_calculations:fee_calculations_no_truncate:fee_calculation_no_truncate:false,fee_calculations:fee_calculations_with_request:fee_calculation_with_request:true",
+        "attorney_consultation_offers:attorney_consultation_offers_change_guard:attorney_consultation_offer_integrity:false,attorney_consultation_offers:attorney_consultation_offers_no_truncate:attorney_consultation_offer_integrity:false,consultation_requests:consultation_requests_change_guard:consultation_request_integrity:false,consultation_requests:consultation_requests_no_truncate:consultation_request_integrity:false,consultation_requests:consultation_requests_point_in_time_evidence:request_point_in_time_evidence:true,fee_calculations:fee_calculations_no_truncate:fee_calculation_no_truncate:false,fee_calculations:fee_calculations_with_request:fee_calculation_with_request:true",
       );
       sql("drop role s6_probe;");
       return {
         client_functions: Object.keys(CLIENT_FUNCTIONS).length,
+        attorney_functions: Object.keys(ATTORNEY_FUNCTIONS).length,
+        public_functions: Object.keys(PUBLIC_FUNCTIONS).length,
         internal_functions: Object.keys(INTERNAL_FUNCTIONS).length,
       };
     },
@@ -1549,7 +1699,7 @@ async function inventoryChecks() {
 
 async function shippedSeamChecks() {
   await check(
-    "SEAM-1 the shipped price-source seam answers no offer, so with complete configuration every preview and every instant or scheduled Request creation answers price_unavailable and writes nothing (no Request, evaluation, Fee Calculation, Hold or audit event), no option or slot start is offered, and no price is ever zero or a fallback (MB section 152: a missing price makes the attorney not bookable)",
+    "SEAM-1 an attorney without a current offer (MVP-001 S6 PS-A3: the price source reads the real offers; none is stored yet) has no price, so with complete configuration every preview and every instant or scheduled Request creation answers price_unavailable and writes nothing (no Request, evaluation, Fee Calculation, Hold or audit event), no option or slot start is offered, and no price is ever zero or a fallback (MB section 152: a missing price makes the attorney not bookable)",
     () => {
       assert.equal(
         sql(
@@ -1648,6 +1798,9 @@ async function shippedSeamChecks() {
             request_path: "scheduled",
             request_id: null,
             requestable: true,
+            // MVP-001 S6 PS-A3: the jurisdiction's referral policy sets no
+            // message maximum, so no message can be added.
+            message_maximum_characters: null,
           },
         ],
       );
@@ -1675,7 +1828,7 @@ const quoteOf = (lawyer, jurisdiction, modality, duration) =>
 
 async function pricingChecks() {
   await check(
-    "POL-1 the Fee Policy reader requires every parameter explicitly: the complete synthetic policy is valid (null bounds allowed), and a missing, extra, mistyped or out-of-range key, a duplicate duration or modality, an unknown rounding, a minimum above its maximum or a malformed component makes it policy_incomplete; no policy is no_applicable_policy",
+    "POL-1 the Fee Policy readers require every parameter explicitly: the complete synthetic jurisdiction policy is valid (null bounds allowed), and a missing, extra, mistyped or out-of-range key (MVP-001 S6 PS-A3: a duration or modality list included, now a platform-scope key), an unknown rounding, a minimum above its maximum or a malformed component makes it policy_incomplete; the platform-scope reader requires exactly the two option lists, and an empty, duplicate, mistyped or out-of-range duration or modality, or a missing or extra key, makes it policy_incomplete; no policy is no_applicable_policy",
     () => {
       const valid = (parameters) =>
         sql(
@@ -1707,17 +1860,10 @@ async function pricingChecks() {
         FEE({ quote_validity_seconds: 604801 }),
         FEE({ quote_validity_seconds: 90.5 }),
         FEE({ quote_validity_seconds: "900" }),
-        FEE({ permitted_durations_minutes: [] }),
-        FEE({ permitted_durations_minutes: [30, 30] }),
-        FEE({ permitted_durations_minutes: [0] }),
-        FEE({ permitted_durations_minutes: [1441] }),
-        FEE({ permitted_durations_minutes: [30.5] }),
-        FEE({ permitted_durations_minutes: "30" }),
-        FEE({ permitted_modalities: [] }),
-        FEE({ permitted_modalities: ["Synthetic Video"] }),
-        FEE({ permitted_modalities: ["synthetic_video", "synthetic_video"] }),
-        FEE({ permitted_modalities: [1] }),
-        FEE({ permitted_modalities: "synthetic_video" }),
+        // MVP-001 S6 PS-A3: the option lists are platform-scope keys only.
+        FEE({ permitted_durations_minutes: [30, 60] }),
+        FEE({ permitted_modalities: ["synthetic_video"] }),
+        { ...FEE(), ...PLATFORM() },
         FEE({ listed_price_minimum_minor: 0 }),
         FEE({ listed_price_minimum_minor: 1.5 }),
         FEE({
@@ -1740,6 +1886,54 @@ async function pricingChecks() {
       for (const parameters of malformed) {
         assert.equal(valid(parameters), "f", JSON.stringify(parameters));
       }
+      // MVP-001 S6 PS-A3: the platform-scope option lists (the duration and
+      // modality cases this check carried for the Fee Policy before).
+      const platformValid = (parameters) =>
+        sql(
+          `select public.pricing_platform_parameters_valid(${lit(parameters)}::jsonb);`,
+        );
+      assert.equal(platformValid(PLATFORM()), "t");
+      assert.equal(
+        platformValid(PLATFORM({ permitted_durations_minutes: [15, 1440] })),
+        "t",
+      );
+      const platformMalformed = [
+        { permitted_modalities: ["synthetic_video"] },
+        { permitted_durations_minutes: [30] },
+        { ...PLATFORM(), extra_key: 1 },
+        { ...PLATFORM(), currency_code: "XTS" },
+        PLATFORM({ permitted_durations_minutes: [] }),
+        PLATFORM({ permitted_durations_minutes: [30, 30] }),
+        PLATFORM({ permitted_durations_minutes: [0] }),
+        PLATFORM({ permitted_durations_minutes: [1441] }),
+        PLATFORM({ permitted_durations_minutes: [30.5] }),
+        PLATFORM({ permitted_durations_minutes: ["30"] }),
+        PLATFORM({ permitted_durations_minutes: "30" }),
+        PLATFORM({ permitted_durations_minutes: null }),
+        PLATFORM({ permitted_modalities: [] }),
+        PLATFORM({ permitted_modalities: ["Synthetic Video"] }),
+        PLATFORM({
+          permitted_modalities: ["synthetic_video", "synthetic_video"],
+        }),
+        PLATFORM({ permitted_modalities: [1] }),
+        PLATFORM({ permitted_modalities: "synthetic_video" }),
+        PLATFORM({ permitted_modalities: ["x"] }),
+        FEE(),
+        [PLATFORM()],
+      ];
+      for (const parameters of platformMalformed) {
+        assert.equal(
+          platformValid(parameters),
+          "f",
+          JSON.stringify(parameters),
+        );
+      }
+      assert.deepEqual(
+        jsonOf(
+          `select json_build_object('outcome', outcome, 'same', policy_version_id = '${world.policies.platform}', 'parameters', parameters)::text from public.pricing_platform_policy(now());`,
+        ),
+        { outcome: "selected", same: true, parameters: PLATFORM() },
+      );
       assert.equal(
         sql(
           `select outcome || '|' || (policy_version_id = '${world.policies.fee[world.J.A]}')::text from public.pricing_fee_policy('${world.J.A}', now());`,
@@ -1758,11 +1952,14 @@ async function pricingChecks() {
         ),
         "policy_incomplete|true|null",
       );
-      return { malformed_refused: malformed.length };
+      return {
+        malformed_refused: malformed.length,
+        platform_malformed_refused: platformMalformed.length,
+      };
     },
   );
   await check(
-    "QUOTE-1 the quote engine prices only a single valid offer that the Fee Policy permits: the components follow clamp(round(price x basis_points / 10000) + fixed, minimum, maximum) under each rounding mode, the client total is price + client fee + other fee (the platform fee is attorney-side), and the refusals are, in order, invalid, policy_unavailable, price_unavailable (no, ambiguous, zero, negative or malformed offer), modality_not_permitted, duration_not_permitted and price_not_permitted (below the minimum, above the maximum, another currency); the snapshot records inputs, every component's pricing source, the formula and the quote validity",
+    "QUOTE-1 the quote engine prices only a single valid current offer that the Fee Policies permit: the components follow clamp(round(price x basis_points / 10000) + fixed, minimum, maximum) under each rounding mode, the client total is price + client fee + other fee (the platform fee is attorney-side), and the refusals are, in order, invalid, policy_unavailable, price_unavailable (no offer; MVP-001 S6 PS-A3: an ambiguous, zero, negative or malformed offer cannot be stored, and an offer only in another currency is not one in the jurisdiction's currency), modality_not_permitted, duration_not_permitted (by the platform-scope policy) and price_not_permitted (below the minimum, above the maximum); the snapshot records inputs (PS-A3: the offer and the platform-scope version), every component's pricing source, the formula and the quote validity",
     () => {
       const component = (price, rule, rounding) =>
         Number(
@@ -1815,7 +2012,10 @@ async function pricingChecks() {
         "quote_validity_seconds",
         "schema",
       ]);
-      assert.equal(snapshot.schema, "rosuno.fee_calculation_snapshot.v1");
+      // MVP-001 S6 PS-A3: snapshot v2 also records the offer and the
+      // platform-scope version with its parameters.
+      assert.equal(snapshot.schema, "rosuno.fee_calculation_snapshot.v2");
+      const adaVideo30 = world.offerIds["Ada Synthetic:synthetic_video-30"];
       assert.deepEqual(
         { ...snapshot.inputs, as_of: undefined },
         {
@@ -1826,8 +2026,17 @@ async function pricingChecks() {
           as_of: undefined,
           attorney_listed_price_minor: 5000,
           attorney_price_currency_code: "XTS",
+          offer: {
+            id: adaVideo30,
+            modality: "synthetic_video",
+            duration_minutes: 30,
+            listed_price_minor: 5000,
+            currency_code: "XTS",
+          },
           fee_policy_version_id: world.policies.fee[world.J.A],
           fee_policy_parameters: FEE(),
+          platform_fee_policy_version_id: world.policies.platform,
+          platform_fee_policy_parameters: PLATFORM(),
         },
       );
       assert.deepEqual(
@@ -1846,9 +2055,7 @@ async function pricingChecks() {
       );
       assert.deepEqual(
         snapshot.components.attorney_listed_price.offer_reference,
-        {
-          synthetic_offer: "synthetic_video-30",
-        },
+        { offer_id: adaVideo30 },
       );
       assert.deepEqual(
         snapshot.components.client_fee.rule,
@@ -1869,7 +2076,9 @@ async function pricingChecks() {
         [world.ada, world.J.A, "synthetic_audio", 30, "priced"],
         [world.ada, world.J.A, "synthetic_video", 90, "duration_not_permitted"],
         [world.ada, world.J.A, "synthetic_text", 30, "modality_not_permitted"],
-        [world.ada, world.J.A, "synthetic_audio", 60, "price_not_permitted"],
+        // MVP-001 S6 PS-A3: the audio-60 offer is only in XXX, so there is no
+        // offer in the jurisdiction's XTS (was price_not_permitted).
+        [world.ada, world.J.A, "synthetic_audio", 60, "price_unavailable"],
         [world.bea, world.J.A, "synthetic_video", 30, "price_not_permitted"],
         [world.bea, world.J.A, "synthetic_video", 60, "price_not_permitted"],
         [world.bea, world.J.A, "synthetic_audio", 30, "price_unavailable"],
@@ -1952,7 +2161,8 @@ async function pricingChecks() {
           { modality: "synthetic_text", duration: 30 },
           "modality_not_permitted",
         ],
-        [{ modality: "synthetic_audio", duration: 60 }, "price_not_permitted"],
+        // MVP-001 S6 PS-A3: offered only in another currency.
+        [{ modality: "synthetic_audio", duration: 60 }, "price_unavailable"],
         [{ modality: "Synthetic", duration: 30 }, "invalid"],
         [{ duration: 0 }, "invalid"],
         [{ slot: null }, "invalid"],
@@ -2079,7 +2289,7 @@ function evidenceOf(request) {
   return jsonOf(`
     with q as (select r.*, r.xmin as row_xmin from public.consultation_requests r where r.id = '${request}')
     select json_build_object(
-      'request', (select row_to_json(x) from (select id, intake_id, client_id, selected_attorney_id, referral_id, request_path, referral_policy_version_id, engagement_policy_version_id, requested_modality, state, extract(epoch from response_deadline_at - created_at)::integer as window_seconds from q) x),
+      'request', (select row_to_json(x) from (select id, intake_id, client_id, selected_attorney_id, referral_id, request_path, referral_policy_version_id, engagement_policy_version_id, requested_modality, state, extract(epoch from response_deadline_at - created_at)::integer as window_seconds, requested_duration_minutes, client_message from q) x),
       'eligibility', (select json_agg(json_build_object('id', e.id, 'context', e.context_type, 'context_id', e.context_id, 'result', e.result) order by e.context_type) from public.eligibility_evaluations e, q where e.xmin = q.row_xmin and e.attorney_id = q.selected_attorney_id),
       'bookability', (select json_agg(json_build_object('result', b.result, 'modality', b.modality, 'slot_start', b.slot_start_at, 'slot_end', b.slot_end_at, 'eligibility_evaluation_id', b.eligibility_evaluation_id, 'same_transaction', b.xmin = q.row_xmin, 'factors', (select json_agg(f ->> 'factor') from jsonb_array_elements(b.constraint_results) f))) from public.bookability_evaluations b, q where b.context_type = 'consultation_request' and b.context_id = q.id),
       'fee', (select json_agg(json_build_object('id', c.id, 'policy', c.fee_policy_version_id, 'price', c.attorney_listed_price_minor, 'platform', c.platform_fee_minor, 'client', c.client_fee_minor, 'other', c.tax_or_other_required_fee_minor, 'total', c.total_client_amount_minor, 'currency', c.currency_code, 'validity', extract(epoch from c.quote_valid_until - c.calculated_at)::integer, 'quote_valid_until', c.quote_valid_until, 'root', c.supersedes_fee_calculation_id is null, 'same_transaction', c.xmin = q.row_xmin, 'duration', c.calculation_snapshot -> 'inputs' -> 'duration_minutes', 'modality', c.calculation_snapshot -> 'inputs' ->> 'modality')) from public.fee_calculations c, q where c.consultation_request_id = q.id),
@@ -2119,6 +2329,9 @@ async function requestChecks() {
         requested_modality: "synthetic_video",
         state: "created",
         window_seconds: 900,
+        // MVP-001 S6 PS-A3: the recorded duration of the offer, no message.
+        requested_duration_minutes: 30,
+        client_message: null,
       });
       assert.equal(evidence.eligibility.length, 1);
       assert.equal(evidence.eligibility[0].context, "jurisdiction");
@@ -2202,6 +2415,8 @@ async function requestChecks() {
         "total_client_amount_minor",
         "currency_code",
         "quote_valid_until",
+        // MVP-001 S6 PS-A3: the client's own message.
+        "client_message",
       ]);
       assert.deepEqual(
         {
@@ -2228,6 +2443,7 @@ async function requestChecks() {
           total_client_amount_minor: 5175,
           currency_code: "XTS",
           quote_valid_until: undefined,
+          client_message: null,
         },
       );
       assert.equal(
@@ -2251,6 +2467,7 @@ async function requestChecks() {
           request_path: "instant",
           request_id: made.request,
           requestable: false,
+          message_maximum_characters: null,
         },
       ]);
       assert.equal(
@@ -2289,6 +2506,8 @@ async function requestChecks() {
       const evidence = evidenceOf(made.request);
       assert.equal(evidence.request.state, "slot_held");
       assert.equal(evidence.request.window_seconds, 3600);
+      // MVP-001 S6 PS-A3: the recorded duration is the offer's, the Hold's.
+      assert.equal(evidence.request.requested_duration_minutes, 60);
       assert.deepEqual(
         evidence.eligibility.map((e) => [e.context, e.context_id, e.result]),
         [
@@ -2473,6 +2692,8 @@ async function requestChecks() {
           { path: "scheduled", modality: "synthetic_audio", slot },
           "price_unavailable||",
         ],
+        // MVP-001 S6 PS-A3: offered only in another currency (was
+        // price_not_permitted).
         [
           scheduledA,
           {
@@ -2481,7 +2702,7 @@ async function requestChecks() {
             duration: 60,
             slot,
           },
-          "price_not_permitted||",
+          "price_unavailable||",
         ],
         [
           scheduledA,
@@ -2622,8 +2843,15 @@ async function financialChecks() {
         `select row_to_json(c)::text from public.fee_calculations c where consultation_request_id = '${made.request}';`,
       );
       assert.equal(fee.attorney_listed_price_minor, 4000);
-      sql(
-        `update proof_s6.offers set listed_price_minor = 4500 where attorney_id = '${world.ada.profile}' and modality = 'synthetic_audio' and duration_minutes = 30;`,
+      // MVP-001 S6 PS-A3: the attorney changes the price through their own
+      // function at aal2 (the current offer is withdrawn and a new one made).
+      assert.equal(
+        as(
+          "authenticated",
+          world.ada.auth,
+          "select outcome from public.attorney_set_consultation_offer('synthetic_audio', 30, 4500, 'XTS');",
+        ),
+        "replaced",
       );
       assert.deepEqual(
         jsonOf(
@@ -3653,13 +3881,14 @@ async function authorizationChecks() {
 
 async function auditChecks() {
   await check(
-    "AUD-1 audit minimization: each Request creation records exactly one client-actor event with fixed identifier, path, modality, duration, amount and currency keys, its jurisdiction and the eligibility, referral, fee and scheduling policy references; withdrawals and expiries record one event each with fixed keys and a fixed reason; no free text and no other request action exists",
+    "AUD-1 audit minimization: each Request creation records exactly one client-actor event with fixed identifier (MVP-001 S6 PS-A3: the offer's included), path, modality, duration, amount and currency keys, its jurisdiction and the eligibility, referral, fee (PS-A3: jurisdiction and platform scope) and scheduling policy references; withdrawals and expiries record one event each with fixed keys and a fixed reason; no free text (PS-A3: never the client's message) and no other request action exists",
     () => {
       assert.equal(
         sql(
           "select string_agg(distinct (select string_agg(k, ',' order by k) from jsonb_object_keys(after_snapshot) k), ';') from public.audit_events where action_code = 'consultation_request.created';",
         ),
-        "attorney_id,attorney_listed_price_minor,bookability_evaluation_id,client_fee_minor,currency_code,duration_minutes,eligibility_evaluation_id,fee_calculation_id,hold_id,intake_id,platform_fee_minor,quote_valid_until,referral_id,request_path,requested_modality,state,tax_or_other_required_fee_minor,total_client_amount_minor",
+        // MVP-001 S6 PS-A3: the priced offer's id is recorded too.
+        "attorney_id,attorney_listed_price_minor,bookability_evaluation_id,client_fee_minor,currency_code,duration_minutes,eligibility_evaluation_id,fee_calculation_id,hold_id,intake_id,offer_id,platform_fee_minor,quote_valid_until,referral_id,request_path,requested_modality,state,tax_or_other_required_fee_minor,total_client_amount_minor",
       );
       assert.equal(
         count(
@@ -3671,7 +3900,7 @@ async function auditChecks() {
       assert.equal(
         count(
           "audit_events a",
-          "a.action_code = 'consultation_request.created' and not exists (select 1 from jsonb_array_elements(a.policy_references) p where p ->> 'policy_type_code' = 'eligibility') or a.action_code = 'consultation_request.created' and (select string_agg(p ->> 'policy_type_code', ',' order by p ->> 'policy_type_code') from jsonb_array_elements(a.policy_references) p where p ->> 'policy_type_code' <> 'eligibility') <> 'fee,referral,scheduling'",
+          "a.action_code = 'consultation_request.created' and not exists (select 1 from jsonb_array_elements(a.policy_references) p where p ->> 'policy_type_code' = 'eligibility') or a.action_code = 'consultation_request.created' and (select string_agg(p ->> 'policy_type_code', ',' order by p ->> 'policy_type_code') from jsonb_array_elements(a.policy_references) p where p ->> 'policy_type_code' <> 'eligibility') <> 'fee,fee,referral,scheduling'",
         ),
         0,
       );
@@ -3694,6 +3923,15 @@ async function auditChecks() {
         count(
           "audit_events",
           "action_code = 'consultation_request.expired' and actor_user_id is not null",
+        ),
+        0,
+      );
+      // MVP-001 S6 PS-A3: the platform-scope fee reference is the platform
+      // version and the recorded offer exists.
+      assert.equal(
+        count(
+          "audit_events a",
+          `a.action_code = 'consultation_request.created' and (not exists (select 1 from jsonb_array_elements(a.policy_references) p where p ->> 'policy_type_code' = 'fee' and p ->> 'policy_version_id' = '${world.policies.platform}') or not exists (select 1 from public.attorney_consultation_offers o where o.id::text = a.after_snapshot ->> 'offer_id'))`,
         ),
         0,
       );
@@ -3725,7 +3963,6 @@ async function main() {
     seed();
     await inventoryChecks();
     await shippedSeamChecks();
-    installTestPriceSource();
     seedOffers();
     expirySetup();
     await pricingChecks();

@@ -14,13 +14,21 @@
 // Each such failure writes one log line naming the call and how it failed
 // (the error code and HTTP status only, MVP-001 D-8), and nothing the call
 // carried or answered.
+//
+// MVP-001 S6 PS-A3: request_create also receives the client's optional
+// message (null for none), checked here only for its form (plain text, not
+// blank, at most the 20,000-character ceiling); the maximum is the database's
+// to decide.
 
 import {
   CREATE_OUTCOMES,
+  MESSAGE_CEILING,
+  messageLength,
   REQUEST_PATHS,
   WITHDRAW_OUTCOMES,
   type CreateAnswer,
   type QuoteInput,
+  type RequestInput,
   type RequestReads,
   type RequestSources,
   type RequestWrites,
@@ -256,6 +264,12 @@ const isQuoteInput = (input: QuoteInput): boolean =>
   (input.path === "scheduled"
     ? typeof input.slotStart === "string" && TIMESTAMP.test(input.slotStart)
     : input.slotStart === null);
+const isRequestInput = (input: RequestInput): boolean =>
+  isQuoteInput(input) &&
+  (input.message === null ||
+    (typeof input.message === "string" &&
+      input.message.trim() !== "" &&
+      messageLength(input.message) <= MESSAGE_CEILING));
 
 export function createRequestReads(
   clientSource: RequestClientSource = createDefaultRequestClient,
@@ -352,8 +366,8 @@ export function createRequestWrites(
       return null;
     }
     return Object.freeze({
-      createRequest: async (input: QuoteInput) =>
-        isQuoteInput(input)
+      createRequest: async (input: RequestInput) =>
+        isRequestInput(input)
           ? observedWrite(
               "request_create",
               deadlineMs,
@@ -366,6 +380,7 @@ export function createRequestWrites(
                   p_modality: input.modality,
                   p_duration_minutes: input.durationMinutes,
                   p_slot_start: input.slotStart,
+                  p_client_message: input.message,
                 }),
             )
           : REJECTED_CREATE,

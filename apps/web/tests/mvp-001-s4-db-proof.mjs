@@ -60,7 +60,15 @@
 // the slot it then holds) and a root Fee Calculation (no quote validity, so
 // it never bounds the Hold's expiry); a held scheduled Request moves to
 // slot_held; and acceptance walks slot_held (scheduled) or payment_authorized
-// (instant) -> awaiting_attorney -> accepted. No Supabase
+// (instant) -> awaiting_attorney -> accepted.
+//
+// MVP-001 S6 PS-A3 update: the PS-A3 migration (20261122040000) follows the
+// S6 migrations. consultation_requests gains exactly the two PS-A3 columns
+// (requested_duration_minutes and client_message), and a Request commits only
+// with its duration, a scheduled one only with a Hold of exactly that length.
+// The synthetic Requests' owner fixture therefore records the duration: the
+// length of the slot it is evaluated for (and then holds), or 60 minutes for
+// a Request with no slot. No Supabase
 // project, network service, or pre-existing cluster is contacted, nothing
 // persists after the run, and every value is synthetic test data. The JSON
 // report goes to stdout; exit 0 means PASS, 1 FAIL, 2 cleanup failure.
@@ -404,7 +412,8 @@ function applyMigrations() {
   // S4 follows S3, contiguous and in order, and every S4 migration is
   // registered unreviewed and applied nowhere. MVP-001 S5: the three S5
   // migrations, contiguous and in order, follow S4; MVP-001 S6: then exactly
-  // the three S6 migrations, contiguous and in order.
+  // the three S6 migrations, contiguous and in order; MVP-001 S6 PS-A3: then
+  // exactly the PS-A3 migration.
   const s3 = files.indexOf(S3_LAST);
   assert.ok(s3 >= 0, "the last S3 migration is present");
   assert.deepEqual(files.slice(s3 + 1, s3 + 1 + S4_MIGRATIONS.length), [
@@ -417,6 +426,7 @@ function applyMigrations() {
     "20261122010000_mvp_001_s6_request_integrity.sql",
     "20261122020000_mvp_001_s6_pricing.sql",
     "20261122030000_mvp_001_s6_requests.sql",
+    "20261122040000_mvp_001_s6_consultation_offers.sql",
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -746,8 +756,13 @@ function requestSql({
   // transaction (20261121010000). MVP-001 S6: the Request's own evidence (the
   // same eligible evaluation, a consultation_request Bookability Evaluation
   // for its slot) and its root Fee Calculation, also in that transaction
-  // (20261122010000).
+  // (20261122010000). MVP-001 S6 PS-A3: the Request records its duration,
+  // the length of its slot (60 minutes without one) (20261122040000).
   const evaluation = uid();
+  const duration =
+    start === null || end === null
+      ? "60"
+      : `(extract(epoch from (${lit(end)}::timestamptz - ${lit(start)}::timestamptz)) / 60)::integer`;
   return `insert into public.referrals (id, intake_id, attorney_id, jurisdiction_id, attempt_ordinal, allocation_method)
     values ('${referral}', '${client.intake}', '${attorney.profile}', '${jurisdiction}', ${ordinal}, 'client_selected');
   insert into public.eligibility_evaluations (id, attorney_id, jurisdiction_id, context_type, context_id, evaluated_at, policy_references, result, factor_results, evidence_references, as_of)
@@ -758,8 +773,8 @@ function requestSql({
     values ('${referral}', '${attorney.profile}', 1, 'platform', now());
   insert into public.bookability_evaluations (attorney_id, eligibility_evaluation_id, context_type, context_id, evaluated_at, as_of, modality, constraint_results, result)
     values ('${attorney.profile}', '${evaluation}', 'referral', '${referral}', now(), now(), 'synthetic', '[]'::jsonb, 'bookable');
-  insert into public.consultation_requests (id, intake_id, client_id, selected_attorney_id, referral_id, request_path, referral_policy_version_id, requested_modality, state, response_deadline_at)
-    values ('${request}', '${client.intake}', '${client.client}', '${attorney.profile}', '${referral}', '${requestPath}', '${world.referralPolicy}', 'video', 'created', ${deadline === null ? "null" : lit(deadline)});
+  insert into public.consultation_requests (id, intake_id, client_id, selected_attorney_id, referral_id, request_path, referral_policy_version_id, requested_modality, requested_duration_minutes, state, response_deadline_at)
+    values ('${request}', '${client.intake}', '${client.client}', '${attorney.profile}', '${referral}', '${requestPath}', '${world.referralPolicy}', 'video', ${duration}, 'created', ${deadline === null ? "null" : lit(deadline)});
   insert into public.bookability_evaluations (attorney_id, eligibility_evaluation_id, context_type, context_id, evaluated_at, as_of, modality, slot_start_at, slot_end_at, constraint_results, result)
     values ('${attorney.profile}', '${evaluation}', 'consultation_request', '${request}', now(), now(), 'video', ${start === null ? "null" : `${lit(start)}::timestamptz`}, ${end === null ? "null" : `${lit(end)}::timestamptz`}, '[]'::jsonb, 'bookable');
   insert into public.fee_calculations (consultation_request_id, fee_policy_version_id, attorney_listed_price_minor, platform_fee_minor, client_fee_minor, tax_or_other_required_fee_minor, total_client_amount_minor, currency_code, calculated_at, calculation_snapshot)
@@ -963,7 +978,9 @@ function seed() {
 // Inventory and privileges
 // ---------------------------------------------------------------------------
 
-// The P1 columns of every relation S4 uses (Packet rule 16: no column added).
+// The P1 columns of every relation S4 uses (Packet rule 16: no column added;
+// MVP-001 S6 PS-A3: consultation_requests gains exactly the two PS-A3
+// columns, last).
 const P1_COLUMNS = Object.freeze({
   availability_rules:
     "id,attorney_id,rule_kind,timezone_name,weekday,specific_date,local_start_time,local_end_time,effective_from,effective_until,active,created_at,updated_at",
@@ -980,7 +997,7 @@ const P1_COLUMNS = Object.freeze({
   application_sessions:
     "id,user_id,auth_session_reference,expires_at,revoked_at,created_at,started_at,ended_at",
   consultation_requests:
-    "id,intake_id,client_id,selected_attorney_id,referral_id,request_path,referral_policy_version_id,engagement_policy_version_id,requested_modality,state,response_deadline_at,created_at,accepted_at,declined_at,expired_at,cancelled_at",
+    "id,intake_id,client_id,selected_attorney_id,referral_id,request_path,referral_policy_version_id,engagement_policy_version_id,requested_modality,state,response_deadline_at,created_at,accepted_at,declined_at,expired_at,cancelled_at,requested_duration_minutes,client_message",
 });
 
 const S4_RELATIONS = Object.freeze([
@@ -1054,7 +1071,7 @@ async function inventoryChecks() {
     },
   );
   await check(
-    "MIG-2 no relation, column, enum type, policy type, capability or seed row is added: the P1 columns are unchanged and the S4 migration texts create none",
+    "MIG-2 no relation, column, enum type, policy type, capability or seed row is added: the P1 columns are unchanged (MVP-001 S6 PS-A3: but for exactly the two PS-A3 request columns) and the S4 migration texts create none",
     () => {
       for (const [table, columns] of Object.entries(P1_COLUMNS)) {
         assert.equal(

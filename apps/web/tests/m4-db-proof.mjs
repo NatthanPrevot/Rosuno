@@ -65,6 +65,14 @@
 // relation: it appends decision-point eligibility_evaluations rows (never an
 // update or delete) together with its Request.
 //
+// MVP-001 S6 PS-A3 update: the PS-A3 migration follows. SEC-1 lists exactly
+// the five further definer functions, as exact assertions: the attorney's
+// own offer list and offer options reads and the public offer read (stable,
+// writing nothing), and the attorney's offer set and withdrawal functions,
+// which write only attorney_consultation_offers and audit events; no M4
+// relation. request_create, client_request and client_request_review are
+// replaced under their own names (already listed).
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -1417,6 +1425,11 @@ function probes() {
           // ai_suggestions and audit events; no M4 relation.
           "ai_record_intake_suggestion:v",
           "attorney_change_practice_area_request:v",
+          // MVP-001 S6 PS-A3 re-pin (20261122040000): the attorney's own offer
+          // options and offer list reads (authenticated, aal2), which write
+          // nothing.
+          "attorney_consultation_offer_options:s",
+          "attorney_consultation_offers:s",
           // MVP-001 S4 re-pin (20261120020000): the attorney's own schedule
           // functions (authenticated, aal2), which write only availability
           // rules, Blackouts, application sessions, Instant intents and
@@ -1432,9 +1445,17 @@ function probes() {
           "attorney_save_profile_details:v",
           // MVP-001 S4 re-pin (20261120020000): read and switch, as above.
           "attorney_schedule_calendar:s",
+          // MVP-001 S6 PS-A3 re-pin (20261122040000): the attorney's offer
+          // price function (authenticated, aal2), which writes only
+          // attorney_consultation_offers and audit events; no M4 relation.
+          "attorney_set_consultation_offer:v",
           "attorney_set_instant_intent:v",
           "attorney_start_application:v",
           "attorney_submit_application:v",
+          // MVP-001 S6 PS-A3 re-pin (20261122040000): the attorney's offer
+          // withdrawal (authenticated, aal2), which writes only the offer's
+          // withdrawal and an audit event; no M4 relation.
+          "attorney_withdraw_consultation_offer:v",
           // MVP-001 S2 re-pin (20261118040000, PS-A4): the authentication-
           // abuse decision functions (service_role only), which write only
           // their own counters and security audit events, no M4 relation.
@@ -1504,6 +1525,9 @@ function probes() {
           // MVP-001 S5 re-pin (20261121020000): the three public discovery
           // reads (anon and authenticated), stable, which write nothing.
           "public_attorney_directory:s",
+          // MVP-001 S6 PS-A3 re-pin (20261122040000): the public offer read
+          // (anon and authenticated), stable, which writes nothing.
+          "public_attorney_offers:s",
           "public_attorney_profile:s",
           "public_discovery_filters:s",
           // MVP-001 S5 re-pin (20261121030000): the client's selection

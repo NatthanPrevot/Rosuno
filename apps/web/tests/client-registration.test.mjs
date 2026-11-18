@@ -2886,6 +2886,8 @@ const DISCOVERY_RPCS = Object.freeze([
   "public_attorney_profile",
   "client_referrals",
   "referral_create",
+  // MVP-001 S6 PS-A3: the public offer read, called the same way.
+  "public_attorney_offers",
 ]);
 // MVP-001 S6: the consultation request adapter calls the database's own six
 // request reads (review, options, slot starts, quote preview, the client's
@@ -2905,6 +2907,21 @@ const REQUEST_RPCS = Object.freeze([
   "client_intake_requests",
   "request_create",
   "request_withdraw",
+]);
+// MVP-001 S6 PS-A3: the consultation offer adapter calls the database's own
+// two offer reads (the attorney's options and offer list), the two offer
+// functions (setting a price and withdrawing an offer) and the PS-A2
+// environment accessor (checked before a change), each exactly once and each
+// as a literal call through the request's own unprivileged session; it
+// builds or receives no privileged client, and no other file names any of
+// the four offer functions.
+const OFFER_ADAPTER =
+  "src/infrastructure/offers/consultation-offer-adapter.ts";
+const OFFER_RPCS = Object.freeze([
+  "attorney_consultation_offer_options",
+  "attorney_consultation_offers",
+  "attorney_set_consultation_offer",
+  "attorney_withdraw_consultation_offer",
 ]);
 const CAPABILITY_PREDICATE_RPC =
   'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';
@@ -2936,6 +2953,9 @@ const RPC_OCCURRENCES = Object.freeze({
   [DISCOVERY_ADAPTER]: DISCOVERY_RPCS.length + 1,
   // MVP-001 S6: the eight request functions, plus the environment accessor.
   [REQUEST_ADAPTER]: REQUEST_RPCS.length + 1,
+  // MVP-001 S6 PS-A3: the four offer functions, plus the environment
+  // accessor.
+  [OFFER_ADAPTER]: OFFER_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -3048,6 +3068,32 @@ function assertQuotaRpcContract(codes) {
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
       );
     }
+    // MVP-001 S6 PS-A3: the offer functions, as for the request functions.
+    for (const name of OFFER_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === OFFER_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== OFFER_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === OFFER_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        OFFER_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
     assert.equal(
       code.match(/\brpc\b/gi)?.length ?? 0,
       RPC_OCCURRENCES[file] ?? 0,
@@ -3064,7 +3110,8 @@ function assertQuotaRpcContract(codes) {
       file === STAFF_ADAPTER ||
         file === CONFIGURATION_ADAPTER ||
         file === DISCOVERY_ADAPTER ||
-        file === REQUEST_ADAPTER
+        file === REQUEST_ADAPTER ||
+        file === OFFER_ADAPTER
         ? 1
         : 0,
       file,

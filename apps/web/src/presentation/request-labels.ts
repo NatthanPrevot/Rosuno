@@ -8,7 +8,8 @@
 // shown as its words, never translated through a fixed list. Amounts come
 // from the database in minor units and are shown with their currency code;
 // instants come from the database and are shown in UTC. The server decides
-// every expiry; these labels only show what it reports.
+// every expiry; these labels only show what it reports. MVP-001 S6 PS-A3: the
+// optional message's wording, its maximum (from the database) and its count.
 
 import type {
   RequestActionState,
@@ -100,6 +101,26 @@ export const SERVER_TIME_NOTE =
 
 export const QUOTE_NOTE =
   "If you confirm, this price is fixed for your request and is held until the time shown on your request.";
+
+export const MESSAGE_LABEL = "Message (optional)";
+
+export function messageHint(maximum: number): string {
+  return `Plain text, up to ${maximum} characters. It is kept with your request as you write it.`;
+}
+
+export function messageCount(used: number, maximum: number): string {
+  return `${used} of ${maximum} characters`;
+}
+
+export function messageOverBy(over: number): string {
+  return over === 1
+    ? "Your message is 1 character too long. Shorten it to continue."
+    : `Your message is ${over} characters too long. Shorten it to continue.`;
+}
+
+export const NO_MESSAGE = "A message cannot be added to this request.";
+
+export const YOUR_MESSAGE = "Your message";
 
 export const EXPIRED_NOTE =
   "This request has expired. Its price cannot be used again. To try again, select an attorney again from your Intake.";
@@ -193,6 +214,18 @@ export function requestMessage(state: RequestActionState): {
         tone: "warning",
         title: "Requests are not available",
         body: "Requests cannot be made in this jurisdiction right now. Nothing was requested.",
+      };
+    case "message-not-permitted":
+      return {
+        tone: "warning",
+        title: "A message cannot be added",
+        body: `${NO_MESSAGE} Nothing was requested. Remove the message and try again.`,
+      };
+    case "message-too-long":
+      return {
+        tone: "warning",
+        title: "Your message is too long",
+        body: "Nothing was requested. Shorten your message to the number of characters shown and try again.",
       };
     case "cap-reached":
       return {

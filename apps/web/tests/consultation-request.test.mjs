@@ -26,10 +26,14 @@ import {
   resolveIntakeRequests,
   resolveRequestReview,
   REVIEW_COLUMNS,
+  messageLength,
+  MESSAGE_CEILING,
+  submittedMessage,
   withdrawConsultationRequest,
 } from "../src/application/consultation-request.ts";
 import {
   createAnswerOf,
+  createRequestWrites,
   withdrawAnswerOf,
 } from "../src/infrastructure/requests/consultation-request-adapter.ts";
 import * as labels from "../src/presentation/request-labels.ts";
@@ -75,6 +79,8 @@ function reviewRow(overrides = {}) {
     request_path: "scheduled",
     request_id: null,
     requestable: true,
+    // MVP-001 S6 PS-A3: the message maximum (none by default).
+    message_maximum_characters: null,
     ...overrides,
   };
 }
@@ -133,6 +139,8 @@ function requestRow(overrides = {}) {
     total_client_amount_minor: 5175,
     currency_code: "XTS",
     quote_valid_until: T(8, 15),
+    // MVP-001 S6 PS-A3: the client's own message (none by default).
+    client_message: null,
     ...overrides,
   };
 }
@@ -374,6 +382,12 @@ test("S6-2. the review answers not-found for a malformed, unknown or foreign Ref
     [reviewRow({ requestable: "yes" })],
     [reviewRow({ request_id: REQUEST, requestable: true })],
     [reviewRow({ request_path: null, requestable: true })],
+    // MVP-001 S6 PS-A3: a message maximum is null or an integer 1..20000.
+    [reviewRow({ message_maximum_characters: 0 })],
+    [reviewRow({ message_maximum_characters: 20001 })],
+    [reviewRow({ message_maximum_characters: "100" })],
+    [reviewRow({ message_maximum_characters: 10.5 })],
+    [(({ message_maximum_characters: _m, ...rest }) => rest)(reviewRow())],
   ]) {
     assert.deepEqual(
       await resolveRequestReview(
@@ -390,6 +404,7 @@ test("S6-2. the review answers not-found for a malformed, unknown or foreign Ref
     "request_path",
     "request_id",
     "requestable",
+    "message_maximum_characters",
   ]);
 });
 
@@ -601,6 +616,8 @@ test("S6-5. confirming a request checks every field once, the verified client an
       modality: "synthetic_video",
       durationMinutes: 30,
       slotStart: T(10),
+      // MVP-001 S6 PS-A3: no message was given.
+      message: null,
     },
   ]);
   const answer = (outcome, problem = null) => ({
@@ -787,6 +804,13 @@ test("S6-6. a Request shows exactly the database's fields; an undecided Request 
     [requestRow({ currency_code: null })],
     [requestRow({ attorney_listed_price_minor: 0 })],
     [requestRow({ response_deadline_at: "soon" })],
+    // MVP-001 S6 PS-A3: a message is null or non-blank text within the
+    // ceiling.
+    [requestRow({ client_message: "   " })],
+    [requestRow({ client_message: "" })],
+    [requestRow({ client_message: 42 })],
+    [requestRow({ client_message: "m".repeat(20001) })],
+    [(({ client_message: _m, ...rest }) => rest)(requestRow())],
   ]) {
     assert.deepEqual(
       await resolveConsultationRequest(harness({ request }).sources, REQUEST),
@@ -801,7 +825,9 @@ test("S6-6. a Request shows exactly the database's fields; an undecided Request 
     ),
     { status: "sign-in-required" },
   );
-  assert.deepEqual(REQUEST_COLUMNS.length, 17);
+  // MVP-001 S6 PS-A3: and the client's own message, last.
+  assert.deepEqual(REQUEST_COLUMNS.length, 18);
+  assert.equal(REQUEST_COLUMNS.at(-1), "client_message");
   assert.deepEqual(REQUEST_STATES, [
     "created",
     "payment_authorized",
@@ -1196,9 +1222,10 @@ test("S6-11. the request routes are exactly the review page, the request page, t
   }
   const confirm = read("app/client/requests/new/forms.tsx");
   assert.match(confirm, /^"use client";\n/);
+  // MVP-001 S6 PS-A3: and the optional message.
   assert.deepEqual(
     [...codeOf(confirm).matchAll(/\bname="([^"]+)"/g)].map((m) => m[1]),
-    ["referral", "path", "modality", "duration", "slot"],
+    ["referral", "path", "modality", "duration", "slot", "message"],
   );
   const withdraw = read("app/client/requests/[request]/forms.tsx");
   assert.match(withdraw, /^"use client";\n/);
@@ -1237,4 +1264,250 @@ test("S6-11. the request routes are exactly the review page, the request page, t
       "const requests = await resolveIntakeRequests(REQUEST_SOURCES, intake);",
     ),
   );
+});
+
+// ---------------------------------------------------------------------------
+// MVP-001 S6 PS-A3: the request duration and the optional message
+// ---------------------------------------------------------------------------
+
+test("S6-12. PS-A3: an optional message is read as the client typed it (CRLF as LF, blank as none), counted in code points, checked by the server action against the maximum the database reports before anything is written (none: not permitted; over: too long; over the 20,000 ceiling: too long before anything is read), sent as given, and the database's own message refusals are reported", async () => {
+  const valid = {
+    referral: REFERRAL,
+    path: "instant",
+    modality: "synthetic_video",
+    duration: "30",
+  };
+  // A blank entry is no message: no review read, nothing sent as a message.
+  const blank = harness();
+  assert.equal(
+    (
+      await createConsultationRequest(
+        blank.sources,
+        form({ ...valid, message: "  \r\n " }),
+      )
+    ).status,
+    "created",
+  );
+  assert.equal(
+    blank.calls.some((c) => c[0] === "review"),
+    false,
+  );
+  assert.equal(blank.calls.at(-1)[1].message, null);
+  // Within the maximum: the review is read first, then the binding, then the
+  // write with the message as typed.
+  const fits = harness({
+    review: [reviewRow({ message_maximum_characters: 12 })],
+  });
+  assert.deepEqual(
+    await createConsultationRequest(
+      fits.sources,
+      form({ ...valid, message: "Hello\r\nthere" }),
+    ),
+    { status: "created", requestId: REQUEST },
+  );
+  assert.deepEqual(
+    fits.calls.map((c) => c[0]),
+    ["review", "environmentIdentity", "createRequest"],
+  );
+  assert.equal(fits.calls.at(-1)[1].message, "Hello\nthere");
+  // Code points, as the database counts characters.
+  assert.equal(messageLength("\u{1F600}".repeat(12)), 12);
+  for (const [message, expected] of [
+    ["\u{1F600}".repeat(12), "created"],
+    ["\u{1F600}".repeat(13), "message-too-long"],
+    ["x".repeat(13), "message-too-long"],
+  ]) {
+    const fresh = harness({
+      review: [reviewRow({ message_maximum_characters: 12 })],
+    });
+    assert.equal(
+      (
+        await createConsultationRequest(
+          fresh.sources,
+          form({ ...valid, message }),
+        )
+      ).status,
+      expected,
+    );
+    assert.equal(
+      fresh.calls.some((c) => c[0] === "createRequest"),
+      expected === "created",
+    );
+  }
+  // No maximum: a message cannot be added; nothing is written.
+  const none = harness();
+  assert.deepEqual(
+    await createConsultationRequest(
+      none.sources,
+      form({ ...valid, message: "Hi" }),
+    ),
+    { status: "message-not-permitted" },
+  );
+  assert.equal(
+    none.calls.some((c) => c[0] === "createRequest"),
+    false,
+  );
+  // Over the ceiling: refused before anything is read.
+  const huge = harness({
+    review: [reviewRow({ message_maximum_characters: MESSAGE_CEILING })],
+  });
+  assert.deepEqual(
+    await createConsultationRequest(
+      huge.sources,
+      form({ ...valid, message: "m".repeat(MESSAGE_CEILING + 1) }),
+    ),
+    { status: "message-too-long" },
+  );
+  assert.deepEqual(huge.calls, []);
+  // The review gone or unreadable; a repeated message field.
+  assert.deepEqual(
+    await createConsultationRequest(
+      harness({ review: [] }).sources,
+      form({ ...valid, message: "Hi" }),
+    ),
+    { status: "not-found" },
+  );
+  assert.deepEqual(
+    await createConsultationRequest(
+      harness({ review: null }).sources,
+      form({ ...valid, message: "Hi" }),
+    ),
+    { status: "unavailable" },
+  );
+  const repeated = harness();
+  assert.deepEqual(
+    await createConsultationRequest(
+      repeated.sources,
+      form({ ...valid, message: ["a", "b"] }),
+    ),
+    { status: "invalid" },
+  );
+  assert.deepEqual(repeated.calls, []);
+  // The database decides again.
+  for (const [outcome, status] of [
+    ["message_not_permitted", "message-not-permitted"],
+    ["message_too_long", "message-too-long"],
+  ]) {
+    assert.deepEqual(
+      await createConsultationRequest(
+        harness({
+          review: [reviewRow({ message_maximum_characters: 100 })],
+          createAnswer: {
+            kind: "answer",
+            outcome,
+            requestId: null,
+            problem: null,
+          },
+        }).sources,
+        form({ ...valid, message: "Hi" }),
+      ),
+      { status },
+    );
+  }
+  assert.equal(submittedMessage(undefined), null);
+  assert.equal(submittedMessage(" a\r\nb "), " a\nb ");
+});
+
+test("S6-13. PS-A3: the review carries the database's message maximum, a Request carries its recorded duration and the client's own message exactly, and the pages show the maximum with a live count (over the maximum the form cannot be sent), a fixed sentence when none is set, and the message as plain text", async () => {
+  const limited = await resolveRequestReview(
+    harness({ review: [reviewRow({ message_maximum_characters: 500 })] })
+      .sources,
+    query({ referral: REFERRAL }),
+  );
+  assert.equal(limited.messageMaximum, 500);
+  const unlimited = await resolveRequestReview(
+    harness().sources,
+    query({ referral: REFERRAL }),
+  );
+  assert.equal(unlimited.messageMaximum, null);
+  const message = "Line one\n<b>two</b> & 'three'";
+  const view = await resolveConsultationRequest(
+    harness({
+      request: [requestRow({ client_message: message, duration_minutes: 60 })],
+    }).sources,
+    REQUEST,
+  );
+  assert.equal(view.request.message, message);
+  assert.equal(view.request.durationMinutes, 60);
+  assert.equal(labels.messageCount(3, 10), "3 of 10 characters");
+  assert.equal(
+    labels.messageOverBy(1),
+    "Your message is 1 character too long. Shorten it to continue.",
+  );
+  assert.equal(labels.NO_MESSAGE, "A message cannot be added to this request.");
+  for (const status of ["message-not-permitted", "message-too-long"]) {
+    const shown = labels.requestMessage({ status });
+    assert.equal(shown.tone, "warning");
+    assert.match(shown.body, /Nothing was requested/);
+  }
+  const confirm = codeOf(read("app/client/requests/new/forms.tsx"));
+  for (const fragment of [
+    "const used = messageLength(draft);",
+    "disabled={pending || over > 0}",
+    '{messageMaximum === null ? (\n            <Text tone="muted">{NO_MESSAGE}</Text>',
+    "{messageCount(used, messageMaximum)}",
+    "errors={over > 0 ? messageOverBy(over) : undefined}",
+  ]) {
+    assert.ok(confirm.includes(fragment), fragment);
+  }
+  const review = codeOf(read("app/client/requests/new/page.tsx"));
+  assert.ok(review.includes("messageMaximum={view.messageMaximum}"));
+  const detail = codeOf(read("app/client/requests/[request]/page.tsx"));
+  assert.ok(
+    detail.includes('{record.message.split("\\n").map((line, index) => ('),
+  );
+  assert.doesNotMatch(detail, /dangerouslySetInnerHTML|innerHTML/);
+});
+
+test("S6-14. PS-A3: the adapter sends the message as p_client_message and refuses a blank or over-ceiling message before anything is sent", async () => {
+  const calls = [];
+  const client = {
+    rpc: async (name, args) => {
+      calls.push([name, args]);
+      return {
+        data: [{ outcome: "created", request_id: REQUEST, problem: null }],
+        error: null,
+        status: 200,
+      };
+    },
+  };
+  const writes = await createRequestWrites(async () => client, 1000)();
+  const input = {
+    referralId: REFERRAL,
+    path: "instant",
+    modality: "synthetic_video",
+    durationMinutes: 30,
+    slotStart: null,
+  };
+  assert.deepEqual(
+    await writes.createRequest({ ...input, message: "Hi\nthere" }),
+    {
+      kind: "answer",
+      outcome: "created",
+      requestId: REQUEST,
+      problem: null,
+    },
+  );
+  assert.deepEqual(calls, [
+    [
+      "request_create",
+      {
+        p_referral_id: REFERRAL,
+        p_path: "instant",
+        p_modality: "synthetic_video",
+        p_duration_minutes: 30,
+        p_slot_start: null,
+        p_client_message: "Hi\nthere",
+      },
+    ],
+  ]);
+  await writes.createRequest({ ...input, message: null });
+  assert.equal(calls.at(-1)[1].p_client_message, null);
+  for (const message of ["   ", "", "m".repeat(MESSAGE_CEILING + 1), 7]) {
+    const before = calls.length;
+    assert.deepEqual(await writes.createRequest({ ...input, message }), {
+      kind: "rejected",
+    });
+    assert.equal(calls.length, before);
+  }
 });

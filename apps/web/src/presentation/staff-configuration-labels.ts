@@ -260,6 +260,10 @@ const REASON_MESSAGES: Readonly<
     title: "Effective period required",
     body: "Approval needs an effective start; scheduling needs a future start; activation needs a start that has been reached and an end that has not. Nothing was saved.",
   },
+  parameters_invalid: {
+    title: "Parameters not valid for approval",
+    body: "Approval checks the parameters against what the version's policy type and scope require, and they do not match. Revise the draft parameters and try again. Nothing was saved.",
+  },
   already_ended: {
     title: "Already ended",
     body: "This version already has an end. An end is set only once. Nothing was saved.",

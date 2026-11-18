@@ -9,7 +9,10 @@
 // it), the path, the attorney, the option, the held time for a scheduled
 // Request, the server deadline and the quote's validity in UTC, and the
 // immutable quote. While the Request is undecided and not past its deadline
-// the client may withdraw it; the database decides again. Nothing here shows
+// the client may withdraw it; the database decides again. MVP-001 S6 PS-A3:
+// the option shows the duration the Request recorded, and the client's own
+// message is shown as plain text, line by line (React escapes it; it is
+// never rendered as markup). Nothing here shows
 // a payment step (S7) or anything of the attorney's side (S8).
 
 import type { Metadata } from "next";
@@ -42,6 +45,7 @@ import {
   REQUEST_STATE_LABELS,
   SERVER_TIME_NOTE,
   utcText,
+  YOUR_MESSAGE,
 } from "../../../../src/presentation/request-labels.ts";
 import { WithdrawRequestForm } from "./forms.tsx";
 
@@ -199,6 +203,16 @@ export default async function RequestPage({
             </tr>
           </tbody>
         </Table>
+      )}
+      {record.message === null ? null : (
+        <Stack gap="tight">
+          <Heading as="h2" size="md">
+            {YOUR_MESSAGE}
+          </Heading>
+          {record.message.split("\n").map((line, index) => (
+            <Text key={index}>{line === "" ? "\u00a0" : line}</Text>
+          ))}
+        </Stack>
       )}
       <Text tone="muted">{SERVER_TIME_NOTE}</Text>
       {view.withdrawable ? <WithdrawRequestForm requestId={record.id} /> : null}

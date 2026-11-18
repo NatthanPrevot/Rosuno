@@ -7,7 +7,12 @@
 // checks both on the server. Only the allowlisted public fields, the
 // jurisdictions where the attorney is listed, practice areas, Available Now
 // and a few open times are shown. A guessed, unknown or unlisted attorney is
-// the same not-found page, so nothing can be learnt by guessing.
+// the same not-found page, so nothing can be learnt by guessing. MVP-001 S6
+// PS-A3: the attorney's current consultation offers and prices (only those
+// the platform currently offers; for a chosen jurisdiction only those priced
+// there), each amount with its currency code and the currency's own decimal
+// places. They are listed in the database's own order; nothing is ranked or
+// recommended.
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -27,7 +32,11 @@ import {
 } from "../../../src/presentation/design-system.tsx";
 import {
   AVAILABLE_NOW,
+  NO_OFFERS,
   NO_WINDOWS,
+  offerText,
+  OFFERS_JURISDICTION_NOTE,
+  OFFERS_NOTE,
   PROFILE_JURISDICTION_NOTE,
   utcText,
   WINDOWS_NOTE,
@@ -73,7 +82,7 @@ export default async function AttorneyProfilePage({
       </PublicFrame>
     );
   }
-  const { profile, jurisdictionId } = view;
+  const { profile, jurisdictionId, offers } = view;
   const years = yearsText(profile.yearsExperience);
   return (
     <PublicFrame title={profile.displayName} titleId="profile-title">
@@ -101,6 +110,27 @@ export default async function AttorneyProfilePage({
           <Text>{profile.practiceAreas.join(", ")}</Text>
         </Stack>
       )}
+      <Stack gap="tight">
+        <Heading as="h2" size="md">
+          Consultations and prices
+        </Heading>
+        {offers.length === 0 ? (
+          <Text tone="muted">{NO_OFFERS}</Text>
+        ) : (
+          <>
+            <Text tone="muted">
+              {jurisdictionId === null ? OFFERS_JURISDICTION_NOTE : OFFERS_NOTE}
+            </Text>
+            {offers.map((offer) => (
+              <Text
+                key={`${offer.modality}-${offer.durationMinutes}-${offer.currency}`}
+              >
+                {offerText(offer)}
+              </Text>
+            ))}
+          </>
+        )}
+      </Stack>
       <Stack gap="tight">
         <Heading as="h2" size="md">
           Open times

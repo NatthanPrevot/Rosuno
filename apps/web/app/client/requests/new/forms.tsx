@@ -5,11 +5,19 @@
 // time, to the request action, and shows only the fixed message for the
 // state that action returns. The server decides everything again, the price
 // included; a created Request opens its own page.
+//
+// MVP-001 S6 PS-A3: the optional plain-text message, with the maximum the
+// server provided and a live character count (Unicode code points, as the
+// database counts them). Over the maximum the form says so and cannot be
+// sent; the server action and the database check the message again on their
+// own. Without a maximum no message field is offered and a fixed sentence
+// says so.
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   INITIAL_REQUEST_STATE,
+  messageLength,
   type RequestPath,
 } from "../../../../src/application/consultation-request.ts";
 import {
@@ -17,8 +25,17 @@ import {
   Button,
   Cluster,
   Stack,
+  Text,
+  TextAreaField,
 } from "../../../../src/presentation/design-system.tsx";
-import { requestMessage } from "../../../../src/presentation/request-labels.ts";
+import {
+  MESSAGE_LABEL,
+  messageCount,
+  messageHint,
+  messageOverBy,
+  NO_MESSAGE,
+  requestMessage,
+} from "../../../../src/presentation/request-labels.ts";
 import { createRequestAction } from "../actions.ts";
 
 export function ConfirmRequestForm({
@@ -27,17 +44,22 @@ export function ConfirmRequestForm({
   modality,
   durationMinutes,
   slotStart,
+  messageMaximum,
 }: {
   readonly referralId: string;
   readonly path: RequestPath;
   readonly modality: string;
   readonly durationMinutes: number;
   readonly slotStart: string | null;
+  readonly messageMaximum: number | null;
 }) {
   const [state, action, pending] = useActionState(
     createRequestAction,
     INITIAL_REQUEST_STATE,
   );
+  const [draft, setDraft] = useState("");
+  const used = messageLength(draft);
+  const over = messageMaximum === null ? 0 : Math.max(0, used - messageMaximum);
   const message = requestMessage(state);
   return (
     <Stack>
@@ -51,18 +73,49 @@ export function ConfirmRequestForm({
         </Alert>
       )}
       <form action={action}>
-        <input type="hidden" name="referral" value={referralId} />
-        <input type="hidden" name="path" value={path} />
-        <input type="hidden" name="modality" value={modality} />
-        <input type="hidden" name="duration" value={String(durationMinutes)} />
-        {slotStart === null ? null : (
-          <input type="hidden" name="slot" value={slotStart} />
-        )}
-        <Cluster>
-          <Button variant="primary" type="submit" disabled={pending}>
-            Confirm request
-          </Button>
-        </Cluster>
+        <Stack>
+          <input type="hidden" name="referral" value={referralId} />
+          <input type="hidden" name="path" value={path} />
+          <input type="hidden" name="modality" value={modality} />
+          <input
+            type="hidden"
+            name="duration"
+            value={String(durationMinutes)}
+          />
+          {slotStart === null ? null : (
+            <input type="hidden" name="slot" value={slotStart} />
+          )}
+          {messageMaximum === null ? (
+            <Text tone="muted">{NO_MESSAGE}</Text>
+          ) : (
+            <>
+              <TextAreaField
+                id="request-message"
+                name="message"
+                label={MESSAGE_LABEL}
+                hint={messageHint(messageMaximum)}
+                rows={5}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                errors={over > 0 ? messageOverBy(over) : undefined}
+              />
+              <Text tone="muted">
+                <span id="request-message-count" aria-live="polite">
+                  {messageCount(used, messageMaximum)}
+                </span>
+              </Text>
+            </>
+          )}
+          <Cluster>
+            <Button
+              variant="primary"
+              type="submit"
+              disabled={pending || over > 0}
+            >
+              Confirm request
+            </Button>
+          </Cluster>
+        </Stack>
       </form>
     </Stack>
   );

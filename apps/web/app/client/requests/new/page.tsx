@@ -11,7 +11,10 @@
 // available), for a scheduled Request the open start times the database
 // derives, and the database's own quote for a complete choice. Choosing is a
 // plain first-party GET of this page; confirming posts to the request action,
-// and the database decides everything again. Times are shown in UTC; the
+// and the database decides everything again. MVP-001 S6 PS-A3: the options
+// are the attorney's current offers the database prices now, and the
+// confirmation offers the optional message with the maximum the database
+// reports (or says that no message can be added). Times are shown in UTC; the
 // server decides every expiry. Nothing here ranks or recommends an attorney,
 // and nothing shows a price the database did not derive.
 
@@ -299,6 +302,7 @@ export default async function RequestReviewPage({
                 modality={view.option.modality}
                 durationMinutes={view.option.durationMinutes}
                 slotStart={view.slotStart}
+                messageMaximum={view.messageMaximum}
               />
             </Stack>
           ) : (

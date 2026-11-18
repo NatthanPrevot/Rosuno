@@ -355,7 +355,9 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // unavailable, with the route and outcome only), the request actions (an
   // action not completed, with its fixed outcome only) and the consultation
   // request adapter (a failed call, with the call name and how it failed
-  // only) write lines too.
+  // only) write lines too. MVP-001 S6 PS-A3: the consultation offer adapter
+  // (a failed offer call, with the call name and how it failed only) writes
+  // lines too.
   assert.deepEqual(callers, [
     "app/attorneys/[attorney]/page.tsx",
     "app/client/actions.ts",
@@ -377,6 +379,7 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "src/infrastructure/identity/authentication-abuse-control.ts",
     "src/infrastructure/identity/authenticator-provider.ts",
     "src/infrastructure/jobs/job-worker-adapter.ts",
+    "src/infrastructure/offers/consultation-offer-adapter.ts",
     "src/infrastructure/requests/consultation-request-adapter.ts",
     "src/infrastructure/resources/protected-resource-adapter.ts",
     // MVP-001 S4: the schedule adapter (a failed schedule call, with the
