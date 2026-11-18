@@ -175,7 +175,7 @@
       "reinterpreted": false,
       "integrity": "sha256:6ecdd02b45f4d9e2439b7e5d61b12f97ec72df0dcad6633c98e1fe0d10fa4ac1",
       "usage": "reference-only",
-      "status": "pending_lock_condition"
+      "status": "active"
     }
   ]
 }
