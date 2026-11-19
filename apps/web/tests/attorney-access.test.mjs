@@ -1152,6 +1152,9 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
   // earnings (that page decides its own access too). MVP-001 S9 admits exactly
   // one more: the attorney's consultations, linked once, from the granted
   // state, right after the requests (that page decides its own access too).
+  // MVP-001 S10 admits exactly one more: the attorney's notification center,
+  // linked once, from the granted state, right after the consultations (that
+  // page decides its own access too).
   assert.deepEqual(
     [...new Set([...code.matchAll(/href="([^"]*)"/g)].map((m) => m[1]))],
     [
@@ -1161,6 +1164,7 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
       "/attorney/earnings",
       "/attorney/requests",
       "/attorney/consultations",
+      "/attorney/notifications",
       "/",
       "/sign-in",
       "/attorney/apply",
@@ -1172,6 +1176,7 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
   assert.equal(code.match(/href="\/attorney\/earnings"/g).length, 1);
   assert.equal(code.match(/href="\/attorney\/requests"/g).length, 1);
   assert.equal(code.match(/href="\/attorney\/consultations"/g).length, 1);
+  assert.equal(code.match(/href="\/attorney\/notifications"/g).length, 1);
   assert.equal(code.match(/href="\/attorney\/apply"/g).length, 1);
   assert.doesNotMatch(code, /href=\{/);
   // Design-system primitives and native table structure only.
@@ -1424,6 +1429,12 @@ const REQUESTS_LINK =
 // none of the five.
 const CONSULTATIONS_LINK =
   '<a class="rs-button" data-variant="secondary" href="/attorney/consultations">Consultations</a>';
+// MVP-001 S10: the one fixed link the granted page offers to the attorney's
+// notification center (which decides its own access), in exactly this form,
+// right after the consultations link; every other state advertises none of
+// the six.
+const NOTIFICATIONS_LINK =
+  '<a class="rs-button" data-variant="secondary" href="/attorney/notifications">Notifications</a>';
 const GRANTED_TITLE = "Restricted attorney workspace";
 
 function assertFrame(html, title, name) {
@@ -1433,6 +1444,7 @@ function assertFrame(html, title, name) {
     assert.equal(html.includes("/attorney/earnings"), false, name);
     assert.equal(html.includes("/attorney/requests"), false, name);
     assert.equal(html.includes("/attorney/consultations"), false, name);
+    assert.equal(html.includes("/attorney/notifications"), false, name);
     assert.equal(html.split(APPLICATION_ENTRY_LINK).length, 2, name);
     assertFrameOf(html.replace(APPLICATION_ENTRY_LINK, ""), title, name);
     return;
@@ -1444,9 +1456,10 @@ function assertFrame(html, title, name) {
     assert.equal(html.split(EARNINGS_LINK).length, 2, name);
     assert.equal(html.split(REQUESTS_LINK).length, 2, name);
     assert.equal(html.split(CONSULTATIONS_LINK).length, 2, name);
+    assert.equal(html.split(NOTIFICATIONS_LINK).length, 2, name);
     assert.ok(
       html.includes(
-        `${SCHEDULE_LINK}${OFFERS_LINK}${EARNINGS_LINK}${REQUESTS_LINK}${CONSULTATIONS_LINK}`,
+        `${SCHEDULE_LINK}${OFFERS_LINK}${EARNINGS_LINK}${REQUESTS_LINK}${CONSULTATIONS_LINK}${NOTIFICATIONS_LINK}`,
       ),
       name,
     );
@@ -1456,7 +1469,8 @@ function assertFrame(html, title, name) {
         .replace(OFFERS_LINK, "")
         .replace(EARNINGS_LINK, "")
         .replace(REQUESTS_LINK, "")
-        .replace(CONSULTATIONS_LINK, ""),
+        .replace(CONSULTATIONS_LINK, "")
+        .replace(NOTIFICATIONS_LINK, ""),
       title,
       name,
     );
@@ -1467,6 +1481,7 @@ function assertFrame(html, title, name) {
   assert.equal(html.includes("/attorney/earnings"), false, name);
   assert.equal(html.includes("/attorney/requests"), false, name);
   assert.equal(html.includes("/attorney/consultations"), false, name);
+  assert.equal(html.includes("/attorney/notifications"), false, name);
   assertFrameOf(html, title, name);
 }
 
@@ -1544,6 +1559,7 @@ test("14. the route renders a restricted entry for each admitted stage that keep
         "/attorney/earnings",
         "/attorney/requests",
         "/attorney/consultations",
+        "/attorney/notifications",
         "/",
       ],
       stage,

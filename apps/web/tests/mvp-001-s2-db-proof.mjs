@@ -1862,8 +1862,11 @@ async function privilegeChecks() {
         // MVP-001 S7 re-pin: and exactly the payment escalation trigger of
         // the later registered S7 payment-engine migration (20261123020000),
         // which opens a reconciliation exception when a payment job
-        // escalates.
-        "operational_jobs_lifecycle,operational_jobs_no_truncate,operational_jobs_payment_escalation",
+        // escalates. MVP-001 S10 re-pin: and exactly the notification
+        // escalation trigger of the later registered S10 notifications
+        // migration (20261126020000), which ends a still undelivered email
+        // Notification permanently_failed when its delivery job escalates.
+        "operational_jobs_lifecycle,operational_jobs_no_truncate,operational_jobs_notification_escalation,operational_jobs_payment_escalation",
       );
       assert.equal(
         sql(

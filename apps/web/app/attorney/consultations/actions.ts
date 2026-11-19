@@ -20,16 +20,27 @@
 import { revalidatePath } from "next/cache";
 
 import {
+  openAttorneyDocument,
+  replaceAttorneyDocument,
+  revokeAttorneyDocument,
+  sendAttorneyMessage,
+  uploadAttorneyDocument,
+  type CommunicationActionState,
+} from "../../../src/application/consultation-communication.ts";
+import {
   endConsultation,
   joinAttorneyConsultation,
   startConsultation,
   type CommandActionState,
   type JoinActionState,
 } from "../../../src/application/consultations.ts";
+import { ATTORNEY_COMMUNICATION_SOURCES } from "../../../src/infrastructure/communications/communication-adapter.ts";
 import { ATTORNEY_CONSULTATION_SOURCES } from "../../../src/infrastructure/consultations/consultation-adapter.ts";
 import { stepUpRefusal } from "../../account/gate.ts";
 
-async function gated<State extends JoinActionState | CommandActionState>(
+async function gated<
+  State extends JoinActionState | CommandActionState | CommunicationActionState,
+>(
   operation: () => Promise<State>,
 ): Promise<State | Exclude<Awaited<ReturnType<typeof stepUpRefusal>>, null>> {
   const refusal = await stepUpRefusal("attorney");
@@ -68,4 +79,82 @@ export async function endConsultationAction(
   formData: FormData,
 ): Promise<CommandActionState> {
   return gated(() => endConsultation(ATTORNEY_CONSULTATION_SOURCES, formData));
+}
+
+// MVP-001 S10: the attorney's Message and document actions go through the
+// same guarded helper (the step-up gate first; a session that is not stepped
+// up gets one fixed refusal and nothing is handed to the use case), then hand
+// the submitted form and this request's trusted ports to the communication
+// use case; the database decides again (the attorney's own Consultation at
+// aal2, the recipient, whether communication is still open, the grant and
+// every refusal). A download link travels only in that action's answer and is
+// never stored or logged. After a change the Consultation page is refreshed.
+
+function refreshed(
+  formData: FormData,
+  state: CommunicationActionState,
+): CommunicationActionState {
+  const consultation = formData.get("consultation");
+  if (
+    state.status === "outcome" &&
+    typeof consultation === "string" &&
+    /^[0-9a-f-]{36}$/.test(consultation)
+  ) {
+    revalidatePath(`/attorney/consultations/${consultation}`);
+  }
+  return state;
+}
+
+export async function sendMessageAction(
+  _previous: CommunicationActionState,
+  formData: FormData,
+): Promise<CommunicationActionState> {
+  return gated(() =>
+    sendAttorneyMessage(ATTORNEY_COMMUNICATION_SOURCES, formData).then(
+      (state) => refreshed(formData, state),
+    ),
+  );
+}
+
+export async function uploadDocumentAction(
+  _previous: CommunicationActionState,
+  formData: FormData,
+): Promise<CommunicationActionState> {
+  return gated(() =>
+    uploadAttorneyDocument(ATTORNEY_COMMUNICATION_SOURCES, formData).then(
+      (state) => refreshed(formData, state),
+    ),
+  );
+}
+
+export async function revokeDocumentAction(
+  _previous: CommunicationActionState,
+  formData: FormData,
+): Promise<CommunicationActionState> {
+  return gated(() =>
+    revokeAttorneyDocument(ATTORNEY_COMMUNICATION_SOURCES, formData).then(
+      (state) => refreshed(formData, state),
+    ),
+  );
+}
+
+// MVP-001 S10 (PS-A5): a new version of one of the attorney's own documents.
+export async function replaceDocumentAction(
+  _previous: CommunicationActionState,
+  formData: FormData,
+): Promise<CommunicationActionState> {
+  return gated(() =>
+    replaceAttorneyDocument(ATTORNEY_COMMUNICATION_SOURCES, formData).then(
+      (state) => refreshed(formData, state),
+    ),
+  );
+}
+
+export async function openDocumentAction(
+  _previous: CommunicationActionState,
+  formData: FormData,
+): Promise<CommunicationActionState> {
+  return gated(() =>
+    openAttorneyDocument(ATTORNEY_COMMUNICATION_SOURCES, formData),
+  );
 }

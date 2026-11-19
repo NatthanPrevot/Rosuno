@@ -88,6 +88,23 @@
 // (three). None writes an M4 relation (the start reads eligibility through the
 // S5 recorder, FOR SHARE).
 //
+// MVP-001 S10 update: the four S10 migrations follow. SEC-1 lists exactly the
+// fourteen further definer functions, as exact assertions: the participants'
+// Message send and Consultation communication reads (four), the document upload
+// start and grant revocation, the notification center read and
+// acknowledgement, the two outbox triggers and the delivery escalation trigger,
+// and the notification worker and webhook recording functions (three). None
+// writes an M4 relation; resource_finalize_upload, resource_abandon_upload,
+// resource_authorize_access and has_resource_metadata_access are replaced under
+// their own names (already listed).
+//
+// MVP-001 S10 PS-A5 update: the fifth S10 migration (document versioning)
+// follows. SEC-1 lists exactly the three further definer functions: the
+// uploader's replacement start and completion and a participant's version
+// history read. None writes an M4 relation; document_begin_upload and
+// consultation_documents are replaced or re-created under their own names
+// (already listed).
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -1547,6 +1564,10 @@ function probes() {
           "client_request_review:s",
           "client_save_intake_revision:v",
           "client_submit_intake:v",
+          // MVP-001 S10 (20261126030000, 20261126040000): the participants' own
+          // Consultation communication reads (authenticated; the attorney at
+          // aal2), which write nothing.
+          "consultation_documents:s",
           // MVP-001 S9 (20261125020000): the participants' media access and the
           // attorney's start and end (authenticated), which write only
           // Consultations, Media Rooms, Engagements, appended Eligibility
@@ -1557,6 +1578,9 @@ function probes() {
           "consultation_end:v",
           "consultation_media_access:v",
           "consultation_media_lifecycle:v",
+          // MVP-001 S10 (see consultation_documents above).
+          "consultation_messages:s",
+          "consultation_messaging:s",
           "consultation_start:v",
           // MVP-001 S8 (20261124020000): the capture trigger (no API role),
           // which writes only Consultations, Engagements, payment associations
@@ -1576,6 +1600,22 @@ function probes() {
           // MVP-001 S1 re-pin (20261117010000): the environment identity
           // accessors and the environment-anchored policy resolver.
           "deployment_environment_identity:s",
+          // MVP-001 S10 (20261126040000): a participant's document upload start
+          // and the uploader's grant revocation (authenticated; the attorney
+          // at aal2), which write only resources, documents, Resource Sharing
+          // Grants and audit events; no M4 relation.
+          // MVP-001 S10 PS-A5 (20261126050000): the uploader's replacement
+          // start and completion (authenticated; the attorney at aal2), which
+          // write only resources, documents, Resource Sharing Grants,
+          // Notifications, jobs and audit events; no M4 relation.
+          "document_begin_replacement:v",
+          "document_begin_upload:v",
+          "document_finalize_replacement:v",
+          "document_revoke_sharing:v",
+          // MVP-001 S10 PS-A5 (20261126050000): a participant's version
+          // history read (authenticated; the attorney at aal2), which writes
+          // nothing.
+          "document_versions:s",
           // MVP-001 S8 re-pin (20261124010000): the P1 deferred
           // Consultation/payment check, now security definer like the S6
           // Request checks; read only.
@@ -1606,6 +1646,26 @@ function probes() {
           "media_job_context:s",
           "media_record_operation:v",
           "media_record_provider_event:v",
+          // MVP-001 S10 (20261126030000): a participant's Message
+          // (authenticated; the attorney at aal2), which writes only Messages,
+          // Notifications, jobs and audit events; no M4 relation.
+          "message_send:v",
+          // MVP-001 S10 (20261126020000): the notification center read and
+          // acknowledgement (authenticated), which write only Notifications
+          // and audit events; the two outbox triggers and the delivery
+          // escalation trigger (no API role), which write only Notifications,
+          // jobs, Reconciliation Exceptions and audit events; and the worker
+          // and webhook recording functions (service_role only), which write
+          // only Notifications, delivery attempts, receipts, Reconciliation
+          // Exceptions and audit events; no M4 relation.
+          "notification_acknowledge:v",
+          "notification_center:s",
+          "notification_consultation_events:v",
+          "notification_job_context:s",
+          "notification_job_escalated:v",
+          "notification_record_attempt:v",
+          "notification_record_provider_event:v",
+          "notification_request_events:v",
           // MVP-001 S7 re-pin (20261123020000): the payment worker and webhook
           // recording functions (service_role only) and the two payment
           // trigger functions (executable by no API role), which write only

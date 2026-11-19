@@ -29,9 +29,11 @@ export const RESOURCE_BYTE_CEILING = 1_000_000;
 // starting playback or a download (PS section 29; IMP section 13).
 export const SIGNED_URL_SECONDS = 60;
 
+// MVP-001 S10: and consultation documents.
 export const RESOURCE_KINDS = Object.freeze([
   "voice_memo",
   "verification_artifact",
+  "document",
 ] as const);
 
 export type ResourceKind = (typeof RESOURCE_KINDS)[number];

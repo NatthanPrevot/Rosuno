@@ -390,7 +390,8 @@ function applyMigrations() {
   // three S6 migrations, contiguous and in order; MVP-001 S6 PS-A3: then
   // exactly the PS-A3 migration; MVP-001 S7: then exactly the two S7
   // migrations; MVP-001 S8: then exactly the three S8 migrations; MVP-001 S9:
-  // then exactly the three S9 migrations.
+  // then exactly the three S9 migrations; MVP-001 S10: then exactly the five
+  // S10 migrations.
   const s4 = files.indexOf(S4_LAST);
   assert.ok(s4 >= 0, "the last S4 migration is present");
   assert.deepEqual(files.slice(s4 + 1, s4 + 1 + S5_MIGRATIONS.length), [
@@ -409,6 +410,12 @@ function applyMigrations() {
     "20261125010000_mvp_001_s9_media_integrity.sql",
     "20261125020000_mvp_001_s9_consultation_media.sql",
     "20261125030000_mvp_001_s9_media_evidence.sql",
+    "20261126010000_mvp_001_s10_communication_integrity.sql",
+    "20261126020000_mvp_001_s10_notifications.sql",
+    "20261126030000_mvp_001_s10_messages.sql",
+    "20261126040000_mvp_001_s10_documents.sql",
+    // MVP-001 S10 (PS-A5): the document version lineage.
+    "20261126050000_mvp_001_s10_document_versioning.sql",
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

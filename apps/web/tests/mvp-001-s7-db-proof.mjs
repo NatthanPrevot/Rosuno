@@ -100,6 +100,17 @@ const S9_MIGRATIONS = Object.freeze([
   "20261125020000_mvp_001_s9_consultation_media.sql",
   "20261125030000_mvp_001_s9_media_evidence.sql",
 ]);
+// MVP-001 S10: the five S10 migrations follow the S9 migrations (applied by
+// this proof as later registered migrations; registered and checked by the
+// S10 proof).
+const S10_MIGRATIONS = Object.freeze([
+  "20261126010000_mvp_001_s10_communication_integrity.sql",
+  "20261126020000_mvp_001_s10_notifications.sql",
+  "20261126030000_mvp_001_s10_messages.sql",
+  "20261126040000_mvp_001_s10_documents.sql",
+  // MVP-001 S10 (PS-A5): the document version lineage.
+  "20261126050000_mvp_001_s10_document_versioning.sql",
+]);
 
 const report = {
   proof: "MVP-001 S7 disposable local PostgreSQL proof",
@@ -450,13 +461,15 @@ function applyMigrations() {
   // S7 follows S6 PS-A3, contiguous and in order, and every S7 migration is
   // registered unreviewed (sequences 42 and 43) and applied nowhere.
   // MVP-001 S8: then exactly the three S8 migrations. MVP-001 S9: then exactly
-  // the three S9 migrations.
+  // the three S9 migrations. MVP-001 S10: then exactly the five S10
+  // migrations.
   const s6 = files.indexOf(S6_LAST);
   assert.ok(s6 >= 0, "the S6 PS-A3 migration is present");
   assert.deepEqual(files.slice(s6 + 1), [
     ...S7_MIGRATIONS,
     ...S8_MIGRATIONS,
     ...S9_MIGRATIONS,
+    ...S10_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

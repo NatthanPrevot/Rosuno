@@ -822,7 +822,7 @@ test("S9-6. every outcome has a fixed message, the provider is never named, and 
   );
 });
 
-test("S9-7. the routes: server pages that opt out of prerendering (the attorney pages behind the step-up gate first), the frame only in the two client form modules with the fixed title and permissions, the token only in the action answer (never in a page, URL or log), and the pages read only the route segment", () => {
+test("S9-7. the routes: server pages that opt out of prerendering (the attorney pages behind the step-up gate first), the frame only in the two client form modules with the fixed title and permissions, the token only in the action answer (never in a page, URL or log), and the pages read only the route segment (MVP-001 S10 PS-A5: and a Consultation page exactly one more value, which document's version history to show)", () => {
   assert.deepEqual(filesIn("app/attorney/consultations/"), [
     "app/attorney/consultations/[consultation]/forms.tsx",
     "app/attorney/consultations/[consultation]/page.tsx",
@@ -837,8 +837,23 @@ test("S9-7. the routes: server pages that opt out of prerendering (the attorney 
     const code = codeOf(read(page));
     assert.match(code, /await connection\(\);/, page);
     assert.doesNotMatch(read(page), /["']use (?:client|server)["']/, page);
+    // MVP-001 S10 (PS-A5): a Consultation page reads one more request value,
+    // which document's version history to show, exactly so and nothing else;
+    // the rest of the page is scanned as before.
+    const HISTORY_READ = [
+      "  searchParams,\n",
+      "  readonly searchParams: Promise<{\n    readonly history?: string | readonly string[];\n  }>;\n",
+      "  const { history } = await searchParams;\n",
+    ];
+    let scanned = code;
+    if (page.endsWith("/[consultation]/page.tsx")) {
+      for (const snippet of HISTORY_READ) {
+        assert.equal(scanned.split(snippet).length, 2, `${page}: ${snippet}`);
+        scanned = scanned.replace(snippet, "");
+      }
+    }
     assert.doesNotMatch(
-      code,
+      scanned,
       /<iframe\b|token|frameUrl|searchParams|cookies|headers\(/,
       page,
     );

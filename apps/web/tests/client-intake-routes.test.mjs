@@ -53,7 +53,9 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
   // client module as declared. MVP-001 S7: plus exactly the payment receipt
   // page, a server page. MVP-001 S9: plus exactly the consultation page (a
   // server page), its form (a client module) and the consultation action (a
-  // server action module).
+  // server action module). MVP-001 S10: plus exactly the notification center
+  // page (a server page), its acknowledgement form (a client module) and its
+  // action (a server action module).
   assert.deepEqual(filesIn("app/client/"), [
     "app/client/actions.ts",
     "app/client/consultations/[consultation]/forms.tsx",
@@ -62,6 +64,9 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     "app/client/forms.tsx",
     "app/client/intakes/[intake]/forms.tsx",
     "app/client/intakes/[intake]/page.tsx",
+    "app/client/notifications/actions.ts",
+    "app/client/notifications/forms.tsx",
+    "app/client/notifications/page.tsx",
     "app/client/page.tsx",
     "app/client/payments/[payment]/page.tsx",
     "app/client/requests/[request]/forms.tsx",
@@ -76,8 +81,13 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     read("app/client/consultations/actions.ts"),
     /^"use server";\n/,
   );
+  assert.match(
+    read("app/client/notifications/actions.ts"),
+    /^"use server";\n/,
+  );
   for (const file of [
     "app/client/consultations/[consultation]/forms.tsx",
+    "app/client/notifications/forms.tsx",
     "app/client/forms.tsx",
     "app/client/intakes/[intake]/forms.tsx",
     "app/client/requests/[request]/forms.tsx",
@@ -90,6 +100,7 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     "app/client/requests/new/page.tsx",
     "app/client/payments/[payment]/page.tsx",
     "app/client/consultations/[consultation]/page.tsx",
+    "app/client/notifications/page.tsx",
   ]) {
     assert.doesNotMatch(read(file), /["']use (?:client|server)["']/, file);
   }

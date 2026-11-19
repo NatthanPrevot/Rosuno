@@ -162,6 +162,9 @@ export default async function AttorneyWorkspacePage() {
           <ButtonLink variant="secondary" href="/attorney/consultations">
             Consultations
           </ButtonLink>
+          <ButtonLink variant="secondary" href="/attorney/notifications">
+            Notifications
+          </ButtonLink>
           <ButtonLink variant="tertiary" href="/">
             Return to the home page
           </ButtonLink>

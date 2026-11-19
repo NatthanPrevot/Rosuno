@@ -44,6 +44,7 @@ import {
 } from "../environment/provider-configuration.ts";
 import { createJobWorkerPort } from "../identity/registration-provisioning.ts";
 import { MEDIA_JOB_HANDLERS } from "../media/media-jobs.ts";
+import { NOTIFICATION_JOB_HANDLERS } from "../notifications/notification-jobs.ts";
 import { logRequestEvent } from "../observability/request-log.ts";
 import { PAYMENT_JOB_HANDLERS } from "../payments/payment-jobs.ts";
 
@@ -53,12 +54,17 @@ import { PAYMENT_JOB_HANDLERS } from "../payments/payment-jobs.ts";
 // handlers make the provider calls the payment functions enqueued; MVP-001
 // S9 registers exactly the four media job types (media.room_create,
 // media.room_update, media.room_delete, media.observe), whose handlers make
-// the Daily calls the Consultation and media functions enqueued. Every other
-// job type is still reported unknown_job_type, retried with backoff, and
-// escalated visibly when its attempts are used up (the Storage and
-// communications job types arrive with their slices).
+// the Daily calls the Consultation and media functions enqueued; MVP-001 S10
+// registers exactly the one notification job type (notification.deliver),
+// whose handler sends each email Notification through the email adapter.
+// Every other job type is still reported unknown_job_type, retried with
+// backoff, and escalated visibly when its attempts are used up.
 export const PRODUCTION_JOB_HANDLERS: JobHandlers = new Map<string, JobHandler>(
-  [...PAYMENT_JOB_HANDLERS, ...MEDIA_JOB_HANDLERS],
+  [
+    ...PAYMENT_JOB_HANDLERS,
+    ...MEDIA_JOB_HANDLERS,
+    ...NOTIFICATION_JOB_HANDLERS,
+  ],
 );
 
 // The one setting that protects the worker route.
