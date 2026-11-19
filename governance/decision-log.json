@@ -1981,6 +1981,36 @@
         "Lock Condition complete: the S6 PR (#101) registering this amendment and recording its adoption merged into owner main at merge commit 8dfeaf6698067808275dfd86cb655d88148b7660 (parents 3372bb425f35606529d4991e6eb19bda3e3367af and c4604e166b56ee79f89f3498d24d9ff0194274c0; merge tree equals the reviewed S6 head tree), confirmed by the express owner statement 'S6 MERGE CONFIRMED / S7 PAYMENT INFRASTRUCTURE CONTINUATION' recorded at 2026-11-18T07:16:36Z (session clock); PHYSICAL-SPECIFICATION-AMENDMENT-PS-A3-LOCKED is therefore active",
         "Optional independent review: not performed"
       ]
+    },
+    {
+      "status": "accepted",
+      "owner": "NatthanPrevot",
+      "reviewer": { "identity": "Rosuno", "status": "pending" },
+      "created_at": "2026-11-19T02:13:01Z",
+      "updated_at": "2026-11-19T02:13:01Z",
+      "supersedes": [],
+      "expiry": null,
+      "decision_id": "DEC-20261119-PS-A5-DOCUMENT-VERSION-LINEAGE",
+      "title": "Approve the exact text of Physical Specification amendment PS-A5, revision 1 (document version lineage)",
+      "scope": "Physical model, bounded: one nullable column documents.supersedes_document_id with its foreign key, a partial unique constraint and the integrity rules of PS-A5 section 2 (linear history, same context and document type, set once, history never destroyed, server-assigned version labels); nothing else (PS-A5 sections 1 to 5; DL-ENG-1 R9; MVP-001 Packet S10).",
+      "decision": "The owner expressly approves the complete, unchanged bytes of PS-A5 revision 1, rosuno-physical-specification-amendment-ps-a5.md, 6,497 bytes, SHA-256 5415ab386ccf2913e2f3becf62cc1a6c78745ac7b1f8db57d28abf2b96ec3a74 (Lock Condition element 1). Its registration in governance/authority-references.json (status pending_lock_condition) and this entry are carried by the S10 pull request; the Lock Condition completes when that pull request merges, after which the register status becomes active in the next records update. The amendment text stays in the external locked authority package; the Physical Specification V1.0 keeps its exact bytes.",
+      "rationale": "MBS section 15 (12B) requires that replacing a document creates a new version rather than destroying historical truth, and the Domain Model and Master Blueprint section 54 require document versioning; PS section 19.2 gives each Document exactly one Resource and no reference to the Document it replaces, so version history cannot be represented without one reference column, added on the Specification's existing supersession pattern (policy versions, Engagements) (PS-A5 sections 1 and 4).",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A5-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "impact": "One forward-only S10 migration implements PS-A5: the lineage column, its constraints and guards, server-assigned version labels, document replacement with per-version sharing and authorization, and the version-history read. Nothing is applied to a persistent environment by merge.",
+      "evidence": [
+        "Express owner adoption statement 'PS-A5 OWNER APPROVAL / COMPLETE S10' (approver NatthanPrevot) naming revision 1, 6,497 bytes and SHA-256 5415ab386ccf2913e2f3becf62cc1a6c78745ac7b1f8db57d28abf2b96ec3a74, received in the Builder session and processed at 2026-11-19T02:13:01Z (session clock)",
+        "Amendment file: rosuno-physical-specification-amendment-ps-a5.md, revision 1, 6,497 bytes, SHA-256 5415ab386ccf2913e2f3becf62cc1a6c78745ac7b1f8db57d28abf2b96ec3a74 (owner-held; not in the repository); byte length and digest re-verified by the Builder before registration",
+        "Lock Condition elements 2 and 3 carried by the S10 pull request (register status pending_lock_condition); not complete until that pull request merges",
+        "Optional independent review: not performed"
+      ]
     }
   ]
 }
