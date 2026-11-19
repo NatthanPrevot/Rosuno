@@ -30,8 +30,13 @@ import {
   messageBodyOf,
   openAttorneyDocument,
   openClientDocument,
+  replaceAttorneyDocument,
+  replaceClientDocument,
   resolveAttorneyCommunication,
+  resolveAttorneyDocumentHistory,
   resolveClientCommunication,
+  resolveClientDocumentHistory,
+  VERSION_COLUMNS,
   revokeClientDocument,
   sendAttorneyMessage,
   sendClientMessage,
@@ -84,8 +89,12 @@ const messageRow = (overrides = {}) => ({
   older_not_shown: false,
   ...overrides,
 });
+const DOCUMENT = "66666666-6666-4666-8666-666666666666";
 const documentRow = (overrides = {}) => ({
   resource_id: RESOURCE,
+  document_id: DOCUMENT,
+  lineage_id: DOCUMENT,
+  version_label: "v1",
   mime_type: "application/pdf",
   byte_size: 2048,
   created_at: SENT,
@@ -93,6 +102,7 @@ const documentRow = (overrides = {}) => ({
   mine: true,
   sharing: "active",
   accessible: true,
+  earlier_versions_shared: false,
   older_not_shown: false,
   ...overrides,
 });
@@ -125,6 +135,9 @@ function world(options = {}) {
     revoke: answer("revoked"),
     finalize: answer("available"),
     authorize: answer("authorized", `resources/${RESOURCE}/original`),
+    versions: rows([]),
+    beginReplacement: answer("created", RESOURCE),
+    finalizeReplacement: answer("available"),
     stored: true,
     center: rows([centerRow()]),
     acknowledge: { kind: "answer", outcome: "acknowledged" },
@@ -143,6 +156,10 @@ function world(options = {}) {
       calls.push(["documents", id]);
       return state.documents;
     },
+    versions: async (consultation, document) => {
+      calls.push(["versions", consultation, document]);
+      return state.versions;
+    },
     environmentIdentity: async () => state.environment,
   });
   const writes = async () => ({
@@ -157,6 +174,14 @@ function world(options = {}) {
     revoke: async (id) => {
       calls.push(["revoke", id]);
       return state.revoke;
+    },
+    beginReplacement: async (start) => {
+      calls.push(["beginReplacement", start]);
+      return state.beginReplacement;
+    },
+    finalizeReplacement: async (consultation, resource, document) => {
+      calls.push(["finalizeReplacement", consultation, resource, document]);
+      return state.finalizeReplacement;
     },
   });
   const resources = async () => ({
@@ -299,6 +324,9 @@ test("S10-C1. a participant's communication is read strictly: the messaging stat
   );
   assert.deepEqual(view.documents[0], {
     resourceId: RESOURCE,
+    documentId: DOCUMENT,
+    lineageId: DOCUMENT,
+    versionLabel: "v1",
     mimeType: "application/pdf",
     byteSize: 2048,
     createdAt: SENT,
@@ -306,6 +334,7 @@ test("S10-C1. a participant's communication is read strictly: the messaging stat
     mine: true,
     sharing: "active",
     accessible: true,
+    earlierShared: false,
     olderNotShown: false,
   });
   assert.equal(view.olderMessagesNotShown, false);
@@ -339,6 +368,15 @@ test("S10-C1. a participant's communication is read strictly: the messaging stat
     { documents: rows([documentRow({ byte_size: 1000001 })]) },
     { documents: rows([documentRow({ sharing: "pending" })]) },
     { documents: rows([documentRow({ mine: true, accessible: false })]) },
+    { documents: rows([documentRow({ version_label: "2" })]) },
+    { documents: rows([documentRow({ version_label: "v0" })]) },
+    { documents: rows([documentRow({ document_id: "not-an-id" })]) },
+    // A v1 has no earlier version that could still be shared.
+    { documents: rows([documentRow({ earlier_versions_shared: true })]) },
+    { documents: rows([documentRow({ earlier_versions_shared: null })]) },
+    // A v1 is its own lineage; a later version never is.
+    { documents: rows([documentRow({ lineage_id: RESOURCE })]) },
+    { documents: rows([documentRow({ version_label: "v2" })]) },
     { messages: rows([messageRow({ older_not_shown: null })]) },
     { documents: rows([documentRow({ older_not_shown: "yes" })]) },
     {
@@ -704,6 +742,39 @@ test("S10-C6. the labels: one fixed message for every communication outcome and 
   assert.equal(COMMUNICATION_OUTCOMES.includes("rate_limited"), false);
   assert.equal("rate_limited" in labels.COMMUNICATION_OUTCOME_MESSAGES, false);
   assert.equal(labels.OLDER_MESSAGES_NOTE, "Older messages are not shown.");
+  // PS-A5: sharing is per version, and the wording says so.
+  assert.equal(labels.OLDER_VERSIONS_NOTE, "Older versions are not shown.");
+  assert.equal(labels.REVOKE_LABEL, "Stop sharing this version");
+  assert.equal(
+    labels.DOCUMENTS_NOTE,
+    "A document you add here is shared only with the other participant of this consultation. Sharing is per version: each version you add is shared on its own, and stopping sharing of one version leaves the other versions as they are.",
+  );
+  assert.equal(
+    labels.REPLACE_FIELD_HINT,
+    "The new version will be shared with the other participant. The earlier version stays as it is, available to whoever could open it. A PDF, PNG, or JPEG of at most 1 MB.",
+  );
+  assert.deepEqual(
+    [
+      labels.currentSharingLabel("active", true, false),
+      labels.currentSharingLabel("revoked", true, false),
+      labels.currentSharingLabel("revoked", true, true),
+      labels.currentSharingLabel("active", true, true),
+      labels.currentSharingLabel("revoked", false, true),
+      labels.currentSharingLabel("active", false, false),
+    ],
+    [
+      "Shared",
+      "Sharing stopped",
+      "Sharing stopped. An earlier version is still shared with the other participant.",
+      "Shared. An earlier version is still shared with the other participant.",
+      "No longer shared with you. An earlier version is still shared with you.",
+      "Shared",
+    ],
+  );
+  assert.equal(
+    labels.COMMUNICATION_OUTCOME_MESSAGES.sharing_revoked.body,
+    "The other participant can no longer open this version. Other versions of the document are not affected.",
+  );
   assert.equal(labels.OLDER_DOCUMENTS_NOTE, "Older documents are not shown.");
   const source = codeOf(read("src/presentation/communication-labels.ts"));
   assert.doesNotMatch(
@@ -763,6 +834,9 @@ test("S10-C8. truncation is never silent: when the database answers that older M
     [...DOCUMENT_COLUMNS],
     [
       "resource_id",
+      "document_id",
+      "lineage_id",
+      "version_label",
       "mime_type",
       "byte_size",
       "created_at",
@@ -770,6 +844,7 @@ test("S10-C8. truncation is never silent: when the database answers that older M
       "mine",
       "sharing",
       "accessible",
+      "earlier_versions_shared",
       "older_not_shown",
     ],
   );
@@ -796,6 +871,325 @@ test("S10-C8. truncation is never silent: when the database answers that older M
       page,
     );
   }
+});
+
+const replaceForm = (bytes, fields = {}) => {
+  const data = new FormData();
+  data.append("consultation", fields.consultation ?? CONSULTATION);
+  data.append("document", fields.document ?? DOCUMENT);
+  data.append(fields.field ?? "replacement", new Blob([bytes]), "anything.pdf");
+  return data;
+};
+
+test("S10-C9. replacing a document (PS-A5): the new version's file is checked on the server first (one file, not empty, within the ceiling, a PDF, PNG or JPEG recognized from its bytes), then the database starts the replacement of the named Document from the server-measured type, size and digest, the bytes are stored at the new resource's own path and the replacement is completed, and one worker run follows; a lost race is already superseded, a closed window closed, an earlier version not current; anything but completion marks the upload rejected; the label is never sent", async () => {
+  const w = world();
+  assert.deepEqual(await replaceClientDocument(w.client, replaceForm(PDF)), {
+    status: "outcome",
+    outcome: "document_replaced",
+  });
+  assert.deepEqual(w.calls, [
+    [
+      "beginReplacement",
+      {
+        consultationId: CONSULTATION,
+        documentId: DOCUMENT,
+        mimeType: "application/pdf",
+        byteSize: PDF.length,
+        contentDigest: `sha256:${"a".repeat(64)}`,
+      },
+    ],
+    ["store", RESOURCE, PDF.length, "application/pdf"],
+    ["finalizeReplacement", CONSULTATION, RESOURCE, DOCUMENT],
+    ["drain"],
+  ]);
+  const attorney = world();
+  assert.deepEqual(
+    await replaceAttorneyDocument(attorney.attorney, replaceForm(PDF)),
+    { status: "outcome", outcome: "document_replaced" },
+  );
+  for (const [finalize, expected] of [
+    [
+      answer("already_superseded"),
+      { status: "outcome", outcome: "already_superseded" },
+    ],
+    [answer("not_editable"), { status: "outcome", outcome: "closed" }],
+    [answer("not_stored"), { status: "outcome", outcome: "upload_failed" }],
+    [answer("denied"), { status: "denied" }],
+    [UNREADABLE, { status: "unconfirmed" }],
+  ]) {
+    const x = world({ finalizeReplacement: finalize });
+    assert.deepEqual(
+      await replaceClientDocument(x.client, replaceForm(PDF)),
+      expected,
+    );
+    assert.deepEqual(
+      x.calls.map(([name]) => name),
+      ["beginReplacement", "store", "finalizeReplacement", "abandon"],
+    );
+  }
+  for (const [begin, expected] of [
+    [answer("not_current"), { status: "outcome", outcome: "not_current" }],
+    [answer("closed"), { status: "outcome", outcome: "closed" }],
+    [
+      answer("window_unavailable"),
+      { status: "outcome", outcome: "window_unavailable" },
+    ],
+    [answer("not_found"), { status: "outcome", outcome: "not_found" }],
+    [answer("invalid"), { status: "invalid", field: "replacement" }],
+    [answer("denied"), { status: "denied" }],
+    [answer("already_superseded"), { status: "unconfirmed" }],
+    [UNREADABLE, { status: "unconfirmed" }],
+  ]) {
+    const x = world({ beginReplacement: begin });
+    assert.deepEqual(
+      await replaceClientDocument(x.client, replaceForm(PDF)),
+      expected,
+    );
+    assert.deepEqual(
+      x.calls.map(([name]) => name),
+      ["beginReplacement"],
+    );
+  }
+  const failedStore = world({ stored: false });
+  assert.deepEqual(
+    await replaceClientDocument(failedStore.client, replaceForm(PDF)),
+    { status: "outcome", outcome: "upload_failed" },
+  );
+  assert.deepEqual(
+    failedStore.calls.map(([name]) => name),
+    ["beginReplacement", "store", "abandon"],
+  );
+  for (const [form, expected] of [
+    [
+      replaceForm(PDF, { document: "not-an-id" }),
+      { status: "outcome", outcome: "not_found" },
+    ],
+    [
+      replaceForm(PDF, { consultation: "x" }),
+      { status: "outcome", outcome: "not_found" },
+    ],
+    [replaceForm(TEXT), { status: "invalid", field: "replacement" }],
+    [
+      replaceForm(new Uint8Array()),
+      { status: "invalid", field: "replacement" },
+    ],
+    [
+      replaceForm(PDF, { field: "document_file" }),
+      { status: "invalid", field: "replacement" },
+    ],
+  ]) {
+    const x = world();
+    assert.deepEqual(await replaceClientDocument(x.client, form), expected);
+    assert.deepEqual(x.calls, []);
+  }
+  const code = codeOf(read("src/application/consultation-communication.ts"));
+  assert.doesNotMatch(code, /version_label\s*:|versionLabel\s*:\s*["'`]/);
+});
+
+const versionRow = (overrides = {}) => ({
+  document_id: DOCUMENT,
+  resource_id: RESOURCE,
+  version_label: "v2",
+  mime_type: "application/pdf",
+  byte_size: 3072,
+  created_at: SENT,
+  uploaded_by: "client",
+  mine: false,
+  is_current: true,
+  sharing: "active",
+  accessible: true,
+  older_versions_not_shown: false,
+  ...overrides,
+});
+const EARLIER = "77777777-7777-4777-8777-777777777777";
+const EARLIER_RESOURCE = "88888888-8888-4888-8888-888888888888";
+
+test("S10-C10. a document's version history (PS-A5) is read strictly for the caller, one document at a time: each version's label, type, size, time, uploader role, whether it is current, its grant state and whether the caller may open it; no row is not found; any unexpected column or value, two current versions or an answer without the asked document is unavailable; a malformed id calls nothing; both consultation pages show the history only on request (?history=), open buttons only where the database said so, and the replacement form only to the uploader while communication is open", async () => {
+  assert.deepEqual([...VERSION_COLUMNS], Object.keys(versionRow()));
+  const history = rows([
+    versionRow({
+      document_id: EARLIER,
+      resource_id: EARLIER_RESOURCE,
+      version_label: "v1",
+      is_current: false,
+      sharing: "revoked",
+      accessible: false,
+    }),
+    versionRow(),
+  ]);
+  const w = world({ versions: history });
+  const view = await resolveClientDocumentHistory(
+    w.client,
+    CONSULTATION,
+    DOCUMENT,
+  );
+  assert.equal(view.status, "ready");
+  assert.deepEqual(
+    view.versions.map((v) => [
+      v.versionLabel,
+      v.current,
+      v.sharing,
+      v.accessible,
+      v.mine,
+    ]),
+    [
+      ["v1", false, "revoked", false, false],
+      ["v2", true, "active", true, false],
+    ],
+  );
+  assert.deepEqual(w.calls, [["versions", CONSULTATION, DOCUMENT]]);
+  const attorney = world({ versions: history });
+  assert.equal(
+    (
+      await resolveAttorneyDocumentHistory(
+        attorney.attorney,
+        CONSULTATION,
+        DOCUMENT,
+      )
+    ).status,
+    "ready",
+  );
+  assert.deepEqual(
+    await resolveClientDocumentHistory(
+      world({ versions: rows([]) }).client,
+      CONSULTATION,
+      DOCUMENT,
+    ),
+    { status: "not-found" },
+  );
+  const malformed = world({ versions: history });
+  assert.deepEqual(
+    await resolveClientDocumentHistory(
+      malformed.client,
+      CONSULTATION,
+      "not-an-id",
+    ),
+    { status: "not-found" },
+  );
+  assert.deepEqual(malformed.calls, []);
+  // The newest versions only: the flag on every row, and the asked (older)
+  // version may then be absent; the view says so instead of failing.
+  const bounded = await resolveClientDocumentHistory(
+    world({
+      versions: rows([
+        versionRow({
+          document_id: EARLIER,
+          resource_id: EARLIER_RESOURCE,
+          version_label: "v501",
+          is_current: false,
+          older_versions_not_shown: true,
+        }),
+        versionRow({ version_label: "v502", older_versions_not_shown: true }),
+      ]),
+    }).client,
+    CONSULTATION,
+    "99999999-9999-4999-8999-999999999990",
+  );
+  assert.equal(bounded.status, "ready");
+  assert.equal(bounded.olderNotShown, true);
+  assert.equal(view.olderNotShown, false);
+  for (const versions of [
+    UNREADABLE,
+    rows([versionRow({ older_versions_not_shown: null })]),
+    rows([
+      versionRow({
+        document_id: EARLIER,
+        resource_id: EARLIER_RESOURCE,
+        version_label: "v1",
+        is_current: false,
+        older_versions_not_shown: true,
+      }),
+      versionRow(),
+    ]),
+    rows([{ ...versionRow(), extra: 1 }]),
+    rows([versionRow({ version_label: "2" })]),
+    rows([versionRow({ sharing: "pending" })]),
+    rows([versionRow({ mine: true, accessible: false })]),
+    rows([versionRow({ is_current: "yes" })]),
+    rows([versionRow({ document_id: EARLIER, resource_id: EARLIER_RESOURCE })]),
+    rows([
+      versionRow(),
+      versionRow({ document_id: EARLIER, resource_id: EARLIER_RESOURCE }),
+    ]),
+  ]) {
+    assert.deepEqual(
+      await resolveClientDocumentHistory(
+        world({ versions }).client,
+        CONSULTATION,
+        DOCUMENT,
+      ),
+      { status: "unavailable" },
+      JSON.stringify(versions).slice(0, 80),
+    );
+  }
+  for (const page of [
+    "app/client/consultations/[consultation]/page.tsx",
+    "app/attorney/consultations/[consultation]/page.tsx",
+  ]) {
+    const code = codeOf(read(page));
+    assert.match(
+      code,
+      /const historyId = typeof history === "string" \? history : null;/,
+      page,
+    );
+    assert.match(
+      code,
+      /historyId === null\s*\? null\s*: await resolve(?:Client|Attorney)DocumentHistory\(/,
+      page,
+    );
+    assert.match(
+      code,
+      /\{open && document\.mine \? \(\s*<DocumentReplace/,
+      page,
+    );
+    assert.match(code, /openable=\{version\.accessible\}/, page);
+    assert.match(
+      code,
+      /revocable=\{version\.mine && version\.sharing === "active"\}/,
+      page,
+    );
+    assert.match(code, /\?history=\$\{document\.documentId\}/, page);
+    assert.match(code, /document\.versionLabel === "v1" \? null/, page);
+    // Rows keep their identity (and a replacement's message) across versions.
+    assert.match(code, /<tr key=\{document\.lineageId\}>/, page);
+    assert.match(
+      code,
+      /\{history\.olderNotShown \? \(\s*<Text tone="muted">\{OLDER_VERSIONS_NOTE\}<\/Text>\s*\) : null\}/,
+      page,
+    );
+    assert.match(
+      code,
+      /currentSharingLabel\(\s*document\.sharing,\s*document\.mine,\s*document\.earlierShared,\s*\)/,
+      page,
+    );
+  }
+  for (const forms of [
+    "app/client/consultations/[consultation]/forms.tsx",
+    "app/attorney/consultations/[consultation]/forms.tsx",
+  ]) {
+    const code = codeOf(read(forms));
+    assert.match(code, /export function DocumentReplace\(/, forms);
+    assert.match(code, /name="replacement"/, forms);
+    assert.match(
+      code,
+      /<input type="hidden" name="document" value=\{documentId\} \/>/,
+      forms,
+    );
+    assert.doesNotMatch(code, /version_label|versionLabel/, forms);
+  }
+  for (const label of [
+    labels.REPLACE_LABEL,
+    labels.HISTORY_HEADING,
+    labels.HISTORY_UNAVAILABLE,
+    labels.VERSION_COLUMN,
+  ]) {
+    assert.ok(typeof label === "string" && label.length > 0);
+  }
+  assert.equal(labels.versionSharingLabel(null, true), "Not shared");
+  assert.equal(
+    labels.versionSharingLabel("revoked", false),
+    "No longer shared with you",
+  );
 });
 
 test("S10-C7. source contracts: the new pages are server pages that opt out of prerendering (the attorney center behind the step-up gate), every client form module reaches no infrastructure, the communication adapter is the only module calling the S10 participant functions and uses no privileged client, and the provider-neutral boundary holds: only the notifications infrastructure modules name the email provider or its webhook scheme", () => {

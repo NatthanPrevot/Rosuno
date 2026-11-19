@@ -19,8 +19,9 @@
 // Every migration is applied unmodified, in order, each in one transaction,
 // to two databases: the main database records its environment as
 // development; a second one records production (a synthetic 20-letter
-// project reference) for the production gate probes. The four S10
-// migrations must follow S9 and be registered.
+// project reference) for the production gate probes. The five S10
+// migrations (the fifth adds the PS-A5 document version lineage) must follow
+// S9 and be registered.
 //
 // Configuration: every policy version of the development database is
 // development configuration created by the owner role inside this disposable
@@ -93,7 +94,10 @@ const S10_MIGRATIONS = Object.freeze([
   "20261126020000_mvp_001_s10_notifications.sql",
   "20261126030000_mvp_001_s10_messages.sql",
   "20261126040000_mvp_001_s10_documents.sql",
+  "20261126050000_mvp_001_s10_document_versioning.sql",
 ]);
+// The one migration that adds the PS-A5 column (its constraints and index).
+const S10_VERSIONING = "20261126050000_mvp_001_s10_document_versioning.sql";
 
 const report = {
   proof: "MVP-001 S10 disposable local PostgreSQL proof",
@@ -442,7 +446,7 @@ function applyMigrations() {
     ),
   ).migrations;
   // S10 follows S9, contiguous and in order, and every S10 migration is
-  // registered unreviewed (sequences 50 to 53) and applied nowhere.
+  // registered unreviewed (sequences 50 to 54) and applied nowhere.
   const s9 = files.indexOf(S9_LAST);
   assert.ok(s9 >= 0, "the last S9 migration is present");
   assert.deepEqual(files.slice(s9 + 1), [...S10_MIGRATIONS]);
@@ -1866,6 +1870,87 @@ function uploadDocument(account, consultation, options = {}) {
 
 const clientOptions = Object.freeze({ aal: "aal1" });
 
+// PS-A5 versioning (the replacement flow and the history read).
+const documentIdOf = (resource) =>
+  sql(`select id from public.documents where resource_id = '${resource}';`);
+
+// The Consultation a Document or resource belongs to (the replacement calls
+// name it; a probe may name another one).
+const consultationOfDocument = (document) =>
+  sql(
+    `select r.consultation_id from public.documents d join public.resources r on r.id = d.resource_id where d.id = ${lit(document)};`,
+  ) || uid();
+const consultationOfResource = (resource) =>
+  sql(
+    `select consultation_id from public.resources where id = ${lit(resource)};`,
+  ) || uid();
+
+function beginReplacement(
+  account,
+  document,
+  options = {},
+  {
+    mime = "application/pdf",
+    size = 3072,
+    digest = digestValue(),
+    consultation = consultationOfDocument(document),
+  } = {},
+) {
+  const line = as(
+    "authenticated",
+    account.auth,
+    `select outcome || '|' || coalesce(resource_id::text, '') from public.document_begin_replacement(${lit(consultation)}, ${lit(document)}, ${lit(mime)}, ${size === null ? "null" : size}, ${lit(digest)});`,
+    options,
+  );
+  if (line.startsWith("ERROR")) {
+    return { outcome: line, resource: null };
+  }
+  const [outcome, resource] = line.split("|");
+  return { outcome, resource: resource || null };
+}
+
+const FINALIZE_REPLACEMENT_SQL = (
+  resource,
+  document,
+  consultation = consultationOfResource(resource),
+) =>
+  `select public.document_finalize_replacement(${lit(consultation)}, ${lit(resource)}, ${lit(document)});`;
+
+const finalizeReplacementAs = (
+  account,
+  resource,
+  document,
+  options = {},
+  consultation = consultationOfResource(resource),
+) =>
+  as(
+    "authenticated",
+    account.auth,
+    FINALIZE_REPLACEMENT_SQL(resource, document, consultation),
+    options,
+  );
+
+// A new version through the real replacement flow: begin, then completion.
+// Answers the new resource and Document ids.
+function replaceDocument(account, document, options = {}) {
+  const begun = beginReplacement(account, document, options);
+  assert.equal(begun.outcome, "created", JSON.stringify(begun));
+  assert.equal(
+    finalizeReplacementAs(account, begun.resource, document, options),
+    "available",
+  );
+  return { resource: begun.resource, document: documentIdOf(begun.resource) };
+}
+
+const versionsAs = (account, consultation, document, options = {}) =>
+  rowsJson(
+    account,
+    `select row_to_json(x)::text from public.document_versions(${lit(consultation)}, ${lit(document)}) x;`,
+    options,
+  );
+
+const documentRow = (document) => rowOf("documents", `id = '${document}'`);
+
 function authorizeAs(account, resource, options = {}, kind = "document") {
   return as(
     account === null ? "authenticated" : "authenticated",
@@ -2107,6 +2192,10 @@ const S10_AUTHENTICATED_API = Object.freeze([
   "resource_finalize_upload(uuid)",
   "resource_abandon_upload(uuid)",
   "resource_authorize_access(uuid, text)",
+  // PS-A5 (20261126050000): the replacement flow and the version history.
+  "document_begin_replacement(uuid, uuid, text, bigint, text)",
+  "document_finalize_replacement(uuid, uuid, uuid)",
+  "document_versions(uuid, uuid)",
 ]);
 
 const S10_SERVICE_API = Object.freeze([
@@ -2143,6 +2232,9 @@ const S10_INTERNAL = Object.freeze([
   "communication_participant(uuid)",
   "communication_reader(uuid)",
   "document_finalize_upload(uuid, uuid)",
+  // PS-A5 (20261126050000): the lineage guard and the per-version sharing.
+  "document_version_guard()",
+  "document_share_version(uuid, uuid, uuid, text, uuid)",
 ]);
 
 const executors = (signature) =>
@@ -2171,7 +2263,7 @@ const SELECT_MATRIX = Object.freeze({
 
 async function migrationChecks() {
   await check(
-    "MIG-1 the four S10 migrations follow S9 in order, are registered unreviewed (sequences 50 to 53) and applied nowhere, are Program migration refs, and apply on plain PostgreSQL to a development and a production-class database without notices",
+    "MIG-1 the five S10 migrations follow S9 in order, are registered unreviewed (sequences 50 to 54) and applied nowhere, are Program migration refs, and apply on plain PostgreSQL to a development and a production-class database without notices",
     () => {
       assert.deepEqual(report.migrations.s10, [...S10_MIGRATIONS]);
       assert.deepEqual(
@@ -2183,12 +2275,20 @@ async function migrationChecks() {
   );
 
   await check(
-    "MIG-2 no relation, column, type, row policy, view, sequence, policy type, capability or seed row is added (Packet rules 8, 10 and 16): the S10 texts create none and insert into no catalog table; the six communication relations keep their P1 columns; the policy type catalog is unchanged; the only new indexes are the notification source-event uniqueness, the notification center, the attempt reference lookup, the Consultation document list and the partial lookup of unmatched provider receipts by provider reference",
+    "MIG-2 no relation, column, type, row policy, view, sequence, policy type, capability or seed row is added (Packet rules 8, 10 and 16): the S10 texts create none and insert into no catalog table, except exactly the one PS-A5 column documents.supersedes_document_id (its foreign key, self-reference check and one-successor index) in the versioning migration; the six communication relations keep their P1 columns plus that one; the policy type catalog is unchanged; the only new indexes are the notification source-event uniqueness, the notification center, the attempt reference lookup, the Consultation document list, the partial lookup of unmatched provider receipts by provider reference and the PS-A5 one-successor index",
     () => {
       for (const file of S10_MIGRATIONS) {
-        const text = fs
+        const raw = fs
           .readFileSync(path.join(MIGRATIONS, file), "utf8")
           .replace(/--[^\n]*/g, "");
+        // The versioning migration's one admitted column, removed exactly
+        // once before the same refusal applies to the rest of its text.
+        const admitted =
+          "alter table public.documents\n  add column supersedes_document_id uuid null;";
+        if (file === S10_VERSIONING) {
+          assert.equal(raw.split(admitted).length, 2, file);
+        }
+        const text = file === S10_VERSIONING ? raw.replace(admitted, "") : raw;
         assert.doesNotMatch(
           text,
           /create\s+table|add\s+column|create\s+type|create\s+policy|create\s+view|create\s+sequence|insert\s+into\s+public\.(policy_types|policy_versions|capability_definitions|capability_grants|deployment_environment|jurisdictions|practice_areas|regulatory_modes)/i,
@@ -2210,7 +2310,8 @@ async function migrationChecks() {
             "id,notification_id,provider_code,provider_reference,attempted_at,result,failure_code,created_at",
           resource_sharing_grants:
             "id,resource_id,recipient_user_id,context_type,context_id,purpose_code,granted_at,expires_at,revoked_at,granted_by_user_id",
-          documents: "id,resource_id,document_type,version_label,created_at",
+          documents:
+            "id,resource_id,document_type,version_label,created_at,supersedes_document_id",
           resources:
             "id,resource_kind,owner_user_id,intake_id,consultation_id,storage_bucket,storage_object_path,mime_type,byte_size,content_digest,visibility_state,retention_state,created_at,updated_at",
         },
@@ -2232,7 +2333,7 @@ async function migrationChecks() {
       );
       assert.equal(
         indexes,
-        "documents_pkey,documents_resource_id_key,messages_consultation_created_at_idx,messages_pkey,notification_attempts_notification_id_idx,notification_attempts_pkey,notification_attempts_provider_reference_idx,notifications_in_app_recipient_idx,notifications_pkey,notifications_recipient_state_created_at_idx,notifications_source_event_unique,resource_sharing_grants_authorization_lookup_idx,resource_sharing_grants_pkey,resources_consultation_documents_idx,resources_pkey,resources_storage_identity_key",
+        "documents_one_successor_idx,documents_pkey,documents_resource_id_key,messages_consultation_created_at_idx,messages_pkey,notification_attempts_notification_id_idx,notification_attempts_pkey,notification_attempts_provider_reference_idx,notifications_in_app_recipient_idx,notifications_pkey,notifications_recipient_state_created_at_idx,notifications_source_event_unique,resource_sharing_grants_authorization_lookup_idx,resource_sharing_grants_pkey,resources_consultation_documents_idx,resources_pkey,resources_storage_identity_key",
       );
       const receiptIndexes = sql(
         "select string_agg(indexname || ':' || indexdef, ';' order by indexname) from pg_indexes where schemaname = 'public' and tablename = 'external_event_receipts';",
@@ -2246,7 +2347,24 @@ async function migrationChecks() {
           "external_event_receipts_unmatched_reference_idx:CREATE INDEX external_event_receipts_unmatched_reference_idx ON public.external_event_receipts USING btree (provider_code, ((minimal_payload ->> 'provider_reference'::text))) WHERE (processing_state = 'unmatched'::text)",
         ].join(";"),
       );
-      return { indexes, receiptIndexes };
+      // The PS-A5 column's constraints and index, exactly.
+      const lineage = sql(
+        "select string_agg(conname || ':' || pg_get_constraintdef(oid), ';' order by conname) from pg_constraint where conrelid = 'public.documents'::regclass and conname like 'documents_supersedes%';",
+      );
+      assert.equal(
+        lineage,
+        [
+          "documents_supersedes_document_id_fkey:FOREIGN KEY (supersedes_document_id) REFERENCES documents(id) ON UPDATE RESTRICT ON DELETE RESTRICT",
+          "documents_supersedes_not_self_check:CHECK (((supersedes_document_id IS NULL) OR (supersedes_document_id <> id)))",
+        ].join(";"),
+      );
+      assert.equal(
+        sql(
+          "select indexdef from pg_indexes where schemaname = 'public' and indexname = 'documents_one_successor_idx';",
+        ),
+        "CREATE UNIQUE INDEX documents_one_successor_idx ON public.documents USING btree (supersedes_document_id) WHERE (supersedes_document_id IS NOT NULL)",
+      );
+      return { indexes, receiptIndexes, lineage };
     },
   );
 
@@ -2361,9 +2479,9 @@ async function migrationChecks() {
       }
       assert.equal(
         sql(
-          "select string_agg(p.proname || ':' || array_to_string(p.proconfig, ';'), ',' order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('message_send', 'document_begin_upload', 'document_revoke_sharing', 'notification_acknowledge', 'notification_record_attempt', 'notification_record_provider_event', 'resource_finalize_upload', 'resource_abandon_upload', 'resource_authorize_access');",
+          "select string_agg(p.proname || ':' || array_to_string(p.proconfig, ';'), ',' order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('message_send', 'document_begin_upload', 'document_begin_replacement', 'document_finalize_replacement', 'document_revoke_sharing', 'notification_acknowledge', 'notification_record_attempt', 'notification_record_provider_event', 'resource_finalize_upload', 'resource_abandon_upload', 'resource_authorize_access');",
         ),
-        "document_begin_upload:search_path=pg_catalog, pg_temp;lock_timeout=3s,document_revoke_sharing:search_path=pg_catalog, pg_temp;lock_timeout=3s,message_send:search_path=pg_catalog, pg_temp;lock_timeout=3s,notification_acknowledge:search_path=pg_catalog, pg_temp;lock_timeout=3s,notification_record_attempt:search_path=pg_catalog, pg_temp;lock_timeout=3s,notification_record_provider_event:search_path=pg_catalog, pg_temp;lock_timeout=3s,resource_abandon_upload:search_path=pg_catalog, pg_temp;lock_timeout=3s,resource_authorize_access:search_path=pg_catalog, pg_temp;lock_timeout=3s,resource_finalize_upload:search_path=pg_catalog, pg_temp;lock_timeout=3s",
+        "document_begin_replacement:search_path=pg_catalog, pg_temp;lock_timeout=3s,document_begin_upload:search_path=pg_catalog, pg_temp;lock_timeout=3s,document_finalize_replacement:search_path=pg_catalog, pg_temp;lock_timeout=3s,document_revoke_sharing:search_path=pg_catalog, pg_temp;lock_timeout=3s,message_send:search_path=pg_catalog, pg_temp;lock_timeout=3s,notification_acknowledge:search_path=pg_catalog, pg_temp;lock_timeout=3s,notification_record_attempt:search_path=pg_catalog, pg_temp;lock_timeout=3s,notification_record_provider_event:search_path=pg_catalog, pg_temp;lock_timeout=3s,resource_abandon_upload:search_path=pg_catalog, pg_temp;lock_timeout=3s,resource_authorize_access:search_path=pg_catalog, pg_temp;lock_timeout=3s,resource_finalize_upload:search_path=pg_catalog, pg_temp;lock_timeout=3s",
       );
       // The outbox and escalation triggers run inside the S6 to S9 security
       // definer transactions and the S2 worker: as their owner, with a fixed
@@ -3646,34 +3764,660 @@ async function documentChecks() {
   );
 
   await check(
-    "DOC-6 (MBS section 15 12B; PS-A5 gate) versioning without lineage: no replacement flow exists, every document is version v1 and a new upload is a new document beside the earlier one (nothing is destroyed or overwritten); the document record never changes",
+    "DOC-6 (MBS section 15 12B: replacing a document creates a new version rather than destroying historical truth; PS-A5) the uploader replaces a shared document twice through the real pipeline: v1 -> v2 -> v3, labels assigned by the server, each version superseding the previous one in the same Consultation; the earlier Documents, their resources and their grants are unchanged row for row and stay readable to those authorized (the uploader, and the recipient under each version's own grant); each new version gets its own grant to the other participant and that participant's Notifications; the current-documents list shows the lineage once, as v3 with its label and the lineage's first Document as its stable identity; a plain new upload stays a separate v1 beside it; no Document row ever changes",
     () => {
       const s = liveConsultation("W");
-      const first = uploadDocument(s.client, s.consultation, clientOptions);
-      const second = uploadDocument(s.client, s.consultation, clientOptions);
-      assert.deepEqual(
-        jsonOf(
-          `select json_agg(version_label order by created_at, id)::text from public.documents where resource_id in ('${first}', '${second}');`,
+      const v1Resource = uploadDocument(
+        s.client,
+        s.consultation,
+        clientOptions,
+      );
+      const v1 = documentIdOf(v1Resource);
+      const snapshot = (resource, document) =>
+        JSON.stringify([
+          rowOf("resources", `id = '${resource}'`),
+          documentRow(document),
+          rowOf("resource_sharing_grants", `resource_id = '${resource}'`),
+        ]);
+      const before1 = snapshot(v1Resource, v1);
+      const v2 = replaceDocument(s.client, v1, clientOptions);
+      const before2 = snapshot(v2.resource, v2.document);
+      const v3 = replaceDocument(s.client, v2.document, clientOptions);
+      const plain = uploadDocument(s.client, s.consultation, clientOptions);
+      const resources = [v1Resource, v2.resource, v3.resource];
+      const grants = resources.map((resource) =>
+        rowOf("resource_sharing_grants", `resource_id = '${resource}'`),
+      );
+      const answers = {
+        chain: [v1, v2.document, v3.document].map((document) => {
+          const row = documentRow(document);
+          return [row.version_label, row.supersedes_document_id];
+        }),
+        same_consultation: resources.map(
+          (resource) =>
+            rowOf("resources", `id = '${resource}'`).consultation_id ===
+            s.consultation,
         ),
-        ["v1", "v1"],
-      );
-      assert.equal(
-        refused(
-          `update public.documents set version_label = 'v2' where resource_id = '${first}';`,
+        unchanged: [
+          snapshot(v1Resource, v1) === before1,
+          snapshot(v2.resource, v2.document) === before2,
+        ],
+        uploader_access: resources.map((resource) =>
+          authorizeAs(s.client, resource, clientOptions),
         ),
-        "55000",
+        recipient_access: resources.map((resource) =>
+          authorizeAs(s.lawyer, resource),
+        ),
+        grants: grants.map((grant) => [
+          grant.recipient_user_id === s.lawyer.user,
+          grant.granted_by_user_id === s.client.user,
+          grant.purpose_code,
+          grant.revoked_at,
+        ]),
+        notifications: grants.map((grant) =>
+          count(
+            "notifications",
+            `recipient_user_id = '${s.lawyer.user}' and notification_type = 'document_shared' and source_event_id = '${grant.id}'`,
+          ),
+        ),
+        list: documentsAs(s.lawyer, s.consultation).map((d) => [
+          d.resource_id,
+          d.document_id,
+          d.lineage_id,
+          d.version_label,
+          d.earlier_versions_shared,
+        ]),
+        plain_label: documentRow(documentIdOf(plain)).version_label,
+        update_refused: refused(
+          `update public.documents set version_label = 'v9' where id = '${v1}';`,
+        ),
+        audits: auditsFor("resource", v2.resource).map((a) => [
+          a.action,
+          a.after.replaces_document_id ??
+            a.after.supersedes_document_id ??
+            null,
+          a.after.version_label ?? null,
+        ]),
+      };
+      assert.deepEqual(answers, {
+        chain: [
+          ["v1", null],
+          ["v2", v1],
+          ["v3", v2.document],
+        ],
+        same_consultation: [true, true, true],
+        unchanged: [true, true],
+        uploader_access: resources.map(
+          (resource) => `authorized|${objectPath(resource)}`,
+        ),
+        recipient_access: resources.map(
+          (resource) => `authorized|${objectPath(resource)}`,
+        ),
+        grants: [
+          [true, true, "consultation_document_exchange", null],
+          [true, true, "consultation_document_exchange", null],
+          [true, true, "consultation_document_exchange", null],
+        ],
+        notifications: [2, 2, 2],
+        list: [
+          [v3.resource, v3.document, v1, "v3", true],
+          [plain, documentIdOf(plain), documentIdOf(plain), "v1", false],
+        ],
+        plain_label: "v1",
+        update_refused: "55000",
+        audits: [
+          ["resource_upload_started", v1, null],
+          ["resource_upload_completed", v1, "v2"],
+          ["resource_access_authorized", null, null],
+          ["resource_access_authorized", null, null],
+        ],
+      });
+      return answers;
+    },
+  );
+
+  await check(
+    "DOC-10 (PS-A5 rules in the database for every role, the owner included) linear history: a second Document superseding the same version is refused (one successor) and a Document never supersedes itself; same document, same context: a superseding Document in another Consultation or with another document type is refused (the same type is accepted); only consultation documents have versions (a voice memo never becomes one); a superseding Document needs its own available resource and an available predecessor (a pending one never takes the slot); the label is assigned by the server: any supplied label is refused, a legacy unlabelled Document counts as v1 and a legacy free-form label cannot be superseded; set once and history never destroyed: no update of the lineage (S3 guard) and no deletion of a superseded Document or its resource (restrict); API roles write no Document",
+    () => {
+      const s = liveConsultation("W");
+      const other = liveConsultation("W");
+      const v1Resource = uploadDocument(
+        s.client,
+        s.consultation,
+        clientOptions,
       );
-      assert.deepEqual(
-        documentsAs(s.lawyer, s.consultation).map((d) => d.resource_id),
-        [first, second],
+      const v1 = documentIdOf(v1Resource);
+      const v2 = replaceDocument(s.client, v1, clientOptions);
+      const plantResource = (consultation, owner, visibility = "available") => {
+        const id = uid();
+        sql(
+          `insert into public.resources (id, resource_kind, owner_user_id, intake_id, consultation_id, storage_bucket, storage_object_path, mime_type, byte_size, content_digest, visibility_state, retention_state) values ('${id}', 'document', '${owner}', null, '${consultation}', 'rosuno-private-resources', 'resources/${id}/original', 'application/pdf', 100, '${digestValue()}', '${visibility}', 'active');`,
+        );
+        return id;
+      };
+      const insertDocument = (
+        resource,
+        { supersedes = null, type = null, id = null, label = null } = {},
+      ) =>
+        `insert into public.documents (${id === null ? "" : "id, "}resource_id, document_type, version_label, supersedes_document_id) values (${id === null ? "" : `'${id}', `}'${resource}', ${lit(type)}, ${lit(label)}, ${lit(supersedes)})`;
+      const intake = sql(
+        `select intake_id from public.consultation_requests where id = '${s.request}';`,
       );
+      const voiceMemo = uid();
+      sql(
+        `insert into public.resources (id, resource_kind, owner_user_id, intake_id, consultation_id, storage_bucket, storage_object_path, mime_type, byte_size, content_digest, visibility_state, retention_state) values ('${voiceMemo}', 'voice_memo', '${s.client.user}', '${intake}', null, 'rosuno-private-resources', 'resources/${voiceMemo}/original', 'audio/webm', 100, '${digestValue()}', 'available', 'active');`,
+      );
+      const typedRoot = plantResource(s.consultation, s.client.user);
+      sql(`${insertDocument(typedRoot, { type: "synthetic" })};`);
+      const typedRootDocument = documentIdOf(typedRoot);
+      const pendingPredecessor = plantResource(
+        s.consultation,
+        s.client.user,
+        "pending",
+      );
+      sql(`${insertDocument(pendingPredecessor)};`);
+      // Legacy rows (planted with triggers bypassed): an unlabelled Document
+      // and one with a free-form label.
+      const legacyNull = plantResource(s.consultation, s.client.user);
+      const legacyFree = plantResource(s.consultation, s.client.user);
+      sql(
+        `begin;
+         set local session_replication_role = replica;
+         insert into public.documents (resource_id) values ('${legacyNull}');
+         insert into public.documents (resource_id, version_label) values ('${legacyFree}', 'draft');
+         commit;`,
+      );
+      const selfId = uid();
+      const codes = {
+        second_successor: refused(
+          `${insertDocument(plantResource(s.consultation, s.client.user), { supersedes: v1 })};`,
+        ),
+        self_reference: refused(
+          `${insertDocument(plantResource(s.consultation, s.client.user), { id: selfId, supersedes: selfId })};`,
+        ),
+        other_consultation: refused(
+          `${insertDocument(plantResource(other.consultation, other.client.user), { supersedes: v2.document })};`,
+        ),
+        other_type: refused(
+          `${insertDocument(plantResource(s.consultation, s.client.user), { supersedes: typedRootDocument })};`,
+        ),
+        voice_memo: refused(
+          `${insertDocument(voiceMemo, { supersedes: v2.document })};`,
+        ),
+        pending_successor: refused(
+          `${insertDocument(plantResource(s.consultation, s.client.user, "pending"), { supersedes: v2.document })};`,
+        ),
+        pending_predecessor: refused(
+          `${insertDocument(plantResource(s.consultation, s.client.user), { supersedes: documentIdOf(pendingPredecessor) })};`,
+        ),
+        supplied_label: refused(
+          `${insertDocument(plantResource(s.consultation, s.client.user), { label: "v1" })};`,
+        ),
+        supplied_successor_label: refused(
+          `${insertDocument(plantResource(s.consultation, s.client.user), { supersedes: v2.document, label: "v3" })};`,
+        ),
+        legacy_free_label: refused(
+          `${insertDocument(plantResource(s.consultation, s.client.user), { supersedes: documentIdOf(legacyFree) })};`,
+        ),
+        update_lineage: refused(
+          `update public.documents set supersedes_document_id = null where id = '${v2.document}';`,
+        ),
+        update_set: refused(
+          `update public.documents set supersedes_document_id = '${v1}' where id = '${typedRootDocument}';`,
+        ),
+        delete_superseded: refused(
+          `delete from public.documents where id = '${v1}';`,
+        ),
+        delete_superseded_resource: refused(
+          `delete from public.resources where id = '${v1Resource}';`,
+        ),
+      };
+      const accepted = {
+        same_type: acceptedThenRolledBack(
+          `${insertDocument(plantResource(s.consultation, s.client.user), { type: "synthetic", supersedes: typedRootDocument })} returning version_label;`,
+        ),
+        legacy_unlabelled: acceptedThenRolledBack(
+          `${insertDocument(plantResource(s.consultation, s.client.user), { supersedes: documentIdOf(legacyNull) })} returning version_label;`,
+        ),
+        plain_v1: acceptedThenRolledBack(
+          `${insertDocument(plantResource(s.consultation, s.client.user))} returning version_label;`,
+        ),
+      };
+      const roles = {};
+      for (const role of ["authenticated", "service_role"]) {
+        roles[role] = as(
+          role,
+          role === "service_role" ? null : s.client.auth,
+          `${insertDocument(plantResource(s.consultation, s.client.user), { supersedes: v2.document })};`,
+          role === "service_role" ? {} : clientOptions,
+        );
+      }
+      assert.deepEqual(codes, {
+        second_successor: "23505",
+        self_reference: "23514",
+        other_consultation: "23514",
+        other_type: "23514",
+        voice_memo: "23514",
+        pending_successor: "23514",
+        pending_predecessor: "23514",
+        supplied_label: "23514",
+        supplied_successor_label: "23514",
+        legacy_free_label: "23514",
+        update_lineage: "55000",
+        update_set: "55000",
+        delete_superseded: "23503",
+        delete_superseded_resource: "23503",
+      });
+      assert.deepEqual(accepted, {
+        same_type: "v2",
+        legacy_unlabelled: "v2",
+        plain_v1: "v1",
+      });
+      assert.deepEqual(roles, {
+        authenticated: "ERROR 42501",
+        service_role: "ERROR 42501",
+      });
+      // The lineage is unchanged by every refusal.
+      assert.equal(count("documents", `supersedes_document_id = '${v1}'`), 1);
       assert.equal(
         sql(
-          "select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'documents' and column_name like '%supersede%';",
+          "select string_agg(tgname, ',' order by tgname) from pg_trigger where tgrelid = 'public.documents'::regclass and not tgisinternal;",
         ),
-        "0",
+        "documents_no_truncate,documents_record_guard,documents_version_guard",
       );
-      return { documents: 2 };
+      return { codes, accepted, roles };
+    },
+  );
+
+  await check(
+    "DOC-11 (the replacement flow) only the uploader of the current, available version replaces it, inside the communication window, from server-measured metadata: the recipient, another client, another attorney, the attorney at aal1, an unknown id and a document named with another Consultation are not_found alike (nothing written); invalid metadata is invalid; an earlier version is not_current; a replacement completes only through the replacement completion (the plain completion answers not_found), only in its own Consultation, and only when bound to its start: the immutable start event of the same flow, recorded for the caller, naming this Document (one recorded for another actor never binds); an abandoned replacement ends rejected and never takes the successor slot (a later replacement still becomes v2); of two replacements of one version completed one after the other the second answers already_superseded and its upload ends rejected (audited); after completion with no window the replacement in progress is not_editable and a new one closed, the lineage unchanged",
+    () => {
+      const s = liveConsultation("W");
+      const v1Resource = uploadDocument(s.lawyer, s.consultation);
+      const v1 = documentIdOf(v1Resource);
+      const otherResource = uploadDocument(s.lawyer, s.consultation);
+      const otherDocument = documentIdOf(otherResource);
+      const refusals = {
+        recipient: beginReplacement(s.client, v1, clientOptions).outcome,
+        other_client: beginReplacement(newClient(), v1, clientOptions).outcome,
+        other_attorney: beginReplacement(lawyer("W"), v1).outcome,
+        attorney_aal1: beginReplacement(s.lawyer, v1, { aal: "aal1" }).outcome,
+        unknown: beginReplacement(s.lawyer, uid()).outcome,
+        audio: beginReplacement(s.lawyer, v1, {}, { mime: "audio/webm" })
+          .outcome,
+        empty: beginReplacement(s.lawyer, v1, {}, { size: 0 }).outcome,
+        too_large: beginReplacement(s.lawyer, v1, {}, { size: 1000001 })
+          .outcome,
+      };
+      // The named Consultation must be the document's own (V3): another one
+      // answers not_found and nothing is written.
+      const elsewhere = liveConsultation("W");
+      const resourcesBefore = count("resources");
+      refusals.other_consultation = beginReplacement(
+        s.lawyer,
+        v1,
+        {},
+        { consultation: elsewhere.consultation },
+      ).outcome;
+      refusals.other_consultation_writes = count("resources") - resourcesBefore;
+      const abandoned = beginReplacement(s.lawyer, v1);
+      const flow = {
+        abandoned_begin: abandoned.outcome,
+        abandoned: abandonAs(s.lawyer, abandoned.resource),
+        abandoned_completion: finalizeReplacementAs(
+          s.lawyer,
+          abandoned.resource,
+          v1,
+        ),
+        abandoned_has_document: count(
+          "documents",
+          `resource_id = '${abandoned.resource}'`,
+        ),
+      };
+      const replacement = beginReplacement(s.lawyer, v1);
+      flow.plain_completion = finalizeAs(s.lawyer, replacement.resource);
+      flow.other_consultation_completion = finalizeReplacementAs(
+        s.lawyer,
+        replacement.resource,
+        v1,
+        {},
+        elsewhere.consultation,
+      );
+      flow.other_consultation_state = rowOf(
+        "resources",
+        `id = '${replacement.resource}'`,
+      ).visibility_state;
+      // The binding (V4): a start event naming the Document but recorded for
+      // another actor never binds; the same event recorded for the caller does.
+      const planted = uid();
+      sql(
+        `insert into public.resources (id, resource_kind, owner_user_id, intake_id, consultation_id, storage_bucket, storage_object_path, mime_type, byte_size, content_digest, visibility_state, retention_state) values ('${planted}', 'document', '${s.lawyer.user}', null, '${s.consultation}', 'rosuno-private-resources', 'resources/${planted}/original', 'application/pdf', 100, '${digestValue()}', 'pending', 'active');`,
+      );
+      const plantStart = (actor, actorType) =>
+        sql(
+          `insert into public.audit_events (actor_user_id, actor_type, action_code, resource_type, resource_id, before_snapshot, after_snapshot, reason_code, policy_references, jurisdiction_id, occurred_at) values ('${actor}', '${actorType}', 'resource_upload_started', 'resource', '${planted}', null, jsonb_build_object('resource_kind', 'document', 'visibility_state', 'pending', 'consultation_id', '${s.consultation}', 'replaces_document_id', '${otherDocument}'), null, null, null, clock_timestamp());`,
+        );
+      plantStart(s.client.user, "client");
+      flow.foreign_actor_binding = finalizeReplacementAs(
+        s.lawyer,
+        planted,
+        otherDocument,
+      );
+      flow.foreign_actor_state = rowOf(
+        "resources",
+        `id = '${planted}'`,
+      ).visibility_state;
+      flow.foreign_actor_successors = count(
+        "documents",
+        `supersedes_document_id = '${otherDocument}'`,
+      );
+      plantStart(s.lawyer.user, "attorney");
+      flow.own_actor_binding = finalizeReplacementAs(
+        s.lawyer,
+        planted,
+        otherDocument,
+      );
+      flow.wrong_document = finalizeReplacementAs(
+        s.lawyer,
+        replacement.resource,
+        otherDocument,
+      );
+      flow.recipient_completion = finalizeReplacementAs(
+        s.client,
+        replacement.resource,
+        v1,
+        clientOptions,
+      );
+      flow.completion = finalizeReplacementAs(
+        s.lawyer,
+        replacement.resource,
+        v1,
+      );
+      const v2 = documentIdOf(replacement.resource);
+      flow.label = documentRow(v2).version_label;
+      flow.earlier = beginReplacement(s.lawyer, v1).outcome;
+      const first = beginReplacement(s.lawyer, v2);
+      const second = beginReplacement(s.lawyer, v2);
+      flow.first = finalizeReplacementAs(s.lawyer, first.resource, v2);
+      flow.second = finalizeReplacementAs(s.lawyer, second.resource, v2);
+      flow.second_state = rowOf(
+        "resources",
+        `id = '${second.resource}'`,
+      ).visibility_state;
+      flow.second_audit = auditsFor("resource", second.resource).map((a) => [
+        a.action,
+        a.after.visibility_state,
+      ]);
+      flow.successors = count("documents", `supersedes_document_id = '${v2}'`);
+      flow.second_abandon = abandonAs(s.lawyer, second.resource);
+      // A consultation without a configured window: replacement after the end.
+      const z = liveConsultation("N");
+      const zResource = uploadDocument(z.client, z.consultation, clientOptions);
+      const zDocument = documentIdOf(zResource);
+      const inProgress = beginReplacement(z.client, zDocument, clientOptions);
+      assert.equal(end(z).outcome, "completed");
+      flow.after_end_completion = finalizeReplacementAs(
+        z.client,
+        inProgress.resource,
+        zDocument,
+        clientOptions,
+      );
+      flow.after_end_abandon = abandonAs(
+        z.client,
+        inProgress.resource,
+        clientOptions,
+      );
+      flow.after_end_begin = beginReplacement(
+        z.client,
+        zDocument,
+        clientOptions,
+      ).outcome;
+      flow.after_end_lineage = count(
+        "documents",
+        `supersedes_document_id = '${zDocument}'`,
+      );
+      assert.deepEqual(refusals, {
+        recipient: "not_found",
+        other_client: "not_found",
+        other_attorney: "not_found",
+        attorney_aal1: "not_found",
+        unknown: "not_found",
+        audio: "invalid",
+        empty: "invalid",
+        too_large: "invalid",
+        other_consultation: "not_found",
+        other_consultation_writes: 0,
+      });
+      assert.deepEqual(flow, {
+        abandoned_begin: "created",
+        abandoned: "rejected",
+        abandoned_completion: "not_pending",
+        abandoned_has_document: 0,
+        plain_completion: "not_found",
+        other_consultation_completion: "not_found",
+        other_consultation_state: "pending",
+        foreign_actor_binding: "not_found",
+        foreign_actor_state: "pending",
+        foreign_actor_successors: 0,
+        own_actor_binding: "available",
+        wrong_document: "not_found",
+        recipient_completion: "not_found",
+        completion: "available",
+        label: "v2",
+        earlier: "not_current",
+        first: "available",
+        second: "already_superseded",
+        second_state: "rejected",
+        second_audit: [
+          ["resource_upload_started", "pending"],
+          ["resource_upload_abandoned", "rejected"],
+        ],
+        successors: 1,
+        second_abandon: "not_pending",
+        after_end_completion: "not_editable",
+        after_end_abandon: "rejected",
+        after_end_begin: "window_unavailable",
+        after_end_lineage: 0,
+      });
+      return { refusals, flow };
+    },
+  );
+
+  await check(
+    "DOC-12 (PS-A5 sharing rule; PS sections 26.2 and 29) grants stay recipient-specific per version: revoking v1's grant refuses the recipient v1 only (v2 and v3 still authorized), revoking v2's leaves v1's revocation and v3's grant as they were; the current version's row says whether an earlier version is still shared (after v1's revocation yes, v2 still is; after v2's no), for the uploader and the recipient; another attorney (licensed in the same jurisdiction), another client and the attorney at aal1 are refused for every version; a Legal Hold on the Consultation stops access to every version the caller may open (held) and every deletion of any version's Document or resource, for every role; once released, access returns as before",
+    () => {
+      const s = liveConsultation("W");
+      const v1Resource = uploadDocument(
+        s.client,
+        s.consultation,
+        clientOptions,
+      );
+      const v1 = documentIdOf(v1Resource);
+      const v2 = replaceDocument(s.client, v1, clientOptions);
+      const v3 = replaceDocument(s.client, v2.document, clientOptions);
+      const resources = [v1Resource, v2.resource, v3.resource];
+      const lawyerAccess = () =>
+        resources.map((resource) => authorizeAs(s.lawyer, resource));
+      const answers = {
+        revoke_v1: revokeAs(s.client, v1Resource, clientOptions),
+      };
+      answers.after_v1 = lawyerAccess();
+      // The current version's row says whether an earlier one is still shared.
+      const earlierShared = () => [
+        documentsAs(s.client, s.consultation, clientOptions)[0]
+          .earlier_versions_shared,
+        documentsAs(s.lawyer, s.consultation)[0].earlier_versions_shared,
+      ];
+      answers.earlier_after_v1 = earlierShared();
+      const v1Revoked = rowOf(
+        "resource_sharing_grants",
+        `resource_id = '${v1Resource}'`,
+      ).revoked_at;
+      answers.revoke_v2 = revokeAs(s.client, v2.resource, clientOptions);
+      answers.after_v2 = lawyerAccess();
+      answers.earlier_after_v2 = earlierShared();
+      answers.v1_revocation_unchanged =
+        rowOf("resource_sharing_grants", `resource_id = '${v1Resource}'`)
+          .revoked_at === v1Revoked;
+      answers.v3_grant_active =
+        rowOf("resource_sharing_grants", `resource_id = '${v3.resource}'`)
+          .revoked_at === null;
+      const outsider = lawyer("W");
+      const stranger = newClient();
+      answers.other_attorney = resources.map((resource) =>
+        authorizeAs(outsider, resource),
+      );
+      answers.other_client = resources.map((resource) =>
+        authorizeAs(stranger, resource, clientOptions),
+      );
+      answers.attorney_aal1 = resources.map((resource) =>
+        authorizeAs(s.lawyer, resource, { aal: "aal1" }),
+      );
+      const holdId = uid();
+      sql(
+        `insert into public.legal_holds (id, scope_type, scope_id, status, reason, started_at, created_by_user_id) values ('${holdId}', 'synthetic', '${s.consultation}', 'active', 'synthetic hold', now() - interval '1 minute', '${world.policyAdmin.user}');`,
+      );
+      answers.held_uploader = resources.map((resource) =>
+        authorizeAs(s.client, resource, clientOptions),
+      );
+      answers.held_recipient = lawyerAccess();
+      answers.held_deletions = [
+        refused(`delete from public.documents where id = '${v3.document}';`),
+        refused(`delete from public.resources where id = '${v3.resource}';`),
+        refused(`delete from public.documents where id = '${v1}';`),
+        refused(`delete from public.resources where id = '${v1Resource}';`),
+      ];
+      sql(
+        `update public.legal_holds set released_at = now(), released_by_user_id = '${world.policyAdmin.user}' where id = '${holdId}';`,
+      );
+      answers.released_recipient = lawyerAccess();
+      const authorized = (resource) => `authorized|${objectPath(resource)}`;
+      assert.deepEqual(answers, {
+        revoke_v1: "revoked",
+        after_v1: [
+          "refused|",
+          authorized(v2.resource),
+          authorized(v3.resource),
+        ],
+        earlier_after_v1: [true, true],
+        revoke_v2: "revoked",
+        after_v2: ["refused|", "refused|", authorized(v3.resource)],
+        earlier_after_v2: [false, false],
+        v1_revocation_unchanged: true,
+        v3_grant_active: true,
+        other_attorney: ["refused|", "refused|", "refused|"],
+        other_client: ["refused|", "refused|", "refused|"],
+        attorney_aal1: ["refused|", "refused|", "refused|"],
+        held_uploader: ["held|", "held|", "held|"],
+        held_recipient: ["refused|", "refused|", "held|"],
+        held_deletions: ["55000", "55000", "55000", "55000"],
+        released_recipient: ["refused|", "refused|", authorized(v3.resource)],
+      });
+      return answers;
+    },
+  );
+
+  await check(
+    "DOC-13 (PS-A5 history) document_versions answers one document's lineage in version order for its participants: the uploader the whole lineage (v1, v2, v3; the current flag on v3 only; each version's grant state; every version openable), the recipient the versions they hold or held a grant for (a revoked one marked revoked and not openable); any version's id answers the same lineage; unknown ids, a Document of another Consultation, another client, another attorney and the attorney at aal1 answer alike: no row",
+    () => {
+      const s = liveConsultation("W");
+      const elsewhere = liveConsultation("W");
+      const foreign = documentIdOf(
+        uploadDocument(elsewhere.client, elsewhere.consultation, clientOptions),
+      );
+      const v1Resource = uploadDocument(
+        s.client,
+        s.consultation,
+        clientOptions,
+      );
+      const v1 = documentIdOf(v1Resource);
+      const v2 = replaceDocument(s.client, v1, clientOptions);
+      const v3 = replaceDocument(s.client, v2.document, clientOptions);
+      assert.equal(revokeAs(s.client, v1Resource, clientOptions), "revoked");
+      const shape = (rows) =>
+        rows.map((v) => [
+          v.version_label,
+          v.is_current,
+          v.mine,
+          v.uploaded_by,
+          v.sharing,
+          v.accessible,
+          v.older_versions_not_shown,
+        ]);
+      const uploader = versionsAs(
+        s.client,
+        s.consultation,
+        v2.document,
+        clientOptions,
+      );
+      const answers = {
+        columns: Object.keys(uploader[0]),
+        uploader: shape(uploader),
+        ids: uploader.map((v) => [v.document_id, v.resource_id]),
+        uploader_from_v1: shape(
+          versionsAs(s.client, s.consultation, v1, clientOptions),
+        ),
+        recipient: shape(versionsAs(s.lawyer, s.consultation, v3.document)),
+        unknown: versionsAs(s.client, s.consultation, uid(), clientOptions)
+          .length,
+        foreign: versionsAs(s.client, s.consultation, foreign, clientOptions)
+          .length,
+        foreign_own: versionsAs(
+          elsewhere.client,
+          s.consultation,
+          foreign,
+          clientOptions,
+        ).length,
+        other_client: versionsAs(newClient(), s.consultation, v1, clientOptions)
+          .length,
+        other_attorney: versionsAs(lawyer("W"), s.consultation, v1).length,
+        attorney_aal1: versionsAs(s.lawyer, s.consultation, v1, {
+          aal: "aal1",
+        }).length,
+      };
+      assert.deepEqual(answers, {
+        columns: [
+          "document_id",
+          "resource_id",
+          "version_label",
+          "mime_type",
+          "byte_size",
+          "created_at",
+          "uploaded_by",
+          "mine",
+          "is_current",
+          "sharing",
+          "accessible",
+          "older_versions_not_shown",
+        ],
+        uploader: [
+          ["v1", false, true, "client", "revoked", true, false],
+          ["v2", false, true, "client", "active", true, false],
+          ["v3", true, true, "client", "active", true, false],
+        ],
+        ids: [
+          [v1, v1Resource],
+          [v2.document, v2.resource],
+          [v3.document, v3.resource],
+        ],
+        uploader_from_v1: [
+          ["v1", false, true, "client", "revoked", true, false],
+          ["v2", false, true, "client", "active", true, false],
+          ["v3", true, true, "client", "active", true, false],
+        ],
+        recipient: [
+          ["v1", false, false, "client", "revoked", false, false],
+          ["v2", false, false, "client", "active", true, false],
+          ["v3", true, false, "client", "active", true, false],
+        ],
+        unknown: 0,
+        foreign: 0,
+        foreign_own: 0,
+        other_client: 0,
+        other_attorney: 0,
+        attorney_aal1: 0,
+      });
+      return answers;
     },
   );
 
@@ -3778,6 +4522,9 @@ async function documentChecks() {
       // The exact columns the application's strict reader expects.
       assert.deepEqual(Object.keys(at200[0]), [
         "resource_id",
+        "document_id",
+        "lineage_id",
+        "version_label",
         "mime_type",
         "byte_size",
         "created_at",
@@ -3785,6 +4532,7 @@ async function documentChecks() {
         "mine",
         "sharing",
         "accessible",
+        "earlier_versions_shared",
         "older_not_shown",
       ]);
       shareMany(201, 201);
@@ -3815,6 +4563,147 @@ async function documentChecks() {
         at_201_attorney: [200, [true]],
         newest_last: true,
         oldest_first: true,
+      });
+      return answers;
+    },
+  );
+
+  await check(
+    "DOC-14 (long histories are never silently truncated; no depth bound) a lineage deeper than any former bound (10 050 versions; built by the owner role through the guard, each version superseding the previous one, labels v2 to v10050 assigned by the guard) keeps its current version in both participants' lists (its lineage id the first version; an earlier version still shared; nothing older_not_shown); its history answers the newest 500 versions in version order (v9551 to v10050) with the flag on every row, asked by the current or the first version; the recipient, holding grants on the first and the current version only, sees exactly those two without the flag; at the bound a 500-version lineage answers all 500 without the flag, and one more version through the real replacement flow answers v2 to v501 with the flag",
+    () => {
+      // Owner-role chain fixture: each new version supersedes the previous one
+      // through the guard (available resources of the client's own in the
+      // Consultation). Synthetic test data.
+      const extend = (s, document, versions) => {
+        sql(
+          `do $proof$
+           declare
+             v_previous uuid := '${document}';
+             v_resource uuid;
+           begin
+             for i in 1..${versions} loop
+               v_resource := gen_random_uuid();
+               insert into public.resources (id, resource_kind, owner_user_id, intake_id, consultation_id, storage_bucket, storage_object_path, mime_type, byte_size, content_digest, visibility_state, retention_state)
+               values (v_resource, 'document', '${s.client.user}', null, '${s.consultation}', 'rosuno-private-resources', 'resources/' || v_resource::text || '/original', 'application/pdf', 100, 'sha256:' || encode(sha256(convert_to(v_resource::text, 'UTF8')), 'hex'), 'available', 'active');
+               insert into public.documents (resource_id, supersedes_document_id) values (v_resource, v_previous) returning id into v_previous;
+             end loop;
+           end
+           $proof$;`,
+        );
+        return sql(
+          `select d.id from public.documents d join public.resources r on r.id = d.resource_id where r.consultation_id = '${s.consultation}' and not exists (select 1 from public.documents x where x.supersedes_document_id = d.id);`,
+        );
+      };
+      const labelsOf = (rows) => rows.map((v) => v.version_label);
+      const flagsOf = (rows) => [
+        ...new Set(rows.map((v) => v.older_versions_not_shown)),
+      ];
+      const expectedLabels = (from, to) =>
+        Array.from({ length: to - from + 1 }, (_, i) => `v${from + i}`);
+      // The deep lineage.
+      const s = liveConsultation("W");
+      const rootResource = uploadDocument(
+        s.client,
+        s.consultation,
+        clientOptions,
+      );
+      const root = documentIdOf(rootResource);
+      const current = extend(s, root, 10049);
+      const currentResource = sql(
+        `select resource_id from public.documents where id = '${current}';`,
+      );
+      sql(
+        `insert into public.resource_sharing_grants (resource_id, recipient_user_id, context_type, context_id, purpose_code, granted_at, expires_at, revoked_at, granted_by_user_id) values ('${currentResource}', '${s.lawyer.user}', 'consultation', '${s.consultation}', 'consultation_document_exchange', now(), null, null, '${s.client.user}');`,
+      );
+      const listRow = (rows) =>
+        rows.map((d) => [
+          d.document_id === current,
+          d.lineage_id === root,
+          d.version_label,
+          d.earlier_versions_shared,
+          d.older_not_shown,
+        ]);
+      const fromCurrent = versionsAs(
+        s.client,
+        s.consultation,
+        current,
+        clientOptions,
+      );
+      const fromRoot = versionsAs(
+        s.client,
+        s.consultation,
+        root,
+        clientOptions,
+      );
+      const recipient = versionsAs(s.lawyer, s.consultation, current);
+      const answers = {
+        current_label: documentRow(current).version_label,
+        client_list: listRow(
+          documentsAs(s.client, s.consultation, clientOptions),
+        ),
+        lawyer_list: listRow(documentsAs(s.lawyer, s.consultation)),
+        from_current: [
+          fromCurrent.length,
+          labelsOf(fromCurrent).join(",") ===
+            expectedLabels(9551, 10050).join(","),
+          flagsOf(fromCurrent),
+          fromCurrent.filter((v) => v.is_current).map((v) => v.version_label),
+        ],
+        from_root: [
+          fromRoot.length,
+          labelsOf(fromRoot).join(",") === labelsOf(fromCurrent).join(","),
+          flagsOf(fromRoot),
+        ],
+        recipient: recipient.map((v) => [
+          v.version_label,
+          v.is_current,
+          v.older_versions_not_shown,
+        ]),
+        recipient_from_root: versionsAs(s.lawyer, s.consultation, root).length,
+      };
+      // At the bound.
+      const t = liveConsultation("W");
+      const tRoot = documentIdOf(
+        uploadDocument(t.client, t.consultation, clientOptions),
+      );
+      const tCurrent = extend(t, tRoot, 499);
+      const at500 = versionsAs(
+        t.client,
+        t.consultation,
+        tCurrent,
+        clientOptions,
+      );
+      const next = replaceDocument(t.client, tCurrent, clientOptions);
+      const at501 = versionsAs(
+        t.client,
+        t.consultation,
+        next.document,
+        clientOptions,
+      );
+      answers.at_500 = [
+        at500.length,
+        labelsOf(at500).join(",") === expectedLabels(1, 500).join(","),
+        flagsOf(at500),
+      ];
+      answers.at_501 = [
+        at501.length,
+        labelsOf(at501).join(",") === expectedLabels(2, 501).join(","),
+        flagsOf(at501),
+        at501[at501.length - 1].is_current,
+      ];
+      assert.deepEqual(answers, {
+        current_label: "v10050",
+        client_list: [[true, true, "v10050", true, false]],
+        lawyer_list: [[true, true, "v10050", true, false]],
+        from_current: [500, true, [true], ["v10050"]],
+        from_root: [500, true, [true]],
+        recipient: [
+          ["v1", false, false],
+          ["v10050", true, false],
+        ],
+        recipient_from_root: 2,
+        at_500: [500, true, [false]],
+        at_501: [500, true, [true], true],
       });
       return answers;
     },
@@ -5417,12 +6306,31 @@ async function concurrencyChecks() {
   );
 
   await check(
-    "CONC-6 mixed load with zero deadlocks: eight sessions at once send Messages in both directions, upload and share documents, authorize and revoke access, record delivery results and provider events and acknowledge Notifications across shared Consultations; every statement completes without a deadlock (40P01) or lock timeout",
+    "CONC-6 mixed load with zero deadlocks: ten sessions at once send Messages in both directions, upload, replace (two replacements of one version racing, PS-A5) and share documents, read version histories, authorize and revoke access, record delivery results and provider events and acknowledge Notifications across shared Consultations; every statement completes without a deadlock (40P01) or lock timeout, and the racing replacements leave exactly one successor",
     async () => {
       const a = liveConsultation("W");
       const b = liveConsultation("W");
       const docA = uploadDocument(a.client, a.consultation, clientOptions);
       const docB = uploadDocument(b.lawyer, b.consultation);
+      // PS-A5: a version of a's client document replaced twice at once, and a
+      // replacement of b's attorney document, all started before the load.
+      const versionA = replaceDocument(
+        a.client,
+        documentIdOf(docA),
+        clientOptions,
+      );
+      const raceA1 = beginReplacement(
+        a.client,
+        versionA.document,
+        clientOptions,
+      );
+      const raceA2 = beginReplacement(
+        a.client,
+        versionA.document,
+        clientOptions,
+      );
+      const docBDocument = documentIdOf(docB);
+      const replaceB = beginReplacement(b.lawyer, docBDocument);
       const who = withAddress(lawyer("W"));
       const r = authorizedRequest({
         jurisdiction: world.J.W,
@@ -5444,6 +6352,7 @@ async function concurrencyChecks() {
             SEND_SQL(a.consultation, "Mixed 1."),
             `select outcome from public.document_begin_upload('${a.consultation}', 'application/pdf', 10, '${digest}');`,
             `select public.document_revoke_sharing('${docA}');`,
+            FINALIZE_REPLACEMENT_SQL(raceA1.resource, versionA.document),
           ],
         ],
         [
@@ -5469,6 +6378,7 @@ async function concurrencyChecks() {
           [
             SEND_SQL(b.consultation, "Mixed 4."),
             `select public.document_revoke_sharing('${docB}');`,
+            FINALIZE_REPLACEMENT_SQL(replaceB.resource, docBDocument),
           ],
         ],
         [
@@ -5507,6 +6417,23 @@ async function concurrencyChecks() {
           [
             SEND_SQL(a.consultation, "Mixed 6."),
             `select count(*) from public.consultation_documents('${a.consultation}');`,
+            `select count(*) from public.document_versions('${a.consultation}', '${versionA.document}');`,
+          ],
+        ],
+        [
+          "c-a3",
+          () => clientSession("mix-c-a3", a.client),
+          [
+            FINALIZE_REPLACEMENT_SQL(raceA2.resource, versionA.document),
+            `select count(*) from public.document_versions('${a.consultation}', '${versionA.document}');`,
+          ],
+        ],
+        [
+          "t-a3",
+          () => attorneySession("mix-t-a3", a.lawyer),
+          [
+            `select outcome from public.resource_authorize_access('${versionA.resource}', 'document');`,
+            `select count(*) from public.document_versions('${a.consultation}', '${versionA.document}');`,
           ],
         ],
       ];
@@ -5530,9 +6457,25 @@ async function concurrencyChecks() {
       }
       const failures = states.filter(([, code]) => code !== "00000");
       assert.deepEqual(failures, []);
+      // The racing replacements: one successor, the other upload rejected.
+      assert.equal(
+        count("documents", `supersedes_document_id = '${versionA.document}'`),
+        1,
+      );
+      assert.deepEqual(
+        [raceA1.resource, raceA2.resource]
+          .map((r) => rowOf("resources", `id = '${r}'`).visibility_state)
+          .sort(),
+        ["available", "rejected"],
+      );
+      assert.equal(
+        documentRow(documentIdOf(replaceB.resource)).version_label,
+        "v2",
+      );
       report.concurrency.mixed_load = {
         statements: states.length,
         deadlocks: 0,
+        racing_replacements: "one available, one rejected",
       };
       return report.concurrency.mixed_load;
     },
@@ -5668,6 +6611,205 @@ async function concurrencyChecks() {
         later_access: "refused|",
       });
       report.concurrency.access_waiting_on_revocation = outcome;
+      return outcome;
+    },
+  );
+
+  await check(
+    "CONC-9 (PS-A5 linear history under concurrency) two replacements of one version completed at once from two sessions: the first holds the superseded Document's lock, the second waits for it and then answers already_superseded with its own upload rejected in the same call; exactly one successor (v2) exists and its own grant only",
+    async () => {
+      const s = liveConsultation("W");
+      const v1 = documentIdOf(
+        uploadDocument(s.client, s.consultation, clientOptions),
+      );
+      const first = beginReplacement(s.client, v1, clientOptions);
+      const second = beginReplacement(s.client, v1, clientOptions);
+      // An attorney's two sessions share no own-row lock (the profile is
+      // locked FOR SHARE), so their wait is on the superseded Document itself.
+      const t = liveConsultation("W");
+      const w1 = documentIdOf(uploadDocument(t.lawyer, t.consultation));
+      const firstT = beginReplacement(t.lawyer, w1);
+      const secondT = beginReplacement(t.lawyer, w1);
+      const one = await attorneySession("replace-first", t.lawyer);
+      const won = await one.ok(FINALIZE_REPLACEMENT_SQL(firstT.resource, w1));
+      const two = await attorneySession("replace-second", t.lawyer);
+      const pending = two.send(FINALIZE_REPLACEMENT_SQL(secondT.resource, w1));
+      await blockedBy(two.pid, one.pid);
+      await one.ok("commit;");
+      const lost = await pending;
+      await two.ok("commit;");
+      one.close();
+      two.close();
+      // The client's pair: serialized at the client's own row first.
+      const c1 = await clientSession("client-replace-first", s.client);
+      const clientWon = await c1.ok(
+        FINALIZE_REPLACEMENT_SQL(first.resource, v1),
+      );
+      const c2 = await clientSession("client-replace-second", s.client);
+      const clientPending = c2.send(
+        FINALIZE_REPLACEMENT_SQL(second.resource, v1),
+      );
+      await blockedBy(c2.pid, c1.pid);
+      await c1.ok("commit;");
+      const clientLost = await clientPending;
+      await c2.ok("commit;");
+      c1.close();
+      c2.close();
+      const outcome = {
+        attorney: [lastLine(won), lastLine(lost.rows)],
+        attorney_states: [firstT.resource, secondT.resource].map(
+          (r) => rowOf("resources", `id = '${r}'`).visibility_state,
+        ),
+        attorney_successors: count(
+          "documents",
+          `supersedes_document_id = '${w1}'`,
+        ),
+        attorney_label: documentRow(documentIdOf(firstT.resource))
+          .version_label,
+        attorney_grants: [firstT.resource, secondT.resource].map((r) =>
+          count("resource_sharing_grants", `resource_id = '${r}'`),
+        ),
+        client: [lastLine(clientWon), lastLine(clientLost.rows)],
+        client_successors: count(
+          "documents",
+          `supersedes_document_id = '${v1}'`,
+        ),
+      };
+      assert.deepEqual(outcome, {
+        attorney: ["available", "already_superseded"],
+        attorney_states: ["available", "rejected"],
+        attorney_successors: 1,
+        attorney_label: "v2",
+        attorney_grants: [1, 0],
+        client: ["available", "already_superseded"],
+        client_successors: 1,
+      });
+      report.concurrency.concurrent_replacements = outcome;
+      return outcome;
+    },
+  );
+
+  await check(
+    "CONC-10 (PS-A5 per-version grants under concurrency) a replacement racing a revocation of the predecessor's grant, both orders (the attorney as uploader, two sessions): neither waits for the other (they touch different rows) and both commit; the new version is shared by its own active grant, the predecessor's grant is revoked, and the recipient is refused the predecessor and authorized the new version",
+    async () => {
+      const run = async (revokeFirst) => {
+        const s = liveConsultation("W");
+        const v1Resource = uploadDocument(s.lawyer, s.consultation);
+        const v1 = documentIdOf(v1Resource);
+        const begun = beginReplacement(s.lawyer, v1);
+        const replacer = await attorneySession("race-replace", s.lawyer);
+        const revoker = await attorneySession("race-revoke", s.lawyer);
+        const [firstSession, firstSql, secondSession, secondSql] = revokeFirst
+          ? [
+              revoker,
+              `select public.document_revoke_sharing('${v1Resource}');`,
+              replacer,
+              FINALIZE_REPLACEMENT_SQL(begun.resource, v1),
+            ]
+          : [
+              replacer,
+              FINALIZE_REPLACEMENT_SQL(begun.resource, v1),
+              revoker,
+              `select public.document_revoke_sharing('${v1Resource}');`,
+            ];
+        const firstRows = await firstSession.ok(firstSql);
+        const secondRows = await secondSession.ok(secondSql);
+        await firstSession.ok("commit;");
+        await secondSession.ok("commit;");
+        replacer.close();
+        revoker.close();
+        const replaced = lastLine(revokeFirst ? secondRows : firstRows);
+        const revoked = lastLine(revokeFirst ? firstRows : secondRows);
+        return {
+          replaced,
+          revoked,
+          predecessor_access: authorizeAs(s.client, v1Resource, clientOptions),
+          new_access:
+            authorizeAs(s.client, begun.resource, clientOptions) ===
+            `authorized|${objectPath(begun.resource)}`,
+          new_grant_active:
+            rowOf(
+              "resource_sharing_grants",
+              `resource_id = '${begun.resource}'`,
+            ).revoked_at === null,
+        };
+      };
+      const outcome = {
+        replacement_first: await run(false),
+        revocation_first: await run(true),
+      };
+      const expected = {
+        replaced: "available",
+        revoked: "revoked",
+        predecessor_access: "refused|",
+        new_access: true,
+        new_grant_active: true,
+      };
+      assert.deepEqual(outcome, {
+        replacement_first: expected,
+        revocation_first: expected,
+      });
+      report.concurrency.replacement_racing_revocation = outcome;
+      return outcome;
+    },
+  );
+
+  await check(
+    "CONC-11 (PS-A5 replacement under the communication window) a replacement completion racing the Consultation's end: the attorney's end holds the Consultation; the client's completion waits on its lock and decides on the committed completion: inside a configured window the new version is available (v2), without one it is not_editable, its upload is then abandoned (rejected) and the predecessor stays the current version",
+    async () => {
+      const run = async (key) => {
+        const s = liveConsultation(key);
+        const v1 = documentIdOf(
+          uploadDocument(s.client, s.consultation, clientOptions),
+        );
+        const begun = beginReplacement(s.client, v1, clientOptions);
+        const ender = await attorneySession(`end-${key}`, s.lawyer);
+        const ended = await ender.ok(
+          `select outcome from public.consultation_end('${s.consultation}');`,
+        );
+        const completer = await clientSession(`complete-${key}`, s.client);
+        const pending = completer.send(
+          FINALIZE_REPLACEMENT_SQL(begun.resource, v1),
+        );
+        await blockedBy(completer.pid, ender.pid);
+        await ender.ok("commit;");
+        const completed = await pending;
+        await completer.ok("commit;");
+        ender.close();
+        completer.close();
+        const result = lastLine(completed.rows);
+        const abandoned =
+          result === "available"
+            ? null
+            : abandonAs(s.client, begun.resource, clientOptions);
+        return {
+          ended: lastLine(ended),
+          completion: result,
+          abandoned,
+          successors: count("documents", `supersedes_document_id = '${v1}'`),
+          current: documentsAs(s.client, s.consultation, clientOptions).map(
+            (d) => d.version_label,
+          ),
+        };
+      };
+      const outcome = { window: await run("W"), no_window: await run("N") };
+      assert.deepEqual(outcome, {
+        window: {
+          ended: "completed",
+          completion: "available",
+          abandoned: null,
+          successors: 1,
+          current: ["v2"],
+        },
+        no_window: {
+          ended: "completed",
+          completion: "not_editable",
+          abandoned: "rejected",
+          successors: 0,
+          current: ["v1"],
+        },
+      });
+      report.concurrency.replacement_racing_end = outcome;
       return outcome;
     },
   );

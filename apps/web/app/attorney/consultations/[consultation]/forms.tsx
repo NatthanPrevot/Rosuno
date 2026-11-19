@@ -32,6 +32,9 @@ import {
   MESSAGE_FIELD_HINT,
   MESSAGE_FIELD_LABEL,
   OPEN_LABEL,
+  REPLACE_FIELD_HINT,
+  REPLACE_FIELD_LABEL,
+  REPLACE_LABEL,
   REVOKE_LABEL,
   SEND_LABEL,
   UPLOAD_LABEL,
@@ -59,6 +62,7 @@ import {
   endConsultationAction,
   joinConsultationAction,
   openDocumentAction,
+  replaceDocumentAction,
   revokeDocumentAction,
   sendMessageAction,
   startConsultationAction,
@@ -262,6 +266,46 @@ export function DocumentUpload({
         <Cluster>
           <Button variant="secondary" type="submit" disabled={pending}>
             {UPLOAD_LABEL}
+          </Button>
+        </Cluster>
+      </Stack>
+    </form>
+  );
+}
+
+// MVP-001 S10 (PS-A5): the uploader's replacement of the current version.
+// The new version's type, size and digest are measured on the server; the
+// database decides again that this is the current version of the caller's
+// own document and that communication is still open.
+export function DocumentReplace({
+  consultationId,
+  documentId,
+}: {
+  readonly consultationId: string;
+  readonly documentId: string;
+}) {
+  const [state, action, pending] = useActionState(
+    replaceDocumentAction,
+    INITIAL_COMMUNICATION_STATE,
+  );
+  return (
+    <form action={action}>
+      <Stack gap="tight">
+        <CommunicationOutcome state={state} />
+        <input type="hidden" name="consultation" value={consultationId} />
+        <input type="hidden" name="document" value={documentId} />
+        <TextField
+          id={`attorney-replacement-${documentId}`}
+          name="replacement"
+          type="file"
+          accept="application/pdf,image/png,image/jpeg"
+          label={REPLACE_FIELD_LABEL}
+          hint={REPLACE_FIELD_HINT}
+          required
+        />
+        <Cluster>
+          <Button variant="tertiary" type="submit" disabled={pending}>
+            {REPLACE_LABEL}
           </Button>
         </Cluster>
       </Stack>

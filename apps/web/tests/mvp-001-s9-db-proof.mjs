@@ -91,7 +91,7 @@ const S9_MIGRATIONS = Object.freeze([
   "20261125020000_mvp_001_s9_consultation_media.sql",
   "20261125030000_mvp_001_s9_media_evidence.sql",
 ]);
-// MVP-001 S10: the four S10 migrations follow the S9 migrations (applied by
+// MVP-001 S10: the five S10 migrations follow the S9 migrations (applied by
 // this proof as later registered migrations; registered and checked by the
 // S10 proof).
 const S10_MIGRATIONS = Object.freeze([
@@ -99,6 +99,8 @@ const S10_MIGRATIONS = Object.freeze([
   "20261126020000_mvp_001_s10_notifications.sql",
   "20261126030000_mvp_001_s10_messages.sql",
   "20261126040000_mvp_001_s10_documents.sql",
+  // MVP-001 S10 (PS-A5): the document version lineage.
+  "20261126050000_mvp_001_s10_document_versioning.sql",
 ]);
 
 const report = {
@@ -449,7 +451,7 @@ function applyMigrations() {
   ).migrations;
   // S9 follows S8, contiguous and in order, and every S9 migration is
   // registered unreviewed (sequences 47 to 49) and applied nowhere. MVP-001
-  // S10: then exactly the four S10 migrations (registered and checked by the
+  // S10: then exactly the five S10 migrations (registered and checked by the
   // S10 proof).
   const s8 = files.indexOf(S8_LAST);
   assert.ok(s8 >= 0, "the last S8 migration is present");

@@ -777,11 +777,13 @@ async function check(name, body) {
 }
 
 // The P1 columns of every relation S3 relies on (Packet rule 16: no column
-// is added).
+// is added). MVP-001 S10 (PS-A5, 20261126050000): documents gains exactly the
+// one owner-adopted lineage column, supersedes_document_id, and nothing else.
 const P1_COLUMNS = Object.freeze({
   resources:
     "id,resource_kind,owner_user_id,intake_id,consultation_id,storage_bucket,storage_object_path,mime_type,byte_size,content_digest,visibility_state,retention_state,created_at,updated_at",
-  documents: "id,resource_id,document_type,version_label,created_at",
+  documents:
+    "id,resource_id,document_type,version_label,created_at,supersedes_document_id",
   voice_memos: "id,resource_id,intake_id,duration_seconds,created_at",
   resource_sharing_grants:
     "id,resource_id,recipient_user_id,context_type,context_id,purpose_code,granted_at,expires_at,revoked_at,granted_by_user_id",
@@ -793,7 +795,7 @@ const P1_COLUMNS = Object.freeze({
 
 async function migrationChecks() {
   await check(
-    "MIG-1 the three S3 migrations apply after S2, in order, registered unreviewed and applied nowhere; without a storage schema the bucket step is skipped cleanly; no relation and no column is added to any relation S3 uses",
+    "MIG-1 the three S3 migrations apply after S2, in order, registered unreviewed and applied nowhere; without a storage schema the bucket step is skipped cleanly; no relation and no column is added to any relation S3 uses (later: exactly the PS-A5 lineage column of documents, MVP-001 S10)",
     () => {
       assert.deepEqual(report.migrations.notices[S3_MIGRATIONS[0]], [
         "MVP-001 S3: no storage schema in this database; the private bucket is not created",

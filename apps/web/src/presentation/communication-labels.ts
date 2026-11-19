@@ -75,7 +75,7 @@ export function messagingNote(
 
 export const DOCUMENTS_HEADING = "Documents";
 export const DOCUMENTS_NOTE =
-  "A document you add here is shared only with the other participant of this consultation. You can stop sharing it at any time.";
+  "A document you add here is shared only with the other participant of this consultation. Sharing is per version: each version you add is shared on its own, and stopping sharing of one version leaves the other versions as they are.";
 export const NO_DOCUMENTS = "No documents yet.";
 export const OLDER_DOCUMENTS_NOTE = "Older documents are not shown.";
 export const DOCUMENT_FIELD_LABEL = "Add a document";
@@ -83,7 +83,25 @@ export const DOCUMENT_FIELD_HINT = "A PDF, PNG, or JPEG of at most 1 MB.";
 export const UPLOAD_LABEL = "Share document";
 export const OPEN_LABEL = "Get a download link";
 export const DOWNLOAD_LINK_LABEL = "Download now";
-export const REVOKE_LABEL = "Stop sharing";
+export const REVOKE_LABEL = "Stop sharing this version";
+
+// Versions (PS-A5): a replacement adds a new version; earlier ones stay.
+export const VERSION_COLUMN = "Version";
+export const REPLACE_FIELD_LABEL = "Replace with a new version";
+export const REPLACE_FIELD_HINT =
+  "The new version will be shared with the other participant. The earlier version stays as it is, available to whoever could open it. A PDF, PNG, or JPEG of at most 1 MB.";
+export const REPLACE_LABEL = "Upload new version";
+export const HISTORY_LINK_LABEL = "Version history";
+export const HISTORY_HEADING = "Version history";
+export const HISTORY_NOTE =
+  "Every version stays as it was added. Each version is shared on its own: stopping sharing of one version leaves the others as they are.";
+export const HISTORY_UNAVAILABLE = "This version history is not available.";
+export const HISTORY_CLOSE_LABEL = "Close version history";
+// Shown when the database answers that older versions exist beyond the
+// newest it returns.
+export const OLDER_VERSIONS_NOTE = "Older versions are not shown.";
+export const CURRENT_VERSION_LABEL = "Current version";
+export const EARLIER_VERSION_LABEL = "Earlier version";
 
 export const DOCUMENT_TYPE_LABELS: Readonly<Record<ArtifactType, string>> =
   Object.freeze({
@@ -111,6 +129,30 @@ export function sharingLabel(
     return "Shared";
   }
   return mine ? "Sharing stopped" : "No longer shared with you";
+}
+
+// The sharing state of a document's current version in the list, saying when
+// an earlier version is still shared (sharing is per version).
+export function currentSharingLabel(
+  sharing: "active" | "revoked",
+  mine: boolean,
+  earlierShared: boolean,
+): string {
+  const label = sharingLabel(sharing, mine);
+  if (!earlierShared) {
+    return label;
+  }
+  return mine
+    ? `${label}. An earlier version is still shared with the other participant.`
+    : `${label}. An earlier version is still shared with you.`;
+}
+
+// The sharing state of one version in a history (null: never shared).
+export function versionSharingLabel(
+  sharing: "active" | "revoked" | null,
+  mine: boolean,
+): string {
+  return sharing === null ? "Not shared" : sharingLabel(sharing, mine);
 }
 
 // ---------------------------------------------------------------------------
@@ -158,15 +200,30 @@ export const COMMUNICATION_OUTCOME_MESSAGES: Readonly<
     title: "Document shared",
     body: "Your document was shared with the other participant.",
   },
+  document_replaced: {
+    tone: "success",
+    title: "New version shared",
+    body: "The new version was shared with the other participant. The earlier version stays as it was.",
+  },
+  not_current: {
+    tone: "warning",
+    title: "Not the current version",
+    body: "Nothing was added: a newer version of this document already exists. Replace the current version instead.",
+  },
+  already_superseded: {
+    tone: "warning",
+    title: "Already replaced",
+    body: "Nothing was added: this version was replaced by another upload at the same time. Reload the page to see the current version.",
+  },
   sharing_revoked: {
     tone: "success",
     title: "Sharing stopped",
-    body: "The other participant can no longer open this document.",
+    body: "The other participant can no longer open this version. Other versions of the document are not affected.",
   },
   already_revoked: {
     tone: "information",
     title: "Already stopped",
-    body: "This document is no longer shared.",
+    body: "This version is no longer shared.",
   },
   closed: {
     tone: "warning",
@@ -223,7 +280,10 @@ export function communicationMessage(
           }
         : {
             tone: "warning",
-            title: "Check the document",
+            title:
+              state.field === "replacement"
+                ? "Check the new version"
+                : "Check the document",
             body: "Choose a PDF, PNG, or JPEG of at most 1 MB.",
           };
     case "unconfirmed":

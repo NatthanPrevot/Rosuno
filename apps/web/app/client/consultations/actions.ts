@@ -19,6 +19,7 @@ import { revalidatePath } from "next/cache";
 
 import {
   openClientDocument,
+  replaceClientDocument,
   revokeClientDocument,
   sendClientMessage,
   uploadClientDocument,
@@ -92,6 +93,17 @@ export async function revokeDocumentAction(
   return refreshed(
     formData,
     await revokeClientDocument(CLIENT_COMMUNICATION_SOURCES, formData),
+  );
+}
+
+// MVP-001 S10 (PS-A5): a new version of one of the client's own documents.
+export async function replaceDocumentAction(
+  _previous: CommunicationActionState,
+  formData: FormData,
+): Promise<CommunicationActionState> {
+  return refreshed(
+    formData,
+    await replaceClientDocument(CLIENT_COMMUNICATION_SOURCES, formData),
   );
 }
 

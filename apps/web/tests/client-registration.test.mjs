@@ -3002,7 +3002,9 @@ const CONSULTATION_RPCS = Object.freeze([
 // and acknowledgement, and the PS-A2 environment accessor (checked before a
 // change), each exactly once and each as a literal call through the request's
 // own unprivileged session; it builds or receives no privileged client, and no
-// other file names any of the eight functions.
+// other file names any of the eight functions. MVP-001 S10 (PS-A5): and the
+// three versioning functions (a document's version history read, starting and
+// completing a replacement), under the same rule.
 const COMMUNICATION_ADAPTER =
   "src/infrastructure/communications/communication-adapter.ts";
 const COMMUNICATION_RPCS = Object.freeze([
@@ -3014,6 +3016,9 @@ const COMMUNICATION_RPCS = Object.freeze([
   "document_revoke_sharing",
   "notification_center",
   "notification_acknowledge",
+  "document_versions",
+  "document_begin_replacement",
+  "document_finalize_replacement",
 ]);
 const PAYMENT_ADAPTER = "src/infrastructure/payments/payment-adapter.ts";
 const PAYMENT_RPCS = Object.freeze([
@@ -3080,8 +3085,9 @@ const RPC_OCCURRENCES = Object.freeze({
   // MVP-001 S9: the six Consultation functions, plus the environment
   // accessor.
   [CONSULTATION_ADAPTER]: CONSULTATION_RPCS.length + 1,
-  // MVP-001 S10: the eight communication and notification center functions,
-  // plus the environment accessor.
+  // MVP-001 S10: the eight communication and notification center functions
+  // (PS-A5: and the three versioning functions), plus the environment
+  // accessor.
   [COMMUNICATION_ADAPTER]: COMMUNICATION_RPCS.length + 1,
 });
 

@@ -1385,6 +1385,38 @@
       "drift_check": "clean",
       "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions; no resource, document, Resource Sharing Grant, Notification or audit row is removed.",
       "depends_on": ["20261126030000_mvp_001_s10_messages"]
+    },
+    {
+      "migration_id": "20261126050000_mvp_001_s10_document_versioning",
+      "migration_kind": "product",
+      "sequence": 54,
+      "artifact_path": "supabase/migrations/20261126050000_mvp_001_s10_document_versioning.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+        "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A5-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": [
+        "DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM",
+        "DEC-20261119-PS-A5-DOCUMENT-VERSION-LINEAGE"
+      ],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions or the guard trigger; the PS-A5 lineage column, its constraints and index stay, and no document, resource, Resource Sharing Grant, Notification or audit row is removed (each version's history is preserved).",
+      "depends_on": ["20261126040000_mvp_001_s10_documents"]
     }
   ]
 }

@@ -4,9 +4,10 @@
 // and shared documents) and of the notification center for one request.
 // Every database call goes through the request-scoped, unprivileged server
 // client (the publishable key and the request's own cookie session): the
-// thread and document reads, the messaging status, the PS-A2 environment
-// accessor, sending a Message, starting a document upload, revoking a grant,
-// the notification center and an acknowledgement, so the database decides
+// thread and document reads, a document's version history, the messaging
+// status, the PS-A2 environment accessor, sending a Message, starting a
+// document upload, starting and completing a replacement (PS-A5), revoking a
+// grant, the notification center and an acknowledgement, so the database decides
 // the actor, the aal2 session, the Consultation's own participant and the
 // recipient from the request's own authenticated session. Each function is
 // called by its literal name, exactly once in this module. No privileged
@@ -26,6 +27,8 @@
 
 import {
   BEGIN_DOCUMENT_OUTCOMES,
+  BEGIN_REPLACEMENT_OUTCOMES,
+  REPLACEMENT_OUTCOMES,
   REVOKE_OUTCOMES,
   SEND_OUTCOMES,
   type AttorneyCommunicationSources,
@@ -232,6 +235,15 @@ export function createCommunicationReads(
                 }),
               )
             : Promise.resolve(UNREADABLE_ROWS),
+        versions: (consultationId: string, documentId: string) =>
+          isId(consultationId) && isId(documentId)
+            ? observedRead("document_versions", deadlineMs, () =>
+                client.rpc("document_versions", {
+                  p_consultation_id: consultationId,
+                  p_document_id: documentId,
+                }),
+              )
+            : Promise.resolve(UNREADABLE_ROWS),
         environmentIdentity: () =>
           observedRead("deployment_environment_identity", deadlineMs, () =>
             client.rpc("deployment_environment_identity"),
@@ -292,6 +304,41 @@ export function createCommunicationWrites(
                   p_resource_id: resourceId,
                 }),
               (result) => textAnswerOf(result, REVOKE_OUTCOMES),
+            )
+          : REJECTED_ANSWER,
+      beginReplacement: async (start) =>
+        isId(start.consultationId) && isId(start.documentId)
+          ? observedWrite(
+              "document_begin_replacement",
+              deadlineMs,
+              () =>
+                client.rpc("document_begin_replacement", {
+                  p_consultation_id: start.consultationId,
+                  p_document_id: start.documentId,
+                  p_mime_type: start.mimeType,
+                  p_byte_size: start.byteSize,
+                  p_content_digest: start.contentDigest,
+                }),
+              (result) =>
+                rowAnswerOf(result, BEGIN_REPLACEMENT_OUTCOMES, "resource_id"),
+            )
+          : REJECTED_ANSWER,
+      finalizeReplacement: async (
+        consultationId: string,
+        resourceId: string,
+        documentId: string,
+      ) =>
+        isId(consultationId) && isId(resourceId) && isId(documentId)
+          ? observedWrite(
+              "document_finalize_replacement",
+              deadlineMs,
+              () =>
+                client.rpc("document_finalize_replacement", {
+                  p_consultation_id: consultationId,
+                  p_resource_id: resourceId,
+                  p_document_id: documentId,
+                }),
+              (result) => textAnswerOf(result, REPLACEMENT_OUTCOMES),
             )
           : REJECTED_ANSWER,
     } satisfies CommunicationWrites);

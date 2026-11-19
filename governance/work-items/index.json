@@ -2553,7 +2553,8 @@
         "20261126010000_mvp_001_s10_communication_integrity",
         "20261126020000_mvp_001_s10_notifications",
         "20261126030000_mvp_001_s10_messages",
-        "20261126040000_mvp_001_s10_documents"
+        "20261126040000_mvp_001_s10_documents",
+        "20261126050000_mvp_001_s10_document_versioning"
       ],
       "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",

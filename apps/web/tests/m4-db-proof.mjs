@@ -98,6 +98,13 @@
 // resource_authorize_access and has_resource_metadata_access are replaced under
 // their own names (already listed).
 //
+// MVP-001 S10 PS-A5 update: the fifth S10 migration (document versioning)
+// follows. SEC-1 lists exactly the three further definer functions: the
+// uploader's replacement start and completion and a participant's version
+// history read. None writes an M4 relation; document_begin_upload and
+// consultation_documents are replaced or re-created under their own names
+// (already listed).
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -1597,8 +1604,18 @@ function probes() {
           // and the uploader's grant revocation (authenticated; the attorney
           // at aal2), which write only resources, documents, Resource Sharing
           // Grants and audit events; no M4 relation.
+          // MVP-001 S10 PS-A5 (20261126050000): the uploader's replacement
+          // start and completion (authenticated; the attorney at aal2), which
+          // write only resources, documents, Resource Sharing Grants,
+          // Notifications, jobs and audit events; no M4 relation.
+          "document_begin_replacement:v",
           "document_begin_upload:v",
+          "document_finalize_replacement:v",
           "document_revoke_sharing:v",
+          // MVP-001 S10 PS-A5 (20261126050000): a participant's version
+          // history read (authenticated; the attorney at aal2), which writes
+          // nothing.
+          "document_versions:s",
           // MVP-001 S8 re-pin (20261124010000): the P1 deferred
           // Consultation/payment check, now security definer like the S6
           // Request checks; read only.

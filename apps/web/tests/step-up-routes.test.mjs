@@ -283,7 +283,7 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
     // MVP-001 S9: the consultation's room access, start and end. MVP-001
     // S10: and the consultation's Message, document upload, grant revocation
     // and document download; and the notification center's one
-    // acknowledgement.
+    // acknowledgement. MVP-001 S10 PS-A5: and the document replacement.
     const verification = file === "app/staff/verification/actions.ts";
     const offers = file === "app/attorney/offers/actions.ts";
     const requests = file === "app/attorney/requests/actions.ts";
@@ -294,7 +294,7 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
       : offers || requests
         ? 2
         : consultations
-          ? 7
+          ? 8
           : notifications
             ? 1
             : 6;

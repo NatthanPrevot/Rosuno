@@ -21,6 +21,7 @@ import { revalidatePath } from "next/cache";
 
 import {
   openAttorneyDocument,
+  replaceAttorneyDocument,
   revokeAttorneyDocument,
   sendAttorneyMessage,
   uploadAttorneyDocument,
@@ -132,6 +133,18 @@ export async function revokeDocumentAction(
 ): Promise<CommunicationActionState> {
   return gated(() =>
     revokeAttorneyDocument(ATTORNEY_COMMUNICATION_SOURCES, formData).then(
+      (state) => refreshed(formData, state),
+    ),
+  );
+}
+
+// MVP-001 S10 (PS-A5): a new version of one of the attorney's own documents.
+export async function replaceDocumentAction(
+  _previous: CommunicationActionState,
+  formData: FormData,
+): Promise<CommunicationActionState> {
+  return gated(() =>
+    replaceAttorneyDocument(ATTORNEY_COMMUNICATION_SOURCES, formData).then(
       (state) => refreshed(formData, state),
     ),
   );
