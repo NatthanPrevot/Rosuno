@@ -2509,11 +2509,14 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
   // too knows nothing of recovery and imports only the webhook adapter.
   // MVP-001 S9: and the Daily webhook route, admitted by its exact path; it
   // too knows nothing of recovery and imports only its webhook adapter.
+  // MVP-001 S10: and the Resend webhook route, admitted by its exact path; it
+  // too knows nothing of recovery and imports only its webhook adapter.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
     [
       "app/api/jobs/run/route.ts",
       "app/api/media/daily/route.ts",
+      "app/api/notifications/resend/route.ts",
       "app/api/payments/stripe/route.ts",
       "app/auth/confirm/route.ts",
     ],
@@ -2521,6 +2524,7 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
   for (const route of [
     "app/api/jobs/run/route.ts",
     "app/api/media/daily/route.ts",
+    "app/api/notifications/resend/route.ts",
     "app/api/payments/stripe/route.ts",
   ]) {
     assert.doesNotMatch(
@@ -2534,6 +2538,9 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
   ]);
   assert.deepEqual(importsOf(read("app/api/media/daily/route.ts")), [
     "../../../../src/infrastructure/media/daily-webhook.ts",
+  ]);
+  assert.deepEqual(importsOf(read("app/api/notifications/resend/route.ts")), [
+    "../../../../src/infrastructure/notifications/resend-webhook.ts",
   ]);
   // The signup confirmation handler still verifies only signup links and
   // knows nothing of recovery.

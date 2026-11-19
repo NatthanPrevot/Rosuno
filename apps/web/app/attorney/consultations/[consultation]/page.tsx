@@ -23,7 +23,12 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 
+import {
+  resolveAttorneyCommunication,
+  type CommunicationView,
+} from "../../../../src/application/consultation-communication.ts";
 import { resolveAttorneyConsultation } from "../../../../src/application/consultations.ts";
+import { ATTORNEY_COMMUNICATION_SOURCES } from "../../../../src/infrastructure/communications/communication-adapter.ts";
 import { ATTORNEY_CONSULTATION_SOURCES } from "../../../../src/infrastructure/consultations/consultation-adapter.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
 import {
@@ -42,6 +47,22 @@ import {
   WORKSPACE_NOTE,
 } from "../../../../src/presentation/consultation-labels.ts";
 import {
+  byteSizeText,
+  DOCUMENT_TYPE_LABELS,
+  DOCUMENTS_HEADING,
+  DOCUMENTS_NOTE,
+  MESSAGES_HEADING,
+  MESSAGES_NOTE,
+  messagingNote,
+  NO_DOCUMENTS,
+  NO_MESSAGES,
+  OLDER_DOCUMENTS_NOTE,
+  OLDER_MESSAGES_NOTE,
+  senderLabel,
+  sharingLabel,
+  uploaderLabel,
+} from "../../../../src/presentation/communication-labels.ts";
+import {
   Alert,
   ButtonLink,
   Cluster,
@@ -55,7 +76,121 @@ import {
   Text,
 } from "../../../../src/presentation/design-system.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
-import { CommandPanel, RoomPanel } from "./forms.tsx";
+import {
+  CommandPanel,
+  DocumentControls,
+  DocumentUpload,
+  MessageComposer,
+  RoomPanel,
+} from "./forms.tsx";
+
+// MVP-001 S10: the participants' Messages and shared documents, read afresh
+// for this request (the database answers only this Consultation's own
+// participants; the attorney at aal2). The composer and the upload form are
+// offered only while the server reports communication open; reading stays
+// available after it closes.
+function CommunicationSection({
+  view,
+  consultationId,
+  prefix,
+}: {
+  readonly view: CommunicationView;
+  readonly consultationId: string;
+  readonly prefix: string;
+}) {
+  if (view.status !== "ready") {
+    return (
+      <Alert tone="warning" title="Messages and documents" role="status">
+        Messages and documents could not be shown right now. Please try again
+        later.
+      </Alert>
+    );
+  }
+  const note = messagingNote(view.messaging, view.closesAt, utcText);
+  const open = view.messaging === "open";
+  return (
+    <Stack>
+      <Heading as="h2" size="md" id={`${prefix}-messages-title`}>
+        {MESSAGES_HEADING}
+      </Heading>
+      <Text tone="muted">{MESSAGES_NOTE}</Text>
+      {note === null ? null : <Text>{note}</Text>}
+      {view.olderMessagesNotShown ? (
+        <Text tone="muted">{OLDER_MESSAGES_NOTE}</Text>
+      ) : null}
+      {view.messages.length === 0 ? (
+        <Text tone="muted">{NO_MESSAGES}</Text>
+      ) : (
+        <Table
+          id={`${prefix}-messages`}
+          caption="Messages in this consultation"
+        >
+          <thead>
+            <tr>
+              <th scope="col">From</th>
+              <th scope="col">Sent (UTC)</th>
+              <th scope="col">Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            {view.messages.map((message) => (
+              <tr key={message.id}>
+                <td>{senderLabel(message.senderRole, message.mine)}</td>
+                <td>{utcText(message.sentAt)}</td>
+                <td>{message.body}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+      {open ? <MessageComposer consultationId={consultationId} /> : null}
+      <Heading as="h2" size="md" id={`${prefix}-documents-title`}>
+        {DOCUMENTS_HEADING}
+      </Heading>
+      <Text tone="muted">{DOCUMENTS_NOTE}</Text>
+      {view.olderDocumentsNotShown ? (
+        <Text tone="muted">{OLDER_DOCUMENTS_NOTE}</Text>
+      ) : null}
+      {view.documents.length === 0 ? (
+        <Text tone="muted">{NO_DOCUMENTS}</Text>
+      ) : (
+        <Table
+          id={`${prefix}-documents`}
+          caption="Documents in this consultation"
+        >
+          <thead>
+            <tr>
+              <th scope="col">Document</th>
+              <th scope="col">Added by</th>
+              <th scope="col">Added (UTC)</th>
+              <th scope="col">Sharing</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {view.documents.map((document) => (
+              <tr key={document.resourceId}>
+                <td>{`${DOCUMENT_TYPE_LABELS[document.mimeType]}, ${byteSizeText(document.byteSize)}`}</td>
+                <td>{uploaderLabel(document.uploadedBy, document.mine)}</td>
+                <td>{utcText(document.createdAt)}</td>
+                <td>{sharingLabel(document.sharing, document.mine)}</td>
+                <td>
+                  <DocumentControls
+                    consultationId={consultationId}
+                    resourceId={document.resourceId}
+                    openable={document.accessible}
+                    revocable={document.mine && document.sharing === "active"}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+      {open ? <DocumentUpload consultationId={consultationId} /> : null}
+    </Stack>
+  );
+}
 
 export const metadata: Metadata = {
   title: "Consultation",
@@ -256,6 +391,14 @@ export default async function AttorneyConsultationPage({
         </tbody>
       </Table>
       <Text tone="muted">{EVIDENCE_NOTE}</Text>
+      <CommunicationSection
+        view={await resolveAttorneyCommunication(
+          ATTORNEY_COMMUNICATION_SOURCES,
+          record.id,
+        )}
+        consultationId={record.id}
+        prefix="attorney"
+      />
       {BACK}
     </ConsultationFrame>
   );

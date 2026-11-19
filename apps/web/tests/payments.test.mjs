@@ -1794,7 +1794,23 @@ test("S7-20. the S7 pages decide on the server for every request through the S7 
     /\.tsx?$/.test(f),
   )) {
     const code = codeOf(read(file));
-    if (file !== "src/infrastructure/payments/stripe-provider.ts") {
+    if (file === "src/infrastructure/notifications/resend-provider.ts") {
+      // MVP-001 S10: the server-only Resend adapter names the "whsec_"
+      // prefix of its own Svix-scheme webhook secret (its setting pattern and
+      // the prefix it strips), and nothing else of these.
+      assert.doesNotMatch(
+        code,
+        /ROSUNO_STRIPE_|sk_test_|rk_test_|api\.stripe\.com/,
+        file,
+      );
+      assert.equal(code.match(/whsec_/g).length, 2, file);
+      assert.match(
+        code,
+        /pattern: \/\^whsec_\[A-Za-z0-9\+\/=\]\{16,128\}\$\/,/,
+        file,
+      );
+      assert.ok(code.includes('value.slice("whsec_".length)'), file);
+    } else if (file !== "src/infrastructure/payments/stripe-provider.ts") {
       assert.doesNotMatch(
         code,
         /ROSUNO_STRIPE_|sk_test_|rk_test_|whsec_|api\.stripe\.com/,

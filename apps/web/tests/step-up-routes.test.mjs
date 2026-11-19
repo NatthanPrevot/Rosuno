@@ -84,7 +84,11 @@ const GATED_ACTIONS = {
   // MVP-001 S8: the attorney's acceptance and decline of a request.
   "app/attorney/requests/actions.ts": "attorney",
   // MVP-001 S9: the attorney's consultation room access, start and end.
+  // MVP-001 S10: and its Message, document upload, grant revocation and
+  // document download.
   "app/attorney/consultations/actions.ts": "attorney",
+  // MVP-001 S10: the attorney's notification acknowledgement.
+  "app/attorney/notifications/actions.ts": "attorney",
   "app/staff/actions.ts": "staff",
   // MVP-001 S7: the finance workspace changes.
   "app/staff/finance/actions.ts": "staff",
@@ -180,8 +184,10 @@ test("S2-R3. every attorney page and every staff page asks the step-up gate firs
   // attorney schedule. MVP-001 S6 PS-A3: and the attorney's offers. MVP-001
   // S7: and the attorney's earnings and the three finance pages. MVP-001 S8:
   // and the attorney's request queue and request page. MVP-001 S9: and the
-  // attorney's consultation list and consultation page.
-  assert.equal(GATED_PAGES.length, 28);
+  // attorney's consultation list and consultation page. MVP-001 S10: and the
+  // attorney's notification center.
+  assert.equal(GATED_PAGES.length, 29);
+  assert.ok(GATED_PAGES.includes("app/attorney/notifications/page.tsx"));
   for (const file of [
     "app/attorney/consultations/page.tsx",
     "app/attorney/consultations/[consultation]/page.tsx",
@@ -274,18 +280,24 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
     // heartbeat answering the gate's refusal unchanged like every change.
     // MVP-001 S6 PS-A3: the offers' two changes (price and withdrawal).
     // MVP-001 S8: the request decision's two changes (accept and decline).
-    // MVP-001 S9: the consultation's room access, start and end.
+    // MVP-001 S9: the consultation's room access, start and end. MVP-001
+    // S10: and the consultation's Message, document upload, grant revocation
+    // and document download; and the notification center's one
+    // acknowledgement.
     const verification = file === "app/staff/verification/actions.ts";
     const offers = file === "app/attorney/offers/actions.ts";
     const requests = file === "app/attorney/requests/actions.ts";
     const consultations = file === "app/attorney/consultations/actions.ts";
+    const notifications = file === "app/attorney/notifications/actions.ts";
     const expected = verification
       ? 7
       : offers || requests
         ? 2
         : consultations
-          ? 3
-          : 6;
+          ? 7
+          : notifications
+            ? 1
+            : 6;
     const exported = [...code.matchAll(/^export async function (\w+)\(/gm)];
     assert.equal(exported.length, expected, file);
     assert.equal(

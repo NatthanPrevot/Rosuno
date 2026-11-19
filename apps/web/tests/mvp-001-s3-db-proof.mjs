@@ -1136,9 +1136,12 @@ async function privilegeChecks() {
           signature,
         );
       }
+      // MVP-001 S10 (20261126040000) replaces the metadata predicate forward
+      // with the house search_path (pg_catalog, pg_temp: pg_temp searched
+      // last, never first), the only admitted change.
       assert.equal(
         settings["has_resource_metadata_access(uuid)"],
-        "true|search_path=pg_catalog|postgres",
+        "true|search_path=pg_catalog, pg_temp|postgres",
       );
       for (const signature of [
         "resource_under_legal_hold(uuid)",

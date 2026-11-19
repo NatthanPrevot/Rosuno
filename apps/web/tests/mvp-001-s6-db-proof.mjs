@@ -117,6 +117,15 @@ const S9_MIGRATIONS = Object.freeze([
   "20261125020000_mvp_001_s9_consultation_media.sql",
   "20261125030000_mvp_001_s9_media_evidence.sql",
 ]);
+// MVP-001 S10: the four S10 migrations follow the S9 migrations (applied by
+// this proof as later registered migrations; registered and checked by the
+// S10 proof).
+const S10_MIGRATIONS = Object.freeze([
+  "20261126010000_mvp_001_s10_communication_integrity.sql",
+  "20261126020000_mvp_001_s10_notifications.sql",
+  "20261126030000_mvp_001_s10_messages.sql",
+  "20261126040000_mvp_001_s10_documents.sql",
+]);
 
 const report = {
   proof: "MVP-001 S6 disposable local PostgreSQL proof",
@@ -438,7 +447,8 @@ function applyMigrations() {
   // two S7 migrations (registered and checked by the S7 proof). MVP-001 S8:
   // then exactly the three S8 migrations (registered and checked by the S8
   // proof). MVP-001 S9: then exactly the three S9 migrations (registered and
-  // checked by the S9 proof).
+  // checked by the S9 proof). MVP-001 S10: then exactly the four S10
+  // migrations (registered and checked by the S10 proof).
   const s5 = files.indexOf(S5_LAST);
   assert.ok(s5 >= 0, "the last S5 migration is present");
   assert.deepEqual(files.slice(s5 + 1), [
@@ -447,6 +457,7 @@ function applyMigrations() {
     ...S7_MIGRATIONS,
     ...S8_MIGRATIONS,
     ...S9_MIGRATIONS,
+    ...S10_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

@@ -453,7 +453,8 @@ test("J-I6. a drain without a binding claims nothing; with a port it uses its ow
   assert.equal(await JOB_WORKER_WIRING.port(), null);
   // The production registry was empty in S2; MVP-001 S7 registers exactly
   // the five payment job types, and MVP-001 S9 exactly the four media job
-  // types after them, and no other.
+  // types after them, and MVP-001 S10 exactly the one notification job type
+  // after those, and no other.
   assert.deepEqual(
     [...PRODUCTION_JOB_HANDLERS.keys()],
     [
@@ -466,6 +467,7 @@ test("J-I6. a drain without a binding claims nothing; with a port it uses its ow
       "media.room_update",
       "media.room_delete",
       "media.observe",
+      "notification.deliver",
     ],
   );
   assert.ok(
@@ -883,6 +885,8 @@ test("J-I12. the route and the adapter stay narrow: exact imports, no cookie, se
     "../identity/registration-provisioning.ts",
     // MVP-001 S9: the media job handlers.
     "../media/media-jobs.ts",
+    // MVP-001 S10: the notification job handler.
+    "../notifications/notification-jobs.ts",
     "../observability/request-log.ts",
     // MVP-001 S7: the payment job handlers, and nothing else.
     "../payments/payment-jobs.ts",
@@ -892,17 +896,21 @@ test("J-I12. the route and the adapter stay narrow: exact imports, no cookie, se
     /process\.env|\bconsole\b|ROSUNO_SUPABASE|NEXT_PUBLIC|service_role|sb_secret_|createClient\b|adminKey|\.rpc\(|\.from\(|cookies|next\/headers|\.set\(/,
   );
   // The registry held no handler in S2; MVP-001 S7: it holds exactly the
-  // payment job handlers; MVP-001 S9: and exactly the media job handlers.
+  // payment job handlers; MVP-001 S9: and exactly the media job handlers;
+  // MVP-001 S10: and exactly the notification job handler.
   assert.match(
     adapter,
-    /export const PRODUCTION_JOB_HANDLERS: JobHandlers = new Map<string, JobHandler>\(\n {2}\[\.\.\.PAYMENT_JOB_HANDLERS, \.\.\.MEDIA_JOB_HANDLERS\],\n\);/,
+    /export const PRODUCTION_JOB_HANDLERS: JobHandlers = new Map<string, JobHandler>\(\n {2}\[\n {4}\.\.\.PAYMENT_JOB_HANDLERS,\n {4}\.\.\.MEDIA_JOB_HANDLERS,\n {4}\.\.\.NOTIFICATION_JOB_HANDLERS,\n {2}\],\n\);/,
   );
   assert.equal(adapter.match(/PAYMENT_JOB_HANDLERS/g).length, 2);
   assert.equal(adapter.match(/MEDIA_JOB_HANDLERS/g).length, 2);
+  assert.equal(adapter.match(/NOTIFICATION_JOB_HANDLERS/g).length, 2);
   // Only the worker route loads the adapter (the after-commit helper too),
   // and (MVP-001 S7) the payment adapter, for one bounded drain after a
   // payment attempt is created, and (MVP-001 S9) the consultation adapter,
-  // for one bounded drain while a consultation room is being prepared.
+  // for one bounded drain while a consultation room is being prepared, and
+  // (MVP-001 S10) the communication adapter, for one bounded drain after a
+  // Message or a shared document (the recipient's email Notification).
   const importers = [...filesIn("app/"), ...filesIn("src/")].filter(
     (file) =>
       /\.tsx?$/.test(file) &&
@@ -912,6 +920,7 @@ test("J-I12. the route and the adapter stay narrow: exact imports, no cookie, se
   );
   assert.deepEqual(importers, [
     "app/api/jobs/run/route.ts",
+    "src/infrastructure/communications/communication-adapter.ts",
     "src/infrastructure/consultations/consultation-adapter.ts",
     "src/infrastructure/jobs/after-commit.ts",
     "src/infrastructure/payments/payment-adapter.ts",
@@ -922,9 +931,11 @@ test("J-I12. the route and the adapter stay narrow: exact imports, no cookie, se
   ]);
   // MVP-001 S7: and the Stripe webhook route, its own exact path.
   // MVP-001 S9: and the Daily webhook route, its own exact path.
+  // MVP-001 S10: and the Resend webhook route, its own exact path.
   assert.deepEqual(filesIn("app/api/"), [
     "app/api/jobs/run/route.ts",
     "app/api/media/daily/route.ts",
+    "app/api/notifications/resend/route.ts",
     "app/api/payments/stripe/route.ts",
   ]);
   // No page links to or calls the worker route.

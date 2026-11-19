@@ -32,7 +32,11 @@
 // event); it reads and writes no table. Another (MVP-001 S9) makes only the
 // three fixed media recording calls of the worker and the Daily webhook route
 // (the media job context, a provider call's result, and one authenticated
-// media event); it reads and writes no table. A further
+// media event); it reads and writes no table. Another (MVP-001 S10) makes
+// only the three fixed notification recording calls of the worker and the
+// Resend webhook route (the notification job context, which answers the
+// recipient's address read at send time, a provider call's result, and one
+// authenticated provider event); it reads and writes no table. A further
 // client, built from
 // the publishable key alone and never given the privileged credential, only
 // requests signup confirmation emails. No client receives a request cookie or
@@ -93,6 +97,15 @@ import {
   type MediaEventAnswer,
   type MediaRecorder,
 } from "../../application/media-provider.ts";
+import {
+  isDeliveryAttempt,
+  isNotificationEvent,
+  isProviderCode as isNotificationProviderCode,
+  notificationEventAnswerOf,
+  recordOutcomeOf as notificationRecordOutcomeOf,
+  type NotificationEventAnswer,
+  type NotificationRecorder,
+} from "../../application/notifications.ts";
 import {
   eventAnswerOf,
   isObservation,
@@ -657,6 +670,101 @@ export async function createMediaRecorder(
       }
     },
   } satisfies MediaRecorder);
+}
+
+// MVP-001 S10: the notification recording port (Packet S10 "durable delivery
+// attempts, retries, observations"; ROS section 15; IMP section 23), through
+// its own cookie-free privileged client. It makes only the three fixed
+// service_role calls, each a literal call of one database function with
+// exactly its named arguments, after checking every argument against the
+// database's own bounds, under a deadline: notification_job_context (what a
+// running notification job is to do, with the recipient's address read at
+// send time; the rows are handed only to the job handler, never logged),
+// and notification_record_attempt and notification_record_provider_event (a
+// provider call's result, and one provider event whose signature the webhook
+// route verified first). Each answer is read strictly; anything else,
+// including a failed, refused, aborted, or thrown call, is unknown, so
+// nothing is taken as recorded that the database did not answer. It decides
+// nothing: the database owns every Notification transition, attempt,
+// receipt and exception, and never a business record.
+const NOTIFICATION_CALL_DEADLINE_MS = 10_000;
+const UNKNOWN_NOTIFICATION_EVENT: NotificationEventAnswer = Object.freeze({
+  kind: "unknown",
+});
+
+export async function createNotificationRecorder(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<NotificationRecorder | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    jobContext: async (jobId) => {
+      if (!isUuid(jobId)) {
+        return null;
+      }
+      try {
+        const { data, error } = await admin
+          .rpc("notification_job_context", { p_job_id: jobId })
+          .abortSignal(AbortSignal.timeout(NOTIFICATION_CALL_DEADLINE_MS));
+        return error === null && Array.isArray(data)
+          ? Object.freeze(data.slice())
+          : null;
+      } catch {
+        return null;
+      }
+    },
+    recordAttempt: async (jobId, providerCode, attempt) => {
+      if (
+        !isUuid(jobId) ||
+        !isNotificationProviderCode(providerCode) ||
+        !isDeliveryAttempt(attempt)
+      ) {
+        return "unknown";
+      }
+      try {
+        const { data, error } = await admin
+          .rpc("notification_record_attempt", {
+            p_job_id: jobId,
+            p_provider_code: providerCode,
+            p_result: attempt.result,
+            p_provider_reference:
+              attempt.result === "accepted" ? attempt.reference : null,
+            p_failure_code:
+              attempt.result === "accepted" ? null : attempt.failureCode,
+          })
+          .abortSignal(AbortSignal.timeout(NOTIFICATION_CALL_DEADLINE_MS));
+        return error === null ? notificationRecordOutcomeOf(data) : "unknown";
+      } catch {
+        return "unknown";
+      }
+    },
+    recordEvent: async (event) => {
+      if (!isNotificationEvent(event)) {
+        return UNKNOWN_NOTIFICATION_EVENT;
+      }
+      try {
+        const { data, error } = await admin
+          .rpc("notification_record_provider_event", {
+            p_provider_code: event.providerCode,
+            p_event_reference: event.eventReference,
+            p_event_type: event.eventType,
+            p_occurred_at: event.occurredAt,
+            p_payload_digest: event.payloadDigest,
+            p_observation: event.observation,
+          })
+          .abortSignal(AbortSignal.timeout(NOTIFICATION_CALL_DEADLINE_MS));
+        return error === null
+          ? notificationEventAnswerOf(data)
+          : UNKNOWN_NOTIFICATION_EVENT;
+      } catch {
+        return UNKNOWN_NOTIFICATION_EVENT;
+      }
+    },
+  } satisfies NotificationRecorder);
 }
 
 // MVP-001 S3 part 2 (PS section 13; TA section 30): the AI suggestion

@@ -373,17 +373,24 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // consultation adapter (a failed call, with the call name and how it failed
   // only) and the Daily webhook adapter (each refused, checked or recorded
   // delivery, with a fixed outcome only; never a header, signature, body or
-  // identifier) write lines too.
+  // identifier) write lines too. MVP-001 S10: the attorney and client
+  // notification center pages (a view unavailable, with the route and outcome
+  // only), the communication adapter (a failed call, with the call name and
+  // how it failed only) and the Resend webhook adapter (each refused or
+  // recorded delivery, with a fixed outcome only; never a header, signature,
+  // body, identifier or address) write lines too.
   assert.deepEqual(callers, [
     "app/attorney/consultations/[consultation]/page.tsx",
     "app/attorney/consultations/page.tsx",
     "app/attorney/earnings/page.tsx",
+    "app/attorney/notifications/page.tsx",
     "app/attorney/requests/[request]/page.tsx",
     "app/attorney/requests/page.tsx",
     "app/attorneys/[attorney]/page.tsx",
     "app/client/actions.ts",
     "app/client/consultations/[consultation]/page.tsx",
     "app/client/intakes/[intake]/page.tsx",
+    "app/client/notifications/page.tsx",
     "app/client/page.tsx",
     "app/client/payments/[payment]/page.tsx",
     "app/client/requests/[request]/page.tsx",
@@ -399,12 +406,14 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/staff/verification/actions.ts",
     "src/infrastructure/client/client-intake-adapter.ts",
     "src/infrastructure/client/intake-suggestion-adapter.ts",
+    "src/infrastructure/communications/communication-adapter.ts",
     "src/infrastructure/consultations/consultation-adapter.ts",
     "src/infrastructure/discovery/discovery-adapter.ts",
     "src/infrastructure/identity/authentication-abuse-control.ts",
     "src/infrastructure/identity/authenticator-provider.ts",
     "src/infrastructure/jobs/job-worker-adapter.ts",
     "src/infrastructure/media/daily-webhook.ts",
+    "src/infrastructure/notifications/resend-webhook.ts",
     "src/infrastructure/offers/consultation-offer-adapter.ts",
     "src/infrastructure/payments/payment-adapter.ts",
     "src/infrastructure/payments/stripe-webhook.ts",
