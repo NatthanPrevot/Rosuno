@@ -103,6 +103,19 @@ const S10_MIGRATIONS = Object.freeze([
   "20261126050000_mvp_001_s10_document_versioning.sql",
 ]);
 
+// MVP-001 S11: the seven S11 migrations follow the S10 migrations (applied by
+// this proof as later registered migrations; registered and checked by the
+// S11 proof).
+const S11_MIGRATIONS = Object.freeze([
+  "20261127010000_mvp_001_s11_completion_integrity.sql",
+  "20261127020000_mvp_001_s11_completion.sql",
+  "20261127030000_mvp_001_s11_exception_families.sql",
+  "20261127040000_mvp_001_s11_reviews.sql",
+  "20261127050000_mvp_001_s11_legal_holds.sql",
+  "20261127060000_mvp_001_s11_complaints.sql",
+  "20261127070000_mvp_001_s11_notification_events.sql",
+]);
+
 const report = {
   proof: "MVP-001 S9 disposable local PostgreSQL proof",
   migrations: {},
@@ -455,7 +468,11 @@ function applyMigrations() {
   // S10 proof).
   const s8 = files.indexOf(S8_LAST);
   assert.ok(s8 >= 0, "the last S8 migration is present");
-  assert.deepEqual(files.slice(s8 + 1), [...S9_MIGRATIONS, ...S10_MIGRATIONS]);
+  assert.deepEqual(files.slice(s8 + 1), [
+    ...S9_MIGRATIONS,
+    ...S10_MIGRATIONS,
+    ...S11_MIGRATIONS,
+  ]);
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),
@@ -1864,8 +1881,11 @@ async function migrationChecks() {
         // MVP-001 S10 re-pin: and exactly the readiness notification trigger
         // of the later registered S10 notifications migration
         // (20261126020000), which emits the participants' consultation_ready
-        // Notifications when a Consultation becomes ready.
-        "consultations_change_guard,consultations_media_lifecycle,consultations_no_truncate,consultations_notification_events,consultations_payment_consistency,consultations_relationship_consistency,consultations_set_updated_at,media_rooms_change_guard,media_rooms_no_truncate,media_sessions_change_guard,media_sessions_no_truncate,session_participation_records_append_only,session_participation_records_no_truncate,session_participation_records_participant_consistency",
+        // Notifications when a Consultation becomes ready. MVP-001 S11
+        // re-pin: and exactly the outcome notification trigger
+        // (20261127070000) and the deferred outcome vocabulary check
+        // (20261127010000) of the later registered S11 migrations.
+        "consultations_change_guard,consultations_media_lifecycle,consultations_no_truncate,consultations_notification_events,consultations_outcome_notification_events,consultations_outcome_vocabulary,consultations_payment_consistency,consultations_relationship_consistency,consultations_set_updated_at,media_rooms_change_guard,media_rooms_no_truncate,media_sessions_change_guard,media_sessions_no_truncate,session_participation_records_append_only,session_participation_records_no_truncate,session_participation_records_participant_consistency",
       );
     },
   );

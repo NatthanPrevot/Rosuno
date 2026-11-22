@@ -26,10 +26,15 @@ import {
   type CommunicationActionState,
 } from "../../../src/application/consultation-communication.ts";
 import {
+  cancelClientConsultation,
+  type CancelActionState,
+} from "../../../src/application/consultation-outcomes.ts";
+import {
   joinClientConsultation,
   type JoinActionState,
 } from "../../../src/application/consultations.ts";
 import { CLIENT_COMMUNICATION_SOURCES } from "../../../src/infrastructure/communications/communication-adapter.ts";
+import { CLIENT_OUTCOME_SOURCES } from "../../../src/infrastructure/consultations/completion-adapter.ts";
 import { CLIENT_CONSULTATION_SOURCES } from "../../../src/infrastructure/consultations/consultation-adapter.ts";
 
 export async function joinConsultationAction(
@@ -112,4 +117,31 @@ export async function openDocumentAction(
   formData: FormData,
 ): Promise<CommunicationActionState> {
   return openClientDocument(CLIENT_COMMUNICATION_SOURCES, formData);
+}
+
+// MVP-001 S11: the client cancels one of their own Consultations before it
+// starts. The form names only the Consultation; the use case re-establishes
+// the verified client, checks the environment binding and lets the database
+// decide (the client's own Consultation, its state, the Booking, the room,
+// the attorney's notification and, with a live payment, one review item for
+// a person; no money is moved). The page and the list are refreshed after a
+// cancellation.
+export async function cancelConsultationAction(
+  _previous: CancelActionState,
+  formData: FormData,
+): Promise<CancelActionState> {
+  const state = await cancelClientConsultation(
+    CLIENT_OUTCOME_SOURCES,
+    formData,
+  );
+  const consultation = formData.get("consultation");
+  if (
+    state.status === "outcome" &&
+    typeof consultation === "string" &&
+    /^[0-9a-f-]{36}$/.test(consultation)
+  ) {
+    revalidatePath(`/client/consultations/${consultation}`);
+    revalidatePath("/client/consultations");
+  }
+  return state;
 }

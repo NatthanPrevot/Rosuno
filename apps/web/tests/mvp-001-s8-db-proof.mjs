@@ -104,6 +104,19 @@ const S10_MIGRATIONS = Object.freeze([
   "20261126050000_mvp_001_s10_document_versioning.sql",
 ]);
 
+// MVP-001 S11: the seven S11 migrations follow the S10 migrations (applied by
+// this proof as later registered migrations; registered and checked by the
+// S11 proof).
+const S11_MIGRATIONS = Object.freeze([
+  "20261127010000_mvp_001_s11_completion_integrity.sql",
+  "20261127020000_mvp_001_s11_completion.sql",
+  "20261127030000_mvp_001_s11_exception_families.sql",
+  "20261127040000_mvp_001_s11_reviews.sql",
+  "20261127050000_mvp_001_s11_legal_holds.sql",
+  "20261127060000_mvp_001_s11_complaints.sql",
+  "20261127070000_mvp_001_s11_notification_events.sql",
+]);
+
 const report = {
   proof: "MVP-001 S8 disposable local PostgreSQL proof",
   migrations: {},
@@ -461,6 +474,7 @@ function applyMigrations() {
     ...S8_MIGRATIONS,
     ...S9_MIGRATIONS,
     ...S10_MIGRATIONS,
+    ...S11_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

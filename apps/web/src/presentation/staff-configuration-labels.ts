@@ -94,6 +94,36 @@ export const SURFACE_LINKS: Readonly<
     summary:
       "See transactions, ledger entries and reconciliation exceptions, request refunds, and ask for reconciliation.",
   },
+  // MVP-001 S11.
+  consultations: {
+    href: "/staff/consultations",
+    title: "Consultation operations",
+    summary:
+      "See consultations nobody ended, record their outcome from the attendance evidence, and review operations items.",
+  },
+  reviews: {
+    href: "/staff/reviews",
+    title: "Review moderation",
+    summary:
+      "Read submitted client reviews, publish or reject them, and take a published review down.",
+  },
+  complaints: {
+    href: "/staff/complaints",
+    title: "Complaints",
+    summary:
+      "See reported problems, assign them, and move them through review and escalation.",
+  },
+  "legal-holds": {
+    href: "/staff/legal-holds",
+    title: "Legal Holds",
+    summary: "Place and release Legal Holds, and see which are in force.",
+  },
+  compliance: {
+    href: "/staff/compliance",
+    title: "Compliance review items",
+    summary:
+      "Review the eligibility and jurisdiction changes that affect open requests and consultations.",
+  },
 });
 
 // MVP-001 S2: the operational job states and the groups the job view lists.

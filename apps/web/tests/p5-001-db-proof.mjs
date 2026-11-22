@@ -1027,15 +1027,22 @@ async function privilegeChecks() {
         // S2 operational-jobs migration (20261118010000).
         // MVP-001 S7 re-pin: and exactly the one code of the later registered
         // S7 payment-integrity migration (20261123010000).
+        // MVP-001 S11 re-pin: and exactly the five codes of the later
+        // registered S11 completion-integrity migration (20261127010000).
         [
           "authorize_jurisdiction_launch",
           "manage_attorney_verification",
+          "manage_complaints",
+          "manage_compliance_reviews",
+          "manage_consultation_operations",
           "manage_financial_operations",
           "manage_intake_configuration",
           "manage_jurisdiction_configuration",
+          "manage_legal_holds",
           "manage_operational_jobs",
           "manage_policy_configuration",
           "manage_staff_capabilities",
+          "moderate_reviews",
         ].join(","),
       );
       for (const table of [

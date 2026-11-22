@@ -89,10 +89,20 @@ const GATED_ACTIONS = {
   "app/attorney/consultations/actions.ts": "attorney",
   // MVP-001 S10: the attorney's notification acknowledgement.
   "app/attorney/notifications/actions.ts": "attorney",
+  // MVP-001 S11: the attorney's report of a problem.
+  "app/attorney/complaints/actions.ts": "attorney",
   "app/staff/actions.ts": "staff",
   // MVP-001 S7: the finance workspace changes.
   "app/staff/finance/actions.ts": "staff",
   "app/staff/verification/actions.ts": "staff",
+  // MVP-001 S11: consultation operations (outcome recording and the
+  // operations review items), the compliance review items, review
+  // moderation, the complaint workspace and Legal Holds.
+  "app/staff/consultations/actions.ts": "staff",
+  "app/staff/compliance/actions.ts": "staff",
+  "app/staff/reviews/actions.ts": "staff",
+  "app/staff/complaints/actions.ts": "staff",
+  "app/staff/legal-holds/actions.ts": "staff",
 };
 
 // ---------------------------------------------------------------------------
@@ -185,8 +195,22 @@ test("S2-R3. every attorney page and every staff page asks the step-up gate firs
   // S7: and the attorney's earnings and the three finance pages. MVP-001 S8:
   // and the attorney's request queue and request page. MVP-001 S9: and the
   // attorney's consultation list and consultation page. MVP-001 S10: and the
-  // attorney's notification center.
-  assert.equal(GATED_PAGES.length, 29);
+  // attorney's notification center. MVP-001 S11: and the attorney's reviews
+  // and reported problems, and the seven staff completion pages.
+  assert.equal(GATED_PAGES.length, 38);
+  for (const file of [
+    "app/attorney/reviews/page.tsx",
+    "app/attorney/complaints/page.tsx",
+    "app/staff/consultations/page.tsx",
+    "app/staff/consultations/[consultation]/page.tsx",
+    "app/staff/compliance/page.tsx",
+    "app/staff/reviews/page.tsx",
+    "app/staff/complaints/page.tsx",
+    "app/staff/complaints/[case]/page.tsx",
+    "app/staff/legal-holds/page.tsx",
+  ]) {
+    assert.ok(GATED_PAGES.includes(file), file);
+  }
   assert.ok(GATED_PAGES.includes("app/attorney/notifications/page.tsx"));
   for (const file of [
     "app/attorney/consultations/page.tsx",
@@ -284,20 +308,35 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
     // S10: and the consultation's Message, document upload, grant revocation
     // and document download; and the notification center's one
     // acknowledgement. MVP-001 S10 PS-A5: and the document replacement.
+    // MVP-001 S11: and the consultation's cancellation and early end; the
+    // attorney's report of a problem; the staff outcome recording and the
+    // operations items' assignment and resolution; the compliance items'
+    // assignment and resolution; review moderation; the complaint case step,
+    // classification and resolution; and placing and releasing a Legal Hold.
+    const s11 = {
+      "app/attorney/complaints/actions.ts": 1,
+      "app/staff/consultations/actions.ts": 3,
+      "app/staff/compliance/actions.ts": 2,
+      "app/staff/reviews/actions.ts": 1,
+      "app/staff/complaints/actions.ts": 3,
+      "app/staff/legal-holds/actions.ts": 2,
+    };
     const verification = file === "app/staff/verification/actions.ts";
     const offers = file === "app/attorney/offers/actions.ts";
     const requests = file === "app/attorney/requests/actions.ts";
     const consultations = file === "app/attorney/consultations/actions.ts";
     const notifications = file === "app/attorney/notifications/actions.ts";
-    const expected = verification
-      ? 7
-      : offers || requests
-        ? 2
-        : consultations
-          ? 8
-          : notifications
-            ? 1
-            : 6;
+    const expected = Object.hasOwn(s11, file)
+      ? s11[file]
+      : verification
+        ? 7
+        : offers || requests
+          ? 2
+          : consultations
+            ? 10
+            : notifications
+              ? 1
+              : 6;
     const exported = [...code.matchAll(/^export async function (\w+)\(/gm)];
     assert.equal(exported.length, expected, file);
     assert.equal(

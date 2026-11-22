@@ -760,6 +760,19 @@ const MVP001_STAFF_APP = [
   "app/staff/capabilities/page.tsx",
   "app/staff/catalog/forms.tsx",
   "app/staff/catalog/page.tsx",
+  // MVP-001 S11: the reported problems queue and case, the compliance review
+  // items, the consultation operations (queue and one Consultation), each with
+  // its forms where it has any and its one server action module.
+  "app/staff/complaints/[case]/page.tsx",
+  "app/staff/complaints/actions.ts",
+  "app/staff/complaints/forms.tsx",
+  "app/staff/complaints/page.tsx",
+  "app/staff/compliance/actions.ts",
+  "app/staff/compliance/page.tsx",
+  "app/staff/consultations/[consultation]/page.tsx",
+  "app/staff/consultations/actions.ts",
+  "app/staff/consultations/forms.tsx",
+  "app/staff/consultations/page.tsx",
   // MVP-001 S7: the finance workspace (payments, one payment, exceptions),
   // its forms and its one server action module.
   "app/staff/finance/[payment]/page.tsx",
@@ -782,11 +795,23 @@ const MVP001_STAFF_APP = [
   "app/staff/launch/[jurisdiction]/page.tsx",
   "app/staff/launch/forms.tsx",
   "app/staff/launch/page.tsx",
+  // MVP-001 S11: the Legal Holds page, its forms and its server action module.
+  "app/staff/legal-holds/actions.ts",
+  "app/staff/legal-holds/forms.tsx",
+  "app/staff/legal-holds/page.tsx",
   "app/staff/outcome.tsx",
   "app/staff/page.tsx",
   "app/staff/policies/[version]/page.tsx",
   "app/staff/policies/forms.tsx",
   "app/staff/policies/page.tsx",
+  // MVP-001 S11: the shared review item list (a server module) and its
+  // controls (a client module), and the review moderation page, its forms and
+  // its server action module.
+  "app/staff/review-item-list.tsx",
+  "app/staff/review-items.tsx",
+  "app/staff/reviews/actions.ts",
+  "app/staff/reviews/forms.tsx",
+  "app/staff/reviews/page.tsx",
 ];
 
 // MVP-001 D-4: the verification queue page reads exactly one query value,

@@ -170,6 +170,15 @@ export default async function ClientWorkspacePage({
           </Alert>
         )}
         <Cluster>
+          <ButtonLink variant="secondary" href="/client/consultations">
+            Your consultations
+          </ButtonLink>
+          <ButtonLink variant="secondary" href="/client/reviews">
+            Your reviews
+          </ButtonLink>
+          <ButtonLink variant="secondary" href="/client/complaints">
+            Report a problem
+          </ButtonLink>
           <ButtonLink variant="secondary" href="/client/notifications">
             Notifications
           </ButtonLink>

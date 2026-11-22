@@ -910,7 +910,10 @@ test("J-I12. the route and the adapter stay narrow: exact imports, no cookie, se
   // payment attempt is created, and (MVP-001 S9) the consultation adapter,
   // for one bounded drain while a consultation room is being prepared, and
   // (MVP-001 S10) the communication adapter, for one bounded drain after a
-  // Message or a shared document (the recipient's email Notification).
+  // Message or a shared document (the recipient's email Notification), and
+  // (MVP-001 S11) the completion adapter, for one bounded drain after a
+  // cancellation, an early completion or a staff outcome (the room's closing,
+  // a provider release and the notification emails).
   const importers = [...filesIn("app/"), ...filesIn("src/")].filter(
     (file) =>
       /\.tsx?$/.test(file) &&
@@ -921,6 +924,7 @@ test("J-I12. the route and the adapter stay narrow: exact imports, no cookie, se
   assert.deepEqual(importers, [
     "app/api/jobs/run/route.ts",
     "src/infrastructure/communications/communication-adapter.ts",
+    "src/infrastructure/consultations/completion-adapter.ts",
     "src/infrastructure/consultations/consultation-adapter.ts",
     "src/infrastructure/jobs/after-commit.ts",
     "src/infrastructure/payments/payment-adapter.ts",

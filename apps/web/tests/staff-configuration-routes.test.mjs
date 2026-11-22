@@ -101,6 +101,28 @@ const CONFIGURATION_FILES = [
   "app/staff/policies/page.tsx",
 ];
 
+// MVP-001 S11: the completion workspaces' staff files.
+const S11_STAFF_FILES = [
+  "app/staff/complaints/[case]/page.tsx",
+  "app/staff/complaints/actions.ts",
+  "app/staff/complaints/forms.tsx",
+  "app/staff/complaints/page.tsx",
+  "app/staff/compliance/actions.ts",
+  "app/staff/compliance/page.tsx",
+  "app/staff/consultations/[consultation]/page.tsx",
+  "app/staff/consultations/actions.ts",
+  "app/staff/consultations/forms.tsx",
+  "app/staff/consultations/page.tsx",
+  "app/staff/legal-holds/actions.ts",
+  "app/staff/legal-holds/forms.tsx",
+  "app/staff/legal-holds/page.tsx",
+  "app/staff/review-item-list.tsx",
+  "app/staff/review-items.tsx",
+  "app/staff/reviews/actions.ts",
+  "app/staff/reviews/forms.tsx",
+  "app/staff/reviews/page.tsx",
+];
+
 // Each list page: its use case. Each reads exactly one query value, page.
 const LIST_PAGES = {
   "app/staff/policies/page.tsx": "resolvePolicyWorkspace",
@@ -138,9 +160,56 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
     filesIn("app/staff/").filter(
       (f) =>
         !f.startsWith("app/staff/verification/") &&
-        !f.startsWith("app/staff/finance/"),
+        !f.startsWith("app/staff/finance/") &&
+        !S11_STAFF_FILES.includes(f),
     ),
     CONFIGURATION_FILES,
+  );
+  // MVP-001 S11: the completion workspaces are their own staff surfaces
+  // (their own sources and use cases, like finance), admitted by their exact
+  // files: server pages rendered per request and unindexed that read the
+  // completion adapter's sources and nothing this list forbids, client form
+  // modules that import no infrastructure, and server action modules.
+  assert.deepEqual(
+    filesIn("app/staff/").filter((f) => S11_STAFF_FILES.includes(f)),
+    S11_STAFF_FILES,
+  );
+  for (const file of S11_STAFF_FILES.filter((f) => f.endsWith("page.tsx"))) {
+    const source = read(file);
+    const code = codeOf(source);
+    assert.doesNotMatch(source, /["']use (?:client|server)["']/, file);
+    assert.match(code, /robots: \{ index: false, follow: false \},/, file);
+    assert.ok(code.indexOf("await connection();") > 0, file);
+    assert.doesNotMatch(code, FORBIDDEN_IN_PAGES, file);
+    assert.doesNotMatch(code, /STAFF_CONFIGURATION_SOURCES/, file);
+    assert.match(
+      code,
+      /from "(?:\.\.\/)+src\/infrastructure\/consultations\/completion-adapter\.ts";/,
+      file,
+    );
+  }
+  for (const file of S11_STAFF_FILES.filter((f) => f.endsWith("actions.ts"))) {
+    assert.match(read(file), /^"use server";\n/, file);
+  }
+  for (const file of [
+    ...S11_STAFF_FILES.filter((f) => f.endsWith("forms.tsx")),
+    "app/staff/review-items.tsx",
+  ]) {
+    assert.match(read(file), /^"use client";\n/, file);
+    assert.ok(
+      importsOf(read(file)).every(
+        (specifier) => !/infrastructure/.test(specifier),
+      ),
+      file,
+    );
+  }
+  assert.doesNotMatch(
+    read("app/staff/review-item-list.tsx"),
+    /["']use (?:client|server)["']/,
+  );
+  assert.doesNotMatch(
+    codeOf(read("app/staff/review-item-list.tsx")),
+    FORBIDDEN_IN_PAGES,
   );
   assert.deepEqual(filesIn("app/staff/finance/"), [
     "app/staff/finance/[payment]/page.tsx",

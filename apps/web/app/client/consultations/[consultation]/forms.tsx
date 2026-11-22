@@ -19,9 +19,18 @@ import {
   type CommunicationActionState,
 } from "../../../../src/application/consultation-communication.ts";
 import {
+  INITIAL_CANCEL_STATE,
+  type CancelActionState,
+} from "../../../../src/application/consultation-outcomes.ts";
+import {
   INITIAL_JOIN_STATE,
   type JoinActionState,
 } from "../../../../src/application/consultations.ts";
+import {
+  CANCEL_MESSAGES,
+  CANCEL_NOTE,
+  messageOf,
+} from "../../../../src/presentation/completion-labels.ts";
 import {
   communicationMessage,
   DOCUMENT_FIELD_HINT,
@@ -50,10 +59,12 @@ import {
   Cluster,
   MediaFrame,
   Stack,
+  Text,
   TextAreaField,
   TextField,
 } from "../../../../src/presentation/design-system.tsx";
 import {
+  cancelConsultationAction,
   joinConsultationAction,
   openDocumentAction,
   replaceDocumentAction,
@@ -299,6 +310,55 @@ export function DocumentControls({
           </form>
         ) : null}
       </Cluster>
+    </Stack>
+  );
+}
+
+// MVP-001 S11: the client cancels before the consultation starts. A hidden
+// field only names the Consultation; the server decides afresh whether it is
+// the client's own and whether it can still be cancelled, frees the booked
+// time, closes the room and tells the attorney. No money moves here.
+export function CancelPanel({
+  consultationId,
+  cancellable,
+}: {
+  readonly consultationId: string;
+  // Whether the page reports the Consultation cancellable; the panel stays
+  // mounted after a cancellation refreshes the page, so the fixed outcome
+  // message stays in view.
+  readonly cancellable: boolean;
+}) {
+  const [state, action, pending] = useActionState<CancelActionState, FormData>(
+    cancelConsultationAction,
+    INITIAL_CANCEL_STATE,
+  );
+  const message = messageOf(state, CANCEL_MESSAGES);
+  return (
+    <Stack gap="tight">
+      {message === null ? null : (
+        <Alert
+          tone={message.tone}
+          title={message.title}
+          role={message.tone === "error" ? "alert" : "status"}
+        >
+          {message.body}
+        </Alert>
+      )}
+      {cancellable ? (
+        <form action={action}>
+          <Stack gap="tight">
+            <Text size="small" tone="muted">
+              {CANCEL_NOTE}
+            </Text>
+            <input type="hidden" name="consultation" value={consultationId} />
+            <Cluster>
+              <Button variant="secondary" type="submit" disabled={pending}>
+                Cancel the consultation
+              </Button>
+            </Cluster>
+          </Stack>
+        </form>
+      ) : null}
     </Stack>
   );
 }

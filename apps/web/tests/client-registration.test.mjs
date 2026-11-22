@@ -3020,6 +3020,45 @@ const COMMUNICATION_RPCS = Object.freeze([
   "document_begin_replacement",
   "document_finalize_replacement",
 ]);
+// MVP-001 S11: the completion adapter calls the database's own participant
+// cancellation and early completion, the client's Consultation list, the
+// staff consultation operations (the stale queue, one Consultation, outcome
+// recording and one family's review items), the review functions (the
+// client's and the attorney's reads, the moderation queue, the public read,
+// submission and moderation), the complaint functions (the complainant's
+// list, the staff queue and case, intake, the case steps, classification and
+// resolution), the Legal Hold functions (the list, placing and releasing) and
+// the PS-A2 environment accessor (checked before a change), each exactly once
+// and each as a literal call through the request's own unprivileged session;
+// it builds or receives no privileged client, and no other file names any of
+// the twenty-three functions.
+const COMPLETION_ADAPTER =
+  "src/infrastructure/consultations/completion-adapter.ts";
+const COMPLETION_RPCS = Object.freeze([
+  "client_consultations",
+  "consultation_cancel",
+  "consultation_end_early",
+  "staff_stale_consultations",
+  "staff_consultation",
+  "staff_review_exceptions",
+  "staff_record_consultation_outcome",
+  "client_reviews",
+  "attorney_reviews",
+  "staff_review_queue",
+  "public_attorney_reviews",
+  "review_submit",
+  "staff_moderate_review",
+  "complaint_cases_mine",
+  "staff_complaint_queue",
+  "staff_complaint_case",
+  "complaint_open",
+  "staff_update_complaint",
+  "staff_classify_complaint",
+  "staff_resolve_complaint",
+  "staff_legal_holds",
+  "staff_place_legal_hold",
+  "staff_release_legal_hold",
+]);
 const PAYMENT_ADAPTER = "src/infrastructure/payments/payment-adapter.ts";
 const PAYMENT_RPCS = Object.freeze([
   "client_request_payment",
@@ -3089,6 +3128,9 @@ const RPC_OCCURRENCES = Object.freeze({
   // (PS-A5: and the three versioning functions), plus the environment
   // accessor.
   [COMMUNICATION_ADAPTER]: COMMUNICATION_RPCS.length + 1,
+  // MVP-001 S11: the twenty-three completion functions, plus the environment
+  // accessor.
+  [COMPLETION_ADAPTER]: COMPLETION_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -3306,6 +3348,33 @@ function assertQuotaRpcContract(codes) {
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
       );
     }
+    // MVP-001 S11: the completion functions, as for the communication
+    // functions.
+    for (const name of COMPLETION_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === COMPLETION_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== COMPLETION_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === COMPLETION_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        COMPLETION_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
     // MVP-001 S7: the payment functions, as for the offer functions.
     for (const name of PAYMENT_RPCS) {
       assert.equal(
@@ -3353,7 +3422,8 @@ function assertQuotaRpcContract(codes) {
         file === PAYMENT_ADAPTER ||
         file === ATTORNEY_REQUEST_ADAPTER ||
         file === CONSULTATION_ADAPTER ||
-        file === COMMUNICATION_ADAPTER
+        file === COMMUNICATION_ADAPTER ||
+        file === COMPLETION_ADAPTER
         ? 1
         : 0,
       file,

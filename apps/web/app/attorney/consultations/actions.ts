@@ -28,6 +28,12 @@ import {
   type CommunicationActionState,
 } from "../../../src/application/consultation-communication.ts";
 import {
+  cancelAttorneyConsultation,
+  endConsultationEarly,
+  type CancelActionState,
+  type EndEarlyActionState,
+} from "../../../src/application/consultation-outcomes.ts";
+import {
   endConsultation,
   joinAttorneyConsultation,
   startConsultation,
@@ -35,11 +41,17 @@ import {
   type JoinActionState,
 } from "../../../src/application/consultations.ts";
 import { ATTORNEY_COMMUNICATION_SOURCES } from "../../../src/infrastructure/communications/communication-adapter.ts";
+import { ATTORNEY_OUTCOME_SOURCES } from "../../../src/infrastructure/consultations/completion-adapter.ts";
 import { ATTORNEY_CONSULTATION_SOURCES } from "../../../src/infrastructure/consultations/consultation-adapter.ts";
 import { stepUpRefusal } from "../../account/gate.ts";
 
 async function gated<
-  State extends JoinActionState | CommandActionState | CommunicationActionState,
+  State extends
+    | JoinActionState
+    | CommandActionState
+    | CommunicationActionState
+    | CancelActionState
+    | EndEarlyActionState,
 >(
   operation: () => Promise<State>,
 ): Promise<State | Exclude<Awaited<ReturnType<typeof stepUpRefusal>>, null>> {
@@ -157,4 +169,49 @@ export async function openDocumentAction(
   return gated(() =>
     openAttorneyDocument(ATTORNEY_COMMUNICATION_SOURCES, formData),
   );
+}
+
+// MVP-001 S11: the attorney cancels one of their own Consultations before it
+// starts, or records that a live one ended early by agreement (before its
+// nominal end). Both go through the same guarded helper; the database decides
+// again (the attorney's own Consultation at aal2, the state, the nominal end,
+// the Booking, the room, the client's notification and every payment
+// consequence: a cancellation moves no money and opens one review item for a
+// person when a payment is live; an early end follows the normal end's
+// payment rule and refunds nothing). The Consultation page is refreshed.
+
+export async function cancelConsultationAction(
+  _previous: CancelActionState,
+  formData: FormData,
+): Promise<CancelActionState> {
+  return gated(() =>
+    cancelAttorneyConsultation(ATTORNEY_OUTCOME_SOURCES, formData).then(
+      (state) => refreshedOutcome(formData, state),
+    ),
+  );
+}
+
+export async function endEarlyAction(
+  _previous: EndEarlyActionState,
+  formData: FormData,
+): Promise<EndEarlyActionState> {
+  return gated(() =>
+    endConsultationEarly(ATTORNEY_OUTCOME_SOURCES, formData).then((state) =>
+      refreshedOutcome(formData, state),
+    ),
+  );
+}
+
+function refreshedOutcome<
+  State extends CancelActionState | EndEarlyActionState,
+>(formData: FormData, state: State): State {
+  const consultation = formData.get("consultation");
+  if (
+    state.status === "outcome" &&
+    typeof consultation === "string" &&
+    /^[0-9a-f-]{36}$/.test(consultation)
+  ) {
+    revalidatePath(`/attorney/consultations/${consultation}`);
+  }
+  return state;
 }

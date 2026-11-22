@@ -12,13 +12,19 @@
 // the platform currently offers; for a chosen jurisdiction only those priced
 // there), each amount with its currency code and the currency's own decimal
 // places. They are listed in the database's own order; nothing is ranked or
-// recommended.
+// recommended. MVP-001 S11: the attorney's published Verified Client Reviews
+// (rating, text and publication date only; never a client or a Consultation)
+// with their count and average, which the database computes at read time
+// over every published review (no aggregate is stored, PS P3). When they
+// cannot be read, the profile is shown without them.
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
 import { resolveAttorneyProfile } from "../../../src/application/discovery.ts";
+import { resolvePublicReviews } from "../../../src/application/reviews.ts";
+import { PUBLIC_REVIEW_SOURCES } from "../../../src/infrastructure/consultations/completion-adapter.ts";
 import { DISCOVERY_SOURCES } from "../../../src/infrastructure/discovery/discovery-adapter.ts";
 import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";
 import {
@@ -42,6 +48,10 @@ import {
   WINDOWS_NOTE,
   yearsText,
 } from "../../../src/presentation/discovery-labels.ts";
+import {
+  PUBLIC_REVIEWS_NOTE,
+  RATING_LABELS,
+} from "../../../src/presentation/completion-labels.ts";
 import { PublicFrame } from "../../../src/presentation/public-site.tsx";
 
 export const metadata: Metadata = {
@@ -84,6 +94,7 @@ export default async function AttorneyProfilePage({
   }
   const { profile, jurisdictionId, offers } = view;
   const years = yearsText(profile.yearsExperience);
+  const reviews = await resolvePublicReviews(PUBLIC_REVIEW_SOURCES, attorney);
   return (
     <PublicFrame title={profile.displayName} titleId="profile-title">
       {profile.headline === null ? null : (
@@ -131,6 +142,32 @@ export default async function AttorneyProfilePage({
           </>
         )}
       </Stack>
+      {reviews === null || reviews.count === 0 ? null : (
+        <Stack gap="tight">
+          <Heading as="h2" size="md">
+            Client reviews
+          </Heading>
+          <Text>
+            {`${reviews.count} published ${reviews.count === 1 ? "review" : "reviews"}${
+              reviews.average === null
+                ? ""
+                : `, average rating ${reviews.average.toFixed(1)} of 5`
+            }`}
+          </Text>
+          <Text tone="muted">{PUBLIC_REVIEWS_NOTE}</Text>
+          {reviews.reviews.map((review, index) => (
+            <Stack key={`${review.publishedAt}-${index}`} gap="tight">
+              <Text>{`Rating: ${RATING_LABELS[review.rating]}`}</Text>
+              {review.text === null ? null : (
+                <Text size="small">{review.text}</Text>
+              )}
+              <Text size="small" tone="muted">
+                {`Published ${utcText(review.publishedAt)}`}
+              </Text>
+            </Stack>
+          ))}
+        </Stack>
+      )}
       <Stack gap="tight">
         <Heading as="h2" size="md">
           Open times

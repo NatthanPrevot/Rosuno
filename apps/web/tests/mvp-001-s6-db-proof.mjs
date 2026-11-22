@@ -129,6 +129,19 @@ const S10_MIGRATIONS = Object.freeze([
   "20261126050000_mvp_001_s10_document_versioning.sql",
 ]);
 
+// MVP-001 S11: the seven S11 migrations follow the S10 migrations (applied by
+// this proof as later registered migrations; registered and checked by the
+// S11 proof).
+const S11_MIGRATIONS = Object.freeze([
+  "20261127010000_mvp_001_s11_completion_integrity.sql",
+  "20261127020000_mvp_001_s11_completion.sql",
+  "20261127030000_mvp_001_s11_exception_families.sql",
+  "20261127040000_mvp_001_s11_reviews.sql",
+  "20261127050000_mvp_001_s11_legal_holds.sql",
+  "20261127060000_mvp_001_s11_complaints.sql",
+  "20261127070000_mvp_001_s11_notification_events.sql",
+]);
+
 const report = {
   proof: "MVP-001 S6 disposable local PostgreSQL proof",
   migrations: {},
@@ -460,6 +473,7 @@ function applyMigrations() {
     ...S8_MIGRATIONS,
     ...S9_MIGRATIONS,
     ...S10_MIGRATIONS,
+    ...S11_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -1525,10 +1539,14 @@ async function inventoryChecks() {
       const executable = sql(
         "select string_agg(p.oid::regprocedure::text, ';' order by p.oid::regprocedure::text) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'EXECUTE');",
       ).split(";");
+      // MVP-001 S11 re-pin: and exactly the public read of an attorney's
+      // published reviews of the later registered S11 reviews migration
+      // (20261127040000).
       assert.deepEqual(executable, [
         "public_attorney_directory(uuid,uuid,text,integer)",
         "public_attorney_offers(uuid,uuid)",
         "public_attorney_profile(uuid,uuid)",
+        "public_attorney_reviews(uuid)",
         "public_discovery_filters()",
       ]);
       assert.equal(

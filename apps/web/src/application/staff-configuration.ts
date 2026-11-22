@@ -101,6 +101,13 @@ export const STAFF_CAPABILITIES = Object.freeze([
   "manage_operational_jobs",
   // MVP-001 S7: the finance workspace.
   "manage_financial_operations",
+  // MVP-001 S11: consultation operations, review moderation, complaint
+  // handling, Legal Holds and the compliance review items.
+  "manage_consultation_operations",
+  "moderate_reviews",
+  "manage_complaints",
+  "manage_legal_holds",
+  "manage_compliance_reviews",
 ] as const);
 export type StaffCapability = (typeof STAFF_CAPABILITIES)[number];
 
@@ -117,6 +124,12 @@ export const STAFF_SURFACES = Object.freeze([
   "jobs",
   // MVP-001 S7.
   "finance",
+  // MVP-001 S11.
+  "consultations",
+  "reviews",
+  "complaints",
+  "legal-holds",
+  "compliance",
 ] as const);
 export type StaffSurface = (typeof STAFF_SURFACES)[number];
 
@@ -1485,6 +1498,38 @@ export async function verifiedStaffWith(
   }
 }
 
+// MVP-001 S11: the caller's verified staff identity holding one capability
+// in some scope (a global grant or a grant for any jurisdiction), for a staff
+// surface whose rows the database scopes by jurisdiction itself, with
+// whether the grant held is the global one; or the fixed refusal. The same
+// checks as every surface here.
+export async function verifiedStaffWithAny(
+  sources: ConfigurationSources,
+  capability: StaffCapability,
+): Promise<{ readonly userId: string; readonly global: boolean } | Refusal> {
+  try {
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE;
+    }
+    const staff = await staffOf(sources, reads);
+    if (!("userId" in staff)) {
+      return staff;
+    }
+    const any = await holds(reads, capability, null, true);
+    if (any === null) {
+      return UNAVAILABLE;
+    }
+    if (!any) {
+      return DENIED;
+    }
+    const global = await holds(reads, capability, null, false);
+    return global === null ? UNAVAILABLE : { userId: staff.userId, global };
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
 // Who recorded something, as far as the caller needs to know.
 export type Who = "you" | "another staff member";
 function whoOf(userId: string | null, me: string): Who | null {
@@ -1536,6 +1581,15 @@ export async function resolveStaffHome(
       ["manage_intake_configuration", true],
       // MVP-001 S7: the finance workspace (global grant only).
       ["manage_financial_operations", false],
+      // MVP-001 S11: consultation operations, review moderation and
+      // complaint handling in any scope (the database scopes their rows by
+      // jurisdiction); Legal Holds need the global grant.
+      ["manage_consultation_operations", true],
+      ["moderate_reviews", true],
+      ["manage_complaints", true],
+      ["manage_legal_holds", false],
+      // MVP-001 S11: the compliance review items (global grant only).
+      ["manage_compliance_reviews", false],
     ];
     const answers: boolean[] = [];
     for (const [capability, anyJurisdiction] of asked) {
@@ -1556,6 +1610,11 @@ export async function resolveStaffHome(
       jobs,
       review,
       finance,
+      consultations,
+      reviews,
+      complaints,
+      legalHolds,
+      compliance,
     ] = answers;
     const held: Readonly<Record<StaffSurface, boolean>> = {
       verification: verify,
@@ -1568,6 +1627,11 @@ export async function resolveStaffHome(
       "jurisdiction-review": review,
       jobs,
       finance,
+      consultations,
+      reviews,
+      complaints,
+      "legal-holds": legalHolds,
+      compliance,
     };
     return Object.freeze({
       status: "ready",

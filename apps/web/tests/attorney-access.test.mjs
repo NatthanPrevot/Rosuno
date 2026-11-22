@@ -1154,7 +1154,10 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
   // state, right after the requests (that page decides its own access too).
   // MVP-001 S10 admits exactly one more: the attorney's notification center,
   // linked once, from the granted state, right after the consultations (that
-  // page decides its own access too).
+  // page decides its own access too). MVP-001 S11 admits exactly two more:
+  // the attorney's published reviews and reported problems, each linked once,
+  // from the granted state, right after the consultations (each page decides
+  // its own access too).
   assert.deepEqual(
     [...new Set([...code.matchAll(/href="([^"]*)"/g)].map((m) => m[1]))],
     [
@@ -1164,6 +1167,8 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
       "/attorney/earnings",
       "/attorney/requests",
       "/attorney/consultations",
+      "/attorney/reviews",
+      "/attorney/complaints",
       "/attorney/notifications",
       "/",
       "/sign-in",
@@ -1177,6 +1182,8 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
   assert.equal(code.match(/href="\/attorney\/requests"/g).length, 1);
   assert.equal(code.match(/href="\/attorney\/consultations"/g).length, 1);
   assert.equal(code.match(/href="\/attorney\/notifications"/g).length, 1);
+  assert.equal(code.match(/href="\/attorney\/reviews"/g).length, 1);
+  assert.equal(code.match(/href="\/attorney\/complaints"/g).length, 1);
   assert.equal(code.match(/href="\/attorney\/apply"/g).length, 1);
   assert.doesNotMatch(code, /href=\{/);
   // Design-system primitives and native table structure only.
@@ -1435,6 +1442,13 @@ const CONSULTATIONS_LINK =
 // the six.
 const NOTIFICATIONS_LINK =
   '<a class="rs-button" data-variant="secondary" href="/attorney/notifications">Notifications</a>';
+// MVP-001 S11: the two fixed links the granted page offers to the
+// attorney's published reviews and reported problems (each decides its own
+// access), in exactly this form, right after the consultations link.
+const REVIEWS_LINK =
+  '<a class="rs-button" data-variant="secondary" href="/attorney/reviews">Reviews</a>';
+const COMPLAINTS_LINK =
+  '<a class="rs-button" data-variant="secondary" href="/attorney/complaints">Report a problem</a>';
 const GRANTED_TITLE = "Restricted attorney workspace";
 
 function assertFrame(html, title, name) {
@@ -1445,6 +1459,8 @@ function assertFrame(html, title, name) {
     assert.equal(html.includes("/attorney/requests"), false, name);
     assert.equal(html.includes("/attorney/consultations"), false, name);
     assert.equal(html.includes("/attorney/notifications"), false, name);
+    assert.equal(html.includes("/attorney/reviews"), false, name);
+    assert.equal(html.includes("/attorney/complaints"), false, name);
     assert.equal(html.split(APPLICATION_ENTRY_LINK).length, 2, name);
     assertFrameOf(html.replace(APPLICATION_ENTRY_LINK, ""), title, name);
     return;
@@ -1457,9 +1473,11 @@ function assertFrame(html, title, name) {
     assert.equal(html.split(REQUESTS_LINK).length, 2, name);
     assert.equal(html.split(CONSULTATIONS_LINK).length, 2, name);
     assert.equal(html.split(NOTIFICATIONS_LINK).length, 2, name);
+    assert.equal(html.split(REVIEWS_LINK).length, 2, name);
+    assert.equal(html.split(COMPLAINTS_LINK).length, 2, name);
     assert.ok(
       html.includes(
-        `${SCHEDULE_LINK}${OFFERS_LINK}${EARNINGS_LINK}${REQUESTS_LINK}${CONSULTATIONS_LINK}${NOTIFICATIONS_LINK}`,
+        `${SCHEDULE_LINK}${OFFERS_LINK}${EARNINGS_LINK}${REQUESTS_LINK}${CONSULTATIONS_LINK}${REVIEWS_LINK}${COMPLAINTS_LINK}${NOTIFICATIONS_LINK}`,
       ),
       name,
     );
@@ -1470,6 +1488,8 @@ function assertFrame(html, title, name) {
         .replace(EARNINGS_LINK, "")
         .replace(REQUESTS_LINK, "")
         .replace(CONSULTATIONS_LINK, "")
+        .replace(REVIEWS_LINK, "")
+        .replace(COMPLAINTS_LINK, "")
         .replace(NOTIFICATIONS_LINK, ""),
       title,
       name,
@@ -1482,6 +1502,8 @@ function assertFrame(html, title, name) {
   assert.equal(html.includes("/attorney/requests"), false, name);
   assert.equal(html.includes("/attorney/consultations"), false, name);
   assert.equal(html.includes("/attorney/notifications"), false, name);
+  assert.equal(html.includes("/attorney/reviews"), false, name);
+  assert.equal(html.includes("/attorney/complaints"), false, name);
   assertFrameOf(html, title, name);
 }
 
@@ -1559,6 +1581,8 @@ test("14. the route renders a restricted entry for each admitted stage that keep
         "/attorney/earnings",
         "/attorney/requests",
         "/attorney/consultations",
+        "/attorney/reviews",
+        "/attorney/complaints",
         "/attorney/notifications",
         "/",
       ],

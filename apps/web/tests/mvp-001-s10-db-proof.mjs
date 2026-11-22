@@ -96,6 +96,18 @@ const S10_MIGRATIONS = Object.freeze([
   "20261126040000_mvp_001_s10_documents.sql",
   "20261126050000_mvp_001_s10_document_versioning.sql",
 ]);
+// MVP-001 S11: the seven S11 migrations follow the S10 migrations (applied by
+// this proof as later registered migrations; registered and checked by the
+// S11 proof).
+const S11_MIGRATIONS = Object.freeze([
+  "20261127010000_mvp_001_s11_completion_integrity.sql",
+  "20261127020000_mvp_001_s11_completion.sql",
+  "20261127030000_mvp_001_s11_exception_families.sql",
+  "20261127040000_mvp_001_s11_reviews.sql",
+  "20261127050000_mvp_001_s11_legal_holds.sql",
+  "20261127060000_mvp_001_s11_complaints.sql",
+  "20261127070000_mvp_001_s11_notification_events.sql",
+]);
 // The one migration that adds the PS-A5 column (its constraints and index).
 const S10_VERSIONING = "20261126050000_mvp_001_s10_document_versioning.sql";
 
@@ -449,7 +461,7 @@ function applyMigrations() {
   // registered unreviewed (sequences 50 to 54) and applied nowhere.
   const s9 = files.indexOf(S9_LAST);
   assert.ok(s9 >= 0, "the last S9 migration is present");
-  assert.deepEqual(files.slice(s9 + 1), [...S10_MIGRATIONS]);
+  assert.deepEqual(files.slice(s9 + 1), [...S10_MIGRATIONS, ...S11_MIGRATIONS]);
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),
@@ -1689,6 +1701,11 @@ const EXPECTED_TRIGGERS = [
   "consultations.consultations_media_lifecycle",
   "consultations.consultations_no_truncate",
   "consultations.consultations_notification_events",
+  // MVP-001 S11 re-pin: exactly the outcome notification trigger
+  // (20261127070000) and the deferred outcome vocabulary check
+  // (20261127010000) of the later registered S11 migrations.
+  "consultations.consultations_outcome_notification_events",
+  "consultations.consultations_outcome_vocabulary",
   "consultations.consultations_payment_consistency",
   "consultations.consultations_relationship_consistency",
   "consultations.consultations_set_updated_at",

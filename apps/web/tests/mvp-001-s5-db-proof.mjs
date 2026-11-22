@@ -416,6 +416,15 @@ function applyMigrations() {
     "20261126040000_mvp_001_s10_documents.sql",
     // MVP-001 S10 (PS-A5): the document version lineage.
     "20261126050000_mvp_001_s10_document_versioning.sql",
+    // MVP-001 S11: the seven S11 migrations (registered and checked by the
+    // S11 proof).
+    "20261127010000_mvp_001_s11_completion_integrity.sql",
+    "20261127020000_mvp_001_s11_completion.sql",
+    "20261127030000_mvp_001_s11_exception_families.sql",
+    "20261127040000_mvp_001_s11_reviews.sql",
+    "20261127050000_mvp_001_s11_legal_holds.sql",
+    "20261127060000_mvp_001_s11_complaints.sql",
+    "20261127070000_mvp_001_s11_notification_events.sql",
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -1207,9 +1216,12 @@ async function inventoryChecks() {
       ).split(";");
       // MVP-001 S6 PS-A3 (20261122040000): the public offer read is the one
       // further anon function (inventoried by the S6 proofs).
+      // MVP-001 S11 (20261127040000): and exactly the public read of an
+      // attorney's published reviews (inventoried by the S11 proof).
       const expected = [
         ...Object.keys(PUBLIC_FUNCTIONS),
         "public_attorney_offers(uuid, uuid)",
+        "public_attorney_reviews(uuid)",
       ]
         .map((signature) =>
           sql(`select 'public.${signature}'::regprocedure::text;`),

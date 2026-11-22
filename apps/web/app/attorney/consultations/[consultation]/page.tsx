@@ -29,6 +29,10 @@ import {
   type CommunicationView,
   type HistoryView,
 } from "../../../../src/application/consultation-communication.ts";
+import {
+  cancellable,
+  earlyEndOffered,
+} from "../../../../src/application/consultation-outcomes.ts";
 import { resolveAttorneyConsultation } from "../../../../src/application/consultations.ts";
 import { ATTORNEY_COMMUNICATION_SOURCES } from "../../../../src/infrastructure/communications/communication-adapter.ts";
 import { ATTORNEY_CONSULTATION_SOURCES } from "../../../../src/infrastructure/consultations/consultation-adapter.ts";
@@ -88,8 +92,10 @@ import {
   Text,
 } from "../../../../src/presentation/design-system.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
+import { outcomeLabelOf } from "../../../../src/presentation/completion-labels.ts";
 import {
   CommandPanel,
+  CompletionPanel,
   DocumentControls,
   DocumentReplace,
   DocumentUpload,
@@ -470,7 +476,11 @@ export default async function AttorneyConsultationPage({
           {record.outcomeCode === null ? null : (
             <tr>
               <th scope="row">How it ended</th>
-              <td>{COMPLETION_LABELS[record.outcomeCode] ?? "Ended"}</td>
+              <td>
+                {outcomeLabelOf(record.outcomeCode) ??
+                  COMPLETION_LABELS[record.outcomeCode] ??
+                  "Ended"}
+              </td>
             </tr>
           )}
           {record.mediaState === null ? null : (
@@ -487,6 +497,19 @@ export default async function AttorneyConsultationPage({
         startable={view.startable}
         endable={view.endable}
       />
+      <CompletionPanel
+        consultationId={record.id}
+        cancellable={cancellable(record.state)}
+        endableEarly={earlyEndOffered(record, Date.now())}
+      />
+      <Cluster>
+        <ButtonLink
+          variant="tertiary"
+          href={`/attorney/complaints?consultation=${record.id}`}
+        >
+          Report a problem
+        </ButtonLink>
+      </Cluster>
       <Table
         id="attorney-consultation-attendance"
         caption="Attendance recorded"

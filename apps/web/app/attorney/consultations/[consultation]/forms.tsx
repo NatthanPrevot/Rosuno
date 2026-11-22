@@ -19,6 +19,12 @@ import {
   type CommunicationActionState,
 } from "../../../../src/application/consultation-communication.ts";
 import {
+  INITIAL_CANCEL_STATE,
+  INITIAL_END_EARLY_STATE,
+  type CancelActionState,
+  type EndEarlyActionState,
+} from "../../../../src/application/consultation-outcomes.ts";
+import {
   INITIAL_COMMAND_STATE,
   INITIAL_JOIN_STATE,
   type CommandActionState,
@@ -50,16 +56,26 @@ import {
   START_LABEL,
 } from "../../../../src/presentation/consultation-labels.ts";
 import {
+  CANCEL_MESSAGES,
+  CANCEL_NOTE,
+  END_EARLY_MESSAGES,
+  END_EARLY_NOTE,
+  messageOf,
+} from "../../../../src/presentation/completion-labels.ts";
+import {
   Alert,
   Button,
   Cluster,
   MediaFrame,
   Stack,
+  Text,
   TextAreaField,
   TextField,
 } from "../../../../src/presentation/design-system.tsx";
 import {
+  cancelConsultationAction,
   endConsultationAction,
+  endEarlyAction,
   joinConsultationAction,
   openDocumentAction,
   replaceDocumentAction,
@@ -173,6 +189,65 @@ export function CommandPanel({
             </form>
           ) : null}
         </Cluster>
+      ) : null}
+    </Stack>
+  );
+}
+
+// MVP-001 S11: cancelling before the start and ending early by agreement,
+// offered as the page reports them possible; the server decides again on
+// submission. A hidden field only names the Consultation.
+export function CompletionPanel({
+  consultationId,
+  cancellable,
+  endableEarly,
+}: {
+  readonly consultationId: string;
+  readonly cancellable: boolean;
+  readonly endableEarly: boolean;
+}) {
+  const [cancelState, cancelAction, cancelling] = useActionState<
+    CancelActionState,
+    FormData
+  >(cancelConsultationAction, INITIAL_CANCEL_STATE);
+  const [earlyState, earlyAction, ending] = useActionState<
+    EndEarlyActionState,
+    FormData
+  >(endEarlyAction, INITIAL_END_EARLY_STATE);
+  const pending = cancelling || ending;
+  return (
+    <Stack gap="tight">
+      <Message message={messageOf(cancelState, CANCEL_MESSAGES)} />
+      <Message message={messageOf(earlyState, END_EARLY_MESSAGES)} />
+      {cancellable ? (
+        <form action={cancelAction}>
+          <Stack gap="tight">
+            <Text size="small" tone="muted">
+              {CANCEL_NOTE}
+            </Text>
+            <input type="hidden" name="consultation" value={consultationId} />
+            <Cluster>
+              <Button variant="secondary" type="submit" disabled={pending}>
+                Cancel the consultation
+              </Button>
+            </Cluster>
+          </Stack>
+        </form>
+      ) : null}
+      {endableEarly ? (
+        <form action={earlyAction}>
+          <Stack gap="tight">
+            <Text size="small" tone="muted">
+              {END_EARLY_NOTE}
+            </Text>
+            <input type="hidden" name="consultation" value={consultationId} />
+            <Cluster>
+              <Button variant="secondary" type="submit" disabled={pending}>
+                End early by agreement
+              </Button>
+            </Cluster>
+          </Stack>
+        </form>
       ) : null}
     </Stack>
   );
