@@ -3104,6 +3104,26 @@ const WORKSPACE_RPCS = Object.freeze([
   "attorney_documents",
   "attorney_compliance_records",
 ]);
+// MVP-001 S11 PS-A6: the privacy and security actions adapter calls the six
+// break-glass and seven data request functions, each as a literal call
+// through the request's own unprivileged session; it builds or receives no
+// privileged client, and no other file names any of the thirteen functions.
+const PRIVACY_ADAPTER = "src/infrastructure/privacy/privacy-adapter.ts";
+const PRIVACY_RPCS = Object.freeze([
+  "staff_break_glass_grants_mine",
+  "staff_break_glass_queue",
+  "staff_break_glass_consultation",
+  "staff_request_break_glass",
+  "staff_approve_break_glass",
+  "staff_revoke_break_glass",
+  "client_data_requests",
+  "staff_data_request_queue",
+  "staff_data_request",
+  "client_submit_data_request",
+  "client_withdraw_data_request",
+  "staff_assign_data_request",
+  "staff_decide_data_request",
+]);
 const PAYMENT_ADAPTER = "src/infrastructure/payments/payment-adapter.ts";
 const PAYMENT_RPCS = Object.freeze([
   "client_request_payment",
@@ -3182,6 +3202,9 @@ const RPC_OCCURRENCES = Object.freeze({
   // MVP-001 S11 pass 2B: the six workspace reads (no change, so no
   // environment accessor).
   [WORKSPACE_ADAPTER]: WORKSPACE_RPCS.length,
+  // MVP-001 S11 PS-A6: the thirteen privacy and security functions, plus the
+  // environment accessor.
+  [PRIVACY_ADAPTER]: PRIVACY_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -3480,6 +3503,33 @@ function assertQuotaRpcContract(codes) {
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(|deployment_environment_identity/i,
       );
     }
+    // MVP-001 S11 PS-A6: the privacy and security functions, as for the
+    // operations functions.
+    for (const name of PRIVACY_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === PRIVACY_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== PRIVACY_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === PRIVACY_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        PRIVACY_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
     // MVP-001 S7: the payment functions, as for the offer functions.
     for (const name of PAYMENT_RPCS) {
       assert.equal(
@@ -3529,7 +3579,9 @@ function assertQuotaRpcContract(codes) {
         file === CONSULTATION_ADAPTER ||
         file === COMMUNICATION_ADAPTER ||
         file === COMPLETION_ADAPTER ||
-        file === OPERATIONS_ADAPTER
+        file === OPERATIONS_ADAPTER ||
+        // MVP-001 S11 PS-A6: the privacy adapter's environment accessor.
+        file === PRIVACY_ADAPTER
         ? 1
         : 0,
       file,

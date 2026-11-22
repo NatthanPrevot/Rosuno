@@ -2579,7 +2579,10 @@
         "20261127150000_mvp_001_s11_capture_gate",
         "20261127160000_mvp_001_s11_definer_search_path",
         "20261127170000_mvp_001_s11_workspace_reads",
-        "20261127180000_mvp_001_s11_review_corrections"
+        "20261127180000_mvp_001_s11_review_corrections",
+        "20261127190000_mvp_001_s11_break_glass",
+        "20261127200000_mvp_001_s11_data_requests",
+        "20261127210000_mvp_001_s11_complaint_configuration"
       ],
       "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",

@@ -498,6 +498,9 @@ test("SC-2. the staff home lists exactly the surfaces the caller holds a current
   const s = setup();
   const home = async (who) =>
     (await resolveStaffHome(sourcesOf(s, who))).surfaces;
+  // MVP-001 S11 PS-A6 re-pin: every active staff member may also request
+  // break-glass access (no capability), listed last.
+  const ALWAYS = "break-glass";
   assert.deepEqual(await home(s.admin), [
     "verification",
     "policies",
@@ -509,6 +512,7 @@ test("SC-2. the staff home lists exactly the surfaces the caller holds a current
     // MVP-001 S3 part 2: the admin's global intake grant opens the review.
     "jurisdiction-review",
     "jobs",
+    ALWAYS,
   ]);
   // MVP-001 S3 part 2: a jurisdiction-scoped manage_intake_configuration
   // grant opens the review and nothing else (publishing needs the global
@@ -517,30 +521,31 @@ test("SC-2. the staff home lists exactly the surfaces the caller holds a current
   grant(s.world, reviewer.userId, "manage_intake_configuration", {
     jurisdiction_id: s.a,
   });
-  assert.deepEqual(await home(reviewer), ["jurisdiction-review"]);
+  assert.deepEqual(await home(reviewer), ["jurisdiction-review", ALWAYS]);
   // MVP-001 S2: the job view needs the global manage_operational_jobs grant;
   // a jurisdiction-scoped one counts for nothing.
   const operator = addStaff(s.world, 32);
   grant(s.world, operator.userId, "manage_operational_jobs");
-  assert.deepEqual(await home(operator), ["jobs"]);
+  assert.deepEqual(await home(operator), ["jobs", ALWAYS]);
   const scopedOperator = addStaff(s.world, 33);
   grant(s.world, scopedOperator.userId, "manage_operational_jobs", {
     jurisdiction_id: s.a,
   });
-  assert.deepEqual(await home(scopedOperator), []);
+  assert.deepEqual(await home(scopedOperator), [ALWAYS]);
   // Jurisdiction-scoped grants: the scoped surfaces, but not the catalog,
   // which needs the global jurisdiction-configuration grant.
   assert.deepEqual(await home(s.scoped), [
     "policies",
     "jurisdictions",
     "launch",
+    ALWAYS,
   ]);
-  assert.deepEqual(await home(s.plain), []);
+  assert.deepEqual(await home(s.plain), [ALWAYS]);
   const launcher = addStaff(s.world, 30);
   grant(s.world, launcher.userId, "authorize_jurisdiction_launch", {
     jurisdiction_id: s.b,
   });
-  assert.deepEqual(await home(launcher), ["launch"]);
+  assert.deepEqual(await home(launcher), ["launch", ALWAYS]);
   // Expired, revoked, future, and resource-scoped grants count for nothing.
   const lapsed = addStaff(s.world, 31);
   for (const overrides of [
@@ -551,7 +556,7 @@ test("SC-2. the staff home lists exactly the surfaces the caller holds a current
   ]) {
     grant(s.world, lapsed.userId, "manage_staff_capabilities", overrides);
   }
-  assert.deepEqual(await home(lapsed), []);
+  assert.deepEqual(await home(lapsed), [ALWAYS]);
   // An unreadable capability answer is unavailable, never access.
   s.world.failures.add("reads.holdsCapability");
   assert.deepEqual(await resolveStaffHome(sourcesOf(s, s.admin)), {

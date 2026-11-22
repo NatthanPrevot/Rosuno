@@ -114,6 +114,10 @@ export const STAFF_CAPABILITIES = Object.freeze([
   "view_operations",
   "view_referral_operations",
   "manage_client_accounts",
+  // MVP-001 S11 PS-A6: approving and revoking break-glass access, and
+  // handling data requests.
+  "approve_break_glass",
+  "manage_data_requests",
 ] as const);
 export type StaffCapability = (typeof STAFF_CAPABILITIES)[number];
 
@@ -143,6 +147,9 @@ export const STAFF_SURFACES = Object.freeze([
   "clients",
   "referrals",
   "finance-summary",
+  // MVP-001 S11 PS-A6.
+  "break-glass",
+  "data-requests",
 ] as const);
 export type StaffSurface = (typeof STAFF_SURFACES)[number];
 
@@ -1514,6 +1521,25 @@ export async function verifiedStaffWith(
   }
 }
 
+// MVP-001 S11 PS-A6: the caller's verified staff identity (an active User
+// with an active Staff Profile; no capability), for the one staff surface
+// every active staff member uses (requesting break-glass access), or the
+// fixed refusal. The same checks as every surface here; the database decides
+// again.
+export async function verifiedActiveStaff(
+  sources: ConfigurationSources,
+): Promise<{ readonly userId: string } | Refusal> {
+  try {
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE;
+    }
+    return await staffOf(sources, reads);
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
 // MVP-001 S11: the caller's verified staff identity holding one capability
 // in some scope (a global grant or a grant for any jurisdiction), for a staff
 // surface whose rows the database scopes by jurisdiction itself, with
@@ -1614,6 +1640,10 @@ export async function resolveStaffHome(
       ["view_audit_events", true],
       ["manage_client_accounts", false],
       ["view_referral_operations", true],
+      // MVP-001 S11 PS-A6: data requests (global grant only). Requesting
+      // break-glass access needs only the active Staff Profile; the queue of
+      // that surface needs approve_break_glass, which it checks itself.
+      ["manage_data_requests", false],
     ];
     const answers: boolean[] = [];
     for (const [capability, anyJurisdiction] of asked) {
@@ -1643,6 +1673,7 @@ export async function resolveStaffHome(
       audit,
       clients,
       referrals,
+      dataRequests,
     ] = answers;
     const held: Readonly<Record<StaffSurface, boolean>> = {
       verification: verify,
@@ -1667,6 +1698,10 @@ export async function resolveStaffHome(
       referrals,
       // The financial activity summary belongs to the finance workspace.
       "finance-summary": finance,
+      // MVP-001 S11 PS-A6: every active staff member may request break-glass
+      // access.
+      "break-glass": true,
+      "data-requests": dataRequests,
     };
     return Object.freeze({
       status: "ready",

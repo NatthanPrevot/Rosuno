@@ -74,13 +74,18 @@ const S2_MIGRATIONS = Object.freeze([
 // MVP-001 S11 pass 2 re-pin: the later registered S11 operations-integrity
 // migration (20261127080000) adds exactly manage_client_accounts,
 // view_audit_events, view_operations and view_referral_operations.
+// MVP-001 S11 PS-A6 re-pin: the later registered PS-A6 migrations
+// (20261127190000, 20261127200000) add exactly approve_break_glass and
+// manage_data_requests.
 const CAPABILITIES = Object.freeze([
+  "approve_break_glass",
   "authorize_jurisdiction_launch",
   "manage_attorney_verification",
   "manage_client_accounts",
   "manage_complaints",
   "manage_compliance_reviews",
   "manage_consultation_operations",
+  "manage_data_requests",
   "manage_financial_operations",
   "manage_intake_configuration",
   "manage_jurisdiction_configuration",

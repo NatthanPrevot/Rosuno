@@ -1921,6 +1921,102 @@
       "drift_check": "clean",
       "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the corrected functions again; no relation, column, policy or row is changed.",
       "depends_on": ["20261127170000_mvp_001_s11_workspace_reads"]
+    },
+    {
+      "migration_id": "20261127190000_mvp_001_s11_break_glass",
+      "migration_kind": "product",
+      "sequence": 73,
+      "artifact_path": "supabase/migrations/20261127190000_mvp_001_s11_break_glass.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+        "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A6-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": [
+        "DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM",
+        "DEC-20261122-PS-A6-BREAK-GLASS-DATA-REQUESTS-COMPLAINTS"
+      ],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions or the guard trigger; the PS-A6 relation, its constraints and the capability catalog row stay, and no Break-Glass Grant or audit row is removed (PS-A6 section 2 rule 6).",
+      "depends_on": ["20261127180000_mvp_001_s11_review_corrections"]
+    },
+    {
+      "migration_id": "20261127200000_mvp_001_s11_data_requests",
+      "migration_kind": "product",
+      "sequence": 74,
+      "artifact_path": "supabase/migrations/20261127200000_mvp_001_s11_data_requests.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+        "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A6-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": [
+        "DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM",
+        "DEC-20261122-PS-A6-BREAK-GLASS-DATA-REQUESTS-COMPLAINTS"
+      ],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions or the guard trigger; the PS-A6 relation, its constraints and the capability catalog row stay, and no data request or audit row is removed (PS-A6 section 3 rule 7).",
+      "depends_on": ["20261127190000_mvp_001_s11_break_glass"]
+    },
+    {
+      "migration_id": "20261127210000_mvp_001_s11_complaint_configuration",
+      "migration_kind": "product",
+      "sequence": 75,
+      "artifact_path": "supabase/migrations/20261127210000_mvp_001_s11_complaint_configuration.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+        "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A6-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "decision_refs": [
+        "DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM",
+        "DEC-20261122-PS-A6-BREAK-GLASS-DATA-REQUESTS-COMPLAINTS"
+      ],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Before merge: forward-only correction commits on the Program branch. After merge: a separately reviewed forward corrective migration replacing the functions or the guard trigger; the complaint policy type row and the statement column with its constraint stay, and no Complaint Case, policy version or audit row is removed (PS-A6 sections 4 and 5).",
+      "depends_on": ["20261127200000_mvp_001_s11_data_requests"]
     }
   ]
 }

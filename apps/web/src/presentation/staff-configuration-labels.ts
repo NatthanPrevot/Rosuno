@@ -159,6 +159,19 @@ export const SURFACE_LINKS: Readonly<
     summary:
       "See ledger totals, transaction states, refunds and disputes for a chosen period.",
   },
+  // MVP-001 S11 PS-A6.
+  "break-glass": {
+    href: "/staff/break-glass",
+    title: "Break-glass access",
+    summary:
+      "Request time-limited, audited read access to one consultation with a reason; holders of the approval capability approve or revoke requests.",
+  },
+  "data-requests": {
+    href: "/staff/data-requests",
+    title: "Data requests",
+    summary:
+      "See the data requests clients submit, assign them and record a decision.",
+  },
 });
 
 // MVP-001 S11 pass 2: the areas the staff home groups its links into, in
@@ -183,12 +196,12 @@ export const SURFACE_AREAS: readonly {
   {
     id: "security-and-audit",
     title: "Security and audit",
-    surfaces: ["capabilities", "audit"],
+    surfaces: ["capabilities", "audit", "break-glass"],
   },
   {
     id: "clients",
     title: "Clients",
-    surfaces: ["intake", "jurisdiction-review", "clients"],
+    surfaces: ["intake", "jurisdiction-review", "clients", "data-requests"],
   },
   { id: "referrals", title: "Referrals", surfaces: ["referrals"] },
   {

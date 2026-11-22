@@ -141,6 +141,19 @@ const S11_OPERATIONS_STAFF_FILES = [
   "app/staff/system-health/page.tsx",
 ];
 
+// MVP-001 S11 PS-A6: break-glass access and data requests, their own staff
+// surfaces (the privacy adapter's sources and their own use cases).
+const S11_PS_A6_STAFF_FILES = [
+  "app/staff/break-glass/[grant]/page.tsx",
+  "app/staff/break-glass/actions.ts",
+  "app/staff/break-glass/forms.tsx",
+  "app/staff/break-glass/page.tsx",
+  "app/staff/data-requests/[request]/page.tsx",
+  "app/staff/data-requests/actions.ts",
+  "app/staff/data-requests/forms.tsx",
+  "app/staff/data-requests/page.tsx",
+];
+
 // Each list page: its use case. Each reads exactly one query value, page.
 const LIST_PAGES = {
   "app/staff/policies/page.tsx": "resolvePolicyWorkspace",
@@ -180,10 +193,52 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
         !f.startsWith("app/staff/verification/") &&
         !f.startsWith("app/staff/finance/") &&
         !S11_STAFF_FILES.includes(f) &&
-        !S11_OPERATIONS_STAFF_FILES.includes(f),
+        !S11_OPERATIONS_STAFF_FILES.includes(f) &&
+        !S11_PS_A6_STAFF_FILES.includes(f),
     ),
     CONFIGURATION_FILES,
   );
+  // MVP-001 S11 PS-A6: break-glass access and data requests are their own
+  // staff surfaces, admitted by their exact files: server pages rendered per
+  // request and unindexed that read the privacy adapter's sources and nothing
+  // this list forbids, client form modules that import no infrastructure,
+  // and server action modules.
+  assert.deepEqual(
+    filesIn("app/staff/").filter((f) => S11_PS_A6_STAFF_FILES.includes(f)),
+    S11_PS_A6_STAFF_FILES,
+  );
+  for (const file of S11_PS_A6_STAFF_FILES.filter((f) =>
+    f.endsWith("page.tsx"),
+  )) {
+    const source = read(file);
+    const code = codeOf(source);
+    assert.doesNotMatch(source, /["']use (?:client|server)["']/, file);
+    assert.match(code, /robots: \{ index: false, follow: false \},/, file);
+    assert.ok(code.indexOf("await connection();") > 0, file);
+    assert.doesNotMatch(code, FORBIDDEN_IN_PAGES, file);
+    assert.doesNotMatch(code, /STAFF_CONFIGURATION_SOURCES/, file);
+    assert.match(
+      code,
+      /import \{ (?:BREAK_GLASS_SOURCES|STAFF_DATA_REQUEST_SOURCES) \} from "(?:\.\.\/)+src\/infrastructure\/privacy\/privacy-adapter\.ts";/,
+      file,
+    );
+  }
+  for (const file of S11_PS_A6_STAFF_FILES.filter((f) =>
+    f.endsWith("actions.ts"),
+  )) {
+    assert.match(read(file), /^"use server";\n/, file);
+  }
+  for (const file of S11_PS_A6_STAFF_FILES.filter((f) =>
+    f.endsWith("forms.tsx"),
+  )) {
+    assert.match(read(file), /^"use client";\n/, file);
+    assert.ok(
+      importsOf(read(file)).every(
+        (specifier) => !/infrastructure/.test(specifier),
+      ),
+      file,
+    );
+  }
   // MVP-001 S11 pass 2: the operations and administration workspaces are
   // their own staff surfaces, admitted by their exact files: server pages
   // rendered per request and unindexed that read the operations adapter's
@@ -653,6 +708,9 @@ test("SR-4. the staff home links only to the surfaces the caller holds, and refu
     "/staff/launch",
     "/staff/catalog",
     "/staff/capabilities",
+    // MVP-001 S11 PS-A6: break-glass access, which every active staff member
+    // may request (in the security and audit area).
+    "/staff/break-glass",
     "/staff/intake-configuration",
     // MVP-001 S3 part 2: the review, for a manage_intake_configuration grant.
     "/staff/jurisdiction-review",
@@ -664,11 +722,14 @@ test("SR-4. the staff home links only to the surfaces the caller holds, and refu
   );
   assert.deepEqual(
     (await render("app/staff/page.tsx", sources(w, scoped))).hrefs,
-    ["/staff/policies"],
+    ["/staff/policies", "/staff/break-glass"],
   );
+  // MVP-001 S11 PS-A6 re-pin: an active staff member without any grant sees
+  // exactly the break-glass request surface (a Staff Profile alone opens it)
+  // and no other.
   const none = await render("app/staff/page.tsx", sources(w, plain));
-  assert.deepEqual(none.hrefs, []);
-  assert.ok(none.text.includes("No staff tools available"));
+  assert.deepEqual(none.hrefs, ["/staff/break-glass"]);
+  assert.equal(none.text.includes("No staff tools available"), false);
   const anonymous = await render(
     "app/staff/page.tsx",
     configurationSources(w, null),
@@ -940,7 +1001,9 @@ const jobsPage = (query = {}) => ({ searchParams: Promise.resolve(query) });
 test("SR-10. the job view is listed for its capability holders, shows escalated jobs first with retry and cancel, and never a message, worker, or subject data", async () => {
   const j = jobWorld();
   const home = await render("app/staff/page.tsx", sources(j.w, j.operator));
-  assert.deepEqual(home.hrefs, ["/staff/jobs"]);
+  // MVP-001 S11 PS-A6 re-pin: and the break-glass request surface every
+  // active staff member sees.
+  assert.deepEqual(home.hrefs, ["/staff/jobs", "/staff/break-glass"]);
   assert.ok(home.text.includes("Operational jobs"));
   const view = await render(
     "app/staff/jobs/page.tsx",

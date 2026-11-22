@@ -3,8 +3,9 @@
 //
 // Rendered on the server for every request and never indexed. The verified
 // client of the request decides access; the database answers only the
-// client's own Complaint Cases (state, linkage and instants; nothing about
-// assignment, classification or resolution). The report form may name one of
+// client's own Complaint Cases (state, linkage, instants and, PS-A6 section
+// 5, the client's own statement; nothing about assignment, classification or
+// resolution). The report form may name one of
 // the client's own Consultations; the one query value read only preselects
 // it, and the database checks it again on submission.
 
@@ -165,6 +166,9 @@ export default async function ClientComplaintsPage({
               )}
               {entry.resolvedAt === null ? null : (
                 <Text size="small">{`Resolved ${utcText(entry.resolvedAt)}`}</Text>
+              )}
+              {entry.statement === null ? null : (
+                <Text size="small">{`What you described: ${entry.statement}`}</Text>
               )}
             </Stack>
           </Surface>

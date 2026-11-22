@@ -4,7 +4,8 @@
 // Rendered on the server for every request and never indexed. The step-up
 // gate comes first (aal2); the unchanged Security Shell then decides access
 // and the database answers only the attorney's own Complaint Cases (state,
-// linkage and instants). The report form may name one of the attorney's own
+// linkage, instants and, PS-A6 section 5, the attorney's own statement; never
+// another participant's). The report form may name one of the attorney's own
 // current Consultations, or the Consultation the attorney came from (the one
 // query value read, only to preselect it); the database checks it again on
 // submission.
@@ -173,6 +174,9 @@ export default async function AttorneyComplaintsPage({
               )}
               {entry.resolvedAt === null ? null : (
                 <Text size="small">{`Resolved ${utcText(entry.resolvedAt)}`}</Text>
+              )}
+              {entry.statement === null ? null : (
+                <Text size="small">{`What you described: ${entry.statement}`}</Text>
               )}
             </Stack>
           </Surface>

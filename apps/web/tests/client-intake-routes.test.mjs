@@ -61,7 +61,8 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
   // its action (a server action module). MVP-001 S11 pass 2B: plus exactly
   // the message inbox, the payment history, the privacy and data page and
   // the profile and settings page, four read-only server pages (no form and
-  // no action).
+  // no action). MVP-001 S11 PS-A6: plus exactly the privacy and data page's
+  // data request form (a client module) and action (a server action module).
   assert.deepEqual(filesIn("app/client/"), [
     "app/client/actions.ts",
     "app/client/complaints/actions.ts",
@@ -81,6 +82,8 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     "app/client/page.tsx",
     "app/client/payments/[payment]/page.tsx",
     "app/client/payments/page.tsx",
+    "app/client/privacy/actions.ts",
+    "app/client/privacy/forms.tsx",
     "app/client/privacy/page.tsx",
     "app/client/requests/[request]/forms.tsx",
     "app/client/requests/[request]/page.tsx",
@@ -96,6 +99,8 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
   for (const file of [
     "app/client/complaints/actions.ts",
     "app/client/reviews/actions.ts",
+    // MVP-001 S11 PS-A6.
+    "app/client/privacy/actions.ts",
   ]) {
     assert.match(read(file), /^"use server";\n/, file);
   }
@@ -117,6 +122,8 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     "app/client/requests/new/forms.tsx",
     "app/client/complaints/forms.tsx",
     "app/client/reviews/forms.tsx",
+    // MVP-001 S11 PS-A6.
+    "app/client/privacy/forms.tsx",
   ]) {
     assert.match(read(file), /^"use client";\n/, file);
   }

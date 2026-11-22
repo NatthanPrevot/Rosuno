@@ -8,12 +8,13 @@
 // id get the same not-found page). The page shows the minimum metadata the
 // database answers: the state, who reported it (client or attorney, never a
 // name), the linked Consultation's and Referral's states, four attendance
-// facts, the latest payment state and the Legal Holds in force on the case or
-// its Consultation. Staff assign, unassign, escalate or return the case;
-// classification and resolution need the complaint vocabularies, which are
-// configuration not adopted yet (the database answers that and changes
-// nothing). Holders of the global Legal Holds grant can place a hold on the
-// case from here.
+// facts, the latest payment state, the Legal Holds in force on the case or
+// its Consultation and the complainant's own statement (PS-A6 section 5).
+// Staff assign, unassign, escalate or return the case; classification and
+// resolution offer exactly the codes of the complaint vocabulary the
+// database selects for the case (PS-A6 section 4; while none is configured
+// the page says so and the database would change nothing). Holders of the
+// global Legal Holds grant can place a hold on the case from here.
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -127,6 +128,7 @@ export default async function ComplaintCasePage({
         : record.paymentState.replaceAll("_", " "),
     ],
     ["Legal Holds in force", String(record.activeLegalHolds)],
+    ["What was reported", record.statement ?? "No description given"],
   ];
   const holds = await legalHoldsHeld(LEGAL_HOLD_SOURCES);
   return (
@@ -166,7 +168,11 @@ export default async function ComplaintCasePage({
             caseId={record.id}
             actions={actionsOf(record.state, record.assignedToMe)}
           />
-          <DecideCaseForm caseId={record.id} kind="classify" />
+          <DecideCaseForm
+            caseId={record.id}
+            kind="classify"
+            codes={record.categoryCodes}
+          />
         </>
       )}
       {/* One slot for the resolution form, so it (and the message for the
@@ -174,6 +180,7 @@ export default async function ComplaintCasePage({
       <DecideCaseForm
         caseId={record.id}
         kind="resolve"
+        codes={record.resolutionCodes}
         resolved={record.state === "resolved"}
       />
       {holds ? (

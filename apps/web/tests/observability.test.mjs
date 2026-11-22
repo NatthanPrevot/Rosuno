@@ -395,7 +395,11 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // only) write lines too. MVP-001 S11 correction pass (A7): the client's
   // consultation actions (a cancellation not completed, with its fixed
   // outcome only) and the attorney's week view (a view unavailable, with the
-  // route and outcome only) write lines too.
+  // route and outcome only) write lines too. MVP-001 S11 PS-A6: the client's
+  // data request actions and the staff break-glass and data request actions
+  // (an action not completed, with its fixed outcome only) and the privacy
+  // adapter (a failed call, with the call name and how it failed only) write
+  // lines too.
   assert.deepEqual(callers, [
     "app/attorney/complaints/actions.ts",
     "app/attorney/complaints/page.tsx",
@@ -425,6 +429,7 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/client/page.tsx",
     "app/client/payments/[payment]/page.tsx",
     "app/client/payments/page.tsx",
+    "app/client/privacy/actions.ts",
     "app/client/privacy/page.tsx",
     "app/client/requests/[request]/page.tsx",
     "app/client/requests/actions.ts",
@@ -438,10 +443,12 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/sign-in/actions.ts",
     "app/staff/actions.ts",
     "app/staff/attorneys/actions.ts",
+    "app/staff/break-glass/actions.ts",
     "app/staff/clients/actions.ts",
     "app/staff/complaints/actions.ts",
     "app/staff/compliance/actions.ts",
     "app/staff/consultations/actions.ts",
+    "app/staff/data-requests/actions.ts",
     "app/staff/finance/actions.ts",
     "app/staff/frame.tsx",
     "app/staff/legal-holds/actions.ts",
@@ -461,6 +468,8 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "src/infrastructure/offers/consultation-offer-adapter.ts",
     "src/infrastructure/payments/payment-adapter.ts",
     "src/infrastructure/payments/stripe-webhook.ts",
+    // MVP-001 S11 PS-A6: the privacy and security actions adapter.
+    "src/infrastructure/privacy/privacy-adapter.ts",
     "src/infrastructure/requests/attorney-request-adapter.ts",
     "src/infrastructure/requests/consultation-request-adapter.ts",
     "src/infrastructure/resources/protected-resource-adapter.ts",

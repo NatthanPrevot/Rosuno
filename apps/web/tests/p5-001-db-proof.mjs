@@ -1034,13 +1034,17 @@ async function privilegeChecks() {
         // registered S11 completion-integrity migration (20261127010000).
         // MVP-001 S11 pass 2 re-pin: and exactly the four codes of the later
         // registered S11 operations-integrity migration (20261127080000).
+        // MVP-001 S11 PS-A6 re-pin: and exactly the two codes of the later
+        // registered PS-A6 migrations (20261127190000, 20261127200000).
         [
+          "approve_break_glass",
           "authorize_jurisdiction_launch",
           "manage_attorney_verification",
           "manage_client_accounts",
           "manage_complaints",
           "manage_compliance_reviews",
           "manage_consultation_operations",
+          "manage_data_requests",
           "manage_financial_operations",
           "manage_intake_configuration",
           "manage_jurisdiction_configuration",

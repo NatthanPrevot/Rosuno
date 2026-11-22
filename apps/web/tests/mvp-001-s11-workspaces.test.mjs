@@ -57,6 +57,8 @@ import {
   createClientWorkspaceReads,
 } from "../src/infrastructure/workspaces/workspace-adapter.ts";
 import { NOTIFICATION_LABELS } from "../src/presentation/communication-labels.ts";
+// MVP-001 S11 PS-A6: the data request wording is held to the same rules.
+import * as privacyLabels from "../src/presentation/privacy-labels.ts";
 import * as labels from "../src/presentation/workspace-labels.ts";
 
 const appRoot = new URL("../", import.meta.url);
@@ -296,6 +298,12 @@ test("S11C-1 (MBS section 18.6) the new pages are server pages rendered per requ
     assert.match(code, /href="\/sign-in"/, file);
     assert.match(code, /"denied"/, file);
     for (const specifier of importsOf(source)) {
+      // MVP-001 S11 PS-A6 section 3: the privacy and data page also renders
+      // the data request forms of its own client module (the one admitted
+      // sibling import).
+      if (file === "app/client/privacy/page.tsx" && specifier === "./forms.tsx") {
+        continue;
+      }
       assert.match(
         specifier,
         /^(?:next|next\/server|react|(?:\.\.\/)+src\/(?:application|presentation)\/[a-z-]+\.tsx?|(?:\.\.\/)+src\/infrastructure\/[a-z-]+\/[a-z-]+\.ts|(?:\.\.\/)+account\/gate\.ts)$/,
@@ -334,9 +342,12 @@ test("S11C-1 (MBS section 18.6) the new pages are server pages rendered per requ
         continue;
       }
       // The existing schedule and consultations modules beside the new
-      // subdirectories are earlier work.
+      // subdirectories are earlier work. MVP-001 S11 PS-A6 section 3: the
+      // privacy and data page's data request action and forms.
       assert.ok(
         [
+          "app/client/privacy/actions.ts",
+          "app/client/privacy/forms.tsx",
           "app/attorney/consultations/actions.ts",
           "app/attorney/consultations/page.tsx",
           "app/attorney/schedule/actions.ts",
@@ -1351,11 +1362,15 @@ test("S11C-13 (Packet rule 11) the workspace wording is fixed and neutral: every
   }
   const privacy = codeOf(read("app/privacy/page.tsx"));
   assert.ok(privacy.includes(labels.PRIVACY_NOT_AVAILABLE));
-  assert.equal(
-    labels.DATA_REQUESTS_NOT_AVAILABLE,
-    "Requests about your data cannot be made here yet.",
-  );
-  const texts = Object.values(labels)
+  // MVP-001 S11 PS-A6 section 3 re-pin: data requests can be made on the
+  // privacy and data page now, so the sentence saying they could not is
+  // gone and the page renders the data request form; the data request and
+  // break-glass wording is checked with the workspace wording below.
+  assert.equal(labels.DATA_REQUESTS_NOT_AVAILABLE, undefined);
+  const page = codeOf(read("app/client/privacy/page.tsx"));
+  assert.ok(page.includes("<DataRequestForm />"));
+  assert.ok(page.includes("<Text>{PRIVACY_NOT_AVAILABLE}</Text>"));
+  const texts = [...Object.values(labels), ...Object.values(privacyLabels)]
     .flatMap((value) =>
       typeof value === "string"
         ? [value]

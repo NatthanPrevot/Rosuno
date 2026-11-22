@@ -171,8 +171,6 @@ export const DATA_CATEGORY_LABELS: Readonly<Record<DataCategory, string>> =
 // The public privacy page's own words (no privacy text is approved yet).
 export const PRIVACY_NOT_AVAILABLE =
   "Privacy information is not yet available.";
-export const DATA_REQUESTS_NOT_AVAILABLE =
-  "Requests about your data cannot be made here yet.";
 
 // ---------------------------------------------------------------------------
 // Attorney surfaces

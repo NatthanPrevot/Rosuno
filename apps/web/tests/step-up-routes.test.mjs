@@ -106,6 +106,9 @@ const GATED_ACTIONS = {
   // MVP-001 S11 pass 2: attorney reinstatement and removal, and the client
   // account-state change.
   "app/staff/attorneys/actions.ts": "staff",
+  // MVP-001 S11 PS-A6: break-glass access and data requests.
+  "app/staff/break-glass/actions.ts": "staff",
+  "app/staff/data-requests/actions.ts": "staff",
   "app/staff/clients/actions.ts": "staff",
 };
 
@@ -203,8 +206,17 @@ test("S2-R3. every attorney page and every staff page asks the step-up gate firs
   // and reported problems, and the seven staff completion pages. MVP-001 S11
   // pass 2: and the nine staff operations and administration pages. MVP-001
   // S11 pass 2B: and the attorney's dashboard, past consultations, week
-  // view, messages, documents and compliance pages.
-  assert.equal(GATED_PAGES.length, 53);
+  // view, messages, documents and compliance pages. MVP-001 S11 PS-A6: and
+  // the four staff break-glass and data request pages.
+  assert.equal(GATED_PAGES.length, 57);
+  for (const file of [
+    "app/staff/break-glass/page.tsx",
+    "app/staff/break-glass/[grant]/page.tsx",
+    "app/staff/data-requests/page.tsx",
+    "app/staff/data-requests/[request]/page.tsx",
+  ]) {
+    assert.ok(GATED_PAGES.includes(file), file);
+  }
   for (const file of [
     "app/attorney/dashboard/page.tsx",
     "app/attorney/consultations/history/page.tsx",
@@ -354,6 +366,10 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
       // client account-state change (one action).
       "app/staff/attorneys/actions.ts": 1,
       "app/staff/clients/actions.ts": 1,
+      // MVP-001 S11 PS-A6: the break-glass request, approval and revocation,
+      // and the data request assignment and decision.
+      "app/staff/break-glass/actions.ts": 3,
+      "app/staff/data-requests/actions.ts": 2,
     };
     const verification = file === "app/staff/verification/actions.ts";
     const offers = file === "app/attorney/offers/actions.ts";

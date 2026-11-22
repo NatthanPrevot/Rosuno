@@ -12,10 +12,15 @@
 // own cases (state, linkage and instants), the other participant sees
 // nothing, and staff holding manage_complaints see the minimum metadata for
 // the jurisdictions they hold. Staff assign, unassign, escalate and return a
-// case; classification and resolution exist, but their vocabularies are
-// configuration that is not adopted yet, so the database answers
-// configuration_unavailable and changes nothing. Every step is audited by the
-// database. Reads are strict.
+// case; classification and resolution use the complaint vocabulary the
+// database selects for the case (PS-A6 section 4: configuration, a Complaint
+// policy version; while none is selectable the database answers
+// configuration_unavailable and changes nothing), and the case page offers
+// exactly its codes. PS-A6 section 5: the complainant may describe the
+// problem in an optional statement (at most 20,000 characters), written once
+// and restricted as the case is: the complainant sees their own and staff in
+// scope see it on the case, never in a list. Every step is audited by the
+// database (never the statement). Reads are strict.
 
 import type { AttorneyPrincipalSource } from "./attorney-access.ts";
 import type { ClientIntakeSources } from "./client-intake.ts";
@@ -25,6 +30,7 @@ import {
   attempt,
   portFrom,
   rowsOf,
+  textField,
   UNAVAILABLE,
   type Refusal,
   type RowsResult,
@@ -104,13 +110,18 @@ export const DECIDE_OUTCOMES = Object.freeze([
   "invalid_code",
 ]);
 
-export const OWN_CASE_COLUMNS = Object.freeze([
+const BASE_CASE_COLUMNS = Object.freeze([
   "complaint_case_id",
   "state",
   "consultation_id",
   "referral_id",
   "opened_at",
   "resolved_at",
+]);
+// PS-A6 section 5: the complainant's own cases carry their statement.
+export const OWN_CASE_COLUMNS = Object.freeze([
+  ...BASE_CASE_COLUMNS,
+  "statement",
 ]);
 export const QUEUE_COLUMNS = Object.freeze([
   "complaint_case_id",
@@ -143,10 +154,21 @@ export const CASE_COLUMNS = Object.freeze([
   "either_left",
   "payment_state",
   "active_legal_holds",
+  // PS-A6 sections 4 and 5: the statement and the codes of the vocabulary
+  // that governs the case now.
+  "statement",
+  "category_codes",
+  "resolution_codes",
 ]);
 
 // The database's own bound on the complainant's list.
 export const MAX_OWN_CASES = 200;
+
+// PS-A6 section 5: the statement's ceiling (the PS-A1 client free-text
+// ceiling).
+export const MAX_STATEMENT = 20000;
+// A configured code list's bound as the case page reads it.
+const MAX_CODES = 500;
 
 // ---------------------------------------------------------------------------
 // Ports
@@ -167,10 +189,11 @@ export type ComplaintReads = {
 };
 
 export type ComplaintWrites = {
-  // complaint_open(p_consultation_id, p_referral_id)
+  // complaint_open(p_consultation_id, p_referral_id, p_statement)
   readonly open: (
     consultationId: string | null,
     referralId: string | null,
+    statement: string | null,
   ) => Promise<CommandAnswer>;
   // staff_update_complaint(p_complaint_case_id, p_action)
   readonly update: (
@@ -217,7 +240,7 @@ const isCount = (value: unknown): value is number =>
   (value as number) >= 0 &&
   (value as number) <= 100000;
 
-export type OwnComplaint = {
+type ComplaintBase = {
   readonly id: string;
   readonly state: ComplaintState;
   readonly consultationId: string | null;
@@ -226,8 +249,38 @@ export type OwnComplaint = {
   readonly resolvedAt: string | null;
 };
 
+export type OwnComplaint = ComplaintBase & {
+  readonly statement: string | null;
+};
+
+const isStatement = (value: unknown): value is string | null =>
+  value === null ||
+  (typeof value === "string" &&
+    value.trim() !== "" &&
+    value.length <= MAX_STATEMENT);
+
 function readOwn(row: unknown): OwnComplaint | null {
   const f = readExact(row, OWN_CASE_COLUMNS);
+  if (f === null) {
+    return null;
+  }
+  const base = readBase({
+    complaint_case_id: f.get("complaint_case_id"),
+    state: f.get("state"),
+    consultation_id: f.get("consultation_id"),
+    referral_id: f.get("referral_id"),
+    opened_at: f.get("opened_at"),
+    resolved_at: f.get("resolved_at"),
+  });
+  const statement = f.get("statement");
+  if (base === null || !isStatement(statement)) {
+    return null;
+  }
+  return Object.freeze({ ...base, statement });
+}
+
+function readBase(row: unknown): ComplaintBase | null {
+  const f = readExact(row, BASE_CASE_COLUMNS);
   if (f === null) {
     return null;
   }
@@ -250,10 +303,10 @@ function readOwn(row: unknown): OwnComplaint | null {
   ) {
     return null;
   }
-  return Object.freeze(value) as OwnComplaint;
+  return Object.freeze(value) as ComplaintBase;
 }
 
-export type QueuedComplaint = OwnComplaint & {
+export type QueuedComplaint = ComplaintBase & {
   readonly jurisdictionId: string | null;
   readonly assignedToMe: boolean;
 };
@@ -263,7 +316,7 @@ function readQueued(row: unknown): QueuedComplaint | null {
   if (f === null) {
     return null;
   }
-  const own = readOwn({
+  const own = readBase({
     complaint_case_id: f.get("complaint_case_id"),
     state: f.get("state"),
     consultation_id: f.get("consultation_id"),
@@ -296,7 +349,24 @@ export type StaffComplaintCase = QueuedComplaint & {
   readonly eitherLeft: boolean;
   readonly paymentState: PaymentState | null;
   readonly activeLegalHolds: number;
+  readonly statement: string | null;
+  readonly categoryCodes: readonly string[];
+  readonly resolutionCodes: readonly string[];
 };
+
+// A configured code list: distinct lower-snake codes (empty while no
+// vocabulary is selectable).
+function codesOf(value: unknown): readonly string[] | null {
+  if (
+    !Array.isArray(value) ||
+    value.length > MAX_CODES ||
+    !value.every((code) => isCode(code)) ||
+    new Set(value).size !== value.length
+  ) {
+    return null;
+  }
+  return Object.freeze([...(value as string[])]);
+}
 
 function readCase(row: unknown): StaffComplaintCase | null {
   const f = readExact(row, CASE_COLUMNS);
@@ -326,7 +396,10 @@ function readCase(row: unknown): StaffComplaintCase | null {
     eitherLeft: f.get("either_left"),
     paymentState: f.get("payment_state"),
     activeLegalHolds: f.get("active_legal_holds"),
+    statement: f.get("statement"),
   };
+  const categoryCodes = codesOf(f.get("category_codes"));
+  const resolutionCodes = codesOf(f.get("resolution_codes"));
   if (
     queued === null ||
     !nullableCode(value.categoryCode) ||
@@ -343,11 +416,19 @@ function readCase(row: unknown): StaffComplaintCase | null {
     !(
       value.paymentState === null || isOneOf(PAYMENT_STATES, value.paymentState)
     ) ||
-    !isCount(value.activeLegalHolds)
+    !isCount(value.activeLegalHolds) ||
+    !isStatement(value.statement) ||
+    categoryCodes === null ||
+    resolutionCodes === null
   ) {
     return null;
   }
-  return Object.freeze({ ...queued, ...value }) as StaffComplaintCase;
+  return Object.freeze({
+    ...queued,
+    ...value,
+    categoryCodes,
+    resolutionCodes,
+  }) as StaffComplaintCase;
 }
 
 // ---------------------------------------------------------------------------
@@ -424,10 +505,16 @@ async function openComplaint(
 ): Promise<OpenActionState> {
   try {
     // The form may name one of the caller's own Consultations (an empty value
-    // means none); nothing else is sent.
-    const fields = formFieldsOf(formData, [], ["consultation"]);
+    // means none) and carry the caller's optional statement (PS-A6 section
+    // 5; an empty one means none); nothing else is sent.
+    const fields = formFieldsOf(formData, [], ["consultation", "statement"]);
     const consultation = fields?.get("consultation") ?? "";
-    if (fields === null || !(consultation === "" || isUuid(consultation))) {
+    const statement = textField(fields?.get("statement"), MAX_STATEMENT);
+    if (
+      fields === null ||
+      !(consultation === "" || isUuid(consultation)) ||
+      statement === null
+    ) {
       return INVALID;
     }
     const access = await admit();
@@ -448,7 +535,11 @@ async function openComplaint(
     }
     return settle(
       await attempt(() =>
-        writes.open(consultation === "" ? null : consultation, null),
+        writes.open(
+          consultation === "" ? null : consultation,
+          null,
+          statement === "" ? null : statement,
+        ),
       ),
       OPEN_TABLE,
     );
@@ -651,8 +742,8 @@ export async function updateComplaintCase(
 }
 
 // Classification and resolution: a code of the complaint vocabulary, which is
-// configuration. While none is selectable the database answers
-// configuration_unavailable and changes nothing.
+// configuration (PS-A6 section 4). While none is selectable the database
+// answers configuration_unavailable and changes nothing.
 async function decideCase(
   sources: StaffComplaintSources,
   formData: unknown,

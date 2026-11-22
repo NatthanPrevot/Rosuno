@@ -148,6 +148,14 @@ const S11_SURFACES_MIGRATIONS = Object.freeze([
 const S11_CORRECTIONS_MIGRATIONS = Object.freeze([
   "20261127180000_mvp_001_s11_review_corrections.sql",
 ]);
+// MVP-001 S11 PS-A6: the break-glass, data request and complaint
+// configuration migrations follow the review corrections (registered and
+// checked by the S11 PS-A6 proof).
+const S11_PS_A6_MIGRATIONS = Object.freeze([
+  "20261127190000_mvp_001_s11_break_glass.sql",
+  "20261127200000_mvp_001_s11_data_requests.sql",
+  "20261127210000_mvp_001_s11_complaint_configuration.sql",
+]);
 
 const report = {
   proof: "MVP-001 S7 disposable local PostgreSQL proof",
@@ -511,6 +519,7 @@ function applyMigrations() {
     ...S11_OPERATIONS_MIGRATIONS,
     ...S11_SURFACES_MIGRATIONS,
     ...S11_CORRECTIONS_MIGRATIONS,
+    ...S11_PS_A6_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

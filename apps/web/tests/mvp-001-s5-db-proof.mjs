@@ -442,6 +442,11 @@ function applyMigrations() {
     // MVP-001 S11 review corrections (registered and checked by the S11
     // operations proof).
     "20261127180000_mvp_001_s11_review_corrections.sql",
+    // MVP-001 S11 PS-A6: break-glass, data requests and the complaint
+    // configuration (registered and checked by the S11 PS-A6 proof).
+    "20261127190000_mvp_001_s11_break_glass.sql",
+    "20261127200000_mvp_001_s11_data_requests.sql",
+    "20261127210000_mvp_001_s11_complaint_configuration.sql",
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -1162,7 +1167,10 @@ async function inventoryChecks() {
           file,
         );
       }
-      assert.equal(count("policy_types"), 15);
+      // MVP-001 S11 PS-A6 adds exactly one policy type, complaint (registered
+      // and checked by the S11 PS-A6 proof).
+      assert.equal(count("policy_types"), 16);
+      assert.equal(count("policy_types", "code = 'complaint'"), 1);
       assert.equal(
         sql(
           "select count(*) from pg_policies where schemaname = 'public' and tablename in ('referrals', 'referral_eligible_pool_entries', 'referral_presentations');",

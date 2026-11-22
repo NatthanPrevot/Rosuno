@@ -8,9 +8,9 @@
 //   1. the client sees, as the right user, the home with the next upcoming
 //      consultation and a link to every client area, the payment history
 //      (linking the existing receipt), the message inbox, profile and
-//      settings, and privacy and data (counts only, data requests not yet
-//      available, no form); each new page shows the client navigation with
-//      its own page marked;
+//      settings, and privacy and data (counts; MVP-001 S11 PS-A6: and exactly
+//      the one data request form, the client having made no request yet);
+//      each new page shows the client navigation with its own page marked;
 //   2. correction D14: a consultation completed by its attorney emits
 //      review_available, and it renders in the client's notification center
 //      with the link to the client's consultation page;
@@ -610,9 +610,15 @@ insert into public.discipline_records (attorney_id, jurisdiction_id, opened_at, 
     ),
   );
   const privacyForms = await formsOf(me.page);
+  // MVP-001 S11 PS-A6: the one data request form and its own two fields.
+  const privacyFormElements = await me.page.$$eval("main form", (els) => els.length);
+  const privacyRequestFields = await me.page.$$eval(
+    "main form select[name=type], main form textarea[name=details]",
+    (els) => els.length,
+  );
   clientNav["/client/privacy"] = navMarks(await navOf(me.page, "Client workspace"), "/client/privacy");
   step(
-    "the client (aal1) opens the home (the next upcoming consultation, Find an attorney, a link to every client area), the payment history (one attempt, linking its existing receipt), the message inbox (each consultation thread with its messaging state and count, no message body), profile and settings (display name and account state, no form) and privacy and data (the counts of the account's records, data requests not yet available, no form); each new page shows the client navigation with its own page marked",
+    "the client (aal1) opens the home (the next upcoming consultation, Find an attorney, a link to every client area), the payment history (one attempt, linking its existing receipt), the message inbox (each consultation thread with its messaging state and count, no message body), profile and settings (display name and account state, no form) and privacy and data (the counts of the account's records and, PS-A6, exactly the one data request form, the client having made no request yet); each new page shows the client navigation with its own page marked",
     {
       uploadAlerts,
       home: {
@@ -629,7 +635,14 @@ insert into public.discipline_records (attorney_id, jurisdiction_id, opened_at, 
         threads: [A, B, D].map((c) => threadLinks.includes(`/client/consultations/${c}`)),
       },
       settings: { name: settings.includes(`Synthetic client ${tag}`), active: settings.includes("Active"), forms: settingsForms },
-      privacy: { counts, notYet: privacy.includes("Requests about your data cannot be made here yet."), forms: privacyForms },
+      privacy: {
+        counts,
+        notYet: privacy.includes("Requests about your data cannot be made here yet."),
+        requests: privacy.includes("You have not made a request about your data."),
+        forms: privacyForms,
+        formElements: privacyFormElements,
+        requestFields: privacyRequestFields,
+      },
       navigation: clientNav,
     },
     home.includes("Your consultations now") &&
@@ -649,8 +662,12 @@ insert into public.discipline_records (attorney_id, jurisdiction_id, opened_at, 
       counts["Messages you sent"] === 1 &&
       counts["Documents you uploaded"] === 1 &&
       counts["Payment attempts"] === 1 &&
-      privacy.includes("Requests about your data cannot be made here yet.") &&
-      privacyForms === 0 &&
+      // MVP-001 S11 PS-A6 section 3 re-pin: the sentence is replaced by the
+      // data request form (one form; no request to withdraw yet).
+      !privacy.includes("Requests about your data cannot be made here yet.") &&
+      privacy.includes("You have not made a request about your data.") &&
+      privacyFormElements === 1 &&
+      privacyRequestFields === 2 &&
       Object.values(clientNav).every(Boolean),
   );
 

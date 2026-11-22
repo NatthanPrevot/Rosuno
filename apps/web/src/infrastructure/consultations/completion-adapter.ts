@@ -45,6 +45,7 @@ import {
   CASE_ACTIONS,
   COMPLAINT_STATES,
   DECIDE_OUTCOMES,
+  MAX_STATEMENT,
   OPEN_OUTCOMES,
   UPDATE_OUTCOMES,
   type AttorneyComplaintSources,
@@ -545,9 +546,17 @@ function callsOf(client: RequestClient, deadlineMs: number) {
             }),
           )
         : refusedRead(),
-    open: (consultationId: string | null, referralId: string | null) =>
+    open: (
+      consultationId: string | null,
+      referralId: string | null,
+      statement: string | null,
+    ) =>
       (consultationId === null || isId(consultationId)) &&
-      (referralId === null || isId(referralId))
+      (referralId === null || isId(referralId)) &&
+      (statement === null ||
+        (typeof statement === "string" &&
+          statement.trim() !== "" &&
+          statement.length <= MAX_STATEMENT))
         ? observedWrite(
             "complaint_open",
             deadlineMs,
@@ -555,6 +564,7 @@ function callsOf(client: RequestClient, deadlineMs: number) {
               client.rpc("complaint_open", {
                 p_consultation_id: consultationId,
                 p_referral_id: referralId,
+                p_statement: statement,
               }),
             openAnswerOf,
           )

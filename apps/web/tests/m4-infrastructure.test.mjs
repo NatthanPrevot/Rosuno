@@ -830,6 +830,17 @@ const MVP001_STAFF_APP = [
   "app/staff/reviews/actions.ts",
   "app/staff/reviews/forms.tsx",
   "app/staff/reviews/page.tsx",
+  // MVP-001 S11 PS-A6: break-glass access (the request, grants and queue
+  // page and the read-only view) and data requests (the queue and one
+  // request), each with its forms and its one server action module.
+  "app/staff/break-glass/[grant]/page.tsx",
+  "app/staff/break-glass/actions.ts",
+  "app/staff/break-glass/forms.tsx",
+  "app/staff/break-glass/page.tsx",
+  "app/staff/data-requests/[request]/page.tsx",
+  "app/staff/data-requests/actions.ts",
+  "app/staff/data-requests/forms.tsx",
+  "app/staff/data-requests/page.tsx",
 ];
 
 // MVP-001 D-4: the verification queue page reads exactly one query value,

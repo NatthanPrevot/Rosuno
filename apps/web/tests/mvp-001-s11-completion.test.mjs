@@ -900,8 +900,14 @@ function complaintWorld(options = {}) {
       environmentIdentity: async () => DEV,
     }),
     writes: async () => ({
-      open: async (c, r) => {
-        calls.push(["open", c, r]);
+      // MVP-001 S11 PS-A6 section 5: and the optional statement, recorded
+      // when the form carries one.
+      open: async (c, r, statement) => {
+        calls.push(
+          statement === null || statement === undefined
+            ? ["open", c, r]
+            : ["open", c, r, statement],
+        );
         return state.open;
       },
       update: async (id, action) => {
@@ -958,6 +964,32 @@ test("S11-11. a client reports a problem about none or one of their own Consulta
     "invalid",
   );
   assert.deepEqual(bad.calls, []);
+  // MVP-001 S11 PS-A6 section 5: the optional statement is trimmed and sent
+  // (an empty one is none); one longer than 20,000 characters or carrying a
+  // control character is invalid and nothing is sent.
+  const stated = complaintWorld();
+  assert.deepEqual(
+    await openClientComplaint(
+      stated.client,
+      form({ consultation: "", statement: "  Synthetic statement  " }),
+    ),
+    { status: "outcome", outcome: "complaint_opened" },
+  );
+  await openClientComplaint(stated.client, form({ statement: "   " }));
+  assert.deepEqual(stated.calls, [
+    ["open", null, null, "Synthetic statement"],
+    ["open", null, null],
+  ]);
+  for (const statement of ["x".repeat(20001), "a\u0001b"]) {
+    const refused = complaintWorld();
+    assert.equal(
+      (await openClientComplaint(refused.client, form({ statement }))).status,
+      "invalid",
+    );
+    assert.deepEqual(refused.calls, []);
+  }
+  // MVP-001 S11 PS-A6 section 5 re-pin: the complainant's own row carries
+  // their statement (none here).
   const own = {
     complaint_case_id: CASE,
     state: "opened",
@@ -965,16 +997,29 @@ test("S11-11. a client reports a problem about none or one of their own Consulta
     referral_id: null,
     opened_at: T,
     resolved_at: null,
+    statement: null,
   };
   assert.equal(
     (await resolveClientComplaints(complaintWorld({ mine: rows([own]) }).client))
       .status,
     "ready",
   );
+  assert.equal(
+    (
+      await resolveClientComplaints(
+        complaintWorld({ mine: rows([{ ...own, statement: "Synthetic" }]) })
+          .client,
+      )
+    ).status,
+    "ready",
+  );
   for (const row of [
     { ...own, state: "resolved" },
     { ...own, assigned_to_user_id: USER },
     { ...own, state: "closed" },
+    // MVP-001 S11 PS-A6: a blank or missing statement is not a statement.
+    { ...own, statement: "  " },
+    (({ statement, ...rest }) => rest)(own),
   ]) {
     assert.equal(
       (await resolveClientComplaints(complaintWorld({ mine: rows([row]) }).client))

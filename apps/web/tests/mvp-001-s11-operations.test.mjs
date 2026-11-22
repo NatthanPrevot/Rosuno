@@ -461,19 +461,31 @@ test("S11B-3 the staff home groups its links by area (operations, attorneys, pol
       ["manage_client_accounts"],
       ["view_referral_operations", ID(5)],
     ]),
-    ["operations", "system-health", "audit", "clients", "referrals"],
+    // MVP-001 S11 PS-A6 re-pin: and break-glass access, which every active
+    // staff member may request (no capability).
+    ["operations", "system-health", "audit", "clients", "referrals", "break-glass"],
   );
   assert.deepEqual(await home([["manage_financial_operations"]]), [
     "finance",
     "finance-summary",
+    "break-glass",
   ]);
   assert.deepEqual(
     await home([
       ["view_operations", ID(5)],
       ["manage_client_accounts", ID(5)],
     ]),
-    [],
+    ["break-glass"],
   );
+  // MVP-001 S11 PS-A6: data requests need the global manage_data_requests
+  // grant; a scoped one opens nothing.
+  assert.deepEqual(await home([["manage_data_requests"]]), [
+    "break-glass",
+    "data-requests",
+  ]);
+  assert.deepEqual(await home([["manage_data_requests", ID(5)]]), [
+    "break-glass",
+  ]);
   const page = codeOf(read("app/staff/page.tsx"));
   assert.match(page, /SURFACE_AREAS\.map\(/);
   assert.doesNotMatch(page, /searchParams|params/);
@@ -1834,6 +1846,8 @@ test("S11B-19 (correction pass A1, A4 and A7) rendered: the review item list's p
     {
       caseId: ID(90),
       kind: "resolve",
+      // MVP-001 S11 PS-A6 section 4: the configured codes are the choices.
+      codes: ["synthetic_upheld", "synthetic_not_upheld"],
       resolved: false,
     },
   );
@@ -1841,17 +1855,37 @@ test("S11B-19 (correction pass A1, A4 and A7) rendered: the review item list's p
   assert.match(open.html, /name="code"/);
   assert.match(open.text, /Resolve/);
   assert.doesNotMatch(open.text, /This case is resolved\./);
+  // MVP-001 S11 PS-A6 section 4: exactly the configured codes are offered
+  // (a select, no free entry), and without a configured vocabulary there is
+  // no field at all.
+  assert.deepEqual(
+    [...open.html.matchAll(/<option value="([a-z_]+)"/g)].map((m) => m[1]),
+    ["synthetic_upheld", "synthetic_not_upheld"],
+  );
+  assert.doesNotMatch(open.html, /<input[^>]*name="code"/);
+  const unconfigured = await renderOf(
+    "app/staff/complaints/forms.tsx",
+    "DecideCaseForm",
+    { caseId: ID(90), kind: "classify", codes: [], resolved: false },
+  );
+  assert.doesNotMatch(unconfigured.html, /<form|<input|<select|<button/);
+  assert.equal(
+    unconfigured.text,
+    "No categories are configured for this case yet.",
+  );
   const resolved = await renderOf(
     "app/staff/complaints/forms.tsx",
     "DecideCaseForm",
-    { caseId: ID(90), kind: "resolve", resolved: true },
+    { caseId: ID(90), kind: "resolve", codes: [], resolved: true },
   );
   assert.doesNotMatch(resolved.html, /<form|<input|<button/);
   assert.equal(resolved.text, "This case is resolved.");
   const casePage = codeOf(read("app/staff/complaints/[case]/page.tsx"));
   assert.match(
     casePage,
-    /\{record\.state === "resolved" \? null : \(\s+<>\s+<CaseActionsForm[\s\S]*?<DecideCaseForm caseId=\{record\.id\} kind="classify" \/>\s+<\/>\s+\)\}\s+(?:\{\}\s+)?<DecideCaseForm\s+caseId=\{record\.id\}\s+kind="resolve"\s+resolved=\{record\.state === "resolved"\}\s+\/>/,
+    // MVP-001 S11 PS-A6 section 4 re-pin: each form receives the case's
+    // configured codes.
+    /\{record\.state === "resolved" \? null : \(\s+<>\s+<CaseActionsForm[\s\S]*?<DecideCaseForm\s+caseId=\{record\.id\}\s+kind="classify"\s+codes=\{record\.categoryCodes\}\s+\/>\s+<\/>\s+\)\}\s+(?:\{\}\s+)?<DecideCaseForm\s+caseId=\{record\.id\}\s+kind="resolve"\s+codes=\{record\.resolutionCodes\}\s+resolved=\{record\.state === "resolved"\}\s+\/>/,
   );
   assert.equal(casePage.match(/<DecideCaseForm\b/g).length, 2);
   assert.doesNotMatch(casePage, /This case is resolved/);

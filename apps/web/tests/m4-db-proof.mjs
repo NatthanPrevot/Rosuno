@@ -1575,6 +1575,10 @@ function probes() {
           // (authenticated), which writes nothing.
           "client_consultations:s",
           "client_create_intake:v",
+          // MVP-001 S11 PS-A6 (20261127190000 and 20261127200000): break-glass
+          // access and data requests (authenticated; staff at aal2), which write
+          // only break_glass_grants, data_requests and audit events; no M4 relation.
+          "client_data_requests:s",
           "client_intake_jurisdictions:s",
           "client_intake_practice_areas:s",
           // MVP-001 S6 re-pin (20261122030000): the client's own Intake
@@ -1611,7 +1615,11 @@ function probes() {
           // Consultations (authenticated), which writes nothing.
           "client_reviews:s",
           "client_save_intake_revision:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "client_submit_data_request:v",
           "client_submit_intake:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "client_withdraw_data_request:v",
           // MVP-001 S11 (20261127060000): the complainant's own Complaint Cases
           // (authenticated), and a participant's complaint intake, which writes
           // only one Complaint Case, the complainant's Notifications and an
@@ -1826,6 +1834,9 @@ function probes() {
           // MVP-001 S1 re-pin (20261117030000): the configuration
           // administration functions, which write no M4 relation.
           "staff_add_policy_authority_reference:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "staff_approve_break_glass:v",
+          "staff_assign_data_request:v",
           // MVP-001 S7 re-pin (20261123020000): the finance workspace functions
           // (authenticated, aal2, manage_financial_operations): the reads
           // write nothing; the refund, reconciliation and exception functions
@@ -1842,6 +1853,11 @@ function probes() {
           "staff_attorney_profile:s",
           "staff_audit_event:v",
           "staff_audit_events:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "staff_break_glass_consultation:v",
+          "staff_break_glass_grant:s",
+          "staff_break_glass_grants_mine:s",
+          "staff_break_glass_queue:s",
           "staff_cancel_job:v",
           // MVP-001 S11 pass 2 (20261127110000, 20261127120000): reinstatement and
           // removal (authenticated, aal2, global manage_attorney_verification), an
@@ -1875,6 +1891,10 @@ function probes() {
           "staff_create_policy_version:v",
           "staff_create_practice_area:v",
           "staff_create_service_area:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "staff_data_request:s",
+          "staff_data_request_queue:s",
+          "staff_decide_data_request:v",
           "staff_decide_policy_authority_reference:v",
           "staff_decide_practice_area:v",
           "staff_define_launch_gate:v",
@@ -1937,6 +1957,8 @@ function probes() {
           "staff_referral_counts:s",
           "staff_referrals:s",
           "staff_release_legal_hold:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "staff_request_break_glass:v",
           // MVP-001 S7 re-pin (20261123020000): finance writes, as above.
           "staff_request_reconciliation:v",
           "staff_request_refund:v",
@@ -1962,6 +1984,8 @@ function probes() {
           // (authenticated, aal2, moderate_reviews), which writes nothing.
           "staff_review_queue:s",
           "staff_revise_policy_draft:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "staff_revoke_break_glass:v",
           "staff_revoke_capability:v",
           "staff_revoke_launch_authorization:v",
           "staff_set_practice_area_active:v",

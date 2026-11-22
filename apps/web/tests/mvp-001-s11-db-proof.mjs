@@ -117,6 +117,14 @@ const S11_SURFACES_MIGRATIONS = Object.freeze([
 const S11_CORRECTIONS_MIGRATIONS = Object.freeze([
   "20261127180000_mvp_001_s11_review_corrections.sql",
 ]);
+// MVP-001 S11 PS-A6: the break-glass, data request and complaint
+// configuration migrations follow the review corrections (registered and
+// checked by the S11 PS-A6 proof).
+const S11_PS_A6_MIGRATIONS = Object.freeze([
+  "20261127190000_mvp_001_s11_break_glass.sql",
+  "20261127200000_mvp_001_s11_data_requests.sql",
+  "20261127210000_mvp_001_s11_complaint_configuration.sql",
+]);
 // The one migration that inserts catalog rows (the five capability codes) and
 // the one that creates a relation (the PS section 21.1 reviews relation).
 const S11_INTEGRITY = "20261127010000_mvp_001_s11_completion_integrity.sql";
@@ -478,6 +486,7 @@ function applyMigrations() {
     ...S11_OPERATIONS_MIGRATIONS,
     ...S11_SURFACES_MIGRATIONS,
     ...S11_CORRECTIONS_MIGRATIONS,
+    ...S11_PS_A6_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -2534,7 +2543,9 @@ const S11_AUTHENTICATED_API = Object.freeze([
   "staff_place_legal_hold(text, uuid, text)",
   "staff_release_legal_hold(uuid)",
   "staff_legal_holds(text, integer)",
-  "complaint_open(uuid, uuid)",
+  // MVP-001 S11 PS-A6 section 5: complaint_open takes the optional
+  // statement last (20261127210000).
+  "complaint_open(uuid, uuid, text)",
   "complaint_cases_mine()",
   "staff_complaint_queue(text, integer)",
   "staff_complaint_case(uuid)",
@@ -2669,8 +2680,11 @@ async function migrationChecks() {
       assert.deepEqual(columns, {
         reviews:
           "id:uuid:NO,consultation_id:uuid:NO,client_id:uuid:NO,rating:smallint:NO,review_text:text:YES,state:text:NO,submitted_at:timestamp with time zone:YES,published_at:timestamp with time zone:YES,moderated_at:timestamp with time zone:YES,created_at:timestamp with time zone:NO",
+        // MVP-001 S11 PS-A6 section 5 re-pin: and exactly the statement
+        // column of the later registered complaint configuration migration
+        // (20261127210000; checked by the S11 PS-A6 proof).
         complaint_cases:
-          "id:uuid:NO,complainant_user_id:uuid:NO,consultation_id:uuid:YES,referral_id:uuid:YES,jurisdiction_id:uuid:YES,state:text:NO,category_code:text:YES,opened_at:timestamp with time zone:NO,resolved_at:timestamp with time zone:YES,assigned_to_user_id:uuid:YES,resolution_code:text:YES,created_at:timestamp with time zone:NO,updated_at:timestamp with time zone:NO",
+          "id:uuid:NO,complainant_user_id:uuid:NO,consultation_id:uuid:YES,referral_id:uuid:YES,jurisdiction_id:uuid:YES,state:text:NO,category_code:text:YES,opened_at:timestamp with time zone:NO,resolved_at:timestamp with time zone:YES,assigned_to_user_id:uuid:YES,resolution_code:text:YES,created_at:timestamp with time zone:NO,updated_at:timestamp with time zone:NO,statement:text:YES",
         legal_holds:
           "id:uuid:NO,scope_type:text:NO,scope_id:uuid:NO,status:text:NO,reason:text:NO,started_at:timestamp with time zone:NO,released_at:timestamp with time zone:YES,created_by_user_id:uuid:NO,released_by_user_id:uuid:YES,created_at:timestamp with time zone:NO",
       });
@@ -2678,7 +2692,9 @@ async function migrationChecks() {
         sql(
           "select string_agg(code, ',' order by code) from public.policy_types;",
         ),
-        "automated_referral_quality,bookability,cancellation,eligibility,engagement,fee,governance,notification,payment,payment_flow,referral,refund,reporting,retention,scheduling",
+        // MVP-001 S11 PS-A6 adds exactly one policy type, complaint
+        // (registered and checked by the S11 PS-A6 proof).
+        "automated_referral_quality,bookability,cancellation,complaint,eligibility,engagement,fee,governance,notification,payment,payment_flow,referral,refund,reporting,retention,scheduling",
       );
       const policies = sql(
         "select string_agg(tablename || '.' || policyname || ':' || cmd || ':' || array_to_string(roles, '+'), ',' order by tablename, policyname) from pg_policies where schemaname = 'public' and tablename in ('reviews', 'complaint_cases', 'legal_holds');",
@@ -2703,6 +2719,10 @@ async function migrationChecks() {
           "complaint_cases.complaint_cases_codes_v1_check",
           "complaint_cases.complaint_cases_resolution_v1_check",
           "complaint_cases.complaint_cases_state_v1_check",
+          // MVP-001 S11 PS-A6 section 5 re-pin: and exactly the statement
+          // check of the later registered complaint configuration migration
+          // (20261127210000).
+          "complaint_cases.complaint_cases_statement_v1_check",
           "legal_holds.legal_holds_reason_v1_check",
           "legal_holds.legal_holds_status_v1_check",
           "notifications.notifications_type_v2_check",
@@ -2749,8 +2769,11 @@ async function migrationChecks() {
         // MVP-001 S11 pass 2 re-pin: and exactly the four codes of the later
         // registered S11 operations-integrity migration (20261127080000):
         // manage_client_accounts, view_audit_events, view_operations and
-        // view_referral_operations.
-        "authorize_jurisdiction_launch,manage_attorney_verification,manage_client_accounts,manage_complaints,manage_compliance_reviews,manage_consultation_operations,manage_financial_operations,manage_intake_configuration,manage_jurisdiction_configuration,manage_legal_holds,manage_operational_jobs,manage_policy_configuration,manage_staff_capabilities,moderate_reviews,view_audit_events,view_operations,view_referral_operations",
+        // view_referral_operations. MVP-001 S11 PS-A6 re-pin: and exactly the
+        // two codes of the later registered PS-A6 migrations
+        // (approve_break_glass, 20261127190000; manage_data_requests,
+        // 20261127200000).
+        "approve_break_glass,authorize_jurisdiction_launch,manage_attorney_verification,manage_client_accounts,manage_complaints,manage_compliance_reviews,manage_consultation_operations,manage_data_requests,manage_financial_operations,manage_intake_configuration,manage_jurisdiction_configuration,manage_legal_holds,manage_operational_jobs,manage_policy_configuration,manage_staff_capabilities,moderate_reviews,view_audit_events,view_operations,view_referral_operations",
       );
       assert.equal(
         sql(
@@ -5662,7 +5685,9 @@ async function complaintChecks() {
         ]),
         [
           [
-            "complaint_case_id,consultation_id,opened_at,referral_id,resolved_at,state",
+            // MVP-001 S11 PS-A6 section 5 re-pin: and the complainant's own
+            // statement (none here).
+            "complaint_case_id,consultation_id,opened_at,referral_id,resolved_at,state,statement",
             linked,
             "opened",
             s.consultation,
@@ -5710,7 +5735,9 @@ async function complaintChecks() {
       assert.equal(one.length, 1);
       assert.equal(
         keysOf(one[0]),
-        "active_legal_holds,assigned_to_me,attorney_joined,both_present,category_code,client_joined,complainant_role,complaint_case_id,consultation_id,consultation_outcome_code,consultation_state,either_left,jurisdiction_id,opened_at,payment_state,referral_id,referral_outcome_code,resolution_code,resolved_at,state",
+        // MVP-001 S11 PS-A6 sections 4 and 5 re-pin: and the statement and the
+        // codes of the vocabulary that governs the case now.
+        "active_legal_holds,assigned_to_me,attorney_joined,both_present,category_code,category_codes,client_joined,complainant_role,complaint_case_id,consultation_id,consultation_outcome_code,consultation_state,either_left,jurisdiction_id,opened_at,payment_state,referral_id,referral_outcome_code,resolution_code,resolution_codes,resolved_at,state,statement",
       );
       assert.deepEqual(
         [

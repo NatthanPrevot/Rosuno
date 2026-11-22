@@ -2,14 +2,16 @@
 
 // The attorney's report form (MVP-001 S11).
 //
-// The form may name one of the attorney's own Consultations; the attorney is
-// always the complainant and the server decides afresh. It shows only the
-// fixed message for the state its action returns.
+// The form may name one of the attorney's own Consultations and carry an
+// optional statement (PS-A6 section 5); the attorney is always the
+// complainant and the server decides afresh. It shows only the fixed message
+// for the state its action returns.
 
 import { useActionState } from "react";
 
 import {
   INITIAL_OPEN_STATE,
+  MAX_STATEMENT,
   type OpenActionState,
 } from "../../../src/application/complaints.ts";
 import {
@@ -22,6 +24,7 @@ import {
   Cluster,
   SelectField,
   Stack,
+  TextAreaField,
 } from "../../../src/presentation/design-system.tsx";
 import { openComplaintAction } from "./actions.ts";
 
@@ -67,6 +70,13 @@ export function ReportForm({
             </option>
           ))}
         </SelectField>
+        <TextAreaField
+          id="report-statement"
+          name="statement"
+          label="What happened (optional)"
+          hint={`At most ${MAX_STATEMENT.toLocaleString("en-US")} characters. Seen only by you and the Rosuno staff who handle reported problems.`}
+          maxLength={MAX_STATEMENT}
+        />
         <Cluster>
           <Button variant="primary" type="submit" disabled={pending}>
             Report the problem

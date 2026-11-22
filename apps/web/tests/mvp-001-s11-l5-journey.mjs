@@ -14,10 +14,11 @@
 //      public profile with the count and average computed at read time;
 //   3. the client reports a problem about that consultation; staff (aal2,
 //      manage_complaints) assign the case and (manage_legal_holds) place a
-//      Legal Hold on it from the case page; with a synthetic complaint
-//      vocabulary wired in as an owner fixture (and the original function
-//      restored byte for byte afterwards), staff classify and resolve the
-//      case and the resolution's message stays in view (correction pass A4);
+//      Legal Hold on it from the case page; with a complaint policy version
+//      for the case's jurisdiction (PS-A6 section 4; development
+//      configuration created by the owner, closed afterwards), staff classify
+//      and resolve the case with its configured codes and the resolution's
+//      message stays in view (correction pass A4);
 //   4. after its slot has passed, the client's cancellation of a stale
 //      consultation is refused with the fixed message and nothing changes
 //      (correction pass R2); staff (aal2, manage_consultation_operations)
@@ -687,51 +688,59 @@ try {
   );
 
   // 3b. MVP-001 S11 correction pass (A4): staff classify and resolve the
-  // case. No configuration home for the complaint vocabularies exists, so a
-  // synthetic vocabulary is wired into the database's one seam as an owner
-  // fixture (as the S11 DB proof does inside a rolled-back transaction) and
-  // the original function is restored byte for byte right after.
-  const VOCABULARY = "public.complaint_vocabulary(uuid, timestamp with time zone)";
-  const vocabulary = sql(`select pg_get_functiondef('${VOCABULARY}'::regprocedure);`);
+  // case. MVP-001 S11 PS-A6 section 4: through the real configured path, a
+  // complaint policy version for the case's jurisdiction (development
+  // configuration created by the owner as a fixture, like every other
+  // version here; closed again right after): the case page offers exactly
+  // its codes and the database records them.
   const resolution = {};
+  resolution.unconfiguredBefore = sql(`select outcome from public.complaint_vocabulary('${J}', now());`);
+  const vocabularyVersion = policy("complaint", J, {
+    category_codes: ["synthetic_category", "synthetic_other_category"],
+    resolution_codes: ["synthetic_resolution"],
+  });
   try {
-    sql(`create or replace function public.complaint_vocabulary(p_jurisdiction uuid, p_as_of timestamptz)
-returns table (outcome text, policy_version_id uuid, category_codes text[], resolution_codes text[])
-language sql stable security invoker set search_path = pg_catalog, pg_temp
-as $f$ select 'selected'::text, null::uuid, array['synthetic_category']::text[], array['synthetic_resolution']::text[]; $f$;`);
+    resolution.selected = sql(`select outcome || '|' || (policy_version_id = '${vocabularyVersion}')::text from public.complaint_vocabulary('${J}', now());`);
     await go(ops.page, `${BASE}/staff/complaints/${caseId}`);
-    await ops.page.fill(`#classify-${caseId}`, "synthetic_category");
+    resolution.offered = await ops.page.$$eval(`#classify-${caseId} option`, (els) => els.map((el) => el.value).filter((v) => v !== ""));
+    await ops.page.selectOption(`#classify-${caseId}`, "synthetic_category");
     await click(ops.page, "Classify");
     resolution.classifyAlerts = await alerts(ops.page);
-    await ops.page.fill(`#resolve-${caseId}`, "synthetic_resolution");
+    await ops.page.selectOption(`#resolve-${caseId}`, "synthetic_resolution");
     await click(ops.page, "Resolve");
     resolution.resolveAlerts = await alerts(ops.page);
     resolution.page = await textOf(ops.page);
-    resolution.fields = await ops.page.$$eval("main form input[name=code]", (els) => els.length);
+    resolution.fields = await ops.page.$$eval("main form [name=code]", (els) => els.length);
     resolution.state = sql(`select concat_ws('|', state, category_code, resolution_code, resolved_at is not null) from public.complaint_cases where id = '${caseId}';`);
+    resolution.audited = sql(`select string_agg(action_code || ':' || (after_snapshot ->> 'vocabulary_policy_version_id' = '${vocabularyVersion}')::text, ',' order by occurred_at) from public.audit_events where resource_id = '${caseId}' and action_code in ('complaint_case.classified', 'complaint_case.resolved');`);
   } finally {
-    sql(`${vocabulary};`);
+    sql(`update public.policy_versions set effective_until = now() where id = '${vocabularyVersion}';`);
   }
-  resolution.restored = sql(`select pg_get_functiondef('${VOCABULARY}'::regprocedure);`) === vocabulary;
-  resolution.unconfigured = sql("select outcome from public.complaint_vocabulary(null, now());");
+  resolution.unconfigured = sql(`select outcome from public.complaint_vocabulary('${J}', now());`);
   step(
-    "staff (aal2, manage_complaints) classify and resolve the case from its page (synthetic vocabulary owner fixture, restored afterwards): the case is resolved with its codes, and the resolution form stays in its slot, so its fixed message stays in view with the resolved text and no field; the matter is unchanged",
+    "staff (aal2, manage_complaints) classify and resolve the case from its page with the configured codes of a complaint policy version for its jurisdiction (PS-A6 section 4; development configuration, closed afterwards): the page offers exactly those codes, the case is resolved with them and the selected version is audited, and the resolution form stays in its slot, so its fixed message stays in view with the resolved text and no field; the matter is unchanged",
     {
+      unconfiguredBefore: resolution.unconfiguredBefore,
+      selected: resolution.selected,
+      offered: resolution.offered,
       classifyAlerts: resolution.classifyAlerts,
       resolveAlerts: resolution.resolveAlerts,
       resolvedShown: resolution.page?.includes("This case is resolved.") ?? false,
       fields: resolution.fields,
       state: resolution.state,
-      restored: resolution.restored,
+      audited: resolution.audited,
       unconfigured: resolution.unconfigured,
       matterUnchanged: matterBefore === matterOf(),
     },
-    resolution.classifyAlerts?.includes("Saved") === true &&
+    resolution.unconfiguredBefore === "configuration_unavailable" &&
+      resolution.selected === "selected|true" &&
+      JSON.stringify(resolution.offered) === JSON.stringify(["synthetic_category", "synthetic_other_category"]) &&
+      resolution.classifyAlerts?.includes("Saved") === true &&
       resolution.resolveAlerts?.includes("Saved") === true &&
       resolution.page.includes("This case is resolved.") &&
       resolution.fields === 0 &&
       resolution.state === "resolved|synthetic_category|synthetic_resolution|t" &&
-      resolution.restored &&
+      resolution.audited === "complaint_case.classified:true,complaint_case.resolved:true" &&
       resolution.unconfigured === "configuration_unavailable" &&
       matterBefore === matterOf(),
   );

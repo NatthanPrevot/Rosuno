@@ -3,10 +3,12 @@
 // Complaint workspace forms (MVP-001 S11).
 //
 // Each form names only the case and the step (assign, unassign, escalate,
-// return to review) or the code the staff member enters for classification
-// or resolution. The server re-checks the caller's step-up, identity and
-// capability, and the database decides again. Each form shows only the fixed
-// message for the state its action returns.
+// return to review) or the code the staff member chooses for classification
+// or resolution among the codes the database answers for the case (PS-A6
+// section 4; none while no complaint vocabulary is configured). The server
+// re-checks the caller's step-up, identity and capability, and the database
+// decides again. Each form shows only the fixed message for the state its
+// action returns.
 
 import { useActionState } from "react";
 
@@ -24,9 +26,9 @@ import {
   Alert,
   Button,
   Cluster,
+  SelectField,
   Stack,
   Text,
-  TextField,
 } from "../../../src/presentation/design-system.tsx";
 import {
   classifyCaseAction,
@@ -82,10 +84,13 @@ export function CaseActionsForm({
 export function DecideCaseForm({
   caseId,
   kind,
+  codes,
   resolved = false,
 }: {
   readonly caseId: string;
   readonly kind: "classify" | "resolve";
+  // The configured codes for this case (empty while none is configured).
+  readonly codes: readonly string[];
   readonly resolved?: boolean;
 }) {
   const [state, action, pending] = useActionState<CaseActionState, FormData>(
@@ -100,19 +105,40 @@ export function DecideCaseForm({
       </Stack>
     );
   }
+  if (codes.length === 0) {
+    return (
+      <Stack gap="tight">
+        <Outcome state={state} />
+        <Text>
+          {kind === "classify"
+            ? "No categories are configured for this case yet."
+            : "No resolutions are configured for this case yet."}
+        </Text>
+      </Stack>
+    );
+  }
   return (
     <form action={action}>
       <Stack gap="tight">
         <Outcome state={state} />
         <input type="hidden" name="case" value={caseId} />
-        <TextField
+        <SelectField
           id={`${kind}-${caseId}`}
           name="code"
-          label={kind === "classify" ? "Category code" : "Resolution code"}
-          hint="A code from the configured list."
-          autoComplete="off"
+          label={kind === "classify" ? "Category" : "Resolution"}
+          hint="The configured codes for this case."
           required
-        />
+          defaultValue=""
+        >
+          <option value="" disabled>
+            Choose
+          </option>
+          {codes.map((code) => (
+            <option key={code} value={code}>
+              {code}
+            </option>
+          ))}
+        </SelectField>
         <Cluster>
           <Button variant="secondary" type="submit" disabled={pending}>
             {kind === "classify" ? "Classify" : "Resolve"}

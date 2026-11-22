@@ -133,6 +133,14 @@ const S11_SURFACES_MIGRATIONS = Object.freeze([
 const S11_CORRECTIONS_MIGRATIONS = Object.freeze([
   "20261127180000_mvp_001_s11_review_corrections.sql",
 ]);
+// MVP-001 S11 PS-A6: the break-glass, data request and complaint
+// configuration migrations follow the review corrections (registered and
+// checked by the S11 PS-A6 proof).
+const S11_PS_A6_MIGRATIONS = Object.freeze([
+  "20261127190000_mvp_001_s11_break_glass.sql",
+  "20261127200000_mvp_001_s11_data_requests.sql",
+  "20261127210000_mvp_001_s11_complaint_configuration.sql",
+]);
 // The one migration that inserts catalog rows (the five capability codes) and
 // the one that creates a relation (the PS section 21.1 reviews relation).
 const S11_INTEGRITY = "20261127010000_mvp_001_s11_completion_integrity.sql";
@@ -510,6 +518,7 @@ function applyMigrations() {
     ...S11_OPERATIONS_MIGRATIONS,
     ...S11_SURFACES_MIGRATIONS,
     ...S11_CORRECTIONS_MIGRATIONS,
+    ...S11_PS_A6_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -2908,6 +2917,50 @@ const CATALOG_QUERIES = Object.freeze({
     "select coalesce(string_agg(table_name || ':' || grantee || ':' || privilege_type, ',' order by table_name, grantee, privilege_type), '') from information_schema.role_table_grants where table_schema = 'public' and grantee in ('anon', 'authenticated', 'service_role');",
 });
 
+// MVP-001 S11 PS-A6: the catalog objects the later registered PS-A6
+// migrations add (20261127190000 to 20261127210000), admitted exactly by name
+// so the listings above still compare pass 2 with pass 1 (their exact
+// columns, constraints, indexes, triggers, rows and privileges are checked by
+// the S11 PS-A6 proof): the relations break_glass_grants and data_requests
+// with their row types, named indexes, constraints and triggers; the
+// complaint_cases statement column and its one check; the complaint policy
+// type; the two capability catalog rows.
+const PS_A6_RELATIONS = Object.freeze(["break_glass_grants", "data_requests"]);
+const PS_A6_INDEXES = Object.freeze([
+  "break_glass_grants_pkey",
+  "break_glass_grants_requested_at_idx",
+  "break_glass_grants_requester_idx",
+  "break_glass_grants_resource_idx",
+  "data_requests_one_open_idx",
+  "data_requests_pkey",
+  "data_requests_requester_idx",
+  "data_requests_state_submitted_idx",
+]);
+const PS_A6_TRIGGERS = Object.freeze([
+  "break_glass_grants.break_glass_grants_guard",
+  "break_glass_grants.break_glass_grants_no_truncate",
+  "data_requests.data_requests_guard",
+  "data_requests.data_requests_no_truncate",
+  "data_requests.data_requests_set_updated_at",
+]);
+const PS_A6_CAPABILITIES = Object.freeze([
+  "approve_break_glass",
+  "manage_data_requests",
+]);
+const psA6List = (names) => names.map((n) => `'${n}'`).join(", ");
+// The same listings without exactly those objects (for the database with
+// every migration applied).
+const CATALOG_QUERIES_BEFORE_PS_A6 = Object.freeze({
+  ...CATALOG_QUERIES,
+  relations: `select coalesce(string_agg(relkind::text || ':' || relname, ',' order by relname), '') from pg_class where relnamespace = 'public'::regnamespace and relname not in (${psA6List([...PS_A6_RELATIONS, ...PS_A6_INDEXES])});`,
+  columns: `select coalesce(string_agg(table_name || '.' || column_name || ':' || data_type || ':' || is_nullable || ':' || coalesce(column_default, ''), ',' order by table_name, ordinal_position), '') from information_schema.columns where table_schema = 'public' and table_name not in (${psA6List(PS_A6_RELATIONS)}) and not (table_name = 'complaint_cases' and column_name = 'statement');`,
+  constraints: `select coalesce(string_agg(conrelid::regclass::text || '.' || conname || ':' || pg_get_constraintdef(oid), ',' order by conrelid::regclass::text, conname), '') from pg_constraint where connamespace = 'public'::regnamespace and conrelid::regclass::text not in (${psA6List(PS_A6_RELATIONS)}) and conname <> 'complaint_cases_statement_v1_check';`,
+  indexes: `select coalesce(string_agg(indexdef, ',' order by indexname), '') from pg_indexes where schemaname = 'public' and indexname not in (${psA6List(PS_A6_INDEXES)});`,
+  types: `select coalesce(string_agg(typname, ',' order by typname), '') from pg_type where typnamespace = 'public'::regnamespace and typname not in (${psA6List([...PS_A6_RELATIONS, ...PS_A6_RELATIONS.map((n) => `_${n}`)])});`,
+  policy_types:
+    "select coalesce(string_agg(code, ',' order by code), '') from public.policy_types where code <> 'complaint';",
+});
+
 const triggersOf = (db) =>
   sql(
     "select coalesce(string_agg(c.relname || '.' || t.tgname, ',' order by c.relname, t.tgname), '') from pg_trigger t join pg_class c on c.oid = t.tgrelid where not t.tgisinternal and c.relnamespace = 'public'::regnamespace;",
@@ -2935,19 +2988,30 @@ async function opsMigrationChecks() {
       const differences = {};
       for (const [name, query] of Object.entries(CATALOG_QUERIES)) {
         const before = sql(query, BASE_DB);
-        const after = sql(query);
+        // MVP-001 S11 PS-A6: without exactly the PS-A6 objects (see above).
+        const after = sql(CATALOG_QUERIES_BEFORE_PS_A6[name]);
         if (before !== after) {
           differences[name] = true;
         }
       }
       assert.deepEqual(differences, {});
       const before = new Set(triggersOf(BASE_DB));
-      const added = triggersOf(DB).filter((t) => !before.has(t));
+      const added = triggersOf(DB).filter(
+        (t) => !before.has(t) && !PS_A6_TRIGGERS.includes(t),
+      );
       assert.deepEqual(added, [
         "attorney_profiles.attorney_profiles_rejoin_detection",
         "licenses.licenses_rejoin_detection",
       ]);
-      assert.equal(triggersOf(DB).length, before.size + 2);
+      // MVP-001 S11 PS-A6: and exactly the five PS-A6 triggers.
+      assert.deepEqual(
+        triggersOf(DB).filter((t) => PS_A6_TRIGGERS.includes(t)),
+        [...PS_A6_TRIGGERS],
+      );
+      assert.equal(
+        triggersOf(DB).length,
+        before.size + 2 + PS_A6_TRIGGERS.length,
+      );
       const admittedCatalog =
         "insert into public.capability_definitions (capability_code)";
       for (const file of S11_OPERATIONS_MIGRATIONS) {
@@ -2982,13 +3046,20 @@ async function opsMigrationChecks() {
         ).split(",");
       const before = new Set(catalog(BASE_DB));
       assert.deepEqual(
-        catalog(PROD_DB).filter((c) => !before.has(c)),
+        catalog(PROD_DB).filter(
+          (c) => !before.has(c) && !PS_A6_CAPABILITIES.includes(c),
+        ),
         [
           "manage_client_accounts",
           "view_audit_events",
           "view_operations",
           "view_referral_operations",
         ],
+      );
+      // MVP-001 S11 PS-A6: and exactly the two PS-A6 catalog rows.
+      assert.deepEqual(
+        catalog(PROD_DB).filter((c) => PS_A6_CAPABILITIES.includes(c)),
+        [...PS_A6_CAPABILITIES],
       );
       assert.equal(
         sql("select count(*) from public.capability_grants;", PROD_DB),
@@ -5989,7 +6060,8 @@ async function surfacesChecks() {
       );
       const differences = {};
       for (const [name, query] of Object.entries(CATALOG_QUERIES)) {
-        if (sql(query, BASE_DB) !== sql(query)) {
+        // MVP-001 S11 PS-A6: without exactly the PS-A6 objects.
+        if (sql(query, BASE_DB) !== sql(CATALOG_QUERIES_BEFORE_PS_A6[name])) {
           differences[name] = true;
         }
       }
@@ -6742,7 +6814,8 @@ async function correctionChecks() {
       );
       const differences = {};
       for (const [name, query] of Object.entries(CATALOG_QUERIES)) {
-        if (sql(query, BASE_DB) !== sql(query)) {
+        // MVP-001 S11 PS-A6: without exactly the PS-A6 objects.
+        if (sql(query, BASE_DB) !== sql(CATALOG_QUERIES_BEFORE_PS_A6[name])) {
           differences[name] = true;
         }
       }
