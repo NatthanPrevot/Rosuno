@@ -2448,7 +2448,8 @@
         "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
         "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A4-LOCKED",
         "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A3-LOCKED",
-        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A5-LOCKED"
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A5-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A6-LOCKED"
       ],
       "decision_refs": [
         "DEC-20261116-DL-ENG-3-PROGRAM-PACKETS",
@@ -2457,7 +2458,8 @@
         "DEC-20261117-PS-A4-AUTHENTICATION-ABUSE-COUNTERS",
         "DEC-20261117-S2-AUTHENTICATION-PROTECTION-UNAVAILABLE-BEHAVIOR",
         "DEC-20261118-PS-A3-CONSULTATION-OFFERS",
-        "DEC-20261119-PS-A5-DOCUMENT-VERSION-LINEAGE"
+        "DEC-20261119-PS-A5-DOCUMENT-VERSION-LINEAGE",
+        "DEC-20261122-PS-A6-BREAK-GLASS-DATA-REQUESTS-COMPLAINTS"
       ],
       "dependencies": [
         "WI-P1-003-JURISDICTION-POLICY-LAUNCH-FOUNDATION",
@@ -2581,7 +2583,7 @@
       ],
       "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",
-      "updated_at": "2026-11-22T17:12:28Z"
+      "updated_at": "2026-11-22T20:34:05Z"
     },
     {
       "work_item_id": "WI-P2-005-EXISTING-ACCOUNT-AUTHENTICATION-ENTRY",

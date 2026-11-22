@@ -187,6 +187,17 @@
       "integrity": "sha256:5415ab386ccf2913e2f3becf62cc1a6c78745ac7b1f8db57d28abf2b96ec3a74",
       "usage": "reference-only",
       "status": "active"
+    },
+    {
+      "authority_id": "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A6-LOCKED",
+      "title": "Rosuno Physical Specification Bounded Amendment PS-A6, revision 1 (break-glass grants, data requests, the complaint policy type and complaint_cases.statement), rosuno-physical-specification-amendment-ps-a6.md",
+      "location": "external locked authority package",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "sha256:34e7fcff469470a80baaf1dd6dbab35aa124c1734aadc2b5979efb9adff331c7",
+      "usage": "reference-only",
+      "status": "pending_lock_condition"
     }
   ]
 }
