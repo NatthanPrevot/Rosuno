@@ -467,6 +467,9 @@ function applyMigrations() {
     // MVP-001 S11 pass 2B: the participants' workspace reads (registered
     // and checked by the S11 operations proof).
     "20261127170000_mvp_001_s11_workspace_reads.sql",
+    // MVP-001 S11 review corrections (registered and checked by the S11
+    // operations proof).
+    "20261127180000_mvp_001_s11_review_corrections.sql",
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

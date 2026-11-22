@@ -58,11 +58,18 @@ import { readProviderConfiguration } from "../environment/provider-configuration
 import {
   DAILY_API_KEY_SETTING,
   DAILY_DOMAIN_SETTING,
+  readDailyWebhookSecret,
 } from "../media/daily-provider.ts";
-import { emailDeliveryConfigured } from "../notifications/notification-jobs.ts";
+import {
+  emailDeliveryConfigured,
+  emailWebhookConfigured,
+} from "../notifications/notification-jobs.ts";
 import { errorFieldsOf, type LogFields } from "../observability/log.ts";
 import { logRequestEvent } from "../observability/request-log.ts";
-import { readStripeApiConfiguration } from "../payments/stripe-provider.ts";
+import {
+  readStripeApiConfiguration,
+  readStripeWebhookSecret,
+} from "../payments/stripe-provider.ts";
 import {
   boundedPort,
   CALL_DEADLINE_MS,
@@ -458,21 +465,31 @@ export function createAdministrationWrites(
 type Environment = Readonly<Record<string, string | undefined>>;
 
 // Whether each provider's settings have their declared shape for the current
-// environment class: configured or not configured, never a value.
+// environment class: configured or not configured, never a value. An area is
+// configured only with its webhook signing setting too (the payment, media
+// and email webhook routes answer unavailable without it).
 export function providerStatuses(
   environment: Environment = process.env,
 ): Readonly<Record<ProviderArea, ProviderStatus>> {
   const status = (configured: boolean): ProviderStatus =>
     configured ? "configured" : "not_configured";
+  // The signing settings are checked by the webhook routes' own readers; only
+  // whether one answers is kept here.
   return Object.freeze({
-    payments: status(readStripeApiConfiguration(environment) !== null),
+    payments: status(
+      readStripeApiConfiguration(environment) !== null &&
+        readStripeWebhookSecret(environment) !== null,
+    ),
     media: status(
       readProviderConfiguration(
         [DAILY_API_KEY_SETTING, DAILY_DOMAIN_SETTING],
         environment,
-      ).kind === "configured",
+      ).kind === "configured" && readDailyWebhookSecret(environment) !== null,
     ),
-    email: status(emailDeliveryConfigured(environment)),
+    email: status(
+      emailDeliveryConfigured(environment) &&
+        emailWebhookConfigured(environment),
+    ),
     // Gate D-4: no AI provider is adopted.
     ai: status(false),
   });

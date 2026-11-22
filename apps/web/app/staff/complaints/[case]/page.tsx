@@ -40,7 +40,6 @@ import {
   Heading,
   Status,
   Table,
-  Text,
 } from "../../../../src/presentation/design-system.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
 import { BackLink, refusalPage, StaffFrame } from "../../frame.tsx";
@@ -161,18 +160,22 @@ export default async function ComplaintCasePage({
       <Heading as="h2" size="md" id="case-steps-title">
         Handling
       </Heading>
-      {record.state === "resolved" ? (
-        <Text>This case is resolved.</Text>
-      ) : (
+      {record.state === "resolved" ? null : (
         <>
           <CaseActionsForm
             caseId={record.id}
             actions={actionsOf(record.state, record.assignedToMe)}
           />
           <DecideCaseForm caseId={record.id} kind="classify" />
-          <DecideCaseForm caseId={record.id} kind="resolve" />
         </>
       )}
+      {/* One slot for the resolution form, so it (and the message for the
+          state its action returned) stays mounted when the case is resolved. */}
+      <DecideCaseForm
+        caseId={record.id}
+        kind="resolve"
+        resolved={record.state === "resolved"}
+      />
       {holds ? (
         <>
           <Heading as="h2" size="md" id="case-hold-title">

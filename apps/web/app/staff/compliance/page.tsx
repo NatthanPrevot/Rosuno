@@ -10,7 +10,9 @@
 //   applications under review, approved, suspended and removed profiles,
 //   licence and insurance end dates, evidence age against the eligibility
 //   policy in force, discipline records and the attorney waitlist; each
-//   profile links to its lifecycle page and its verification record;
+//   profile links to its lifecycle page (which links its verification
+//   record) for holders of the global grant that page requires (plain text
+//   otherwise);
 // - the compliance family's review items (the global manage_compliance_reviews
 //   grant): eligibility and jurisdiction change reviews, rejoin reviews and
 //   client account reviews, listed one page at a time, open or resolved; an
@@ -19,6 +21,9 @@
 // - reported problems by state (manage_complaints), recent policy version
 //   status changes (manage_policy_configuration) and Legal Holds in force
 //   (manage_legal_holds).
+// Each optional section (the attorney records, the review items, the policy
+// status changes) that cannot be read right now is shown as unavailable while
+// the rest of the page is shown; a refusal still refuses the page.
 // Panels, surveys, referral quality and other regulatory-mode-conditional
 // sections are not presented. The query values read, status and page (the
 // review items) and section and records (the attorney records), only choose
@@ -104,7 +109,13 @@ export default async function ComplianceItemsPage({
         page,
       )
     : null;
-  if (view !== null && view.status !== "ready") {
+  // A refusal of the review items refuses the page; review items that cannot
+  // be read right now are shown as unavailable in their own section.
+  if (
+    view !== null &&
+    view.status !== "ready" &&
+    view.status !== "unavailable"
+  ) {
     return refusalPage(view, "/staff/compliance", "Compliance");
   }
   const recordsBase = `/staff/compliance?section=${workspace.section}`;
@@ -146,6 +157,16 @@ export default async function ComplianceItemsPage({
             Open Legal Holds
           </ButtonLink>
         </Cluster>
+      ) : null}
+      {workspace.sections.records === "unavailable" ? (
+        <>
+          <Heading as="h2" size="md">
+            Attorney records
+          </Heading>
+          <Text tone="muted">
+            The attorney records could not be shown right now.
+          </Text>
+        </>
       ) : null}
       {workspace.records === null || workspace.pager === null ? null : (
         <>
@@ -216,12 +237,16 @@ export default async function ComplianceItemsPage({
                           .join(", ") || "—"}
                       </td>
                       <td>
-                        <ButtonLink
-                          variant="tertiary"
-                          href={`/staff/attorneys/${record.attorneyId}`}
-                        >
-                          Open
-                        </ButtonLink>
+                        {workspace.attorneyPages ? (
+                          <ButtonLink
+                            variant="tertiary"
+                            href={`/staff/attorneys/${record.attorneyId}`}
+                          >
+                            Open
+                          </ButtonLink>
+                        ) : (
+                          "Not in your scope"
+                        )}
                       </td>
                     </tr>
                   );
@@ -260,14 +285,31 @@ export default async function ComplianceItemsPage({
             client account suspended with open matters is recorded here for a
             person to review. Nothing is decided automatically.
           </Text>
-          <ReviewItemList
-            view={view}
-            base={`/staff/compliance?status=${view.exceptionStatus}`}
-            assignAction={assignComplianceItemAction}
-            resolveAction={resolveComplianceItemAction}
-          />
+          {view.status !== "ready" ? (
+            <Text tone="muted">
+              The review items could not be shown right now.
+            </Text>
+          ) : (
+            <ReviewItemList
+              view={view}
+              base={`/staff/compliance?status=${view.exceptionStatus}`}
+              pageParameter="page"
+              assignAction={assignComplianceItemAction}
+              resolveAction={resolveComplianceItemAction}
+            />
+          )}
         </>
       )}
+      {workspace.sections.policyChanges === "unavailable" ? (
+        <>
+          <Heading as="h2" size="md">
+            Recent policy status changes
+          </Heading>
+          <Text tone="muted">
+            The policy status changes could not be shown right now.
+          </Text>
+        </>
+      ) : null}
       {workspace.policyChanges === null ? null : (
         <>
           <Heading as="h2" size="md">

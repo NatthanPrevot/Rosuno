@@ -32,12 +32,16 @@ type ItemAction = (
 export function ReviewItemList({
   view,
   base,
+  pageParameter,
   assignAction,
   resolveAction,
 }: {
   readonly view: Extract<FamilyExceptionsView, { status: "ready" }>;
   // The list's own address, with its status.
   readonly base: string;
+  // The query value that carries the list's page on its own address (the
+  // consultation operations page keeps "page" for its consultation list).
+  readonly pageParameter: "items" | "page";
   readonly assignAction: ItemAction;
   readonly resolveAction: ItemAction;
 }) {
@@ -112,7 +116,7 @@ export function ReviewItemList({
         {view.pager.page > 1 ? (
           <ButtonLink
             variant="secondary"
-            href={`${base}&page=${view.pager.page - 1}`}
+            href={`${base}&${pageParameter}=${view.pager.page - 1}`}
           >
             Previous page
           </ButtonLink>
@@ -120,7 +124,7 @@ export function ReviewItemList({
         {view.pager.hasNext ? (
           <ButtonLink
             variant="secondary"
-            href={`${base}&page=${view.pager.page + 1}`}
+            href={`${base}&${pageParameter}=${view.pager.page + 1}`}
           >
             Next page
           </ButtonLink>

@@ -12,7 +12,7 @@
 // Consultation the request concerns. No timer in the browser decides
 // anything.
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   INITIAL_COMMUNICATION_STATE,
@@ -56,6 +56,10 @@ import {
   START_LABEL,
 } from "../../../../src/presentation/consultation-labels.ts";
 import {
+  CANCEL_CONFIRM_LABEL,
+  CANCEL_CONFIRM_PROMPT,
+  CANCEL_KEEP_LABEL,
+  CANCEL_LABEL,
   CANCEL_MESSAGES,
   CANCEL_NOTE,
   END_EARLY_MESSAGES,
@@ -215,25 +219,53 @@ export function CompletionPanel({
     FormData
   >(endEarlyAction, INITIAL_END_EARLY_STATE);
   const pending = cancelling || ending;
+  // Correction pass (A7): the cancellation is asked for in two steps; the
+  // second (sending the form) lasts until the next cancellation answer.
+  const [confirmingAt, setConfirmingAt] = useState<CancelActionState | null>(
+    null,
+  );
   return (
     <Stack gap="tight">
       <Message message={messageOf(cancelState, CANCEL_MESSAGES)} />
       <Message message={messageOf(earlyState, END_EARLY_MESSAGES)} />
-      {cancellable ? (
+      {!cancellable ? null : confirmingAt === cancelState ? (
         <form action={cancelAction}>
           <Stack gap="tight">
             <Text size="small" tone="muted">
               {CANCEL_NOTE}
             </Text>
+            <Text size="small">{CANCEL_CONFIRM_PROMPT}</Text>
             <input type="hidden" name="consultation" value={consultationId} />
             <Cluster>
               <Button variant="secondary" type="submit" disabled={pending}>
-                Cancel the consultation
+                {CANCEL_CONFIRM_LABEL}
+              </Button>
+              <Button
+                variant="tertiary"
+                disabled={pending}
+                onClick={() => setConfirmingAt(null)}
+              >
+                {CANCEL_KEEP_LABEL}
               </Button>
             </Cluster>
           </Stack>
         </form>
-      ) : null}
+      ) : (
+        <Stack gap="tight">
+          <Text size="small" tone="muted">
+            {CANCEL_NOTE}
+          </Text>
+          <Cluster>
+            <Button
+              variant="secondary"
+              disabled={pending}
+              onClick={() => setConfirmingAt(cancelState)}
+            >
+              {CANCEL_LABEL}
+            </Button>
+          </Cluster>
+        </Stack>
+      )}
       {endableEarly ? (
         <form action={earlyAction}>
           <Stack gap="tight">

@@ -14,8 +14,22 @@
 
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { test } from "node:test";
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, posix } from "node:path";
+import { after, test } from "node:test";
+import { pathToFileURL } from "node:url";
+
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import ts from "typescript";
 
 import {
   changeAttorneyLifecycle,
@@ -624,7 +638,7 @@ test("S11B-6 the operations summary needs the global view_operations grant and i
   assert.equal(view.summary.environmentClass, "development");
 });
 
-test("S11B-7 system health reports the recorded environment, whether this deployment's settings match it, the scheduler facts and each provider area's configuration as configured or not configured only (never a value); provider statuses come from the settings' own shape checks, and the AI area is never configured (gate D-4)", async () => {
+test("S11B-7 system health reports the recorded environment, whether this deployment's settings match it, the scheduler facts and each provider area's configuration as configured or not configured only (never a value); provider statuses come from the settings' own shape checks, including each area's webhook signing setting (correction pass A6), and the AI area is never configured (gate D-4)", async () => {
   const view = await resolveSystemHealth(
     operationsSources([["view_operations"]]).sources,
   );
@@ -636,19 +650,62 @@ test("S11B-7 system health reports the recorded environment, whether this deploy
     email: "configured",
     ai: "configured",
   });
-  const statuses = providerStatuses({
+  // MVP-001 S11 correction pass (A6), by exact admission: the settings below
+  // carry the payment and email webhook signing settings (synthetic values
+  // generated for this run only), so the expected statuses are unchanged.
+  const signing = () =>
+    `whsec_${randomBytes(24).toString("base64url").replace(/[-_]/g, "A")}`;
+  const STRIPE_SIGNING = "ROSUNO_STRIPE_WEBHOOK_SECRET";
+  const RESEND_SIGNING = "ROSUNO_RESEND_WEBHOOK_SECRET";
+  const DAILY_SIGNING = "ROSUNO_DAILY_WEBHOOK_SECRET";
+  const settings = {
     ROSUNO_ENVIRONMENT_CLASS: "development",
     ROSUNO_STRIPE_SECRET_KEY: `sk_test_${"a".repeat(24)}`,
     ROSUNO_AUTH_PUBLIC_ORIGIN: "http://localhost:3000",
     ROSUNO_RESEND_API_KEY: `re_${"a".repeat(20)}`,
     ROSUNO_EMAIL_FROM: "notices@rosuno-ops.invalid",
-  });
+    [STRIPE_SIGNING]: signing(),
+    [RESEND_SIGNING]: signing(),
+  };
+  const statuses = providerStatuses(settings);
   assert.deepEqual(statuses, {
     payments: "configured",
     media: "not_configured",
     email: "configured",
     ai: "not_configured",
   });
+  // Each area without (or with a malformed) webhook signing setting is not
+  // configured; media is configured only with its key, domain and signing
+  // setting.
+  for (const [name, area] of [
+    [STRIPE_SIGNING, "payments"],
+    [RESEND_SIGNING, "email"],
+  ]) {
+    for (const value of [undefined, "whsec_", "synthetic"]) {
+      assert.equal(
+        providerStatuses({ ...settings, [name]: value })[area],
+        "not_configured",
+        `${name} ${value}`,
+      );
+    }
+  }
+  const media = {
+    ...settings,
+    ROSUNO_DAILY_API_KEY: "a".repeat(32),
+    ROSUNO_DAILY_DOMAIN: "rosuno-synthetic",
+    [DAILY_SIGNING]: randomBytes(24).toString("base64"),
+  };
+  assert.equal(providerStatuses(media).media, "configured");
+  for (const value of [undefined, "!"]) {
+    assert.equal(
+      providerStatuses({ ...media, [DAILY_SIGNING]: value }).media,
+      "not_configured",
+    );
+  }
+  assert.doesNotMatch(
+    JSON.stringify(providerStatuses(media)),
+    /whsec|sk_test|re_a|localhost|aaaa/,
+  );
   assert.deepEqual(providerStatuses({}), {
     payments: "not_configured",
     media: "not_configured",
@@ -846,7 +903,7 @@ function administrationSources(grants, answers = {}) {
         },
         policyChanges: async (offset) => {
           calls.push(["policyChanges", offset]);
-          return rows([]);
+          return rows(answers.policyChanges ?? []);
         },
         jurisdictionNames: async () => rows([]),
         environmentIdentity: async () => DEV,
@@ -1022,7 +1079,7 @@ test("S11B-10 attorney reinstatement and removal need the global manage_attorney
   );
 });
 
-test("S11B-11 the compliance workspace shows each section only to holders of its capability and refuses a staff member holding none; attorney records are read strictly per section (profile sections only at their own stage and without a jurisdiction); the summary groups are complete or absent; the review items stay with the existing family-aware actions", async () => {
+test("S11B-11 the compliance workspace shows each section only to holders of its capability and refuses a staff member holding none; attorney records are read strictly per section (profile sections only at their own stage and without a jurisdiction); each optional section that cannot be read is unavailable on its own while the rest is shown, and a refusal still refuses the page (correction pass A3); records link to the attorney's lifecycle page only for global verification holders (A7); the summary groups are complete or absent; the review items stay with the existing family-aware actions", async () => {
   assert.equal(
     (
       await resolveComplianceWorkspace(
@@ -1049,6 +1106,11 @@ test("S11B-11 the compliance workspace shows each section only to holders of its
   });
   assert.equal(view.records, null);
   assert.equal(view.policyChanges, null);
+  assert.deepEqual(view.sections, {
+    records: "not_held",
+    policyChanges: "not_held",
+  });
+  assert.equal(view.attorneyPages, false);
   assert.deepEqual(holds.calls, []);
   const record = {
     record_type: "attorney_profile",
@@ -1084,15 +1146,90 @@ test("S11B-11 the compliance workspace shows each section only to holders of its
   );
   assert.equal(records.status, "ready");
   assert.deepEqual(verifier.calls[0], ["complianceRecords", "removed", 25]);
-  const wrongStage = administrationSources([["manage_attorney_verification"]], {
-    complianceSummary: [],
-    complianceRecords: [{ ...record, profile_state: "approved" }],
+  assert.equal(records.sections.records, "ready");
+  assert.deepEqual(
+    records.records.map((r) => r.recordId),
+    [ID(70)],
+  );
+  // A scoped verification grant reads the records but not the lifecycle
+  // page (it needs the global grant).
+  assert.equal(records.attorneyPages, false);
+  // MVP-001 S11 correction pass (A3), by exact admission: a malformed record
+  // row no longer withholds the whole workspace; the records section alone
+  // is unavailable (none of its rows is shown) and the rest is ready.
+  const wrongStage = administrationSources(
+    [["manage_attorney_verification"], ["manage_policy_configuration"]],
+    {
+      complianceSummary: [],
+      complianceRecords: [{ ...record, profile_state: "approved" }],
+    },
+  );
+  const partial = await resolveComplianceWorkspace(
+    wrongStage.sources,
+    "removed",
+    "1",
+  );
+  assert.equal(partial.status, "ready");
+  assert.deepEqual(partial.sections, {
+    records: "unavailable",
+    policyChanges: "ready",
   });
+  assert.equal(partial.records, null);
+  assert.equal(partial.pager, null);
+  assert.deepEqual(partial.policyChanges, []);
+  assert.equal(partial.attorneyPages, true);
+  // The policy status changes alike, beside readable records.
+  const policyBroken = administrationSources(
+    [["manage_attorney_verification"], ["manage_policy_configuration"]],
+    {
+      complianceSummary: [],
+      complianceRecords: [record],
+      policyChanges: [{ audit_event_id: ID(80), extra: 1 }],
+    },
+  );
+  const policyPartial = await resolveComplianceWorkspace(
+    policyBroken.sources,
+    "removed",
+    "1",
+  );
+  assert.equal(policyPartial.status, "ready");
+  assert.deepEqual(policyPartial.sections, {
+    records: "ready",
+    policyChanges: "unavailable",
+  });
+  assert.equal(policyPartial.policyChanges, null);
+  assert.equal(policyPartial.records.length, 1);
+  // The workspace itself (the summary) unreadable is still unavailable, and
+  // a refusal of the caller still refuses the page.
   assert.equal(
-    (await resolveComplianceWorkspace(wrongStage.sources, "removed", "1"))
-      .status,
+    (
+      await resolveComplianceWorkspace(
+        administrationSources([["manage_attorney_verification"]], {
+          complianceSummary: [
+            { metric: "synthetic", dimension: "x", value: 1 },
+          ],
+        }).sources,
+        "removed",
+        "1",
+      )
+    ).status,
     "unavailable",
   );
+  const signedOut = administrationSources([["manage_attorney_verification"]]);
+  assert.equal(
+    (
+      await resolveComplianceWorkspace(
+        {
+          ...signedOut.sources,
+          staff: configurationSources(signedOut.world, null),
+        },
+        "removed",
+        "1",
+      )
+    ).status,
+    "sign-in-required",
+  );
+  assert.deepEqual(signedOut.calls, []);
   assert.equal(
     readComplianceSummary([
       { metric: "legal_holds", dimension: "active", value: 1 },
@@ -1123,6 +1260,20 @@ test("S11B-11 the compliance workspace shows each section only to holders of its
   assert.match(page, /assignComplianceItemAction/);
   assert.match(page, /resolveComplianceItemAction/);
   assert.match(page, /workspace\.held\.reviews/);
+  // Each optional section has its own unavailable text; the review items'
+  // refusals (not their unavailability) refuse the page; the lifecycle link
+  // is behind the global grant.
+  assert.match(page, /workspace\.sections\.records === "unavailable"/);
+  assert.match(page, /workspace\.sections\.policyChanges === "unavailable"/);
+  assert.match(
+    page,
+    /view !== null &&\s+view\.status !== "ready" &&\s+view\.status !== "unavailable"/,
+  );
+  assert.match(
+    page,
+    /\{workspace\.attorneyPages \? \(\s+<ButtonLink\s+variant="tertiary"\s+href=\{`\/staff\/attorneys\/\$\{record\.attorneyId\}`\}\s+>\s+Open\s+<\/ButtonLink>\s+\) : \(\s+"Not in your scope"\s+\)\}/,
+  );
+  assert.equal(page.match(/\/staff\/attorneys\//g).length, 1);
 });
 
 // ---------------------------------------------------------------------------
@@ -1528,4 +1679,224 @@ test("S11B-18 (correction D9) outside development the public origin must be http
       ROSUNO_EMAIL_FROM: "notices@rosuno-ops.invalid",
     }),
   );
+});
+
+// ---------------------------------------------------------------------------
+// MVP-001 S11 correction pass: rendered forms (A1, A4 and A7)
+// ---------------------------------------------------------------------------
+
+// The form modules are transpiled with the installed TypeScript and rendered
+// on the server: application modules load as they are, presentation and app
+// modules are transpiled with their imports relinked, and each server action
+// module is a stand-in exporting the same action names.
+const renderDirectory = mkdtempSync(join(tmpdir(), "rosuno-s11-forms-"));
+after(() => rmSync(renderDirectory, { recursive: true, force: true }));
+const renderTarget = (name) => pathToFileURL(join(renderDirectory, name)).href;
+const renderBuilt = new Map();
+
+function buildForRender(path) {
+  if (renderBuilt.has(path)) {
+    return renderBuilt.get(path);
+  }
+  const name = `${path.replace(/[/[\]]/g, "_")}.mjs`;
+  if (/\/actions\.ts$/.test(path)) {
+    const names = [
+      ...codeOf(read(path)).matchAll(/^export async function (\w+)\(/gm),
+    ].map((m) => m[1]);
+    writeFileSync(
+      join(renderDirectory, name),
+      `const action = async (state) => state;\n${names.map((n) => `export const ${n} = action;`).join("\n")}\n`,
+    );
+  } else {
+    const output = ts.transpileModule(read(path), {
+      fileName: path,
+      reportDiagnostics: true,
+      compilerOptions: {
+        jsx: ts.JsxEmit.ReactJSX,
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ES2022,
+        verbatimModuleSyntax: true,
+      },
+    });
+    assert.deepEqual(output.diagnostics, [], path);
+    const code = output.outputText.replace(
+      /(\bfrom\s+|\bimport\s+)"([^"]+)"/g,
+      (_m, keyword, specifier) => {
+        if (specifier === "react" || specifier === "react/jsx-runtime") {
+          return `${keyword}"${import.meta.resolve(specifier)}"`;
+        }
+        assert.ok(specifier.startsWith("."), `${path}: ${specifier}`);
+        const target = posix.normalize(
+          posix.join(posix.dirname(path), specifier),
+        );
+        assert.ok(!target.startsWith("src/infrastructure/"), target);
+        return `${keyword}"${
+          target.startsWith("src/application/")
+            ? new URL(target, appRoot).href
+            : buildForRender(target)
+        }"`;
+      },
+    );
+    writeFileSync(join(renderDirectory, name), code);
+  }
+  renderBuilt.set(path, renderTarget(name));
+  return renderTarget(name);
+}
+
+async function renderOf(path, exported, props) {
+  const module = await import(buildForRender(path));
+  const html = renderToStaticMarkup(createElement(module[exported], props));
+  return {
+    html,
+    text: html
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&#x27;/g, "'")
+      .replace(/\s+/g, " ")
+      .trim(),
+    hrefs: [...html.matchAll(/href="([^"]*)"/g)].map((m) =>
+      m[1].replaceAll("&amp;", "&"),
+    ),
+  };
+}
+
+test("S11B-19 (correction pass A1, A4 and A7) rendered: the review item list's pager links carry the page in its page's own query value (items on consultation operations, page on compliance) beside the status, and its status links keep the bare address; the complaint resolution form stays in one slot and, once the case is resolved, shows only its message and the resolved text with no field; the cancellation asks for confirmation first (its first button sends nothing)", async () => {
+  const view = (page, hasNext) => ({
+    status: "ready",
+    family: "operations",
+    exceptionStatus: "open",
+    exceptions: [],
+    pager: { page, hasNext },
+  });
+  const action = async (state) => state;
+  const operations = await renderOf(
+    "app/staff/review-item-list.tsx",
+    "ReviewItemList",
+    {
+      view: view(2, true),
+      base: "/staff/consultations?status=open",
+      pageParameter: "items",
+      assignAction: action,
+      resolveAction: action,
+    },
+  );
+  assert.deepEqual(operations.hrefs, [
+    "/staff/consultations?status=open",
+    "/staff/consultations?status=resolved",
+    "/staff/consultations?status=open&items=1",
+    "/staff/consultations?status=open&items=3",
+  ]);
+  assert.match(operations.text, /There are no items on this page\./);
+  const compliance = await renderOf(
+    "app/staff/review-item-list.tsx",
+    "ReviewItemList",
+    {
+      view: { ...view(2, true), exceptionStatus: "resolved" },
+      base: "/staff/compliance?status=resolved",
+      pageParameter: "page",
+      assignAction: action,
+      resolveAction: action,
+    },
+  );
+  assert.deepEqual(compliance.hrefs, [
+    "/staff/compliance?status=open",
+    "/staff/compliance?status=resolved",
+    "/staff/compliance?status=resolved&page=1",
+    "/staff/compliance?status=resolved&page=3",
+  ]);
+  const first = await renderOf(
+    "app/staff/review-item-list.tsx",
+    "ReviewItemList",
+    {
+      view: view(1, false),
+      base: "/staff/consultations?status=open",
+      pageParameter: "items",
+      assignAction: action,
+      resolveAction: action,
+    },
+  );
+  assert.equal(first.hrefs.length, 2);
+  assert.match(first.text, /There are no items in this list\./);
+  for (const [file, parameter] of [
+    ["app/staff/consultations/page.tsx", "items"],
+    ["app/staff/compliance/page.tsx", "page"],
+  ]) {
+    assert.match(
+      codeOf(read(file)),
+      new RegExp(`<ReviewItemList[^>]*\\spageParameter="${parameter}"`),
+      file,
+    );
+  }
+
+  // A4: one slot for the resolution form.
+  const open = await renderOf(
+    "app/staff/complaints/forms.tsx",
+    "DecideCaseForm",
+    {
+      caseId: ID(90),
+      kind: "resolve",
+      resolved: false,
+    },
+  );
+  assert.match(open.html, /<form/);
+  assert.match(open.html, /name="code"/);
+  assert.match(open.text, /Resolve/);
+  assert.doesNotMatch(open.text, /This case is resolved\./);
+  const resolved = await renderOf(
+    "app/staff/complaints/forms.tsx",
+    "DecideCaseForm",
+    { caseId: ID(90), kind: "resolve", resolved: true },
+  );
+  assert.doesNotMatch(resolved.html, /<form|<input|<button/);
+  assert.equal(resolved.text, "This case is resolved.");
+  const casePage = codeOf(read("app/staff/complaints/[case]/page.tsx"));
+  assert.match(
+    casePage,
+    /\{record\.state === "resolved" \? null : \(\s+<>\s+<CaseActionsForm[\s\S]*?<DecideCaseForm caseId=\{record\.id\} kind="classify" \/>\s+<\/>\s+\)\}\s+(?:\{\}\s+)?<DecideCaseForm\s+caseId=\{record\.id\}\s+kind="resolve"\s+resolved=\{record\.state === "resolved"\}\s+\/>/,
+  );
+  assert.equal(casePage.match(/<DecideCaseForm\b/g).length, 2);
+  assert.doesNotMatch(casePage, /This case is resolved/);
+
+  // A7: the cancellation is asked for in two steps.
+  for (const [file, exported, props] of [
+    [
+      "app/client/consultations/[consultation]/forms.tsx",
+      "CancelPanel",
+      { consultationId: ID(91), cancellable: true },
+    ],
+    [
+      "app/attorney/consultations/[consultation]/forms.tsx",
+      "CompletionPanel",
+      { consultationId: ID(91), cancellable: true, endableEarly: false },
+    ],
+  ]) {
+    const panel = await renderOf(file, exported, props);
+    assert.doesNotMatch(panel.html, /<form|name="consultation"/, file);
+    assert.match(
+      panel.html,
+      /<button[^>]*type="button"[^>]*>Cancel the consultation<\/button>/,
+      file,
+    );
+    assert.doesNotMatch(panel.text, /Confirm the cancellation/, file);
+    const closed = await renderOf(file, exported, {
+      ...props,
+      cancellable: false,
+    });
+    assert.doesNotMatch(closed.text, /Cancel the consultation/, file);
+    // The one submit button of the cancellation is the confirmation's.
+    const code = codeOf(read(file));
+    const panelCode = code.slice(
+      code.indexOf(`export function ${exported}(`),
+      code.indexOf("\n}\n", code.indexOf(`export function ${exported}(`)),
+    );
+    assert.match(
+      panelCode,
+      /\{!cancellable \? null : confirmingAt === (?:state|cancelState) \? \(\s+<form action=\{(?:action|cancelAction)\}>[\s\S]*?\{CANCEL_CONFIRM_LABEL\}[\s\S]*?<\/form>\s+\) : \(/,
+      file,
+    );
+    assert.equal(
+      panelCode.match(/type="submit"/g).length,
+      exported === "CancelPanel" ? 1 : 2,
+      file,
+    );
+  }
 });

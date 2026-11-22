@@ -20,6 +20,7 @@ import { createNotificationRecorder } from "../identity/registration-provisionin
 import {
   createResendEmailProvider,
   readResendConfiguration,
+  readResendWebhookSecret,
   readSiteOrigin,
   RESEND_PROVIDER_CODE,
 } from "./resend-provider.ts";
@@ -36,6 +37,15 @@ export function emailDeliveryConfigured(
     readResendConfiguration(environment) !== null &&
     readSiteOrigin(environment) !== null
   );
+}
+
+// MVP-001 S11 correction pass (A6; system health): whether the email
+// provider's webhook signing setting has its declared shape now (the
+// delivery report route answers unavailable without it); never a value.
+export function emailWebhookConfigured(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return readResendWebhookSecret(environment) !== null;
 }
 
 export const NOTIFICATION_JOB_HANDLERS = createNotificationJobHandlers(

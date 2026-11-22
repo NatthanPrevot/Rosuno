@@ -128,6 +128,11 @@ const S11_OPERATIONS_MIGRATIONS = Object.freeze([
 const S11_SURFACES_MIGRATIONS = Object.freeze([
   "20261127170000_mvp_001_s11_workspace_reads.sql",
 ]);
+// MVP-001 S11 review corrections follow pass 2B (registered and checked
+// here, by the CORR checks).
+const S11_CORRECTIONS_MIGRATIONS = Object.freeze([
+  "20261127180000_mvp_001_s11_review_corrections.sql",
+]);
 // The one migration that inserts catalog rows (the five capability codes) and
 // the one that creates a relation (the PS section 21.1 reviews relation).
 const S11_INTEGRITY = "20261127010000_mvp_001_s11_completion_integrity.sql";
@@ -145,6 +150,8 @@ let state = null;
 // MVP-001 S11 pass 2B: the notices of the workspace reads migration (kept
 // apart from the pass 2A notices, which MIG-1 compares exactly).
 const surfaceNotices = {};
+// MVP-001 S11 review corrections: the notices of the correction migration.
+const correctionNotices = {};
 
 // ---------------------------------------------------------------------------
 // Cluster and one-shot psql
@@ -468,6 +475,11 @@ function applyMigrationsTo(db, files) {
         (match) => match[1],
       );
     }
+    if (S11_CORRECTIONS_MIGRATIONS.includes(file)) {
+      correctionNotices[file] = [
+        ...result.stderr.matchAll(/NOTICE:\s+(.*)/g),
+      ].map((match) => match[1]);
+    }
     if (S11_SURFACES_MIGRATIONS.includes(file)) {
       surfaceNotices[file] = [...result.stderr.matchAll(/NOTICE:\s+(.*)/g)].map(
         (match) => match[1],
@@ -497,6 +509,7 @@ function applyMigrations() {
     ...S11_MIGRATIONS,
     ...S11_OPERATIONS_MIGRATIONS,
     ...S11_SURFACES_MIGRATIONS,
+    ...S11_CORRECTIONS_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -576,6 +589,30 @@ function applyMigrations() {
     );
     assert.ok(program.migration_refs.includes(id), `${id} is a Program ref`);
   });
+  // MVP-001 S11 review corrections: the correction migration follows pass 2B
+  // and is registered unreviewed (sequence 72, depending on the pass 2B
+  // migration) and applied nowhere.
+  S11_CORRECTIONS_MIGRATIONS.forEach((file, index) => {
+    const id = file.replace(/\.sql$/, "");
+    const row = registered.find(
+      (migration) => migration.artifact_path === `supabase/migrations/${file}`,
+    );
+    assert.ok(row, `${file} is registered`);
+    assert.equal(row.migration_id, id);
+    assert.equal(row.sequence, 72 + index);
+    assert.equal(row.reviewed, false);
+    assert.equal(row.applied_environment, "none");
+    assert.deepEqual(row.depends_on, [
+      (index === 0
+        ? S11_SURFACES_MIGRATIONS[S11_SURFACES_MIGRATIONS.length - 1]
+        : S11_CORRECTIONS_MIGRATIONS[index - 1]
+      ).replace(/\.sql$/, ""),
+    ]);
+    assert.ok(
+      typeof row.rollback_plan === "string" && row.rollback_plan !== "",
+    );
+    assert.ok(program.migration_refs.includes(id), `${id} is a Program ref`);
+  });
   sql(ROLES, "postgres");
   sql(fixtureFor(DB), "postgres");
   sql(fixtureFor(PROD_DB), "postgres");
@@ -599,6 +636,8 @@ function applyMigrations() {
   report.migrations.s11_operations = [...S11_OPERATIONS_MIGRATIONS];
   report.migrations.s11_surfaces = [...S11_SURFACES_MIGRATIONS];
   report.migrations.surface_notices = surfaceNotices;
+  report.migrations.s11_corrections = [...S11_CORRECTIONS_MIGRATIONS];
+  report.migrations.correction_notices = correctionNotices;
 }
 
 // ---------------------------------------------------------------------------
@@ -4495,7 +4534,7 @@ async function clientChecks() {
   );
 
   await check(
-    "CLI-3 (PM row 46; DM section 3) suspending a client with an open matter opens exactly one high client_account_review compliance item (evidence: the User and Client Profile ids, row 46 and the open Request and Consultation ids) and changes nothing else: the Request, its payment, Holds, Bookings and Consultations are unchanged; a second suspension after reactivation opens no second item while the first is open; the suspended client's next Request is refused; suspending the account of a User who also holds an Attorney Profile leaves the profile's stage unchanged",
+    "CLI-3 (PM row 46; DM section 3) suspending a client with an open matter opens exactly one high client_account_review compliance item (evidence: the User and Client Profile ids, row 46 and the open Request and Consultation ids) and changes nothing else: the Request, its payment, Holds, Bookings and Consultations are unchanged; a second suspension after reactivation opens no second item while the first is open; the suspended client's next Request is refused; suspending the account of a User who also holds an Attorney Profile (MVP-001 S11 review correction R3) answers not_found and changes neither the account state nor the profile's stage",
     () => {
       const s = authorizedRequest({
         jurisdiction: world.J.S,
@@ -4571,15 +4610,18 @@ async function clientChecks() {
         `select outcome from public.request_create(${lit(referral)}, 'scheduled', 'synthetic_video', 30, ${lit(nextSlot())}::timestamptz, null::text);`,
       );
       assert.notEqual(refused, "created");
-      // DM section 3: the account, not a profile.
+      // DM section 3: the account, not a profile. MVP-001 S11 review
+      // correction R3 (fail-closed): a User holding an Attorney Profile is
+      // not administered here; it answers as unknown and nothing changes.
       const dual = lawyer("S");
       sql(
         `insert into public.client_profiles (user_id) values ('${dual.user}');`,
       );
       assert.equal(
         changeAccount(world.clientAdmin, dual.user, "suspend"),
-        "applied",
+        "not_found",
       );
+      assert.equal(accountState(dual.user), "active");
       assert.equal(profileState(dual.profile), "approved");
       return {
         item: items[0].evidence.payment_matrix_row,
@@ -6662,6 +6704,275 @@ async function surfacesChecks() {
 }
 
 // ---------------------------------------------------------------------------
+// MVP-001 S11 review corrections (20261127180000): CORR checks of the
+// operations, administration and audit corrections (R3, R4)
+// ---------------------------------------------------------------------------
+
+// The functions the correction migration replaces (with their executors,
+// kept) and the one internal function it adds.
+const CORRECTED_FUNCTIONS = Object.freeze({
+  "client_request_payment(uuid)": "authenticated",
+  "client_authorize_payment(uuid)": "authenticated",
+  "payment_confirm_authorization(public.payment_transactions, text, bigint, text, text, uuid, text)":
+    "",
+  "decision_payment_captured()": "",
+  "consultation_cancel(uuid)": "authenticated",
+  "client_account_rows(uuid, text, integer, integer)": "",
+  "staff_change_client_account(uuid, text, text)": "authenticated",
+  "staff_audit_event(uuid)": "authenticated",
+  "consultation_apply_completion(public.consultations, public.payment_transactions, text, uuid, text, text, text, uuid, jsonb)":
+    "",
+  "consultation_end(uuid)": "authenticated",
+  "staff_update_complaint(uuid, text)": "authenticated",
+  "audit_snapshot_redacted(text, jsonb)": "",
+});
+
+async function correctionChecks() {
+  await check(
+    "CORR-0 (Packet rules 8 and 16) the review corrections migration follows pass 2B, is registered unreviewed (sequence 72, depending on the pass 2B migration, with a rollback plan) and applied nowhere, is a Program migration ref, applies to a development and a production-class database without notices, adds no relation, column, type, constraint, index, row policy, policy type, table grant or trigger (the catalog listings still equal those after pass 1), creates exactly the eleven replaced functions and the one internal redaction function, keeps each replaced function's executors, security mode and pinned search_path (the volatile commands their 3s lock bound), and makes the new function executable by no API role",
+    () => {
+      assert.deepEqual(report.migrations.s11_corrections, [
+        ...S11_CORRECTIONS_MIGRATIONS,
+      ]);
+      assert.deepEqual(
+        report.migrations.correction_notices,
+        Object.fromEntries(
+          S11_CORRECTIONS_MIGRATIONS.map((file) => [file, []]),
+        ),
+      );
+      const differences = {};
+      for (const [name, query] of Object.entries(CATALOG_QUERIES)) {
+        if (sql(query, BASE_DB) !== sql(query)) {
+          differences[name] = true;
+        }
+      }
+      assert.deepEqual(differences, {});
+      const created = new Set();
+      for (const file of S11_CORRECTIONS_MIGRATIONS) {
+        const raw = fs.readFileSync(path.join(MIGRATIONS, file), "utf8");
+        const text = raw.replace(/--[^\n]*/g, "");
+        assert.doesNotMatch(
+          text,
+          /create\s+table|add\s+column|create\s+type|create\s+policy|create\s+view|create\s+sequence|create\s+(unique\s+)?index|alter\s+table|create\s+trigger|^\s*grant\s/im,
+          file,
+        );
+        for (const match of raw.matchAll(
+          /^create (?:or replace )?function public\.([a-z_0-9]+)\(/gm,
+        )) {
+          created.add(match[1]);
+        }
+      }
+      assert.deepEqual(
+        [...created].sort(),
+        Object.keys(CORRECTED_FUNCTIONS)
+          .map((signature) => signature.slice(0, signature.indexOf("(")))
+          .sort(),
+      );
+      const detail = {};
+      for (const [signature, executors] of Object.entries(
+        CORRECTED_FUNCTIONS,
+      )) {
+        assert.equal(opsExecutors(signature), executors, signature);
+        assert.equal(opsExecutors(signature, PROD_DB), executors, signature);
+        const [definer, config, volatility] = sql(
+          `select prosecdef::text || '|' || coalesce(array_to_string(proconfig, ';'), '') || '|' || provolatile::text from pg_proc where oid = 'public.${signature}'::regprocedure;`,
+        ).split("|");
+        assert.match(config, /search_path=pg_catalog, pg_temp/, signature);
+        if (executors === "authenticated") {
+          assert.equal(definer, "true", signature);
+          if (volatility === "v") {
+            assert.match(config, /lock_timeout=3s/, signature);
+          }
+        }
+        detail[signature.slice(0, signature.indexOf("("))] =
+          `${definer === "true" ? "definer" : "invoker"}:${volatility}`;
+      }
+      return detail;
+    },
+  );
+
+  await check(
+    "CORR-R3 (MVP-001 S11 review correction R3; fail-closed) client administration excludes a User holding an Attorney Profile exactly as it excludes staff: staff_client answers nothing for such a User (an approved, a suspended and an applicant profile alike), staff_clients never lists one, and staff_change_client_account answers not_found for both intents and changes neither the account state nor the profile stage nor writes an audit event; a client without an Attorney Profile is still listed, read and suspended",
+    () => {
+      const plain = newClient();
+      const dual = {};
+      for (const stage of ["approved", "suspended", "applicant"]) {
+        const p = profileWith({ stage });
+        sql(
+          `insert into public.client_profiles (user_id) values ('${p.user}');`,
+        );
+        dual[stage] = p;
+      }
+      const listed = [];
+      for (let offset = 0; offset < 5000; offset += 25) {
+        const page = rowsJson(world.clientAdmin, CLIENTS_SQL(null, offset));
+        listed.push(...page.slice(0, 25).map((r) => r.user_id));
+        if (page.length <= 25) {
+          break;
+        }
+      }
+      assert.ok(listed.includes(plain.user));
+      const outcome = {};
+      for (const [stage, p] of Object.entries(dual)) {
+        assert.ok(!listed.includes(p.user), stage);
+        assert.deepEqual(rowsJson(world.clientAdmin, CLIENT_SQL(p.user)), []);
+        const audits = count("audit_events", `resource_id = '${p.user}'`);
+        outcome[stage] = [
+          changeAccount(world.clientAdmin, p.user, "suspend"),
+          changeAccount(world.clientAdmin, p.user, "reactivate"),
+        ];
+        assert.deepEqual(outcome[stage], ["not_found", "not_found"], stage);
+        assert.equal(accountState(p.user), "active", stage);
+        assert.equal(profileState(p.profile), stage, stage);
+        assert.equal(
+          count("audit_events", `resource_id = '${p.user}'`),
+          audits,
+          stage,
+        );
+      }
+      assert.equal(
+        rowsJson(world.clientAdmin, CLIENT_SQL(plain.user)).length,
+        1,
+      );
+      assert.equal(
+        changeAccount(world.clientAdmin, plain.user, "suspend"),
+        "applied",
+      );
+      assert.equal(accountState(plain.user), "suspended");
+      return outcome;
+    },
+  );
+
+  await check(
+    "CORR-R4 (MVP-001 S11 review correction R4) the audit workspace redacts free text: one event's snapshots come back with every free-text value an earlier migration writes (staff_note, message_to_applicant, note, display_name, headline, bio, license_number, license_type, carrier_name, policy_reference, coverage_type, finding_type, external_reference, and a free-text reason) replaced by {\"redacted\": true}, nested values included, while codes, identifiers, numbers, booleans, a code-valued reason and the structure come back as stored; a reason under payment.release_requested, payment.refund_requested and launch_authorization.revoked is redacted even when it reads like a code; the client account command's real staff note is redacted for a jurisdiction-scoped and a global auditor alike; the stored audit rows are unchanged; the list read returns no snapshot",
+    () => {
+      const free = {
+        staff_note: "Synthetic staff note text",
+        message_to_applicant: "Synthetic message to the applicant",
+        note: "Synthetic note",
+        display_name: "Synthetic Display",
+        headline: "Synthetic headline",
+        bio: "Synthetic biography text",
+        license_number: "SYN-LIC-0001",
+        license_type: "Synthetic licence type",
+        carrier_name: "Synthetic Carrier",
+        policy_reference: "SYN-POL-1",
+        coverage_type: "Synthetic coverage",
+        finding_type: "Synthetic finding",
+        external_reference: "SYN-EXT-1",
+      };
+      const after = {
+        ...free,
+        reason: "Synthetic free text reason.",
+        state: "suspended",
+        attorney_id: uid(),
+        amount_minor: 1500,
+        discrepancy: false,
+        nested: {
+          note: "Nested synthetic note",
+          reason: "code_like_value",
+          list: [{ bio: "x" }, 2],
+        },
+        empty: null,
+      };
+      const before = { reason: "account_active", staff_note: "Before note" };
+      const planted = plantAudit({
+        action: "synthetic.redaction_probe",
+        jurisdiction: world.J.S,
+        before,
+        after,
+      });
+      const stored = jsonOf(
+        `select json_build_object('before', before_snapshot, 'after', after_snapshot)::text from public.audit_events where id = '${planted}';`,
+      );
+      const R = { redacted: true };
+      const expectedAfter = {
+        ...Object.fromEntries(Object.keys(free).map((k) => [k, R])),
+        reason: R,
+        state: "suspended",
+        attorney_id: after.attorney_id,
+        amount_minor: 1500,
+        discrepancy: false,
+        nested: { note: R, reason: "code_like_value", list: [{ bio: R }, 2] },
+        empty: null,
+      };
+      for (const auditor of [world.auditor, world.auditorS]) {
+        const one = rowsJson(auditor, AUDIT_ONE_SQL(planted));
+        assert.equal(one.length, 1);
+        assert.deepEqual(one[0].after_snapshot, expectedAfter);
+        assert.deepEqual(one[0].before_snapshot, {
+          reason: "account_active",
+          staff_note: R,
+        });
+      }
+      // A reason that reads like a code is still redacted under the three
+      // free-text action codes.
+      const actions = {};
+      for (const action of [
+        "payment.release_requested",
+        "payment.refund_requested",
+        "launch_authorization.revoked",
+      ]) {
+        const id = plantAudit({
+          action,
+          after: { reason: "looks_like_code", payment_state: "authorized" },
+        });
+        actions[action] = rowsJson(
+          world.auditor,
+          AUDIT_ONE_SQL(id),
+        )[0].after_snapshot;
+        assert.deepEqual(actions[action], {
+          reason: R,
+          payment_state: "authorized",
+        });
+      }
+      // The real client account command's staff note.
+      const c = newClient();
+      assert.equal(
+        changeAccount(
+          world.clientAdmin,
+          c.user,
+          "suspend",
+          "A real synthetic note",
+        ),
+        "applied",
+      );
+      const event = sql(
+        `select id from public.audit_events where action_code = 'user.account_state_changed' and resource_id = '${c.user}';`,
+      );
+      const shown = rowsJson(world.auditor, AUDIT_ONE_SQL(event))[0];
+      assert.deepEqual(shown.after_snapshot, {
+        account_state: "suspended",
+        staff_note: R,
+      });
+      assert.equal(
+        sql(
+          `select after_snapshot ->> 'staff_note' from public.audit_events where id = '${event}';`,
+        ),
+        "A real synthetic note",
+      );
+      // The stored planted row is unchanged.
+      assert.deepEqual(
+        jsonOf(
+          `select json_build_object('before', before_snapshot, 'after', after_snapshot)::text from public.audit_events where id = '${planted}';`,
+        ),
+        stored,
+      );
+      const listRow = auditList(world.auditor, {
+        resourceType: "synthetic_probe",
+      })[0];
+      assert.ok(
+        !("after_snapshot" in listRow) && !("before_snapshot" in listRow),
+      );
+      return {
+        redacted_keys: Object.keys(free).length + 1,
+        actions: Object.keys(actions),
+      };
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -6701,6 +7012,7 @@ async function main() {
     await policyCorrectionChecks();
     await gateChecks();
     await surfacesChecks();
+    await correctionChecks();
     await opsConcurrencyChecks();
   } catch (error) {
     report.error = String(error?.stack ?? error);

@@ -112,6 +112,11 @@ const S11_OPERATIONS_MIGRATIONS = Object.freeze([
 const S11_SURFACES_MIGRATIONS = Object.freeze([
   "20261127170000_mvp_001_s11_workspace_reads.sql",
 ]);
+// MVP-001 S11 review corrections follow (registered and checked by the S11
+// operations proof).
+const S11_CORRECTIONS_MIGRATIONS = Object.freeze([
+  "20261127180000_mvp_001_s11_review_corrections.sql",
+]);
 // The one migration that inserts catalog rows (the five capability codes) and
 // the one that creates a relation (the PS section 21.1 reviews relation).
 const S11_INTEGRITY = "20261127010000_mvp_001_s11_completion_integrity.sql";
@@ -472,6 +477,7 @@ function applyMigrations() {
     ...S11_MIGRATIONS,
     ...S11_OPERATIONS_MIGRATIONS,
     ...S11_SURFACES_MIGRATIONS,
+    ...S11_CORRECTIONS_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -7217,6 +7223,663 @@ async function productionChecks() {
 }
 
 // ---------------------------------------------------------------------------
+// MVP-001 S11 review corrections (20261127180000): CORR checks of the
+// completion, payment and complaint corrections (R1, R2, R5, R6)
+// ---------------------------------------------------------------------------
+
+// A further synthetic jurisdiction of this disposable database, set up as the
+// seed sets up its own (development configuration, test values only).
+function correctionJurisdiction(key, flow, engagement = STANDARD_ENGAGEMENT) {
+  if (world.J[key] !== undefined) {
+    return world.J[key];
+  }
+  const id = newJurisdiction(`SYN_S11_CORR_${key}`);
+  world.J[key] = id;
+  policy("eligibility", id, ELIGIBILITY);
+  policy("scheduling", id, STANDARD_SCHEDULING);
+  policy("referral", id, { outcome_codes: ["synthetic_closed"] });
+  policy("fee", id, FEE());
+  mapMode(id, world.mode);
+  policy("payment_flow", id, flow, world.mode);
+  for (const type of ["payment", "cancellation", "refund"]) {
+    policy(type, id, {}, world.mode);
+  }
+  policy("engagement", id, engagement, world.mode);
+  return id;
+}
+
+// Q: a scheduled Request is authorized after the acceptance and captured at
+// the acceptance (a late authorization after the acceptance is captured on
+// its confirmation). E: every Request is authorized before the decision,
+// captured at the acceptance, and its Engagement is effective at the
+// capture.
+const CORRECTION_FLOWS = Object.freeze({
+  Q: () =>
+    correctionJurisdiction("Q", FLOW(BEFORE, AT_ACCEPTANCE, AT_ACCEPTANCE)),
+  E: () =>
+    correctionJurisdiction(
+      "E",
+      FLOW_ALL(BEFORE, AT_ACCEPTANCE),
+      ENGAGEMENT("attorney_acceptance", "at_payment_capture", 3600),
+    ),
+});
+
+// An accepted scheduled Request of jurisdiction key without any payment
+// attempt (the authorization follows the acceptance).
+function unpaidIn(key) {
+  const who = lawyer(key);
+  const s = makeRequest({
+    jurisdiction: world.J[key],
+    requestPath: "scheduled",
+    lawyer: who,
+  });
+  const decision = accept(who, s.request);
+  assert.equal(decision.outcome, "accepted", JSON.stringify(decision));
+  assert.equal(livePaymentOf(s.request), null);
+  return { ...s, lawyer: who, consultation: decision.consultation };
+}
+
+const PAYMENT_STEP_SQL = (request) =>
+  `select row_to_json(x)::text from public.client_request_payment(${lit(request)}) x;`;
+const stepOf = (s) => {
+  const row = oneRowAs(s.client, PAYMENT_STEP_SQL(s.request), AAL1);
+  return `${row.payment_step}|${row.payable}`;
+};
+const paymentCount = (s) =>
+  count("payment_transactions", `consultation_request_id = '${s.request}'`);
+
+// The client's authorization, played through the hosted checkout job: a
+// pending_authorization attempt.
+function pendingAttempt(s) {
+  const created = authorize(s.client, s.request);
+  assert.equal(created.outcome, "created", created.line);
+  runJob("payment.checkout", "payment_transaction", created.payment, () =>
+    obs("checkout_open", { checkout_reference: checkoutRef() }),
+  );
+  return created.payment;
+}
+
+// The provider's confirmation of an authorization of exactly the quoted
+// total (the webhook route, played as service_role).
+function confirmAuthorization(s, payment) {
+  const total = Number(
+    sql(
+      `select total_client_amount_minor from public.fee_calculations where consultation_request_id = '${s.request}';`,
+    ),
+  );
+  const event = providerEvent(
+    "payment_intent.amount_capturable_updated",
+    obs("authorization_confirmed", {
+      payment_transaction_id: payment,
+      payment_reference: paymentRef(),
+      amount_minor: total,
+      currency_code: "XTS",
+    }),
+  );
+  assert.equal(event.processing, "applied", event.line);
+  return event;
+}
+
+const captureJob = (payment) =>
+  openJob("payment.capture", "payment_transaction", payment);
+const openItems = (consultation, type) =>
+  consultationExceptions(consultation, type).filter((e) => e.status === "open")
+    .length;
+
+// An owner fixture (triggers bypassed): a Consultation planted in a terminal
+// state with its outcome code, where no command reaches that state with the
+// fixture's payment (each probe says why).
+function plantTerminal(consultation, state, code) {
+  sql(
+    `begin;
+     set local session_replication_role = replica;
+     update public.consultations set state = '${state}', outcome_code = '${code}', ended_at = coalesce(ended_at, now()) where id = '${consultation}';
+     commit;`,
+  );
+}
+
+async function correctionChecks() {
+  CORRECTION_FLOWS.Q();
+  CORRECTION_FLOWS.E();
+
+  await check(
+    "CORR-R1a (MVP-001 S11 review correction R1; PM section 1 INV-11) a Request whose Consultation has ended is not payable: for an accepted Request whose flow authorizes after the acceptance, the client's payment step answers authorization_after_acceptance and payable while its Consultation is scheduled (and the authorization is created), but once the Consultation is cancelled by the client or by the attorney, recorded no_show or technical_failure by staff, or completed (an owner-planted completion: no command completes a Consultation the client never paid in this flow), the step answers not_applicable and not payable and client_authorize_payment answers not_payable with problem consultation_ended and creates no payment attempt",
+    () => {
+      const control = unpaidIn("Q");
+      const controlStep = stepOf(control);
+      const created = authorize(control.client, control.request);
+      const answers = { scheduled: [controlStep, created.outcome] };
+      assert.deepEqual(answers.scheduled, [
+        "authorization_after_acceptance|true",
+        "created",
+      ]);
+      const ends = {
+        client_cancelled: (s) => clientCancel(s).outcome,
+        attorney_cancelled: (s) => attorneyCancel(s).outcome,
+        no_show: (s) => {
+          shiftScheduled(s.consultation, 4 * 1440);
+          return recordOutcome(world.ops, s.consultation, "client_no_show")
+            .outcome;
+        },
+        technical_failure: (s) => {
+          shiftScheduled(s.consultation, 4 * 1440);
+          return recordOutcome(world.ops, s.consultation, "neither_connected")
+            .outcome;
+        },
+        completed: (s) => {
+          plantTerminal(s.consultation, "completed", "normal");
+          return "planted";
+        },
+      };
+      for (const [name, finish] of Object.entries(ends)) {
+        const s = unpaidIn("Q");
+        const ended = finish(s);
+        const refused = authorize(s.client, s.request);
+        answers[name] = [
+          ended,
+          consultationRow(s.consultation).state,
+          stepOf(s),
+          `${refused.outcome}|${refused.problem}`,
+          paymentCount(s),
+        ];
+      }
+      assert.deepEqual(answers, {
+        scheduled: ["authorization_after_acceptance|true", "created"],
+        client_cancelled: [
+          "cancelled",
+          "cancelled",
+          "not_applicable|false",
+          "not_payable|consultation_ended",
+          0,
+        ],
+        attorney_cancelled: [
+          "cancelled",
+          "cancelled",
+          "not_applicable|false",
+          "not_payable|consultation_ended",
+          0,
+        ],
+        no_show: [
+          "recorded",
+          "no_show",
+          "not_applicable|false",
+          "not_payable|consultation_ended",
+          0,
+        ],
+        technical_failure: [
+          "recorded",
+          "technical_failure",
+          "not_applicable|false",
+          "not_payable|consultation_ended",
+          0,
+        ],
+        completed: [
+          "planted",
+          "completed",
+          "not_applicable|false",
+          "not_payable|consultation_ended",
+          0,
+        ],
+      });
+      return answers;
+    },
+  );
+
+  await check(
+    "CORR-R1b (MVP-001 S11 review correction R1; PM INV-11; scenario B) an authorization confirmed after the Consultation ended requests no capture: in a flow that captures at the acceptance, a pending_authorization attempt whose authorization is confirmed while the Consultation is scheduled is captured as before (capture_pending, one capture job); one pending at a cancellation by the client or by the attorney, at a staff no_show, or at a technical failure (an owner-planted state: the staff outcome releases a pending attempt) becomes authorized with no capture job, and exactly one open review item of the Consultation exists afterwards (the cancellation's cancellation_payment_review or the outcome's outcome_payment_review, reused; the planted technical failure's opened), the first item's evidence unchanged",
+    () => {
+      const control = unpaidIn("Q");
+      const controlPayment = pendingAttempt(control);
+      confirmAuthorization(control, controlPayment);
+      const outcome = {
+        scheduled: [
+          paymentOf(controlPayment).state,
+          captureJob(controlPayment) !== null,
+        ],
+      };
+      assert.deepEqual(outcome.scheduled, ["capture_pending", true]);
+      const ends = {
+        client_cancelled: [
+          (s) => clientCancel(s).outcome,
+          "cancellation_payment_review",
+        ],
+        attorney_cancelled: [
+          (s) => attorneyCancel(s).outcome,
+          "cancellation_payment_review",
+        ],
+        no_show: [
+          (s) => {
+            shiftScheduled(s.consultation, 4 * 1440);
+            return recordOutcome(world.ops, s.consultation, "client_no_show")
+              .outcome;
+          },
+          "outcome_payment_review",
+        ],
+        technical_failure: [
+          (s) => {
+            plantTerminal(
+              s.consultation,
+              "technical_failure",
+              "mid_consultation_failure",
+            );
+            return "planted";
+          },
+          "outcome_payment_review",
+        ],
+      };
+      for (const [name, [finish, type]] of Object.entries(ends)) {
+        const s = unpaidIn("Q");
+        const payment = pendingAttempt(s);
+        const ended = finish(s);
+        const before = consultationExceptions(s.consultation, type);
+        confirmAuthorization(s, payment);
+        const after = consultationExceptions(s.consultation, type);
+        outcome[name] = [
+          ended,
+          paymentOf(payment).state,
+          captureJob(payment) !== null,
+          openItems(s.consultation, type),
+        ];
+        if (before.length === 1) {
+          assert.deepEqual(after[0].evidence, before[0].evidence, name);
+        } else {
+          assert.equal(after[0].evidence.event, "authorization_confirmed_after_end");
+        }
+        assert.equal(after[0].canonical_id, payment, name);
+      }
+      assert.deepEqual(outcome, {
+        scheduled: ["capture_pending", true],
+        client_cancelled: ["cancelled", "authorized", false, 1],
+        attorney_cancelled: ["cancelled", "authorized", false, 1],
+        no_show: ["recorded", "authorized", false, 1],
+        technical_failure: ["planted", "authorized", false, 1],
+      });
+      return outcome;
+    },
+  );
+
+  await check(
+    "CORR-R1c (MVP-001 S11 review correction R1) a capture confirmed after the Consultation was cancelled or ended unperformed records no Engagement: in a flow that captures at the acceptance with the Engagement effective at the capture, a capture confirmed while the Consultation is scheduled records one effective Engagement as before; one confirmed after a cancellation by the client, a staff no_show or a staff failure to connect records none, and exactly one open review item of the Consultation exists (the cancellation_payment_review or outcome_payment_review reused, or for the failure to connect the critical funds_retained_after_technical_failure item reused), the payment captured",
+    () => {
+      const scheduled = (who) =>
+        acceptedConsultation({
+          key: "E",
+          requestPath: "scheduled",
+          who,
+          capture: false,
+        });
+      const control = scheduled(lawyer("E"));
+      assert.equal(paymentOf(control.payment).state, "capture_pending");
+      confirmCapture(control);
+      const outcome = {
+        scheduled: [
+          paymentOf(control.payment).state,
+          engagementsOf(control.consultation).length,
+        ],
+      };
+      assert.deepEqual(outcome.scheduled, ["captured", 1]);
+      const ends = {
+        client_cancelled: [
+          (s) => clientCancel(s).outcome,
+          "cancellation_payment_review",
+        ],
+        no_show: [
+          (s) => {
+            shiftScheduled(s.consultation, 4 * 1440);
+            return recordOutcome(world.ops, s.consultation, "client_no_show")
+              .outcome;
+          },
+          "outcome_payment_review",
+        ],
+        neither_connected: [
+          (s) => {
+            shiftScheduled(s.consultation, 4 * 1440);
+            return recordOutcome(world.ops, s.consultation, "neither_connected")
+              .outcome;
+          },
+          "funds_retained_after_technical_failure",
+        ],
+      };
+      for (const [name, [finish, type]] of Object.entries(ends)) {
+        const s = scheduled(lawyer("E"));
+        assert.equal(paymentOf(s.payment).state, "capture_pending", name);
+        const ended = finish(s);
+        confirmCapture(s);
+        outcome[name] = [
+          ended,
+          paymentOf(s.payment).state,
+          engagementsOf(s.consultation).length,
+          openItems(s.consultation, type),
+        ];
+      }
+      assert.deepEqual(outcome, {
+        scheduled: ["captured", 1],
+        client_cancelled: ["cancelled", "captured", 0, 1],
+        no_show: ["recorded", "captured", 0, 1],
+        neither_connected: ["recorded", "captured", 0, 1],
+      });
+      return outcome;
+    },
+  );
+
+  await check(
+    "CORR-R2 (MVP-001 S11 review correction R2; fail-closed; PM rows 11 to 16) a Consultation cannot be cancelled at or after its nominal end: a scheduled Consultation whose booked slot has ended answers time_passed to its client and to its attorney and nothing changes (still scheduled, the Booking confirmed, no review item, no cancellation audit event, no notification), after which staff record the no-show it was; an instant ready Consultation past its creation plus its duration answers time_passed alike; a scheduled Consultation whose slot has begun but not ended is still cancelled (whether that should also be refused is an owner question)",
+    () => {
+      const s = scheduledConsultation("S");
+      shiftScheduled(s.consultation, 4 * 1440);
+      const audits = () =>
+        count(
+          "audit_events",
+          `resource_id = '${s.consultation}' and action_code = 'consultation.cancelled'`,
+        );
+      const before = {
+        state: consultationRow(s.consultation).state,
+        booking: bookingsOf(s.consultation)[0].status,
+        items: consultationExceptions(s.consultation, "cancellation_payment_review")
+          .length,
+        audits: audits(),
+        notifications: count(
+          "notifications",
+          `source_event_id = '${s.consultation}' and notification_type = 'consultation_cancelled'`,
+        ),
+      };
+      const answers = {
+        client: clientCancel(s).outcome,
+        attorney: attorneyCancel(s).outcome,
+      };
+      const after = {
+        state: consultationRow(s.consultation).state,
+        booking: bookingsOf(s.consultation)[0].status,
+        items: consultationExceptions(s.consultation, "cancellation_payment_review")
+          .length,
+        audits: audits(),
+        notifications: count(
+          "notifications",
+          `source_event_id = '${s.consultation}' and notification_type = 'consultation_cancelled'`,
+        ),
+      };
+      assert.deepEqual(after, before);
+      assert.deepEqual(before, {
+        state: "scheduled",
+        booking: "confirmed",
+        items: 0,
+        audits: 0,
+        notifications: 0,
+      });
+      answers.staff = recordOutcome(world.ops, s.consultation, "client_no_show")
+        .outcome;
+      answers.recorded = consultationRow(s.consultation).outcome_code;
+      const instant = staleReady("S");
+      answers.instant = clientCancel(instant).outcome;
+      answers.instant_state = consultationRow(instant.consultation).state;
+      const begun = scheduledConsultation("S", {
+        who: lawyer("S"),
+        slot: nearSlot(120),
+      });
+      shiftScheduled(begun.consultation, 10);
+      answers.begun_not_ended = clientCancel(begun).outcome;
+      assert.deepEqual(answers, {
+        client: "time_passed",
+        attorney: "time_passed",
+        staff: "recorded",
+        recorded: "client_no_show",
+        instant: "time_passed",
+        instant_state: "ready",
+        begun_not_ended: "cancelled",
+      });
+      return answers;
+    },
+  );
+
+  await check(
+    "CORR-R5 (MVP-001 S11 review correction R5; MBS section 19; production-class database) a completion that will request the capture at completion keeps the refusal of S9 PROD-2 and S11 PROD-1 and widens its condition to the four-way gate over every version the payment recorded: in a live, launch-authorized jurisdiction whose payment_flow version passes the gate, the attorney's normal end, an early completion by agreement and a staff manual resolution are each refused configuration_unavailable with nothing changed (the Consultation live with no outcome and its Media Room open, the payment authorized, no capture job, no review item, no completion audit event) when another recorded version fails it: a development-only engagement version (development_policy) or a cancellation version no longer selectable because it was suspended (production_gate_closed); with every recorded version passing, each completes (completed or recorded) and requests the capture (capture_pending, one capture job, no review item)",
+    () => {
+      const ops = newAccount("active", PROD_DB);
+      prodSql(
+        `insert into public.staff_profiles (user_id, staff_state) values ('${ops.user}', 'active');
+         insert into public.capability_grants (user_id, capability_code, granted_by_user_id, jurisdiction_id, granted_at)
+           values ('${ops.user}', 'manage_consultation_operations', '${prod.grantor.user}', null, now() - interval '1 day');`,
+      );
+      // A live, launch-authorized jurisdiction (with its active scheduling
+      // version) whose seven payment version types each have an active,
+      // approved, verified, non-development version under its regulatory
+      // mode (the four-way gate holds for every type).
+      const flow = FLOW_ALL(BEFORE, "at_consultation_completion");
+      const openJurisdiction = (key) => {
+        const jurisdiction = prodJurisdiction(key, "live", "active");
+        const mode = newRegulatoryMode(
+          `SYN_S11_R5_${uid().slice(0, 6).toUpperCase()}`,
+          PROD_DB,
+        );
+        mapMode(jurisdiction.id, mode, PROD_DB);
+        return {
+          jurisdiction,
+          mode,
+          versions: {
+            referral: prodActivePolicy("referral", jurisdiction.id, {
+              outcome_codes: ["synthetic_closed"],
+            }),
+            fee: prodActivePolicy("fee", jurisdiction.id, FEE()),
+            payment_flow: prodActivePolicy(
+              "payment_flow",
+              jurisdiction.id,
+              flow,
+              mode,
+            ),
+            payment: prodActivePolicy("payment", jurisdiction.id, {}, mode),
+            engagement: prodActivePolicy(
+              "engagement",
+              jurisdiction.id,
+              STANDARD_ENGAGEMENT,
+              mode,
+            ),
+            cancellation: prodActivePolicy(
+              "cancellation",
+              jurisdiction.id,
+              {},
+              mode,
+            ),
+            refund: prodActivePolicy("refund", jurisdiction.id, {}, mode),
+          },
+        };
+      };
+      // A live planted Consultation with an authorized payment recording the
+      // given versions, its Fee Calculation and its Request's and
+      // Consultation's referral version consistent with them (owner, triggers
+      // bypassed, as prodLivePayment).
+      const livePaid = (world, versions) => {
+        const c = prodReadyConsultation(world.jurisdiction, "live");
+        const payment = uid();
+        const fee = uid();
+        prodSql(
+          `begin;
+           set local session_replication_role = replica;
+           update public.consultation_requests set referral_policy_version_id = '${versions.referral}' where id = '${c.request}';
+           update public.consultations set referral_policy_version_id = '${versions.referral}' where id = '${c.consultation}';
+           insert into public.fee_calculations (id, consultation_request_id, fee_policy_version_id, attorney_listed_price_minor, platform_fee_minor, client_fee_minor, tax_or_other_required_fee_minor, total_client_amount_minor, currency_code, quote_valid_until, calculated_at, calculation_snapshot)
+             values ('${fee}', '${c.request}', '${versions.fee}', 5000, 0, 0, 0, 5000, 'XTS', now() + interval '1 hour', now(), '{}'::jsonb);
+           insert into public.payment_transactions (id, fee_calculation_id, consultation_request_id, consultation_id, jurisdiction_id, regulatory_mode_id, referral_policy_version_id, payment_policy_version_id, fee_policy_version_id, payment_flow_policy_version_id, engagement_policy_version_id, cancellation_policy_version_id, refund_policy_version_id, state, amount_authorized_minor, amount_captured_minor, currency_code, provider_code, provider_payment_reference, authorized_at, captured_at)
+             values ('${payment}', '${fee}', '${c.request}', '${c.consultation}', '${world.jurisdiction.id}', '${world.mode}', '${versions.referral}', '${versions.payment}', '${versions.fee}', '${versions.payment_flow}', '${versions.engagement}', '${versions.cancellation}', '${versions.refund}', 'authorized', 5000, null, 'XTS', 'stripe', 'pi_synthetic_${payment.slice(0, 8)}', now() - interval '1 hour', null);
+           commit;`,
+        );
+        return { ...c, payment };
+      };
+      const shift = (c, minutes) =>
+        prodSql(
+          `begin;
+           set local session_replication_role = replica;
+           update public.consultations set created_at = created_at - interval '${minutes} minutes', started_at = started_at - interval '${minutes} minutes' where id = '${c.consultation}';
+           commit;`,
+        );
+      const finishes = {
+        normal: (c) =>
+          asIn(
+            PROD_DB,
+            "authenticated",
+            c.attorney.auth,
+            `select outcome || '|' || coalesce(problem, '') from public.consultation_end('${c.consultation}');`,
+          ),
+        early_by_agreement: (c) =>
+          asIn(
+            PROD_DB,
+            "authenticated",
+            c.attorney.auth,
+            `select outcome || '|' || coalesce(problem, '') from public.consultation_end_early('${c.consultation}');`,
+          ),
+        manual_resolution: (c) => {
+          shift(c, 36);
+          return asIn(
+            PROD_DB,
+            "authenticated",
+            ops.auth,
+            `select outcome || '|' || coalesce(problem, '') from public.staff_record_consultation_outcome('${c.consultation}', 'manual_resolution', true);`,
+          );
+        },
+      };
+      // Everything a completion would change, as one text.
+      const snapshot = (c) =>
+        prodSql(
+          `select concat_ws('|',
+             (select state || ':' || coalesce(outcome_code, '-') || ':' || (ended_at is null)::text from public.consultations where id = '${c.consultation}'),
+             (select state from public.media_rooms where consultation_id = '${c.consultation}'),
+             (select state from public.payment_transactions where id = '${c.payment}'),
+             (select count(*) from public.operational_jobs where job_type = 'payment.capture' and subject_id = '${c.payment}'),
+             (select count(*) from public.reconciliation_exceptions where canonical_id = '${c.payment}' or source_id in ('${c.payment}', '${c.consultation}')),
+             (select count(*) from public.audit_events where resource_id = '${c.consultation}' and action_code in ('consultation.completed', 'consultation.outcome_recorded')));`,
+        );
+      // The payment_flow version alone passes the gate in every case (the
+      // earlier check, which these refusals now go beyond).
+      const flowOnly = (world, versions) =>
+        prodSql(
+          `select coalesce(public.media_production_problem('${world.jurisdiction.id}', jsonb_build_array(jsonb_build_object('policy_type_code', 'payment_flow', 'policy_version_id', '${versions.payment_flow}', 'regulatory_mode_id', '${world.mode}')), now()), 'open');`,
+        );
+      const out = {};
+      for (const [code, finish] of Object.entries(finishes)) {
+        const key = code.slice(0, 3).toUpperCase();
+        // Open: every recorded version passes; the completion captures.
+        const open = openJurisdiction(`R5O${key}`);
+        const paid = livePaid(open, open.versions);
+        const openBefore = snapshot(paid);
+        const openAnswer = finish(paid);
+        const openAfter = snapshot(paid);
+        // A development-only engagement version recorded.
+        const developmentEngagement = prodPlantedDevelopment(
+          "engagement",
+          open.jurisdiction.id,
+          STANDARD_ENGAGEMENT,
+          open.mode,
+        );
+        const dev = livePaid(open, {
+          ...open.versions,
+          engagement: developmentEngagement,
+        });
+        const devBefore = snapshot(dev);
+        const devAnswer = finish(dev);
+        const devAfter = snapshot(dev);
+        // The recorded cancellation version suspended: the cancellation type
+        // is no longer selectable in the jurisdiction.
+        const suspended = openJurisdiction(`R5S${key}`);
+        const gated = livePaid(suspended, suspended.versions);
+        prodSql(
+          `update public.policy_versions set status = 'suspended' where id = '${suspended.versions.cancellation}';`,
+        );
+        const gateBefore = snapshot(gated);
+        const gateAnswer = finish(gated);
+        const gateAfter = snapshot(gated);
+        out[code] = {
+          flow_only: [
+            flowOnly(open, open.versions),
+            flowOnly(suspended, suspended.versions),
+          ],
+          open: [openAnswer, openBefore, openAfter],
+          development_engagement: [devAnswer, devBefore === devAfter, devAfter],
+          suspended_cancellation: [
+            gateAnswer,
+            gateBefore === gateAfter,
+            gateAfter,
+          ],
+        };
+        const answer = code === "manual_resolution" ? "recorded|" : "completed|";
+        assert.deepEqual(out[code].flow_only, ["open", "open"], code);
+        assert.equal(openBefore, "live:-:true|open|authorized|0|0|0", code);
+        assert.equal(openAnswer, answer, code);
+        assert.equal(
+          openAfter,
+          `completed:${code}:false|closing|capture_pending|1|0|1`,
+          code,
+        );
+        assert.deepEqual(
+          out[code].development_engagement,
+          [
+            "configuration_unavailable|development_policy",
+            true,
+            "live:-:true|open|authorized|0|0|0",
+          ],
+          code,
+        );
+        assert.deepEqual(
+          out[code].suspended_cancellation,
+          [
+            "configuration_unavailable|production_gate_closed",
+            true,
+            "live:-:true|open|authorized|0|0|0",
+          ],
+          code,
+        );
+      }
+      return out;
+    },
+  );
+
+  await check(
+    "CORR-R6 (MVP-001 S11 review correction R6) assigning a complaint case already assigned to the caller is a no-op: the first assignment moves the opened case to in_review assigned to the caller and is audited once; a repeated assignment answers applied and changes no column (updated_at included) and writes no audit event, in review and once escalated alike; an assignment by another holder still reassigns the case and is audited",
+    () => {
+      const s = scheduledConsultation("S");
+      const opened = openComplaint(s.client, { consultation: s.consultation }, AAL1);
+      assert.equal(opened.outcome, "opened");
+      const audits = () =>
+        count(
+          "audit_events",
+          `resource_id = '${opened.id}' and action_code = 'complaint_case.assigned'`,
+        );
+      const update = (staff, action) =>
+        asStaff(staff, COMPLAINT_UPDATE_SQL(opened.id, action));
+      const answers = { first: update(world.complaints, "assign") };
+      const row = complaintRow(opened.id);
+      const firstAudits = audits();
+      answers.repeat = update(world.complaints, "assign");
+      const repeatRow = complaintRow(opened.id);
+      const repeatAudits = audits();
+      answers.escalate = update(world.complaints, "escalate");
+      const escalatedRow = complaintRow(opened.id);
+      answers.repeat_escalated = update(world.complaints, "assign");
+      const escalatedRepeatRow = complaintRow(opened.id);
+      const escalatedAudits = audits();
+      answers.other = update(world.complaintsS, "assign");
+      const reassigned = complaintRow(opened.id);
+      assert.deepEqual(answers, {
+        first: "applied",
+        repeat: "applied",
+        escalate: "applied",
+        repeat_escalated: "applied",
+        other: "applied",
+      });
+      assert.equal(row.state, "in_review");
+      assert.equal(row.assigned_to_user_id, world.complaints.user);
+      assert.equal(firstAudits, 1);
+      assert.deepEqual(repeatRow, row);
+      assert.equal(repeatAudits, 1);
+      assert.equal(escalatedRow.state, "escalated");
+      assert.deepEqual(escalatedRepeatRow, escalatedRow);
+      assert.equal(escalatedAudits, 1);
+      assert.equal(reassigned.assigned_to_user_id, world.complaintsS.user);
+      assert.equal(audits(), 2);
+      return answers;
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
 // EXIT: the M13 operations of this pass, through the functions only
 // ---------------------------------------------------------------------------
 
@@ -7485,7 +8148,7 @@ async function concurrencyChecks() {
   );
 
   await check(
-    "CONC-3 cancel racing the staff outcome, both orders, on a Consultation whose window has ended: a staff outcome in progress makes the client's cancellation wait, which then answers ended (the no-show stands, one outcome_payment_review item, no cancellation item); a cancellation in progress makes the staff outcome wait, which then answers already_decided (the cancellation stands, one cancellation item, no outcome item)",
+    "CONC-3 cancel racing the staff outcome, both orders, on a Consultation whose window has ended: a staff outcome in progress makes the client's cancellation wait, which then answers ended (the no-show stands, one outcome_payment_review item, no cancellation item); a cancellation attempt in progress (refused time_passed: MVP-001 S11 review correction R2 refuses a cancellation at or after the nominal end, which the window's end follows) makes the staff outcome wait, which then records the no-show (one outcome item, no cancellation item)",
     async () => {
       const first = staleReady("S");
       const staff = await staffSession("outcome-first", world.ops);
@@ -7508,7 +8171,7 @@ async function concurrencyChecks() {
       const canceller2 = await clientSession("cancel-before", second.client);
       assert.equal(
         outcomeOf(await canceller2.ok(CANCEL_SQL(second.consultation))).outcome,
-        "cancelled",
+        "time_passed",
       );
       const staff2 = await staffSession("outcome-after", world.ops);
       const pendingOutcome = staff2.send(
@@ -7540,13 +8203,7 @@ async function concurrencyChecks() {
       };
       assert.deepEqual(outcome, {
         outcome_first: ["ended", "no_show", "attorney_no_show", 1, 0],
-        cancel_first: [
-          "already_decided",
-          "cancelled",
-          "client_cancelled",
-          0,
-          1,
-        ],
+        cancel_first: ["recorded", null, "client_no_show", 1, 0],
       });
       report.concurrency.cancel_racing_staff_outcome = outcome;
       return outcome;
@@ -8220,6 +8877,7 @@ async function main() {
     await familyChecks();
     await notificationChecks();
     await productionChecks();
+    await correctionChecks();
     await exitCheck();
     await concurrencyChecks();
   } catch (error) {

@@ -160,6 +160,13 @@ export const COMPLAINT_NOTE =
   "Reporting a problem does not change a consultation or a payment. Rosuno reviews every report; the other participant does not see it.";
 export const CANCEL_NOTE =
   "You can cancel before the consultation starts. The other participant is told. Any payment is reviewed by Rosuno staff; nothing is refunded or charged automatically here.";
+// MVP-001 S11 correction pass (A7): the cancellation is asked for in two
+// steps; the second sends it.
+export const CANCEL_LABEL = "Cancel the consultation";
+export const CANCEL_CONFIRM_PROMPT =
+  "Please confirm that you want to cancel this consultation.";
+export const CANCEL_CONFIRM_LABEL = "Confirm the cancellation";
+export const CANCEL_KEEP_LABEL = "Keep the consultation";
 export const END_EARLY_NOTE =
   "End early only when you and the client agree. The client is told the recorded outcome.";
 export const HOLD_NOTE =
@@ -260,6 +267,12 @@ export const CANCEL_MESSAGES: Readonly<Record<CancelActionOutcome, Message>> =
       tone: "error",
       title: "Not available right now",
       body: "This cannot be done right now. Nothing was changed.",
+    },
+    // MVP-001 S11 review correction R2.
+    time_passed: {
+      tone: "warning",
+      title: "The scheduled time has passed",
+      body: "This consultation can no longer be cancelled. Rosuno staff record what happened. Nothing was changed.",
     },
   });
 

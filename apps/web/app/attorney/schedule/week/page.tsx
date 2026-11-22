@@ -4,19 +4,21 @@
 // Rendered on the server for every request and never indexed. The step-up
 // gate comes first (MVP-001 S2); then the trusted session and the trusted
 // attorney principal source decide access through the unchanged Security
-// Shell, and seven UTC days of the attorney's own calendar are read through
-// the existing calendar read: availability windows, Blackouts, Holds for
-// pending requests and Bookings. The one query value read, week, only names
+// Shell, and seven UTC days of the attorney's own calendar are shown from
+// the existing calendar read (of those days and one local day on each side):
+// availability windows, Blackouts, Holds for pending requests and Bookings. The one query value read, week, only names
 // the first day shown; the server checks it against the span the calendar
 // read answers and shows the current week for anything else. Read-only: the
 // schedule is changed on the existing schedule page. Nothing of a client, a
-// request or an Intake is shown.
+// request or an Intake is shown. A view unavailable is logged with the route
+// and outcome only.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 
 import { resolveScheduleWeek } from "../../../../src/application/participant-workspaces.ts";
+import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
 import { ATTORNEY_SCHEDULE_SOURCES } from "../../../../src/infrastructure/scheduling/attorney-schedule-adapter.ts";
 import {
   Alert,
@@ -111,6 +113,10 @@ export default async function AttorneyWeekPage({
     );
   }
   if (view.status !== "ready") {
+    await logRequestEvent("warn", "scheduling.view_unavailable", {
+      route: "/attorney/schedule/week",
+      outcome: view.status,
+    });
     return (
       <Frame>
         <Alert tone="error" title="Something went wrong" role="alert">

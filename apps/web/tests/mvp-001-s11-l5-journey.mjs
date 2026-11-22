@@ -3,20 +3,27 @@
 //
 // What it proves, through the production build's real pages in a real
 // browser, on a LOCAL DISPOSABLE stack only:
-//   1. a client cancels a scheduled consultation from its page; the
-//      consultation is cancelled by the client, its Booking is cancelled and
-//      the attorney's slot is free again (another client's Request for that
-//      slot is created);
+//   1. a client cancels a scheduled consultation from its page (asked to
+//      confirm first; MVP-001 S11 correction pass A7); the consultation is
+//      cancelled by the client, its Booking is cancelled and the attorney's
+//      slot is free again (another client's Request for that slot is
+//      created);
 //   2. a consultation is started and ended by its attorney (aal2) from its
 //      page; its Booking is completed; the client leaves a review; staff
 //      (aal2, moderate_reviews) publish it; it appears on the attorney's
 //      public profile with the count and average computed at read time;
 //   3. the client reports a problem about that consultation; staff (aal2,
 //      manage_complaints) assign the case and (manage_legal_holds) place a
-//      Legal Hold on it from the case page;
-//   4. staff (aal2, manage_consultation_operations) record an outcome for a
-//      stale consultation (both participants absent) from the operations
-//      page; its Booking is completed and the client sees the outcome.
+//      Legal Hold on it from the case page; with a synthetic complaint
+//      vocabulary wired in as an owner fixture (and the original function
+//      restored byte for byte afterwards), staff classify and resolve the
+//      case and the resolution's message stays in view (correction pass A4);
+//   4. after its slot has passed, the client's cancellation of a stale
+//      consultation is refused with the fixed message and nothing changes
+//      (correction pass R2); staff (aal2, manage_consultation_operations)
+//      record an outcome for it (both participants absent) from the
+//      operations page; its Booking is completed and the client sees the
+//      outcome.
 //
 // Prerequisites (none is installed or changed by this script):
 //   - a local disposable Supabase stack (for example `npx supabase start` in
@@ -412,6 +419,11 @@ async function click(page, name, scope = page) {
   await page.waitForLoadState("networkidle").catch(() => null);
   await page.waitForTimeout(700);
 }
+// A button that sends nothing (the first step of a confirmation).
+async function reveal(page, name, scope = page) {
+  await scope.getByRole("button", { name, exact: true }).first().click();
+  await page.waitForTimeout(300);
+}
 const alerts = async (page) => page.$$eval(".rs-alert__title", (els) => els.map((e) => e.textContent.trim()));
 const textOf = async (page) => (await page.innerText("main")).replace(/\s+/g, " ").trim();
 async function signIn(page, who) {
@@ -501,14 +513,22 @@ try {
   const listed = await textOf(me.page);
   const occupied = scheduledRequest(other, slotA).outcome;
   await go(me.page, `${BASE}/client/consultations/${A}`);
-  await click(me.page, "Cancel the consultation");
+  await reveal(me.page, "Cancel the consultation");
+  const confirmStep = {
+    prompt: (await textOf(me.page)).includes("Please confirm that you want to cancel this consultation."),
+    confirm: await me.page.getByRole("button", { name: "Confirm the cancellation", exact: true }).count(),
+    keep: await me.page.getByRole("button", { name: "Keep the consultation", exact: true }).count(),
+    unchanged: consultationOf(A),
+  };
+  await click(me.page, "Confirm the cancellation");
   const cancelAlerts = await alerts(me.page);
   const freed = scheduledRequest(other, slotA).outcome;
   step(
-    "the client cancels a scheduled consultation from its page (linked from the client home and the consultation list): cancelled by the client, its Booking cancelled, the attorney told; another client's Request for that slot, refused before, is created after",
+    "the client cancels a scheduled consultation from its page (linked from the client home and the consultation list), confirming in a second step (the first sends nothing): cancelled by the client, its Booking cancelled, the attorney told; another client's Request for that slot, refused before, is created after",
     {
       homeLinks: ["/client/consultations", "/client/reviews", "/client/complaints"].map((href) => clientLinks.includes(href)),
       listedUpcoming: listed.includes("Upcoming") && listed.includes("Scheduled"),
+      confirmStep,
       cancelAlerts,
       consultation: consultationOf(A),
       booking: bookingOf(A),
@@ -516,7 +536,11 @@ try {
       slotBefore: occupied,
       slotAfter: freed,
     },
-    cancelAlerts.includes("Consultation cancelled") &&
+    confirmStep.prompt &&
+      confirmStep.confirm === 1 &&
+      confirmStep.keep === 1 &&
+      confirmStep.unchanged === "scheduled:-" &&
+      cancelAlerts.includes("Consultation cancelled") &&
       consultationOf(A) === "cancelled:client_cancelled" &&
       bookingOf(A) === "cancelled" &&
       occupied !== "created" &&
@@ -662,14 +686,80 @@ try {
       holdsPage.includes(caseId),
   );
 
+  // 3b. MVP-001 S11 correction pass (A4): staff classify and resolve the
+  // case. No configuration home for the complaint vocabularies exists, so a
+  // synthetic vocabulary is wired into the database's one seam as an owner
+  // fixture (as the S11 DB proof does inside a rolled-back transaction) and
+  // the original function is restored byte for byte right after.
+  const VOCABULARY = "public.complaint_vocabulary(uuid, timestamp with time zone)";
+  const vocabulary = sql(`select pg_get_functiondef('${VOCABULARY}'::regprocedure);`);
+  const resolution = {};
+  try {
+    sql(`create or replace function public.complaint_vocabulary(p_jurisdiction uuid, p_as_of timestamptz)
+returns table (outcome text, policy_version_id uuid, category_codes text[], resolution_codes text[])
+language sql stable security invoker set search_path = pg_catalog, pg_temp
+as $f$ select 'selected'::text, null::uuid, array['synthetic_category']::text[], array['synthetic_resolution']::text[]; $f$;`);
+    await go(ops.page, `${BASE}/staff/complaints/${caseId}`);
+    await ops.page.fill(`#classify-${caseId}`, "synthetic_category");
+    await click(ops.page, "Classify");
+    resolution.classifyAlerts = await alerts(ops.page);
+    await ops.page.fill(`#resolve-${caseId}`, "synthetic_resolution");
+    await click(ops.page, "Resolve");
+    resolution.resolveAlerts = await alerts(ops.page);
+    resolution.page = await textOf(ops.page);
+    resolution.fields = await ops.page.$$eval("main form input[name=code]", (els) => els.length);
+    resolution.state = sql(`select concat_ws('|', state, category_code, resolution_code, resolved_at is not null) from public.complaint_cases where id = '${caseId}';`);
+  } finally {
+    sql(`${vocabulary};`);
+  }
+  resolution.restored = sql(`select pg_get_functiondef('${VOCABULARY}'::regprocedure);`) === vocabulary;
+  resolution.unconfigured = sql("select outcome from public.complaint_vocabulary(null, now());");
+  step(
+    "staff (aal2, manage_complaints) classify and resolve the case from its page (synthetic vocabulary owner fixture, restored afterwards): the case is resolved with its codes, and the resolution form stays in its slot, so its fixed message stays in view with the resolved text and no field; the matter is unchanged",
+    {
+      classifyAlerts: resolution.classifyAlerts,
+      resolveAlerts: resolution.resolveAlerts,
+      resolvedShown: resolution.page?.includes("This case is resolved.") ?? false,
+      fields: resolution.fields,
+      state: resolution.state,
+      restored: resolution.restored,
+      unconfigured: resolution.unconfigured,
+      matterUnchanged: matterBefore === matterOf(),
+    },
+    resolution.classifyAlerts?.includes("Saved") === true &&
+      resolution.resolveAlerts?.includes("Saved") === true &&
+      resolution.page.includes("This case is resolved.") &&
+      resolution.fields === 0 &&
+      resolution.state === "resolved|synthetic_category|synthetic_resolution|t" &&
+      resolution.restored &&
+      resolution.unconfigured === "configuration_unavailable" &&
+      matterBefore === matterOf(),
+  );
+
   // 4. C becomes stale (owner fixture: its Booking and recorded times move
   // four days into the past, because the journey cannot wait for a slot to
-  // pass); staff record that neither participant attended.
+  // pass); the client's cancellation is refused (correction pass R2); staff
+  // record that neither participant attended.
   sql(`begin;
 set local session_replication_role = replica;
 update public.bookings set starts_at = starts_at - interval '7 days', ends_at = ends_at - interval '7 days', created_at = created_at - interval '7 days' where consultation_id = '${C}';
 update public.consultations set created_at = created_at - interval '7 days' where id = '${C}';
 commit;`);
+  const lateBefore = `${consultationOf(C)}|${bookingOf(C)}`;
+  await go(me.page, `${BASE}/client/consultations/${C}`);
+  await reveal(me.page, "Cancel the consultation");
+  await click(me.page, "Confirm the cancellation");
+  const lateAlerts = await alerts(me.page);
+  const lateAfter = `${consultationOf(C)}|${bookingOf(C)}`;
+  const lateNotified = notificationTypes(attorney.userId, C);
+  step(
+    "after its slot has passed, the client's cancellation of the stale consultation is refused with the fixed message (the scheduled time has passed); the consultation and its Booking are unchanged and the attorney is told nothing",
+    { lateBefore, lateAlerts, lateAfter, lateNotified },
+    lateAlerts.includes("The scheduled time has passed") &&
+      lateAfter === lateBefore &&
+      lateBefore.endsWith("|confirmed") &&
+      !lateNotified.includes("consultation_cancelled:in_app"),
+  );
   await go(ops.page, `${BASE}/staff/consultations`);
   const staleListed = (await ops.page.locator(`a[href="/staff/consultations/${C}"]`).count()) === 1;
   await go(ops.page, `${BASE}/staff/consultations/${C}`);

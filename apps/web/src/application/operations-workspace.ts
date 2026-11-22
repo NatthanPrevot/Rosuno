@@ -447,7 +447,8 @@ export type AuditEventDetail = AuditEventRow & {
   readonly policyReferences: string | null;
 };
 
-// A recorded JSON value as indented text, exactly as stored (bounded).
+// A recorded JSON value as indented text, exactly as the database answers it
+// (bounded; MVP-001 S11 correction R4: the database redacts free text).
 function snapshotText(value: unknown): string | null | undefined {
   if (value === null) {
     return null;

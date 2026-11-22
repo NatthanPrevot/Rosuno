@@ -285,6 +285,8 @@ test("S11-3. cancellation and early completion map every database outcome to a f
     ["in_progress", "in_progress"],
     ["not_found", "not_found"],
     ["configuration_unavailable", "configuration_unavailable"],
+    // MVP-001 S11 correction pass (R2): refused at or after the nominal end.
+    ["time_passed", "time_passed"],
   ];
   for (const [outcome, mapped] of cases) {
     const w = outcomeWorld({ cancel: answer(outcome) });
@@ -1187,6 +1189,26 @@ test("S11-15. every action outcome has a fixed message; nothing promises a refun
   assert.equal(
     labels.messageOf({ status: "step-up-required" }, labels.CANCEL_MESSAGES).title,
     "Confirm your sign-in",
+  );
+  // MVP-001 S11 correction pass (R2 and A7): the refusal after the scheduled
+  // time has its own fixed message, and the confirmation step's wording is
+  // fixed and neutral.
+  assert.deepEqual(
+    labels.messageOf({ status: "outcome", outcome: "time_passed" }, labels.CANCEL_MESSAGES),
+    {
+      tone: "warning",
+      title: "The scheduled time has passed",
+      body: "This consultation can no longer be cancelled. Rosuno staff record what happened. Nothing was changed.",
+    },
+  );
+  assert.deepEqual(
+    [labels.CANCEL_LABEL, labels.CANCEL_CONFIRM_PROMPT, labels.CANCEL_CONFIRM_LABEL, labels.CANCEL_KEEP_LABEL],
+    [
+      "Cancel the consultation",
+      "Please confirm that you want to cancel this consultation.",
+      "Confirm the cancellation",
+      "Keep the consultation",
+    ],
   );
 });
 

@@ -12,7 +12,7 @@
 // dropped connection) asks the server for a new short-lived token for the
 // same room. No timer in the browser decides anything.
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   INITIAL_COMMUNICATION_STATE,
@@ -27,6 +27,10 @@ import {
   type JoinActionState,
 } from "../../../../src/application/consultations.ts";
 import {
+  CANCEL_CONFIRM_LABEL,
+  CANCEL_CONFIRM_PROMPT,
+  CANCEL_KEEP_LABEL,
+  CANCEL_LABEL,
   CANCEL_MESSAGES,
   CANCEL_NOTE,
   messageOf,
@@ -318,6 +322,8 @@ export function DocumentControls({
 // field only names the Consultation; the server decides afresh whether it is
 // the client's own and whether it can still be cancelled, frees the booked
 // time, closes the room and tells the attorney. No money moves here.
+// Correction pass (A7): the first button only asks for confirmation; the
+// form is sent from the second step, which lasts until the next answer.
 export function CancelPanel({
   consultationId,
   cancellable,
@@ -332,6 +338,10 @@ export function CancelPanel({
     cancelConsultationAction,
     INITIAL_CANCEL_STATE,
   );
+  // The answer the confirmation was asked after; a new answer ends it.
+  const [confirmingAt, setConfirmingAt] = useState<CancelActionState | null>(
+    null,
+  );
   const message = messageOf(state, CANCEL_MESSAGES);
   return (
     <Stack gap="tight">
@@ -344,21 +354,44 @@ export function CancelPanel({
           {message.body}
         </Alert>
       )}
-      {cancellable ? (
+      {!cancellable ? null : confirmingAt === state ? (
         <form action={action}>
           <Stack gap="tight">
             <Text size="small" tone="muted">
               {CANCEL_NOTE}
             </Text>
+            <Text size="small">{CANCEL_CONFIRM_PROMPT}</Text>
             <input type="hidden" name="consultation" value={consultationId} />
             <Cluster>
               <Button variant="secondary" type="submit" disabled={pending}>
-                Cancel the consultation
+                {CANCEL_CONFIRM_LABEL}
+              </Button>
+              <Button
+                variant="tertiary"
+                disabled={pending}
+                onClick={() => setConfirmingAt(null)}
+              >
+                {CANCEL_KEEP_LABEL}
               </Button>
             </Cluster>
           </Stack>
         </form>
-      ) : null}
+      ) : (
+        <Stack gap="tight">
+          <Text size="small" tone="muted">
+            {CANCEL_NOTE}
+          </Text>
+          <Cluster>
+            <Button
+              variant="secondary"
+              disabled={pending}
+              onClick={() => setConfirmingAt(state)}
+            >
+              {CANCEL_LABEL}
+            </Button>
+          </Cluster>
+        </Stack>
+      )}
     </Stack>
   );
 }

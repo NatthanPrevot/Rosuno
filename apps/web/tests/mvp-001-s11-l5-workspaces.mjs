@@ -23,7 +23,12 @@
 //      attorney pages, the attorney and a staff member on the client pages, a
 //      staff member on the attorney pages, a signed-out visitor everywhere
 //      (asked to sign in); another client and another attorney see none of
-//      the first ones' records.
+//      the first ones' records;
+//   5. MVP-001 S11 correction pass (A2): the week view shows availability
+//      windows of a zone west of UTC (America/New_York) and east of it
+//      (Asia/Tokyo) that fall inside its UTC week at both week edges, and
+//      none that fall outside it (one-time rules of the second attorney, an
+//      owner fixture).
 //
 // Prerequisites, configuration and safety rules are those of the committed
 // S11 L5 journey (mvp-001-s11-l5-journey.mjs): a local disposable Supabase
@@ -501,7 +506,28 @@ try {
   const other = await newClient("other");
   // Owner fixture: a second approved attorney with no consultation.
   const otherAttorney = await authUser("otherattorney");
-  sql(`insert into public.attorney_profiles (user_id, profile_state, display_name, years_experience) values ('${otherAttorney.userId}', 'approved', 'Synthetic Other Attorney ${tag}', 3);`);
+  const otherProfile = sql(
+    `insert into public.attorney_profiles (user_id, profile_state, display_name, years_experience) values ('${otherAttorney.userId}', 'approved', 'Synthetic Other Attorney ${tag}', 3) returning id;`,
+  );
+  // Correction pass A2 (owner fixture): one-time windows of the second
+  // attorney around the UTC week starting 14 days from today. New York
+  // (UTC-5 or -4) at 20:30 local falls on the next UTC day; Tokyo (UTC+9) at
+  // 08:00 local falls on the previous UTC day.
+  const weekStart = new Date(Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`) + 14 * DAY * 1000);
+  const dayOf = (offset) => new Date(weekStart.getTime() + offset * DAY * 1000).toISOString().slice(0, 10);
+  const weekWindows = [
+    // Inside: the first UTC day (local day before) and the last UTC day
+    // (local day after).
+    ["America/New_York", dayOf(-1), "20:30", "21:30"],
+    ["Asia/Tokyo", dayOf(7), "08:00", "09:00"],
+    // Outside: the UTC day after the week and the UTC day before it.
+    ["America/New_York", dayOf(6), "20:30", "21:30"],
+    ["Asia/Tokyo", dayOf(0), "08:00", "09:00"],
+  ];
+  for (const [zone, date, from, to] of weekWindows) {
+    sql(`insert into public.availability_rules (attorney_id, rule_kind, timezone_name, specific_date, local_start_time, local_end_time, active)
+       values ('${otherProfile}', 'one_time', '${zone}', '${date}', '${from}', '${to}', true);`);
+  }
 
   // Three scheduled consultations of the attorney: A (cancelled by the
   // client), B (near; started and ended by the attorney), D (upcoming; one
@@ -774,6 +800,10 @@ insert into public.discipline_records (attorney_id, jurisdiction_id, opened_at, 
   const otherDocuments = await textOf(otherAttorneySession.page);
   await go(otherAttorneySession.page, `${BASE}/attorney/compliance`);
   const otherCompliance = await textOf(otherAttorneySession.page);
+  await go(otherAttorneySession.page, `${BASE}/attorney/schedule/week?week=${dayOf(0)}`);
+  const weekRows = await otherAttorneySession.page.$$eval("main table tbody tr", (els) =>
+    els.map((e) => e.innerText.replace(/\s+/g, " ").trim()),
+  );
   step(
     "every new page by direct URL refuses the wrong user (the client on the attorney pages; the attorney and a staff member on the client pages; a staff member on the attorney pages) with the fixed refusal and asks a signed-out visitor to sign in, showing nothing of the records; another client sees no payment or thread of the first client and another attorney no past consultation, document, licence or finding of the first attorney",
     {
@@ -802,6 +832,26 @@ insert into public.discipline_records (attorney_id, jurisdiction_id, opened_at, 
       otherDocuments.includes("No documents yet.") &&
       otherCompliance.includes("No licence claim is recorded.") &&
       otherCompliance.includes("No discipline finding is recorded."),
+  );
+  // Each window shows its zone after its start and after its end.
+  const zoneCount = (zone) => (weekRows.join(" ").split(`(${zone})`).length - 1) / 2;
+  step(
+    "the week view (the second attorney, aal2) shows the New York window of the local day before the week on its first UTC day and the Tokyo window of the local day after the week on its last UTC day, each once with its own zone; the windows that fall on the UTC days outside the week are not shown",
+    {
+      week: dayOf(0),
+      days: weekRows.map((row) => row.slice(0, 10)),
+      firstDayNewYork: weekRows[0]?.includes("(America/New_York)") ?? false,
+      lastDayTokyo: weekRows[6]?.includes("(Asia/Tokyo)") ?? false,
+      newYorkWindows: zoneCount("America/New_York"),
+      tokyoWindows: zoneCount("Asia/Tokyo"),
+    },
+    weekRows.length === 7 &&
+      weekRows[0].startsWith(dayOf(0)) &&
+      weekRows[6].startsWith(dayOf(6)) &&
+      weekRows[0].includes("(America/New_York)") &&
+      weekRows[6].includes("(Asia/Tokyo)") &&
+      zoneCount("America/New_York") === 1 &&
+      zoneCount("Asia/Tokyo") === 1,
   );
 } catch (error) {
   failed = true;

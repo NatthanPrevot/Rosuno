@@ -25,6 +25,7 @@ import {
   Button,
   Cluster,
   Stack,
+  Text,
   TextField,
 } from "../../../src/presentation/design-system.tsx";
 import {
@@ -75,17 +76,30 @@ export function CaseActionsForm({
   );
 }
 
+// The resolution form stays mounted once the case is resolved (the page keeps
+// it in one slot), so the message for the state its action returned is still
+// shown; a resolved case offers no fields.
 export function DecideCaseForm({
   caseId,
   kind,
+  resolved = false,
 }: {
   readonly caseId: string;
   readonly kind: "classify" | "resolve";
+  readonly resolved?: boolean;
 }) {
   const [state, action, pending] = useActionState<CaseActionState, FormData>(
     kind === "classify" ? classifyCaseAction : resolveCaseAction,
     INITIAL_CASE_STATE,
   );
+  if (resolved) {
+    return (
+      <Stack gap="tight">
+        <Outcome state={state} />
+        <Text>This case is resolved.</Text>
+      </Stack>
+    );
+  }
   return (
     <form action={action}>
       <Stack gap="tight">

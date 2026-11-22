@@ -611,15 +611,20 @@ export function resolveClientThreads(
 }
 
 // The client's home: Consultations in progress or ready now, and the next
-// upcoming one, from the client's Consultation list as it was read.
+// upcoming one, from the client's Consultation list as it was read. A
+// Consultation not yet ready whose window has already closed (it awaits its
+// outcome) is not upcoming.
 export type ClientHome = {
   readonly active: readonly ClientConsultationEntry[];
   readonly next: ClientConsultationEntry | null;
   readonly upcoming: number;
 };
 
-export function clientHomeOf(view: ClientConsultationsView): ClientHome | null {
-  if (view.status !== "ready") {
+export function clientHomeOf(
+  view: ClientConsultationsView,
+  now: number,
+): ClientHome | null {
+  if (view.status !== "ready" || !Number.isFinite(now)) {
     return null;
   }
   const active = view.entries.filter((entry) => {
@@ -628,7 +633,10 @@ export function clientHomeOf(view: ClientConsultationsView): ClientHome | null {
   });
   const upcoming = view.entries.filter((entry) => {
     const shown = clientDisplayStateOf(entry);
-    return shown === "created" || shown === "scheduled";
+    return (
+      (shown === "created" || shown === "scheduled") &&
+      (entry.closesAt === null || Date.parse(entry.closesAt) > now)
+    );
   });
   return Object.freeze({
     active: Object.freeze(active),
@@ -1136,6 +1144,12 @@ export const WEEK_DAYS = 7;
 const WEEK_BACK_DAYS = 28;
 const WEEK_AHEAD_DAYS = 3646;
 const DAY_MS = 86400000;
+// The calendar read expands availability by the rule's own local dates, so a
+// UTC week reads one local day on each side (the day before its start through
+// the day after its end, inside the span above): an evening window of a zone
+// west of UTC, or a morning window of a zone east of it, that falls inside
+// the UTC week is then not missed.
+const WEEK_READ_DAYS = WEEK_DAYS + 2;
 
 export type WeekDay = {
   readonly date: string;
@@ -1175,8 +1189,9 @@ export function weekStartOf(value: unknown, now: number): string {
 }
 
 // Seven UTC days of the attorney's own calendar (availability windows,
-// Blackouts, Holds and Bookings, from the existing calendar read); each entry
-// is shown on the first day of the week it overlaps. It never throws.
+// Blackouts, Holds and Bookings, from the existing calendar read of the week
+// and one local day on each side); each entry is shown once, on the first day
+// of the week it overlaps. It never throws.
 export async function resolveScheduleWeek(
   sources: AttorneyScheduleSources,
   weekValue: unknown,
@@ -1197,21 +1212,35 @@ export async function resolveScheduleWeek(
     const start = weekStartOf(weekValue, now);
     const from = Date.parse(`${start}T00:00:00Z`);
     const until = from + WEEK_DAYS * DAY_MS;
-    const rows = rowsOf(await attempt(() => reads.calendar(start, WEEK_DAYS)));
+    const readFrom = dateText(from - DAY_MS);
+    const rows = rowsOf(
+      await attempt(() => reads.calendar(readFrom, WEEK_READ_DAYS)),
+    );
     if (rows === null) {
       return UNAVAILABLE;
     }
-    const entries = rows.map(readCalendarEntry);
-    if (entries.includes(null)) {
+    const read = rows.map(readCalendarEntry);
+    if (read.includes(null)) {
       return UNAVAILABLE;
     }
+    // One entry per identity: the availability windows of one rule share the
+    // rule's id, so a window is the rule with its own start and end.
+    const seen = new Set<string>();
+    const entries = (read as CalendarEntry[]).filter((entry) => {
+      const key = `${entry.kind}|${entry.id}|${entry.startsAt}|${entry.endsAt}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
     const days = Array.from({ length: WEEK_DAYS }, (_, index) => {
       const dayStart = from + index * DAY_MS;
       const dayEnd = dayStart + DAY_MS;
       return Object.freeze({
         date: dateText(dayStart),
         entries: Object.freeze(
-          (entries as CalendarEntry[]).filter((entry) => {
+          entries.filter((entry) => {
             const s = Date.parse(entry.startsAt);
             const e = Date.parse(entry.endsAt);
             if (!(s < until && e > from)) {

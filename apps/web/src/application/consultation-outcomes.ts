@@ -155,6 +155,8 @@ export const CANCEL_OUTCOMES = Object.freeze([
   "ended",
   "in_progress",
   "configuration_unavailable",
+  // MVP-001 S11 review correction R2: at or after the nominal end.
+  "time_passed",
 ]);
 export const END_EARLY_OUTCOMES = Object.freeze([
   "completed",
@@ -576,6 +578,7 @@ export const CANCEL_ACTION_OUTCOMES = Object.freeze([
   "ended",
   "in_progress",
   "configuration_unavailable",
+  "time_passed",
 ] as const);
 export type CancelActionOutcome = (typeof CANCEL_ACTION_OUTCOMES)[number];
 export type CancelActionState = ActionState<CancelActionOutcome>;
@@ -602,6 +605,7 @@ const CANCEL_TABLE: Readonly<Record<string, CancelActionOutcome>> =
     ended: "ended",
     in_progress: "in_progress",
     configuration_unavailable: "configuration_unavailable",
+    time_passed: "time_passed",
   });
 
 const END_EARLY_TABLE: Readonly<Record<string, EndEarlyActionOutcome>> =

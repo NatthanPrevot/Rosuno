@@ -658,7 +658,7 @@ test("S11C-6 (MBS sections 18.2 and 18.3 messages) the inboxes read the caller's
   assert.deepEqual(noAttorney.calls, []);
 });
 
-test("S11C-7 the client's home shows the Consultations in progress or ready now and the next upcoming one, from the client's own list as it was read; an unread list shows nothing", () => {
+test("S11C-7 the client's home shows the Consultations in progress or ready now and the next upcoming one, from the client's own list as it was read; a Consultation not yet ready whose window has closed is not upcoming (correction pass A5); an unread list or an unreadable clock shows nothing", () => {
   const entry = (id, state, readyDue = false) => ({
     id,
     state,
@@ -674,7 +674,7 @@ test("S11C-7 the client's home shows the Consultations in progress or ready now 
     endedAt: null,
     outcomeCode: null,
   });
-  const home = clientHomeOf({
+  const list = {
     status: "ready",
     entries: [
       entry(ID(1), "live"),
@@ -683,15 +683,44 @@ test("S11C-7 the client's home shows the Consultations in progress or ready now 
       entry(ID(4), "created"),
       { ...entry(ID(5), "cancelled"), endedAt: LATER },
     ],
-  });
+  };
+  // MVP-001 S11 correction pass (A5), by exact admission: the home takes the
+  // time it is shown at; before the windows close (LATER) the list is as
+  // before.
+  const home = clientHomeOf(list, Date.parse(T));
   assert.deepEqual(
     home.active.map((e) => e.id),
     [ID(1), ID(2)],
   );
   assert.equal(home.next.id, ID(3));
   assert.equal(home.upcoming, 2);
-  assert.equal(clientHomeOf({ status: "unavailable" }), null);
-  assert.deepEqual(clientHomeOf({ status: "ready", entries: [] }), {
+  // At or after the close of their windows the scheduled and created ones
+  // are not upcoming; those in progress or ready are still shown.
+  for (const at of [Date.parse(LATER), NOW]) {
+    const closed = clientHomeOf(list, at);
+    assert.deepEqual(
+      closed.active.map((e) => e.id),
+      [ID(1), ID(2)],
+    );
+    assert.equal(closed.next, null);
+    assert.equal(closed.upcoming, 0);
+  }
+  // A closed one does not hide a later one; one without a window is kept.
+  const mixed = clientHomeOf(
+    {
+      status: "ready",
+      entries: [
+        entry(ID(3), "scheduled"),
+        { ...entry(ID(6), "scheduled"), closesAt: "2026-11-21T10:30:00+00:00" },
+        { ...entry(ID(7), "created"), opensAt: null, closesAt: null },
+      ],
+    },
+    NOW,
+  );
+  assert.deepEqual([mixed.next.id, mixed.upcoming], [ID(6), 2]);
+  assert.equal(clientHomeOf({ status: "unavailable" }, NOW), null);
+  assert.equal(clientHomeOf(list, Number.NaN), null);
+  assert.deepEqual(clientHomeOf({ status: "ready", entries: [] }, NOW), {
     active: [],
     next: null,
     upcoming: 0,
@@ -1060,7 +1089,7 @@ test("S11C-11 (MBS section 18.3 home) the dashboard admits the attorney once thr
   assert.equal(availability.days, 14);
 });
 
-test("S11C-12 (MBS section 18.3 schedule) the week view reads seven days of the attorney's own calendar through the existing read from the named first day (a whole UTC date within 28 days back and the read's span ahead; today otherwise), shows each entry on the first day of the week it overlaps, offers the neighbouring weeks inside the span, and is unavailable on any malformed row", async () => {
+test("S11C-12 (MBS section 18.3 schedule) the week view reads the attorney's own calendar through the existing read for the seven days from the named first day (a whole UTC date within 28 days back and the read's span ahead; today otherwise) and one local day on each side, shows each entry on the first day of the week it overlaps, offers the neighbouring weeks inside the span, and is unavailable on any malformed row", async () => {
   assert.equal(weekStartOf(undefined, NOW), "2026-11-20");
   assert.equal(weekStartOf("2026-11-27", NOW), "2026-11-27");
   assert.equal(weekStartOf("2026-10-23", NOW), "2026-10-23");
@@ -1113,7 +1142,9 @@ test("S11C-12 (MBS section 18.3 schedule) the week view reads seven days of the 
     ),
     "2026-11-20",
   );
-  assert.deepEqual(calls, [["2026-11-20", 7]]);
+  // MVP-001 S11 correction pass (A2), by exact admission: the read starts one
+  // local day before the week and covers nine days (S11C-17).
+  assert.deepEqual(calls, [["2026-11-19", 9]]);
   assert.equal(view.status, "ready");
   assert.deepEqual(
     view.days.map((day) => [day.date, day.entries.map((e) => e.id)]),
@@ -1147,6 +1178,153 @@ test("S11C-12 (MBS section 18.3 schedule) the week view reads seven days of the 
     undefined,
   );
   assert.equal(refused.status, "sign-in-required");
+});
+
+test("S11C-17 (MBS section 18.3 schedule; correction pass A2) the week view reads one local day on each side of its UTC week, so availability windows of a zone west of UTC (America/New_York) and east of it (Asia/Tokyo) that fall inside the UTC week are shown at both week edges; entries outside the UTC week are not; a repeated row is shown once while distinct windows of one rule are all kept; the read stays inside the calendar read's span at both ends of the week range", async () => {
+  const calls = [];
+  const window = (id, startsAt, endsAt, zone, localDate) => ({
+    entry_kind: "window",
+    entry_id: id,
+    starts_at: startsAt,
+    ends_at: endsAt,
+    timezone_name: zone,
+    local_date: localDate,
+    entry_state: "available",
+    reason_code: null,
+  });
+  const booking = (id, startsAt, endsAt) => ({
+    entry_kind: "booking",
+    entry_id: id,
+    starts_at: startsAt,
+    ends_at: endsAt,
+    timezone_name: null,
+    local_date: null,
+    entry_state: "confirmed",
+    reason_code: null,
+  });
+  const scheduleSources = (answer) => ({
+    ...principals({ subject: SUBJECT, stage: "approved" }).attorney,
+    reads: async () => ({
+      calendar: async (from, days) => {
+        calls.push([from, days]);
+        return answer;
+      },
+    }),
+    writes: async () => ({}),
+    clock: () => NOW,
+  });
+  const NY = "America/New_York";
+  const TOKYO = "Asia/Tokyo";
+  const answer = rows([
+    // New York, local 2026-11-19 20:30-21:30 (EST): 2026-11-20 01:30 UTC, the
+    // week's first UTC day, read only through the day before.
+    window(
+      ID(1),
+      "2026-11-20T01:30:00Z",
+      "2026-11-20T02:30:00Z",
+      NY,
+      "2026-11-19",
+    ),
+    // New York, local 2026-11-19 18:00-19:00: still 2026-11-19 in UTC.
+    window(
+      ID(1),
+      "2026-11-19T23:00:00Z",
+      "2026-11-20T00:00:00Z",
+      NY,
+      "2026-11-19",
+    ),
+    // New York, local 2026-11-26 21:00-22:00: 2026-11-27 02:00 UTC, the next
+    // week.
+    window(
+      ID(1),
+      "2026-11-27T02:00:00Z",
+      "2026-11-27T03:00:00Z",
+      NY,
+      "2026-11-26",
+    ),
+    // New York, local 2026-11-26 17:00-18:00: the week's last UTC day.
+    window(
+      ID(1),
+      "2026-11-26T22:00:00Z",
+      "2026-11-26T23:00:00Z",
+      NY,
+      "2026-11-26",
+    ),
+    // Tokyo, local 2026-11-27 08:00-09:00 (JST): 2026-11-26 23:00 UTC, the
+    // week's last UTC day, read only through the day after.
+    window(
+      ID(2),
+      "2026-11-26T23:00:00Z",
+      "2026-11-27T00:00:00Z",
+      TOKYO,
+      "2026-11-27",
+    ),
+    // Tokyo, local 2026-11-20 08:00-09:00: 2026-11-19 23:00 UTC, before the
+    // week.
+    window(
+      ID(2),
+      "2026-11-19T23:00:00Z",
+      "2026-11-20T00:00:00Z",
+      TOKYO,
+      "2026-11-20",
+    ),
+    // Tokyo, local 2026-11-20 10:00-11:00: the week's first UTC day.
+    window(
+      ID(2),
+      "2026-11-20T01:00:00Z",
+      "2026-11-20T02:00:00Z",
+      TOKYO,
+      "2026-11-20",
+    ),
+    // The same booking twice is shown once.
+    booking(ID(3), "2026-11-23T09:00:00Z", "2026-11-23T10:00:00Z"),
+    booking(ID(3), "2026-11-23T09:00:00Z", "2026-11-23T10:00:00Z"),
+  ]);
+  const view = await resolveScheduleWeek(scheduleSources(answer), "2026-11-20");
+  assert.deepEqual(calls, [["2026-11-19", 9]]);
+  assert.equal(view.status, "ready");
+  assert.deepEqual(
+    view.days.map((day) => [
+      day.date,
+      day.entries.map(
+        (e) =>
+          `${e.id === ID(1) ? "ny" : e.id === ID(2) ? "tokyo" : "booking"}@${e.startsAt}`,
+      ),
+    ]),
+    [
+      ["2026-11-20", ["ny@2026-11-20T01:30:00Z", "tokyo@2026-11-20T01:00:00Z"]],
+      ["2026-11-21", []],
+      ["2026-11-22", []],
+      ["2026-11-23", ["booking@2026-11-23T09:00:00Z"]],
+      ["2026-11-24", []],
+      ["2026-11-25", []],
+      ["2026-11-26", ["ny@2026-11-26T22:00:00Z", "tokyo@2026-11-26T23:00:00Z"]],
+    ],
+  );
+  // Both ends of the week range read inside the calendar read's span (31 days
+  // back, 3653 days ahead, at most 31 days).
+  calls.length = 0;
+  await resolveScheduleWeek(scheduleSources(rows([])), "2026-10-23");
+  const last = new Date(Date.parse("2026-11-20T00:00:00Z") + 3646 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  assert.equal(weekStartOf(last, NOW), last);
+  await resolveScheduleWeek(scheduleSources(rows([])), last);
+  const lastRead = new Date(Date.parse(`${last}T00:00:00Z`) - 86400000)
+    .toISOString()
+    .slice(0, 10);
+  assert.deepEqual(calls, [
+    ["2026-10-22", 9],
+    [lastRead, 9],
+  ]);
+  assert.ok(
+    Date.parse("2026-10-22T00:00:00Z") >=
+      Date.parse("2026-11-20T00:00:00Z") - 31 * 86400000,
+  );
+  assert.ok(
+    Date.parse(`${lastRead}T00:00:00Z`) <=
+      Date.parse("2026-11-20T00:00:00Z") + 3653 * 86400000,
+  );
 });
 
 // ---------------------------------------------------------------------------

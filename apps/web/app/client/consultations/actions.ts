@@ -36,6 +36,7 @@ import {
 import { CLIENT_COMMUNICATION_SOURCES } from "../../../src/infrastructure/communications/communication-adapter.ts";
 import { CLIENT_OUTCOME_SOURCES } from "../../../src/infrastructure/consultations/completion-adapter.ts";
 import { CLIENT_CONSULTATION_SOURCES } from "../../../src/infrastructure/consultations/consultation-adapter.ts";
+import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";
 
 export async function joinConsultationAction(
   _previous: JoinActionState,
@@ -125,7 +126,8 @@ export async function openDocumentAction(
 // decide (the client's own Consultation, its state, the Booking, the room,
 // the attorney's notification and, with a live payment, one review item for
 // a person; no money is moved). The page and the list are refreshed after a
-// cancellation.
+// cancellation. A cancellation not completed is logged with its fixed outcome
+// only.
 export async function cancelConsultationAction(
   _previous: CancelActionState,
   formData: FormData,
@@ -134,6 +136,12 @@ export async function cancelConsultationAction(
     CLIENT_OUTCOME_SOURCES,
     formData,
   );
+  if (state.status === "unavailable" || state.status === "unconfirmed") {
+    await logRequestEvent("warn", "consultation.action_not_completed", {
+      operation: "cancelConsultation",
+      outcome: state.status,
+    });
+  }
   const consultation = formData.get("consultation");
   if (
     state.status === "outcome" &&

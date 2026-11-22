@@ -128,6 +128,7 @@ export default async function ClientWorkspacePage({
     const last = first + view.intakes.length - 1;
     const home = clientHomeOf(
       await resolveClientConsultations(CLIENT_OUTCOME_SOURCES),
+      Date.now(),
     );
     return (
       <WorkspaceFrame title="Your Intakes">

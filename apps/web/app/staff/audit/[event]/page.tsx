@@ -4,9 +4,11 @@
 // (aal2); access then needs view_audit_events in some scope, and the
 // database answers the event only when it is in the caller's scope; an
 // unknown identifier, one outside the scope and a malformed one alike show
-// that no event is available. The recorded snapshots are shown exactly as
-// stored, as text. Opening the page is itself audited by the database. The
-// one route value read, event, only names the event.
+// that no event is available. The recorded snapshots are shown as the
+// database answers them, as text (MVP-001 S11 correction R4: free-text values
+// are redacted there; codes and identifiers are kept). Opening the page is
+// itself audited by the database. The one route value read, event, only
+// names the event.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";

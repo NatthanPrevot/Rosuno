@@ -783,12 +783,25 @@ export type ComplianceHeld = {
   readonly legalHolds: boolean;
 };
 
+// An optional section's own state: not held by the caller (not presented),
+// read, or not readable right now (presented as unavailable while the rest
+// of the workspace is shown).
+export type ComplianceSectionState = "not_held" | "ready" | "unavailable";
+
 export type ComplianceView =
   | {
       readonly status: "ready";
       readonly held: ComplianceHeld;
+      // The caller may open an attorney's lifecycle page (the global
+      // manage_attorney_verification grant that page requires).
+      readonly attorneyPages: boolean;
       readonly counts: ComplianceCounts;
       readonly section: ComplianceSection;
+      readonly sections: {
+        readonly records: ComplianceSectionState;
+        readonly policyChanges: ComplianceSectionState;
+      };
+      // Present only while their section is ready.
       readonly records: readonly ComplianceRecord[] | null;
       readonly pager: StaffPager | null;
       readonly policyChanges: readonly PolicyChange[] | null;
@@ -812,7 +825,11 @@ async function held(
 }
 
 // The compliance workspace: each section only for holders of its own
-// capability; a caller holding none of them is refused.
+// capability; a caller holding none of them is refused (as is any caller the
+// capability checks refuse). The summary and the jurisdiction names are the
+// workspace itself; each optional section (the attorney records, the policy
+// status changes) has its own state, so one that cannot be read is shown as
+// unavailable without withholding the others.
 export async function resolveComplianceWorkspace(
   sources: AdministrationSources,
   sectionValue: unknown,
@@ -838,6 +855,12 @@ export async function resolveComplianceWorkspace(
     if (!verification && !reviews && !complaints && !policy && !legalHolds) {
       return DENIED;
     }
+    const attorneyPages = verification
+      ? await held(sources, VERIFICATION_CAPABILITY, "global")
+      : false;
+    if (typeof attorneyPages !== "boolean") {
+      return attorneyPages;
+    }
     const reads = await portFrom(sources.reads);
     if (reads === null) {
       return UNAVAILABLE;
@@ -852,6 +875,7 @@ export async function resolveComplianceWorkspace(
     }
     let records: readonly ComplianceRecord[] | null = null;
     let pager: StaffPager | null = null;
+    let recordsState: ComplianceSectionState = "not_held";
     if (verification) {
       const read = staffPageRows(
         rowsOf(
@@ -862,23 +886,20 @@ export async function resolveComplianceWorkspace(
         recordReader(section),
         page,
       );
-      if (read === null) {
-        return UNAVAILABLE;
-      }
-      records = read.rows;
-      pager = read.pager;
+      recordsState = read === null ? "unavailable" : "ready";
+      records = read?.rows ?? null;
+      pager = read?.pager ?? null;
     }
     let policyChanges: readonly PolicyChange[] | null = null;
+    let policyState: ComplianceSectionState = "not_held";
     if (policy) {
       const read = staffPageRows(
         rowsOf(await attempt(() => reads.policyChanges(0))),
         readPolicyChange,
         1,
       );
-      if (read === null) {
-        return UNAVAILABLE;
-      }
-      policyChanges = read.rows;
+      policyState = read === null ? "unavailable" : "ready";
+      policyChanges = read?.rows ?? null;
     }
     return Object.freeze({
       status: "ready",
@@ -889,8 +910,13 @@ export async function resolveComplianceWorkspace(
         policy,
         legalHolds,
       }),
+      attorneyPages,
       counts,
       section,
+      sections: Object.freeze({
+        records: recordsState,
+        policyChanges: policyState,
+      }),
       records,
       pager,
       policyChanges,

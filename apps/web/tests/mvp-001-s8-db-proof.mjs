@@ -135,6 +135,11 @@ const S11_OPERATIONS_MIGRATIONS = Object.freeze([
 const S11_SURFACES_MIGRATIONS = Object.freeze([
   "20261127170000_mvp_001_s11_workspace_reads.sql",
 ]);
+// MVP-001 S11 review corrections follow (registered and checked by the S11
+// operations proof).
+const S11_CORRECTIONS_MIGRATIONS = Object.freeze([
+  "20261127180000_mvp_001_s11_review_corrections.sql",
+]);
 
 const report = {
   proof: "MVP-001 S8 disposable local PostgreSQL proof",
@@ -496,6 +501,7 @@ function applyMigrations() {
     ...S11_MIGRATIONS,
     ...S11_OPERATIONS_MIGRATIONS,
     ...S11_SURFACES_MIGRATIONS,
+    ...S11_CORRECTIONS_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

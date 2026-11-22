@@ -392,7 +392,10 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // and the client's messages, payments, privacy and settings pages (a view
   // unavailable, with the route and outcome only) and the participant
   // workspace adapter (a failed call, with the call name and how it failed
-  // only) write lines too.
+  // only) write lines too. MVP-001 S11 correction pass (A7): the client's
+  // consultation actions (a cancellation not completed, with its fixed
+  // outcome only) and the attorney's week view (a view unavailable, with the
+  // route and outcome only) write lines too.
   assert.deepEqual(callers, [
     "app/attorney/complaints/actions.ts",
     "app/attorney/complaints/page.tsx",
@@ -408,11 +411,13 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/attorney/requests/[request]/page.tsx",
     "app/attorney/requests/page.tsx",
     "app/attorney/reviews/page.tsx",
+    "app/attorney/schedule/week/page.tsx",
     "app/attorneys/[attorney]/page.tsx",
     "app/client/actions.ts",
     "app/client/complaints/actions.ts",
     "app/client/complaints/page.tsx",
     "app/client/consultations/[consultation]/page.tsx",
+    "app/client/consultations/actions.ts",
     "app/client/consultations/page.tsx",
     "app/client/intakes/[intake]/page.tsx",
     "app/client/messages/page.tsx",

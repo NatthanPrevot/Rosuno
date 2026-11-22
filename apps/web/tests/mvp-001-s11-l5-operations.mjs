@@ -17,7 +17,11 @@
 //   5. referral operations and the financial activity summary are read;
 //   6. an attorney is suspended from the verification record, then reinstated
 //      and removed from the attorney operations page (reached from the
-//      compliance workspace), and removal leaves the history intact;
+//      compliance workspace), and removal leaves the history intact; with
+//      the attorney records read made unavailable (an owner fixture revoking
+//      and then restoring its EXECUTE grant), the compliance workspace still
+//      shows its other sections and says only that the records could not be
+//      shown (MVP-001 S11 correction pass A3);
 //   7. every new staff page refuses by direct URL a staff member without the
 //      capability (or with a jurisdiction-scoped grant of a global-only one)
 //      and a client, and asks a signed-out visitor to sign in.
@@ -667,6 +671,57 @@ insert into public.capability_grants (user_id, capability_code, granted_by_user_
       afterText.includes("No lifecycle change is available at this stage.") &&
       history.startsWith("1:1:") &&
       history.endsWith("staff_review_reinstate,staff_review_remove"),
+  );
+
+  // 6b. Correction pass A3: each optional compliance section has its own
+  // state. The attorney records read is made unavailable for a moment (owner
+  // fixture: its EXECUTE grant to authenticated is revoked and granted back,
+  // and the grants are compared before and after).
+  const RECORDS_READ = "public.staff_compliance_records(text, integer)";
+  const grantsOf = () =>
+    sql(`select array_to_string(array(select a::text from unnest(p.proacl) as a order by 1), ' ') from pg_proc as p where p.oid = '${RECORDS_READ}'::regprocedure;`);
+  const captionsOf = async (page) => page.$$eval("main table caption", (els) => els.map((e) => e.textContent.trim()));
+  await go(ops.page, `${BASE}/staff/compliance?section=removed`);
+  const sectionsBefore = {
+    captions: await captionsOf(ops.page),
+    linked: (await linksOf(ops.page)).includes(`/staff/attorneys/${profile}`),
+  };
+  const grantsBefore = grantsOf();
+  const sectionsDown = {};
+  try {
+    sql(`revoke execute on function ${RECORDS_READ} from authenticated;`);
+    await go(ops.page, `${BASE}/staff/compliance?section=removed`);
+    const text = await textOf(ops.page);
+    sectionsDown.title = await titleOf(ops.page);
+    sectionsDown.captions = await captionsOf(ops.page);
+    sectionsDown.recordsUnavailable = text.includes("The attorney records could not be shown right now.");
+    sectionsDown.reviewItems = text.includes("Compliance review items");
+    sectionsDown.linked = (await linksOf(ops.page)).includes(`/staff/attorneys/${profile}`);
+    sectionsDown.refused = (await alerts(ops.page)).includes("No access");
+  } finally {
+    sql(`grant execute on function ${RECORDS_READ} to authenticated;`);
+  }
+  const grantsRestored = grantsOf() === grantsBefore;
+  await go(ops.page, `${BASE}/staff/compliance?section=removed`);
+  const sectionsAfter = {
+    captions: await captionsOf(ops.page),
+    linked: (await linksOf(ops.page)).includes(`/staff/attorneys/${profile}`),
+  };
+  step(
+    "with the attorney records read unavailable, the compliance workspace is still shown (not refused): its summary and review items stay, the records section says only that it could not be shown and lists no attorney; once the grant is restored (grants equal before and after) the records are listed again",
+    { sectionsBefore, sectionsDown, grantsRestored, sectionsAfter },
+    sectionsBefore.linked &&
+      sectionsDown.title === "Compliance" &&
+      !sectionsDown.refused &&
+      sectionsDown.recordsUnavailable &&
+      sectionsDown.reviewItems &&
+      !sectionsDown.linked &&
+      sectionsDown.captions.length >= 1 &&
+      sectionsDown.captions.length < sectionsBefore.captions.length &&
+      sectionsDown.captions.every((caption) => sectionsBefore.captions.includes(caption)) &&
+      grantsRestored &&
+      sectionsAfter.linked &&
+      JSON.stringify(sectionsAfter.captions) === JSON.stringify(sectionsBefore.captions),
   );
 
   // 7. Refusals by direct URL: a staff member without the capability (or

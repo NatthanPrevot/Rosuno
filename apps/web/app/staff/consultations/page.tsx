@@ -148,6 +148,7 @@ export default async function StaffConsultationsPage({
             <ReviewItemList
               view={family}
               base={`/staff/consultations?status=${family.exceptionStatus}`}
+              pageParameter="items"
               assignAction={assignOperationsItemAction}
               resolveAction={resolveOperationsItemAction}
             />
