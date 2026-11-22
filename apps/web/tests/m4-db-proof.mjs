@@ -119,6 +119,12 @@
 // staff_resolve_reconciliation_exception are replaced under their own names
 // (already listed).
 //
+// MVP-001 S11 pass 2B update: the workspace reads migration follows. SEC-1
+// lists exactly the six further definer functions, as exact assertions: the
+// client's payment history and account overview, the participants' Message
+// threads, and the attorney's ended Consultations, documents and compliance
+// records. Each is a stable read that writes nothing.
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -1478,9 +1484,15 @@ function probes() {
           // read FOR SHARE by the S5 recorder).
           "attorney_accept_request:v",
           "attorney_change_practice_area_request:v",
+          // MVP-001 S11 pass 2B (20261127170000): the participants' own
+          // workspace reads (authenticated; the attorney reads at aal2), which
+          // write nothing.
+          "attorney_compliance_records:s",
           // MVP-001 S9 (20261125030000): the attorney's own Consultation reads
           // (authenticated, aal2), which write nothing.
           "attorney_consultation:s",
+          // MVP-001 S11 pass 2B (see attorney_compliance_records above).
+          "attorney_consultation_history:s",
           // MVP-001 S6 PS-A3 re-pin (20261122040000): the attorney's own offer
           // options and offer list reads (authenticated, aal2), which write
           // nothing.
@@ -1495,6 +1507,8 @@ function probes() {
           "attorney_create_blackout:v",
           "attorney_deactivate_availability_rule:v",
           "attorney_decline_request:v",
+          // MVP-001 S11 pass 2B (see attorney_compliance_records above).
+          "attorney_documents:s",
           "attorney_instant_status:s",
           // MVP-001 S7 re-pin (20261123020000): the attorney's own ledger-derived
           // earnings read (authenticated, aal2), which writes nothing.
@@ -1539,6 +1553,10 @@ function probes() {
           // MVP-001 S1 re-pin (20261117030000): the staff read predicates for
           // the configuration row policies, which write nothing.
           "capability_admin_may_read_user:s",
+          // MVP-001 S11 pass 2B (20261127170000): the participants' own
+          // workspace reads (authenticated; the attorney reads at aal2), which
+          // write nothing.
+          "client_account_overview:s",
           // MVP-001 S7 re-pin (20261123020000): the client's payment
           // authorization (authenticated only), which writes only the payment
           // attempt, an operational job and audit events; no M4 relation.
@@ -1567,6 +1585,8 @@ function probes() {
           // and receipt reads (authenticated only), which write nothing.
           "client_payment_checkout:s",
           "client_payment_receipt:s",
+          // MVP-001 S11 pass 2B (see attorney_compliance_records above).
+          "client_payments:s",
           // MVP-001 S5 re-pin (20261121030000): the client's own attempt
           // list (authenticated only), which writes nothing.
           "client_referrals:s",
@@ -1630,6 +1650,8 @@ function probes() {
           // and writes nothing.
           "consultation_outcome_integrity:v",
           "consultation_start:v",
+          // MVP-001 S11 pass 2B (see attorney_compliance_records above).
+          "consultation_threads:s",
           // MVP-001 S8 (20261124020000): the capture trigger (no API role),
           // which writes only Consultations, Engagements, payment associations
           // and audit events; no M4 relation.

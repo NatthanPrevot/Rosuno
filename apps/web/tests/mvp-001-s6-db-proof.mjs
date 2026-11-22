@@ -155,6 +155,11 @@ const S11_OPERATIONS_MIGRATIONS = Object.freeze([
   "20261127150000_mvp_001_s11_capture_gate.sql",
   "20261127160000_mvp_001_s11_definer_search_path.sql",
 ]);
+// MVP-001 S11 pass 2B: the participants' workspace reads follow
+// (registered and checked by the S11 operations proof).
+const S11_SURFACES_MIGRATIONS = Object.freeze([
+  "20261127170000_mvp_001_s11_workspace_reads.sql",
+]);
 
 const report = {
   proof: "MVP-001 S6 disposable local PostgreSQL proof",
@@ -489,6 +494,7 @@ function applyMigrations() {
     ...S10_MIGRATIONS,
     ...S11_MIGRATIONS,
     ...S11_OPERATIONS_MIGRATIONS,
+    ...S11_SURFACES_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

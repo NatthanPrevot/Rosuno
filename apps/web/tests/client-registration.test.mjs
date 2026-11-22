@@ -3088,6 +3088,22 @@ const OPERATIONS_RPCS = Object.freeze([
   "staff_compliance_records",
   "staff_policy_changes",
 ]);
+// MVP-001 S11 pass 2B: the participant workspace adapter calls the
+// database's own six workspace reads (the client's payment history and
+// account overview, the participants' Message threads, the attorney's ended
+// Consultations, documents and compliance records), each exactly once and
+// each as a literal call through the request's own unprivileged session; it
+// builds or receives no privileged client, writes nothing, and no other file
+// names any of the six functions.
+const WORKSPACE_ADAPTER = "src/infrastructure/workspaces/workspace-adapter.ts";
+const WORKSPACE_RPCS = Object.freeze([
+  "client_payments",
+  "client_account_overview",
+  "consultation_threads",
+  "attorney_consultation_history",
+  "attorney_documents",
+  "attorney_compliance_records",
+]);
 const PAYMENT_ADAPTER = "src/infrastructure/payments/payment-adapter.ts";
 const PAYMENT_RPCS = Object.freeze([
   "client_request_payment",
@@ -3163,6 +3179,9 @@ const RPC_OCCURRENCES = Object.freeze({
   // MVP-001 S11 pass 2: the fifteen operations functions, plus the
   // environment accessor.
   [OPERATIONS_ADAPTER]: OPERATIONS_RPCS.length + 1,
+  // MVP-001 S11 pass 2B: the six workspace reads (no change, so no
+  // environment accessor).
+  [WORKSPACE_ADAPTER]: WORKSPACE_RPCS.length,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -3432,6 +3451,33 @@ function assertQuotaRpcContract(codes) {
       assert.doesNotMatch(
         code,
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
+    // MVP-001 S11 pass 2B: the workspace reads, as for the operations
+    // functions.
+    for (const name of WORKSPACE_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === WORKSPACE_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== WORKSPACE_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === WORKSPACE_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        WORKSPACE_RPCS.length,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(|deployment_environment_identity/i,
       );
     }
     // MVP-001 S7: the payment functions, as for the offer functions.

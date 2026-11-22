@@ -2570,7 +2570,8 @@
         "20261127130000_mvp_001_s11_referral_finance_reads",
         "20261127140000_mvp_001_s11_policy_corrections",
         "20261127150000_mvp_001_s11_capture_gate",
-        "20261127160000_mvp_001_s11_definer_search_path"
+        "20261127160000_mvp_001_s11_definer_search_path",
+        "20261127170000_mvp_001_s11_workspace_reads"
       ],
       "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",

@@ -122,6 +122,11 @@ const S11_OPERATIONS_MIGRATIONS = Object.freeze([
   "20261127150000_mvp_001_s11_capture_gate.sql",
   "20261127160000_mvp_001_s11_definer_search_path.sql",
 ]);
+// MVP-001 S11 pass 2B: the participants' workspace reads follow
+// (registered and checked by the S11 operations proof).
+const S11_SURFACES_MIGRATIONS = Object.freeze([
+  "20261127170000_mvp_001_s11_workspace_reads.sql",
+]);
 // The one migration that adds the PS-A5 column (its constraints and index).
 const S10_VERSIONING = "20261126050000_mvp_001_s10_document_versioning.sql";
 
@@ -479,6 +484,7 @@ function applyMigrations() {
     ...S10_MIGRATIONS,
     ...S11_MIGRATIONS,
     ...S11_OPERATIONS_MIGRATIONS,
+    ...S11_SURFACES_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

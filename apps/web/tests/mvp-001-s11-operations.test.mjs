@@ -219,7 +219,23 @@ test("S11B-1 (MBS section 18.6) every page and server action under app/client, a
     ...filesIn("app/attorney/"),
     ...filesIn("app/staff/"),
   ].filter((f) => f.endsWith("/page.tsx"));
-  assert.ok(pages.length >= 57, String(pages.length));
+  // MVP-001 S11 pass 2B: the ten new client and attorney workspace pages
+  // are enumerated and held to the same contract below.
+  assert.ok(pages.length >= 67, String(pages.length));
+  for (const file of [
+    "app/client/payments/page.tsx",
+    "app/client/messages/page.tsx",
+    "app/client/settings/page.tsx",
+    "app/client/privacy/page.tsx",
+    "app/attorney/dashboard/page.tsx",
+    "app/attorney/consultations/history/page.tsx",
+    "app/attorney/schedule/week/page.tsx",
+    "app/attorney/messages/page.tsx",
+    "app/attorney/documents/page.tsx",
+    "app/attorney/compliance/page.tsx",
+  ]) {
+    assert.ok(pages.includes(file), file);
+  }
   for (const file of pages) {
     const source = read(file);
     const code = codeOf(source);

@@ -201,8 +201,20 @@ test("S2-R3. every attorney page and every staff page asks the step-up gate firs
   // attorney's consultation list and consultation page. MVP-001 S10: and the
   // attorney's notification center. MVP-001 S11: and the attorney's reviews
   // and reported problems, and the seven staff completion pages. MVP-001 S11
-  // pass 2: and the nine staff operations and administration pages.
-  assert.equal(GATED_PAGES.length, 47);
+  // pass 2: and the nine staff operations and administration pages. MVP-001
+  // S11 pass 2B: and the attorney's dashboard, past consultations, week
+  // view, messages, documents and compliance pages.
+  assert.equal(GATED_PAGES.length, 53);
+  for (const file of [
+    "app/attorney/dashboard/page.tsx",
+    "app/attorney/consultations/history/page.tsx",
+    "app/attorney/schedule/week/page.tsx",
+    "app/attorney/messages/page.tsx",
+    "app/attorney/documents/page.tsx",
+    "app/attorney/compliance/page.tsx",
+  ]) {
+    assert.ok(GATED_PAGES.includes(file), file);
+  }
   for (const file of [
     "app/staff/operations/page.tsx",
     "app/staff/system-health/page.tsx",

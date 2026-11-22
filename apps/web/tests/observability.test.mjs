@@ -387,13 +387,23 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // lines too. MVP-001 S11 pass 2: the staff attorney lifecycle and client
   // account actions (an action not completed, with its fixed outcome only)
   // and the operations adapter (a failed call, with the call name and how it
-  // failed only) write lines too.
+  // failed only) write lines too. MVP-001 S11 pass 2B: the attorney's
+  // compliance, past consultations, dashboard, documents and messages pages
+  // and the client's messages, payments, privacy and settings pages (a view
+  // unavailable, with the route and outcome only) and the participant
+  // workspace adapter (a failed call, with the call name and how it failed
+  // only) write lines too.
   assert.deepEqual(callers, [
     "app/attorney/complaints/actions.ts",
     "app/attorney/complaints/page.tsx",
+    "app/attorney/compliance/page.tsx",
     "app/attorney/consultations/[consultation]/page.tsx",
+    "app/attorney/consultations/history/page.tsx",
     "app/attorney/consultations/page.tsx",
+    "app/attorney/dashboard/page.tsx",
+    "app/attorney/documents/page.tsx",
     "app/attorney/earnings/page.tsx",
+    "app/attorney/messages/page.tsx",
     "app/attorney/notifications/page.tsx",
     "app/attorney/requests/[request]/page.tsx",
     "app/attorney/requests/page.tsx",
@@ -405,14 +415,18 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/client/consultations/[consultation]/page.tsx",
     "app/client/consultations/page.tsx",
     "app/client/intakes/[intake]/page.tsx",
+    "app/client/messages/page.tsx",
     "app/client/notifications/page.tsx",
     "app/client/page.tsx",
     "app/client/payments/[payment]/page.tsx",
+    "app/client/payments/page.tsx",
+    "app/client/privacy/page.tsx",
     "app/client/requests/[request]/page.tsx",
     "app/client/requests/actions.ts",
     "app/client/requests/new/page.tsx",
     "app/client/reviews/actions.ts",
     "app/client/reviews/page.tsx",
+    "app/client/settings/page.tsx",
     "app/find-an-attorney/page.tsx",
     "app/find-an-attorney/select/actions.ts",
     "app/find-an-attorney/select/page.tsx",
@@ -452,6 +466,8 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     // MVP-001 S11 pass 2: the staff operations adapter.
     "src/infrastructure/staff/operations-adapter.ts",
     "src/infrastructure/staff/staff-configuration-adapter.ts",
+    // MVP-001 S11 pass 2B: the participant workspace adapter.
+    "src/infrastructure/workspaces/workspace-adapter.ts",
   ]);
   for (const file of callers) {
     const code = codeOf(read(file));

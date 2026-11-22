@@ -57,8 +57,23 @@
 // financial reads, the corrections D2, D3, D5, D7 and D8, the four-way gate
 // matrix and the per-operation negative probes, and the race list under real
 // concurrency with two or more persistent sessions, with the exact observed
-// outcomes. The JSON report goes to stdout; exit 0 means PASS, 1 FAIL, 2
-// cleanup failure.
+// outcomes.
+//
+// MVP-001 S11 pass 2B: the workspace reads migration follows pass 2A
+// (registered as sequence 71 and checked here). The SURF checks prove its
+// six reads of the participants' own records (MBS sections 18.2, 18.3 and
+// 18.6): functions only (the catalog still equals the catalog after pass 1),
+// security definer, stable, executable by authenticated only and taking no
+// identifier; the client's payment history and account overview, the
+// participants' Message threads, the attorney's ended Consultations,
+// documents and compliance records, each own-data only with exactly its
+// minimum columns, equal to owner queries and to the earlier reads whose rule
+// it reuses, and answering nothing to another participant, staff, a caller
+// without a User, an attorney at aal1 or without claims, anon or
+// service_role. SURF-8 (correction D14) runs the application's own center and
+// job-context readers on the S11 notification types as the database
+// serializes them. The JSON report goes to stdout; exit 0 means PASS, 1 FAIL,
+// 2 cleanup failure.
 
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -66,6 +81,12 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+
+// MVP-001 S11 pass 2B (correction D14): the application's own strict readers
+// of the notification center and the delivery job context, run on rows the
+// database itself serializes (as PostgREST does).
+import { resolveClientNotifications } from "../src/application/notification-center.ts";
+import { notificationJobContextOf } from "../src/application/notifications.ts";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54348;
@@ -102,6 +123,11 @@ const S11_OPERATIONS_MIGRATIONS = Object.freeze([
   "20261127150000_mvp_001_s11_capture_gate.sql",
   "20261127160000_mvp_001_s11_definer_search_path.sql",
 ]);
+// MVP-001 S11 pass 2B: the participants' workspace reads follow pass 2A
+// (registered and checked here, by the SURF checks).
+const S11_SURFACES_MIGRATIONS = Object.freeze([
+  "20261127170000_mvp_001_s11_workspace_reads.sql",
+]);
 // The one migration that inserts catalog rows (the five capability codes) and
 // the one that creates a relation (the PS section 21.1 reviews relation).
 const S11_INTEGRITY = "20261127010000_mvp_001_s11_completion_integrity.sql";
@@ -116,6 +142,9 @@ const report = {
   cluster: {},
 };
 let state = null;
+// MVP-001 S11 pass 2B: the notices of the workspace reads migration (kept
+// apart from the pass 2A notices, which MIG-1 compares exactly).
+const surfaceNotices = {};
 
 // ---------------------------------------------------------------------------
 // Cluster and one-shot psql
@@ -439,6 +468,11 @@ function applyMigrationsTo(db, files) {
         (match) => match[1],
       );
     }
+    if (S11_SURFACES_MIGRATIONS.includes(file)) {
+      surfaceNotices[file] = [...result.stderr.matchAll(/NOTICE:\s+(.*)/g)].map(
+        (match) => match[1],
+      );
+    }
   }
   return notices;
 }
@@ -462,6 +496,7 @@ function applyMigrations() {
   assert.deepEqual(files.slice(s10 + 1), [
     ...S11_MIGRATIONS,
     ...S11_OPERATIONS_MIGRATIONS,
+    ...S11_SURFACES_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -517,6 +552,30 @@ function applyMigrations() {
     );
     assert.ok(program.migration_refs.includes(id), `${id} is a Program ref`);
   });
+  // MVP-001 S11 pass 2B: the workspace reads follow pass 2A and are
+  // registered unreviewed (sequence 71, depending on the last pass 2A
+  // migration) and applied nowhere.
+  S11_SURFACES_MIGRATIONS.forEach((file, index) => {
+    const id = file.replace(/\.sql$/, "");
+    const row = registered.find(
+      (migration) => migration.artifact_path === `supabase/migrations/${file}`,
+    );
+    assert.ok(row, `${file} is registered`);
+    assert.equal(row.migration_id, id);
+    assert.equal(row.sequence, 71 + index);
+    assert.equal(row.reviewed, false);
+    assert.equal(row.applied_environment, "none");
+    assert.deepEqual(row.depends_on, [
+      (index === 0
+        ? S11_OPERATIONS_MIGRATIONS[S11_OPERATIONS_MIGRATIONS.length - 1]
+        : S11_SURFACES_MIGRATIONS[index - 1]
+      ).replace(/\.sql$/, ""),
+    ]);
+    assert.ok(
+      typeof row.rollback_plan === "string" && row.rollback_plan !== "",
+    );
+    assert.ok(program.migration_refs.includes(id), `${id} is a Program ref`);
+  });
   sql(ROLES, "postgres");
   sql(fixtureFor(DB), "postgres");
   sql(fixtureFor(PROD_DB), "postgres");
@@ -538,6 +597,8 @@ function applyMigrations() {
   report.migrations.applied = files.length;
   report.migrations.s11 = [...S11_MIGRATIONS];
   report.migrations.s11_operations = [...S11_OPERATIONS_MIGRATIONS];
+  report.migrations.s11_surfaces = [...S11_SURFACES_MIGRATIONS];
+  report.migrations.surface_notices = surfaceNotices;
 }
 
 // ---------------------------------------------------------------------------
@@ -5824,6 +5885,783 @@ async function opsConcurrencyChecks() {
 }
 
 // ---------------------------------------------------------------------------
+// MVP-001 S11 pass 2B: the participants' workspace reads (MBS sections 18.2,
+// 18.3 and 18.6)
+// ---------------------------------------------------------------------------
+
+// The six reads of the workspace reads migration and their volatility.
+const SURFACE_API = Object.freeze({
+  "client_payments(integer)": "s",
+  "client_account_overview()": "s",
+  "consultation_threads(text)": "s",
+  "attorney_consultation_history()": "s",
+  "attorney_documents()": "s",
+  "attorney_compliance_records()": "s",
+});
+const CLIENT_PAYMENTS_SQL = (offset = 0) =>
+  `select row_to_json(x)::text from public.client_payments(${offset === null ? "null" : offset}) x;`;
+const OVERVIEW_SQL =
+  "select row_to_json(x)::text from public.client_account_overview() x;";
+const THREADS_SQL = (role) =>
+  `select row_to_json(x)::text from public.consultation_threads(${role === null ? "null::text" : lit(role)}) x;`;
+const HISTORY_SQL =
+  "select row_to_json(x)::text from public.attorney_consultation_history() x;";
+const DOCUMENTS_SQL =
+  "select row_to_json(x)::text from public.attorney_documents() x;";
+const OWN_COMPLIANCE_SQL =
+  "select row_to_json(x)::text from public.attorney_compliance_records() x;";
+const EVERY_SURFACE_READ = Object.freeze([
+  CLIENT_PAYMENTS_SQL(0),
+  OVERVIEW_SQL,
+  THREADS_SQL("client"),
+  THREADS_SQL("attorney"),
+  HISTORY_SQL,
+  DOCUMENTS_SQL,
+  OWN_COMPLIANCE_SQL,
+]);
+
+// A caller every read answers nothing: no answer row for any of the six.
+function answersNothing(account, options = {}) {
+  return EVERY_SURFACE_READ.every(
+    (statement) => rowsJson(account, statement, options).length === 0,
+  );
+}
+
+const ownPaymentIds = (client) =>
+  sql(
+    `select coalesce(string_agg(pt.id::text, ',' order by pt.created_at desc, pt.id desc), '') from public.payment_transactions pt join public.consultation_requests r on r.id = pt.consultation_request_id where r.client_id = '${client.client}';`,
+  )
+    .split(",")
+    .filter((id) => id !== "");
+
+async function surfacesChecks() {
+  await check(
+    "SURF-0 (Packet rules 8 and 16) the pass 2B migration follows pass 2A, is registered unreviewed (sequence 71, depending on the last pass 2A migration, with a rollback plan) and applied nowhere, is a Program migration ref, applies to a development and a production-class database without notices, creates exactly the six workspace reads and nothing else (no relation, column, type, constraint, index, row policy, policy type or table grant: the catalog equals the catalog after pass 1 in every listing; no insert, update or delete), and every read is stable security definer with search_path pg_catalog, pg_temp, executable by authenticated only and takes no identifier argument",
+    () => {
+      assert.deepEqual(report.migrations.s11_surfaces, [
+        ...S11_SURFACES_MIGRATIONS,
+      ]);
+      assert.deepEqual(
+        report.migrations.surface_notices,
+        Object.fromEntries(S11_SURFACES_MIGRATIONS.map((file) => [file, []])),
+      );
+      const differences = {};
+      for (const [name, query] of Object.entries(CATALOG_QUERIES)) {
+        if (sql(query, BASE_DB) !== sql(query)) {
+          differences[name] = true;
+        }
+      }
+      assert.deepEqual(differences, {});
+      const created = new Set();
+      for (const file of S11_SURFACES_MIGRATIONS) {
+        const raw = fs.readFileSync(path.join(MIGRATIONS, file), "utf8");
+        const text = raw.replace(/--[^\n]*/g, "");
+        assert.doesNotMatch(
+          text,
+          /create\s+table|add\s+column|create\s+type|create\s+policy|create\s+view|create\s+sequence|create\s+(unique\s+)?index|alter\s+table|create\s+trigger|insert\s+into|update\s+public\.|delete\s+from|grant\s+(?!execute)/i,
+          file,
+        );
+        for (const match of raw.matchAll(
+          /^create (?:or replace )?function public\.([a-z_0-9]+)\(/gm,
+        )) {
+          created.add(match[1]);
+        }
+      }
+      assert.deepEqual(
+        [...created].sort(),
+        Object.keys(SURFACE_API)
+          .map((signature) => signature.slice(0, signature.indexOf("(")))
+          .sort(),
+      );
+      const detail = {};
+      for (const [signature, volatility] of Object.entries(SURFACE_API)) {
+        assert.equal(opsExecutors(signature), "authenticated", signature);
+        assert.equal(opsExecutors(signature, PROD_DB), "authenticated");
+        const [definer, config, kind, args] = sql(
+          `select prosecdef::text || '|' || coalesce(array_to_string(proconfig, ';'), '') || '|' || provolatile::text || '|' || pg_get_function_identity_arguments(oid) from pg_proc where oid = 'public.${signature}'::regprocedure;`,
+        ).split("|");
+        assert.equal(definer, "true", signature);
+        assert.equal(config, "search_path=pg_catalog, pg_temp", signature);
+        assert.equal(kind, volatility, signature);
+        assert.doesNotMatch(args, /uuid/, signature);
+        detail[signature] = args === "" ? "no arguments" : args;
+      }
+      return detail;
+    },
+  );
+
+  await check(
+    "SURF-1 (MBS section 18.2 payments) client_payments answers exactly the caller's own payment attempts, newest first, with exactly the attempt and Request ids, state, client total, currency, authorized, captured and refunded amounts and creation (each equal to the recorded attempt and its Fee Calculation); an offset pages them and one outside 0 to 100000 (or none) answers nothing; another client, an attorney, staff, a suspended client and a caller without a User answer nothing of them; anon and service_role cannot execute it (42501)",
+    () => {
+      const first = authorizedRequest({
+        jurisdiction: world.J.S,
+        requestPath: "instant",
+      });
+      const client = first.client;
+      const second = capturedPayment({ jurisdiction: world.J.A });
+      const third = authorizedRequest({
+        jurisdiction: world.J.C,
+        requestPath: "instant",
+        client,
+      });
+      const rows = rowsJson(client, CLIENT_PAYMENTS_SQL(0), AAL1);
+      assert.equal(
+        keysOf(rows[0]),
+        "amount_authorized_minor,amount_captured_minor,amount_refunded_minor,consultation_request_id,created_at,currency_code,payment_state,payment_transaction_id,total_client_amount_minor",
+      );
+      assert.deepEqual(
+        rows.map((r) => r.payment_transaction_id),
+        ownPaymentIds(client),
+      );
+      assert.deepEqual(
+        new Set(rows.map((r) => r.payment_transaction_id)),
+        new Set([first.payment, third.payment]),
+      );
+      for (const row of rows) {
+        const recorded = paymentOf(row.payment_transaction_id);
+        assert.equal(row.payment_state, recorded.state);
+        assert.equal(
+          row.consultation_request_id,
+          recorded.consultation_request_id,
+        );
+        assert.equal(row.currency_code, recorded.currency_code);
+        assert.equal(
+          row.amount_authorized_minor,
+          recorded.amount_authorized_minor,
+        );
+        assert.equal(row.amount_captured_minor, recorded.amount_captured_minor);
+        assert.equal(row.amount_refunded_minor, recorded.amount_refunded_minor);
+        assert.equal(
+          row.total_client_amount_minor,
+          Number(
+            sql(
+              `select total_client_amount_minor from public.fee_calculations where id = '${recorded.fee_calculation_id}';`,
+            ),
+          ),
+        );
+      }
+      assert.deepEqual(
+        rowsJson(client, CLIENT_PAYMENTS_SQL(1), AAL1),
+        rows.slice(1),
+      );
+      for (const offset of [25, -1, 100001, null]) {
+        assert.deepEqual(
+          rowsJson(client, CLIENT_PAYMENTS_SQL(offset), AAL1),
+          [],
+          String(offset),
+        );
+      }
+      assert.match(
+        sql(
+          "select pg_get_functiondef('public.client_payments(integer)'::regprocedure);",
+        ),
+        /limit 26;/,
+      );
+      const otherRows = rowsJson(second.client, CLIENT_PAYMENTS_SQL(0), AAL1);
+      assert.deepEqual(
+        otherRows.map((r) => r.payment_transaction_id),
+        [second.payment],
+      );
+      assert.equal(otherRows[0].payment_state, "captured");
+      const suspended = authorizedRequest({
+        jurisdiction: world.J.S,
+        requestPath: "instant",
+      }).client;
+      sql(
+        `update public.users set account_state = 'suspended' where id = '${suspended.user}';`,
+      );
+      for (const account of [
+        world.ann,
+        world.finance,
+        suspended,
+        newAccount(),
+      ]) {
+        assert.deepEqual(rowsJson(account, CLIENT_PAYMENTS_SQL(0), AAL1), []);
+        assert.deepEqual(rowsJson(account, CLIENT_PAYMENTS_SQL(0)), []);
+      }
+      assert.deepEqual(
+        rowsAs("authenticated", uid(), CLIENT_PAYMENTS_SQL(0), AAL1),
+        [],
+      );
+      assert.deepEqual(apiRefusals(CLIENT_PAYMENTS_SQL(0)), {
+        anon: "ERROR 42501",
+        service_role: "ERROR 42501",
+      });
+      world.surfaceClient = { client, first, third };
+      return {
+        own: rows.length,
+        states: rows.map((r) => r.payment_state),
+        other: otherRows.length,
+      };
+    },
+  );
+
+  await check(
+    "SURF-2 (MBS section 18.2 privacy and data controls) client_account_overview answers one row of the caller's own account (display name, state, creation) and exactly the counts of its Intakes, Requests, Consultations, stored uploaded documents, visible sent Messages, payment attempts and Complaint Cases (each equal to an owner count; another participant's records are not counted); counts only, no identifier or content; an attorney, staff, a suspended client and a caller without a User answer nothing; anon and service_role cannot execute it (42501)",
+    () => {
+      const s = acceptedConsultation({
+        key: "S",
+        who: world.ann,
+        requestPath: "instant",
+      });
+      assert.equal(clientSend(s, "Synthetic client message").outcome, "sent");
+      assert.equal(attorneySend(s, "Synthetic attorney reply").outcome, "sent");
+      uploadDocument(s.client, s.consultation, AAL1);
+      uploadDocument(s.lawyer, s.consultation);
+      assert.equal(
+        asClient(s.client, COMPLAINT_SQL(s.consultation, null)).split("|")[0],
+        "opened",
+      );
+      const row = oneRowAs(s.client, OVERVIEW_SQL, AAL1);
+      assert.equal(
+        keysOf(row),
+        "account_state,complaints,consultations,created_at,display_name,documents,intakes,messages,payments,requests",
+      );
+      const owner = (query) => Number(sql(query));
+      const expected = {
+        intakes: owner(
+          `select count(*) from public.intakes where client_id = '${s.client.client}';`,
+        ),
+        requests: owner(
+          `select count(*) from public.consultation_requests where client_id = '${s.client.client}';`,
+        ),
+        consultations: owner(
+          `select count(*) from public.consultations where client_id = '${s.client.client}';`,
+        ),
+        documents: owner(
+          `select count(*) from public.resources where owner_user_id = '${s.client.user}' and resource_kind = 'document' and visibility_state = 'available';`,
+        ),
+        messages: owner(
+          `select count(*) from public.messages where sender_user_id = '${s.client.user}' and visibility_state = 'visible';`,
+        ),
+        payments: owner(
+          `select count(*) from public.payment_transactions pt join public.consultation_requests r on r.id = pt.consultation_request_id where r.client_id = '${s.client.client}';`,
+        ),
+        complaints: owner(
+          `select count(*) from public.complaint_cases where complainant_user_id = '${s.client.user}';`,
+        ),
+      };
+      const counts = Object.fromEntries(
+        Object.keys(expected).map((key) => [key, row[key]]),
+      );
+      assert.deepEqual(counts, expected);
+      assert.deepEqual(counts, {
+        intakes: 1,
+        requests: 1,
+        consultations: 1,
+        documents: 1,
+        messages: 1,
+        payments: 1,
+        complaints: 1,
+      });
+      assert.equal(row.account_state, "active");
+      assert.equal(row.display_name, null);
+      const suspended = newClient();
+      sql(
+        `update public.users set account_state = 'suspended' where id = '${suspended.user}';`,
+      );
+      for (const account of [
+        world.ann,
+        world.finance,
+        suspended,
+        newAccount(),
+      ]) {
+        assert.equal(oneRowAs(account, OVERVIEW_SQL, AAL1), null);
+      }
+      assert.deepEqual(apiRefusals(OVERVIEW_SQL), {
+        anon: "ERROR 42501",
+        service_role: "ERROR 42501",
+      });
+      world.surfaceThread = s;
+      return counts;
+    },
+  );
+
+  await check(
+    "SURF-3 (MBS sections 18.2 and 18.3 messages) consultation_threads answers the caller's own Consultation threads for the role named: for 'client' the client's Consultations, for 'attorney' the approved attorney's at aal2; each row exactly the Consultation id and state, the messaging status the communication window reports (equal to consultation_messaging), the visible Message count, the latest Message instant and whether the caller sent it (no body, nothing of the counterpart); an attorney at aal1, a role the caller does not hold, an unknown or missing role, another client and a caller without a User answer nothing of them; anon and service_role cannot execute it (42501)",
+    () => {
+      const s = world.surfaceThread;
+      const clientRows = rowsJson(s.client, THREADS_SQL("client"), AAL1);
+      assert.equal(
+        keysOf(clientRows[0]),
+        "consultation_id,consultation_state,last_message_at,last_message_mine,message_count,messaging_status",
+      );
+      assert.deepEqual(
+        clientRows.map((r) => r.consultation_id),
+        [s.consultation],
+      );
+      const last = sql(
+        `select to_json(max(sent_at))::text from public.messages where consultation_id = '${s.consultation}' and visibility_state = 'visible';`,
+      );
+      const clientRow = clientRows[0];
+      assert.equal(clientRow.message_count, 2);
+      assert.equal(clientRow.last_message_mine, false);
+      assert.equal(
+        new Date(clientRow.last_message_at).getTime(),
+        new Date(JSON.parse(last)).getTime(),
+      );
+      assert.equal(
+        clientRow.consultation_state,
+        consultationRow(s.consultation).state,
+      );
+      assert.equal(
+        clientRow.messaging_status,
+        messagingAs(s.client, s.consultation, AAL1).status,
+      );
+      const attorneyRows = rowsJson(s.lawyer, THREADS_SQL("attorney"));
+      const attorneyRow = attorneyRows.find(
+        (r) => r.consultation_id === s.consultation,
+      );
+      assert.ok(attorneyRow);
+      assert.equal(attorneyRow.last_message_mine, true);
+      assert.equal(attorneyRow.message_count, 2);
+      assert.equal(
+        attorneyRow.messaging_status,
+        messagingAs(s.lawyer, s.consultation).status,
+      );
+      const attorneyOwn = sql(
+        `select coalesce(string_agg(id::text, ',' order by id), '') from public.consultations where attorney_id = '${world.ann.profile}';`,
+      ).split(",");
+      assert.deepEqual(
+        attorneyRows.map((r) => r.consultation_id).sort(),
+        attorneyOwn.slice(0, 200).sort(),
+      );
+      const times = attorneyRows
+        .map((r) => r.last_message_at)
+        .filter((t) => t !== null)
+        .map((t) => new Date(t).getTime());
+      assert.deepEqual(
+        times,
+        [...times].sort((a, b) => b - a),
+      );
+      assert.deepEqual(rowsJson(s.lawyer, THREADS_SQL("attorney"), AAL1), []);
+      assert.deepEqual(rowsJson(s.client, THREADS_SQL("attorney"), AAL1), []);
+      assert.deepEqual(rowsJson(s.client, THREADS_SQL("attorney")), []);
+      assert.deepEqual(rowsJson(s.lawyer, THREADS_SQL("client")), []);
+      for (const role of ["staff", "Client", "", null]) {
+        assert.deepEqual(
+          rowsJson(s.client, THREADS_SQL(role), AAL1),
+          [],
+          String(role),
+        );
+      }
+      const other = newClient();
+      assert.deepEqual(rowsJson(other, THREADS_SQL("client"), AAL1), []);
+      assert.deepEqual(rowsJson(newAccount(), THREADS_SQL("client"), AAL1), []);
+      assert.deepEqual(rowsJson(world.finance, THREADS_SQL("attorney")), []);
+      assert.deepEqual(apiRefusals(THREADS_SQL("client")), {
+        anon: "ERROR 42501",
+        service_role: "ERROR 42501",
+      });
+      return {
+        client: clientRow.messaging_status,
+        attorney_threads: attorneyRows.length,
+      };
+    },
+  );
+
+  await check(
+    "SURF-4 (MBS section 18.3 consultations) attorney_consultation_history answers exactly the caller's own ended Consultations (completed, cancelled, no_show, technical_failure), most recent first, with exactly the columns of client_consultations and the same values the client's list answers for the same Consultation; Consultations not ended stay in attorney_consultations and out of the history; an attorney at aal1, another attorney, the client, staff and a caller without a User answer nothing of them; anon and service_role cannot execute it (42501)",
+    () => {
+      const who = lawyer("S");
+      const ended = acceptedConsultation({
+        key: "S",
+        who,
+        requestPath: "scheduled",
+      });
+      const open = acceptedConsultation({
+        key: "S",
+        who,
+        requestPath: "scheduled",
+      });
+      clientCancel(ended);
+      assert.equal(consultationRow(ended.consultation).state, "cancelled");
+      const history = rowsJson(who, HISTORY_SQL);
+      assert.deepEqual(
+        history.map((r) => r.consultation_id),
+        [ended.consultation],
+      );
+      const clientRow = rowsJson(
+        ended.client,
+        "select row_to_json(x)::text from public.client_consultations() x;",
+        AAL1,
+      ).find((r) => r.consultation_id === ended.consultation);
+      assert.deepEqual(history[0], clientRow);
+      assert.equal(history[0].state, "cancelled");
+      assert.notEqual(history[0].ended_at, null);
+      // The ended Consultation's thread reads as closed, exactly as
+      // consultation_messaging reports it.
+      const endedThread = rowsJson(
+        ended.client,
+        THREADS_SQL("client"),
+        AAL1,
+      ).find((r) => r.consultation_id === ended.consultation);
+      assert.equal(endedThread.messaging_status, "closed");
+      assert.equal(
+        endedThread.messaging_status,
+        messagingAs(ended.client, ended.consultation, AAL1).status,
+      );
+      const current = rowsJson(
+        who,
+        "select row_to_json(x)::text from public.attorney_consultations() x;",
+      ).map((r) => r.consultation_id);
+      assert.deepEqual(current, [open.consultation]);
+      const terminal = sql(
+        `select coalesce(string_agg(id::text, ',' order by id), '') from public.consultations where attorney_id = '${world.ann.profile}' and state in ('completed', 'cancelled', 'no_show', 'technical_failure');`,
+      )
+        .split(",")
+        .filter((id) => id !== "");
+      const annHistory = rowsJson(world.ann, HISTORY_SQL);
+      assert.deepEqual(
+        annHistory.map((r) => r.consultation_id).sort(),
+        terminal.slice(0, 200).sort(),
+      );
+      assert.ok(
+        !annHistory.some((r) => r.consultation_id === ended.consultation),
+      );
+      const order = annHistory.map((r) =>
+        new Date(r.ended_at ?? r.booking_starts_at).getTime(),
+      );
+      assert.deepEqual(
+        order,
+        [...order].sort((a, b) => b - a),
+      );
+      assert.deepEqual(rowsJson(who, HISTORY_SQL, AAL1), []);
+      for (const account of [ended.client, world.ops, newAccount()]) {
+        assert.deepEqual(rowsJson(account, HISTORY_SQL), []);
+      }
+      assert.deepEqual(apiRefusals(HISTORY_SQL), {
+        anon: "ERROR 42501",
+        service_role: "ERROR 42501",
+      });
+      world.surfaceLawyer = who;
+      return { ended: history.length, ann: annHistory.length };
+    },
+  );
+
+  await check(
+    "SURF-5 (MBS section 18.3 documents) attorney_documents answers the current document versions the caller may see across their own Consultations, exactly as consultation_documents answers them per Consultation (the attorney's uploads and the client's uploads shared with the attorney), newest first, with exactly the Consultation and Document ids, version label, type, size, creation, uploader, whether the attorney uploaded it, sharing state and whether it opens now (no storage path, no content); an attorney at aal1, another attorney, the client, staff and a caller without a User answer nothing of them; anon and service_role cannot execute it (42501)",
+    () => {
+      const who = world.surfaceLawyer;
+      const d = acceptedConsultation({
+        key: "S",
+        who,
+        requestPath: "instant",
+      });
+      const mineResource = uploadDocument(d.lawyer, d.consultation);
+      const theirsResource = uploadDocument(d.client, d.consultation, AAL1);
+      const rows = rowsJson(who, DOCUMENTS_SQL);
+      assert.equal(
+        keysOf(rows[0]),
+        "accessible,byte_size,consultation_id,created_at,document_id,mime_type,mine,sharing,uploaded_by,version_label",
+      );
+      const consultations = sql(
+        `select coalesce(string_agg(id::text, ','), '') from public.consultations where attorney_id = '${who.profile}';`,
+      ).split(",");
+      const expected = consultations.flatMap((c) =>
+        rowsJson(
+          who,
+          `select row_to_json(x)::text from public.consultation_documents(${lit(c)}) x;`,
+        ).map((r) => ({
+          accessible: r.accessible,
+          byte_size: r.byte_size,
+          consultation_id: c,
+          created_at: r.created_at,
+          document_id: r.document_id,
+          mime_type: r.mime_type,
+          mine: r.mine,
+          sharing: r.sharing,
+          uploaded_by: r.uploaded_by,
+          version_label: r.version_label,
+        })),
+      );
+      const byId = (list) =>
+        [...list].sort((a, b) => a.document_id.localeCompare(b.document_id));
+      assert.deepEqual(byId(rows), byId(expected));
+      const times = rows.map((r) => new Date(r.created_at).getTime());
+      assert.deepEqual(
+        times,
+        [...times].sort((a, b) => b - a),
+      );
+      const mine = rows.find(
+        (r) => r.document_id === documentIdOf(mineResource),
+      );
+      const theirs = rows.find(
+        (r) => r.document_id === documentIdOf(theirsResource),
+      );
+      assert.equal(mine.mine, true);
+      assert.equal(mine.uploaded_by, "attorney");
+      assert.equal(theirs.mine, false);
+      assert.equal(theirs.uploaded_by, "client");
+      assert.equal(theirs.sharing, "active");
+      assert.equal(theirs.accessible, true);
+      assert.deepEqual(rowsJson(who, DOCUMENTS_SQL, AAL1), []);
+      const ann = rowsJson(world.ann, DOCUMENTS_SQL).map((r) => r.document_id);
+      assert.ok(!ann.includes(mine.document_id));
+      assert.ok(!ann.includes(theirs.document_id));
+      for (const account of [d.client, world.ops, newAccount()]) {
+        assert.deepEqual(rowsJson(account, DOCUMENTS_SQL), []);
+        assert.deepEqual(rowsJson(account, DOCUMENTS_SQL, AAL1), []);
+      }
+      assert.deepEqual(apiRefusals(DOCUMENTS_SQL), {
+        anon: "ERROR 42501",
+        service_role: "ERROR 42501",
+      });
+      return { documents: rows.length };
+    },
+  );
+
+  await check(
+    "SURF-6 (MBS section 18.3 compliance) attorney_compliance_records answers exactly the caller's own licences and insurance records (validity dates; the date the latest evidence reaches the in-force Eligibility policy's stated age, equal to the staff evidence_age section and to the retrieval date plus the configured days, null without evidence) and the discipline findings recorded about the caller (a lower-snake status or null, opened and resolved dates), with no number, carrier, reference or evidence content; the applicant, under_review and approved stages are answered and a suspended or removed profile, an attorney at aal1, another attorney, a client, staff and a caller without a User answer nothing of them; anon and service_role cannot execute it (42501)",
+    () => {
+      const who = lawyer("S", "C");
+      const insurance = uid();
+      const finding = uid();
+      const unnamed = uid();
+      sql(
+        `insert into public.insurance_records (id, attorney_id, jurisdiction_id, carrier_name, coverage_from, coverage_until) values ('${insurance}', '${who.profile}', '${world.J.S}', 'Synthetic Carrier', '2026-01-01', '2027-01-01');
+         insert into public.discipline_records (id, attorney_id, jurisdiction_id, external_reference, finding_type, opened_at, resolved_at, status) values ('${finding}', '${who.profile}', '${world.J.S}', 'synthetic-ref', 'synthetic_finding', '2026-03-01', '2026-04-01', 'synthetic_cleared');
+         insert into public.discipline_records (id, attorney_id, jurisdiction_id, opened_at, status) values ('${unnamed}', '${who.profile}', '${world.J.C}', '2026-05-01', 'Synthetic Free Text');`,
+      );
+      const rows = rowsJson(who, OWN_COMPLIANCE_SQL);
+      assert.equal(
+        keysOf(rows[0]),
+        "ends_on,evidence_lapses_on,jurisdiction_id,record_id,record_kind,recorded_at,starts_on,status_code",
+      );
+      const licences = sql(
+        `select coalesce(string_agg(id::text, ',' order by id), '') from public.licenses where attorney_id = '${who.profile}';`,
+      ).split(",");
+      assert.deepEqual(
+        rows.map((r) => r.record_id).sort(),
+        [...licences, insurance, finding, unnamed].sort(),
+      );
+      assert.deepEqual(
+        rows.map((r) => r.record_kind),
+        ["license", "license", "insurance", "discipline", "discipline"],
+      );
+      // Every page of the staff evidence_age section (records without
+      // evidence come first).
+      const staffAge = [];
+      for (let offset = 0; offset < 5000; offset += 25) {
+        const page = rowsJson(
+          world.verifier,
+          RECORDS_SQL("evidence_age", offset),
+        );
+        staffAge.push(...page.slice(0, 25));
+        if (page.length <= 25) {
+          break;
+        }
+      }
+      for (const row of rows.filter((r) => r.record_kind === "license")) {
+        const staffRow = staffAge.find((r) => r.record_id === row.record_id);
+        assert.ok(staffRow, row.record_id);
+        assert.equal(row.evidence_lapses_on, staffRow.lapses_on);
+        assert.notEqual(row.evidence_lapses_on, null);
+        const retrieved = new Date(staffRow.recorded_at);
+        const expected = new Date(
+          Date.UTC(
+            retrieved.getUTCFullYear(),
+            retrieved.getUTCMonth(),
+            retrieved.getUTCDate(),
+          ) +
+            30 * DAY_MS,
+        )
+          .toISOString()
+          .slice(0, 10);
+        assert.equal(row.evidence_lapses_on, expected);
+        assert.equal(row.status_code, null);
+      }
+      const insuranceRow = rows.find((r) => r.record_id === insurance);
+      assert.deepEqual(
+        [
+          insuranceRow.starts_on,
+          insuranceRow.ends_on,
+          insuranceRow.evidence_lapses_on,
+          insuranceRow.status_code,
+        ],
+        ["2026-01-01", "2027-01-01", null, null],
+      );
+      const findingRow = rows.find((r) => r.record_id === finding);
+      assert.deepEqual(
+        [
+          findingRow.status_code,
+          findingRow.starts_on,
+          findingRow.ends_on,
+          findingRow.evidence_lapses_on,
+        ],
+        ["synthetic_cleared", "2026-03-01", "2026-04-01", null],
+      );
+      assert.equal(rows.find((r) => r.record_id === unnamed).status_code, null);
+      const text = JSON.stringify(rows);
+      assert.doesNotMatch(
+        text,
+        /SYN-S11-LIC|Synthetic Carrier|synthetic-ref|synthetic_finding|Synthetic Free Text/,
+      );
+      const applicant = profileWith({
+        stage: "applicant",
+        licences: [[world.J.S, `SYN-AP-${uid().slice(0, 6)}`, "2027-06-30"]],
+      });
+      const applicantRows = rowsJson(applicant, OWN_COMPLIANCE_SQL);
+      assert.deepEqual(
+        applicantRows.map((r) => [
+          r.record_id,
+          r.ends_on,
+          r.evidence_lapses_on,
+        ]),
+        [[applicant.licences[0], "2027-06-30", null]],
+      );
+      for (const stage of ["suspended", "removed"]) {
+        const held = profileWith({
+          stage,
+          licences: [[world.J.S, `SYN-HD-${uid().slice(0, 6)}`]],
+        });
+        assert.deepEqual(rowsJson(held, OWN_COMPLIANCE_SQL), [], stage);
+      }
+      assert.deepEqual(rowsJson(who, OWN_COMPLIANCE_SQL, AAL1), []);
+      const ann = rowsJson(world.ann, OWN_COMPLIANCE_SQL).map(
+        (r) => r.record_id,
+      );
+      assert.ok(
+        !ann.some((id) =>
+          [...licences, insurance, finding, unnamed].includes(id),
+        ),
+      );
+      for (const account of [newClient(), world.verifier, newAccount()]) {
+        assert.deepEqual(rowsJson(account, OWN_COMPLIANCE_SQL), []);
+      }
+      assert.deepEqual(apiRefusals(OWN_COMPLIANCE_SQL), {
+        anon: "ERROR 42501",
+        service_role: "ERROR 42501",
+      });
+      return {
+        kinds: rows.map((r) => r.record_kind),
+        evidence_lapses_on: rows
+          .filter((r) => r.record_kind === "license")
+          .map((r) => r.evidence_lapses_on),
+      };
+    },
+  );
+
+  await check(
+    "SURF-7 (MBS section 18.6 guessed identifiers and manipulated client state) none of the six reads takes an identifier, so no guessed id can name another person's record; every one answers nothing to a request subject that names no User, to a User holding no client or attorney profile, to a staff member holding every capability, and, for the attorney reads, to the same attorney at aal1 or with no claims; the client reads answer the client at aal1 and aal2 alike (the session's assurance is not client-controlled state the reads trust beyond the database's own rule)",
+    () => {
+      assert.ok(
+        Object.keys(SURFACE_API).every((signature) => !/uuid/.test(signature)),
+      );
+      const ghost = { auth: uid() };
+      assert.ok(answersNothing(ghost));
+      assert.ok(answersNothing(ghost, AAL1));
+      assert.ok(answersNothing(newAccount()));
+      assert.ok(answersNothing(world.everything));
+      const who = world.surfaceLawyer;
+      for (const statement of [
+        THREADS_SQL("attorney"),
+        HISTORY_SQL,
+        DOCUMENTS_SQL,
+        OWN_COMPLIANCE_SQL,
+      ]) {
+        assert.deepEqual(rowsJson(who, statement, AAL1), [], statement);
+        assert.deepEqual(
+          rowsJson(who, statement, { aal: null }),
+          [],
+          statement,
+        );
+        assert.ok(rowsJson(who, statement).length > 0, statement);
+      }
+      const { client } = world.surfaceClient;
+      assert.deepEqual(
+        rowsJson(client, CLIENT_PAYMENTS_SQL(0), AAL1),
+        rowsJson(client, CLIENT_PAYMENTS_SQL(0)),
+      );
+      return { identifier_arguments: 0 };
+    },
+  );
+
+  await check(
+    "SURF-8 (correction D14; MB section 98) a Consultation completed through the attorney's end emits review_available to its client, and the client's notification center as the database serializes it (with a reported problem's complaint_received linking to the client's reported problems page) is read by the application's own strict center reader as ready, review_available linking to the client's Consultation page; the delivery job of the review_available email answers act with the client's notification center, and the application's own job-context reader accepts it",
+    async () => {
+      const s = completedConsultation("S");
+      withAddress(s.client);
+      assert.equal(
+        asClient(s.client, COMPLAINT_SQL(s.consultation, null)).split("|")[0],
+        "opened",
+      );
+      const centerRows = rowsJson(
+        s.client,
+        "select row_to_json(x)::text from public.notification_center() x;",
+        AAL1,
+      );
+      const clientIntake = {
+        session: { currentSubject: async () => s.client.auth },
+        contexts: { contextsOf: async () => ["client"] },
+        account: {
+          currentAccount: async () => ({
+            kind: "user",
+            id: s.client.auth,
+            emailConfirmedAt: "2026-11-01T00:00:00Z",
+          }),
+        },
+        reads: async () => ({
+          usersOf: async () => ({
+            kind: "rows",
+            rows: [
+              {
+                id: s.client.user,
+                auth_user_id: s.client.auth,
+                account_state: "active",
+              },
+            ],
+          }),
+          clientProfilesOf: async () => ({
+            kind: "rows",
+            rows: [{ id: s.client.client, user_id: s.client.user }],
+          }),
+        }),
+        writes: async () => ({}),
+      };
+      const view = await resolveClientNotifications({
+        clientIntake,
+        reads: async () => ({
+          center: async () => ({ kind: "rows", rows: centerRows }),
+        }),
+        writes: async () => ({}),
+      });
+      assert.equal(view.status, "ready");
+      const shown = view.entries.map((e) => [e.type, e.linkPath]);
+      assert.ok(
+        shown.some(
+          ([type, link]) =>
+            type === "review_available" &&
+            link === `/client/consultations/${s.consultation}`,
+        ),
+        JSON.stringify(shown),
+      );
+      assert.ok(
+        shown.some(
+          ([type, link]) =>
+            type === "complaint_received" && link === "/client/complaints",
+        ),
+        JSON.stringify(shown),
+      );
+      const email = emailNotification(
+        s.client.user,
+        "review_available",
+        s.consultation,
+      );
+      const job = deliveryJob(email.id);
+      assert.ok(job, "one delivery job");
+      claimJob(job);
+      const context = notificationJobContextOf([notificationContext(job)]);
+      assert.deepEqual(
+        [context.outcome, context.type, context.centerPath],
+        ["act", "review_available", "/client/notifications"],
+      );
+      return { center: shown.map(([type]) => type), context: context.outcome };
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -5862,6 +6700,7 @@ async function main() {
     await readChecks();
     await policyCorrectionChecks();
     await gateChecks();
+    await surfacesChecks();
     await opsConcurrencyChecks();
   } catch (error) {
     report.error = String(error?.stack ?? error);

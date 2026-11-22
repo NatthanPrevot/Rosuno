@@ -4,8 +4,9 @@
 // Rendered on the server for every request and never indexed. The verified
 // client of the request decides access (the client intake sources); the
 // database answers only the client's own in-app Notifications, newest first,
-// each with its link (the client's own Request or Consultation page) and the
-// delivery state of its email twin. Nothing about an address or a provider is
+// each with its link (the client's own Request or Consultation page, or,
+// MVP-001 S11 correction D14, the client's own reported problems page) and
+// the delivery state of its email twin. Nothing about an address or a provider is
 // shown. An acknowledgement-required Notification offers the acknowledge
 // form; the database decides again on submission.
 

@@ -436,6 +436,9 @@ function applyMigrations() {
     "20261127140000_mvp_001_s11_policy_corrections.sql",
     "20261127150000_mvp_001_s11_capture_gate.sql",
     "20261127160000_mvp_001_s11_definer_search_path.sql",
+    // MVP-001 S11 pass 2B: the participants' workspace reads (registered
+    // and checked by the S11 operations proof).
+    "20261127170000_mvp_001_s11_workspace_reads.sql",
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

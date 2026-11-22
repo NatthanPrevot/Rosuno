@@ -823,10 +823,13 @@ test("S9-6. every outcome has a fixed message, the provider is never named, and 
 });
 
 test("S9-7. the routes: server pages that opt out of prerendering (the attorney pages behind the step-up gate first), the frame only in the two client form modules with the fixed title and permissions, the token only in the action answer (never in a page, URL or log), and the pages read only the route segment (MVP-001 S10 PS-A5: and a Consultation page exactly one more value, which document's version history to show)", () => {
+  // MVP-001 S11 pass 2B: plus exactly the attorney's past consultations, a
+  // read-only server page behind the step-up gate (no form, no action).
   assert.deepEqual(filesIn("app/attorney/consultations/"), [
     "app/attorney/consultations/[consultation]/forms.tsx",
     "app/attorney/consultations/[consultation]/page.tsx",
     "app/attorney/consultations/actions.ts",
+    "app/attorney/consultations/history/page.tsx",
     "app/attorney/consultations/page.tsx",
   ]);
   for (const page of [

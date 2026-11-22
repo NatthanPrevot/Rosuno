@@ -322,6 +322,12 @@ export const NOTIFICATION_LABELS: Readonly<Record<NotificationType, string>> =
     consultation_ready: "Your consultation is ready",
     message_received: "New message in your consultation",
     document_shared: "A document was shared with you",
+    // MVP-001 S11 (correction D14).
+    consultation_cancelled: "A consultation was cancelled",
+    consultation_outcome_recorded:
+      "An outcome was recorded for your consultation",
+    review_available: "You can review your ended consultation",
+    complaint_received: "We received the problem you reported",
   });
 
 export const EMAIL_STATE_LABELS: Readonly<Record<EmailState, string>> =

@@ -58,7 +58,10 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
   // action (a server action module). MVP-001 S11: plus exactly the
   // consultation list (a server page), the reviews page and the reported
   // problems page (server pages), each with its form (a client module) and
-  // its action (a server action module).
+  // its action (a server action module). MVP-001 S11 pass 2B: plus exactly
+  // the message inbox, the payment history, the privacy and data page and
+  // the profile and settings page, four read-only server pages (no form and
+  // no action).
   assert.deepEqual(filesIn("app/client/"), [
     "app/client/actions.ts",
     "app/client/complaints/actions.ts",
@@ -71,11 +74,14 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     "app/client/forms.tsx",
     "app/client/intakes/[intake]/forms.tsx",
     "app/client/intakes/[intake]/page.tsx",
+    "app/client/messages/page.tsx",
     "app/client/notifications/actions.ts",
     "app/client/notifications/forms.tsx",
     "app/client/notifications/page.tsx",
     "app/client/page.tsx",
     "app/client/payments/[payment]/page.tsx",
+    "app/client/payments/page.tsx",
+    "app/client/privacy/page.tsx",
     "app/client/requests/[request]/forms.tsx",
     "app/client/requests/[request]/page.tsx",
     "app/client/requests/actions.ts",
@@ -84,6 +90,7 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     "app/client/reviews/actions.ts",
     "app/client/reviews/forms.tsx",
     "app/client/reviews/page.tsx",
+    "app/client/settings/page.tsx",
   ]);
   assert.match(read("app/client/actions.ts"), /^"use server";\n/);
   for (const file of [
@@ -122,6 +129,10 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     "app/client/consultations/page.tsx",
     "app/client/complaints/page.tsx",
     "app/client/reviews/page.tsx",
+    "app/client/messages/page.tsx",
+    "app/client/payments/page.tsx",
+    "app/client/privacy/page.tsx",
+    "app/client/settings/page.tsx",
   ]) {
     assert.doesNotMatch(read(file), /["']use (?:client|server)["']/, file);
   }

@@ -409,7 +409,10 @@ function outcomeFits(state: ConsultationState, code: unknown): boolean {
     : code === null;
 }
 
-function readClientEntry(row: unknown): ClientConsultationEntry | null {
+// One row of a participant's Consultation list read strictly (MVP-001 S11
+// pass 2B: also the attorney's ended Consultations, which the database
+// answers with the same columns).
+export function readClientEntry(row: unknown): ClientConsultationEntry | null {
   const f = readExact(row, CLIENT_LIST_COLUMNS);
   if (f === null) {
     return null;
