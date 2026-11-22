@@ -1499,6 +1499,11 @@ function probes() {
           // MVP-001 S7 re-pin (20261123020000): the attorney's own ledger-derived
           // earnings read (authenticated, aal2), which writes nothing.
           "attorney_payment_earnings:s",
+          // MVP-001 S11 pass 2 (20261127110000): the rejoin detection triggers,
+          // which write only Reconciliation Exceptions and audit events; no M4
+          // relation.
+          "attorney_rejoin_application_submitted:v",
+          "attorney_rejoin_license_saved:v",
           "attorney_remove_blackout:v",
           // MVP-001 S8 (20261124020000): the attorney's own request reads
           // (authenticated, aal2), which write nothing.
@@ -1807,15 +1812,39 @@ function probes() {
           "staff_assign_reconciliation_exception:v",
           // MVP-001 S2 re-pin (20261118010000): the staff job functions,
           // which write no M4 relation.
+          // MVP-001 S11 pass 2 (20261127110000, 20261127090000): one Attorney Profile
+          // for the lifecycle commands (authenticated, aal2, global
+          // manage_attorney_verification), which writes nothing; the audit
+          // workspace reads (authenticated, aal2, view_audit_events), which write
+          // only their own audit event; no M4 relation.
+          "staff_attorney_profile:s",
+          "staff_audit_event:v",
+          "staff_audit_events:v",
           "staff_cancel_job:v",
+          // MVP-001 S11 pass 2 (20261127110000, 20261127120000): reinstatement and
+          // removal (authenticated, aal2, global manage_attorney_verification), an
+          // operation-specific write of attorney_profiles.profile_state with its
+          // audit event, like staff_change_profile_stage; the client account-state
+          // command (authenticated, aal2, manage_client_accounts), which writes only
+          // users.account_state, Reconciliation Exceptions and audit events.
+          "staff_change_attorney_lifecycle:v",
+          "staff_change_client_account:v",
           "staff_change_jurisdiction_lifecycle:v",
           "staff_change_profile_stage:v",
           // MVP-001 S11 (20261127060000): the complaint workspace (authenticated,
           // aal2, manage_complaints): reads, and steps that write only Complaint
           // Cases and audit events; no M4 relation.
           "staff_classify_complaint:v",
+          // MVP-001 S11 pass 2 (20261127120000): client administration reads
+          // (authenticated, aal2, manage_client_accounts), which write nothing.
+          "staff_client:s",
+          "staff_clients:s",
           "staff_complaint_case:s",
           "staff_complaint_queue:s",
+          // MVP-001 S11 pass 2 (20261127110000): the compliance workspace reads
+          // (authenticated, aal2), which write nothing.
+          "staff_compliance_records:s",
+          "staff_compliance_summary:s",
           // MVP-001 S11 (20261127020000): one Consultation for operations staff
           // (authenticated, aal2, manage_consultation_operations), which writes
           // nothing.
@@ -1834,10 +1863,19 @@ function probes() {
           "staff_finance_payment:s",
           "staff_finance_payments:s",
           "staff_finance_receipts:s",
+          // MVP-001 S11 pass 2 (20261127130000): the financial activity summary
+          // (authenticated, aal2, manage_financial_operations), which writes
+          // nothing.
+          "staff_finance_summary:s",
           "staff_grant_capability:v",
           "staff_grant_launch_authorization:v",
           // MVP-001 S3 part 2 re-pin (20261119060000): the jurisdiction
           // assessment review reads, which write nothing.
+          // MVP-001 S11 pass 2 (20261127130000, 20261127140000): jurisdiction names
+          // for staff surfaces and the Regulatory Modes of a jurisdiction
+          // (authenticated, aal2), which write nothing.
+          "staff_jurisdiction_names:s",
+          "staff_jurisdiction_regulatory_modes:s",
           "staff_jurisdiction_review_assessments:s",
           "staff_jurisdiction_review_intakes:s",
           // MVP-001 S11 (20261127050000): the Legal Hold list (authenticated,
@@ -1850,7 +1888,13 @@ function probes() {
           // MVP-001 S11 (20261127050000): placing a Legal Hold (authenticated,
           // aal2, manage_legal_holds), which writes only legal_holds and audit
           // events; no M4 relation.
+          // MVP-001 S11 pass 2 (20261127100000): the counts-only operations summary
+          // (authenticated, aal2, view_operations), which writes nothing.
+          "staff_operations_summary:s",
           "staff_place_legal_hold:v",
+          // MVP-001 S11 pass 2 (20261127110000): policy version status changes
+          // (authenticated, aal2, manage_policy_configuration), which writes nothing.
+          "staff_policy_changes:s",
           "staff_publish_intake_question_set:v",
           // MVP-001 S11 (20261127020000): staff outcome recording (authenticated,
           // aal2, manage_consultation_operations), which writes only the
@@ -1866,6 +1910,10 @@ function probes() {
           // MVP-001 S11 (20261127050000): releasing a Legal Hold (authenticated,
           // aal2, manage_legal_holds), which writes only legal_holds and audit
           // events; no M4 relation.
+          // MVP-001 S11 pass 2 (20261127130000): referral operations reads
+          // (authenticated, aal2, view_referral_operations), which write nothing.
+          "staff_referral_counts:s",
+          "staff_referrals:s",
           "staff_release_legal_hold:v",
           // MVP-001 S7 re-pin (20261123020000): finance writes, as above.
           "staff_request_reconciliation:v",
@@ -1945,11 +1993,23 @@ function probes() {
       // constraint triggers that never write an M4 relation (they read the
       // facts and open review Reconciliation Exceptions, 20261124030000),
       // pinned below to their function, deferral and timing.
+      // MVP-001 S11 pass 2 admits exactly two more, the rejoin detection of
+      // MB section 19 (20261127110000): one after a licence is inserted or
+      // its number or jurisdiction changes, one after a profile enters
+      // under_review. They never write an M4 relation (they read the licences
+      // and profiles and open rejoin_review Reconciliation Exceptions), pinned
+      // below to their function and timing.
       assert.equal(
         sql(
           `select coalesce(string_agg(c.relname || ':' || t.tgname, ',' order by c.relname, t.tgname), '') from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in (${m4}, 'audit_events') and not t.tgisinternal and t.tgname not like '%set_updated_at' and t.tgname <> 'audit_events_immutable';`,
         ),
-        "attorney_profiles:attorney_profiles_decision_review,discipline_records:discipline_records_decision_review,eligibility_evaluations:eligibility_evaluations_append_only,eligibility_evaluations:eligibility_evaluations_no_truncate,insurance_records:insurance_records_decision_review,licenses:licenses_decision_review,practice_area_authorisations:practice_area_authorisations_decision_review,verification_evidence:verification_evidence_artifact_guard,verification_evidence:verification_evidence_decision_review,verification_evidence_subjects:verification_evidence_subjects_decision_review",
+        "attorney_profiles:attorney_profiles_decision_review,attorney_profiles:attorney_profiles_rejoin_detection,discipline_records:discipline_records_decision_review,eligibility_evaluations:eligibility_evaluations_append_only,eligibility_evaluations:eligibility_evaluations_no_truncate,insurance_records:insurance_records_decision_review,licenses:licenses_decision_review,licenses:licenses_rejoin_detection,practice_area_authorisations:practice_area_authorisations_decision_review,verification_evidence:verification_evidence_artifact_guard,verification_evidence:verification_evidence_decision_review,verification_evidence_subjects:verification_evidence_subjects_decision_review",
+      );
+      assert.equal(
+        sql(
+          "select string_agg(t.tgname || '|' || p.proname || '|' || p.prosecdef::text || '|' || t.tgdeferrable::text || '|' || t.tgtype::text || '|' || (pg_get_triggerdef(t.oid) like '%WHEN (((new.profile_state = ''under_review''::text) AND (old.profile_state IS DISTINCT FROM ''under_review''::text)))%')::text, ',' order by t.tgname) from pg_trigger t join pg_proc p on p.oid = t.tgfoid where t.tgname like '%_rejoin_detection';",
+        ),
+        "attorney_profiles_rejoin_detection|attorney_rejoin_application_submitted|true|false|17|true,licenses_rejoin_detection|attorney_rejoin_license_saved|true|false|21|false",
       );
       assert.equal(
         sql(

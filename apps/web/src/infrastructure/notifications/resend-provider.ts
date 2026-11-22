@@ -19,7 +19,7 @@
 //   bare address; no display name, which the placeholder rule would refuse);
 // - ROSUNO_AUTH_PUBLIC_ORIGIN: the site's trusted public origin (the same
 //   setting the confirmation route and the payment return URLs use), for the
-//   one link an email carries;
+//   one link an email carries; MVP-001 S11 D9: https outside development;
 // - ROSUNO_RESEND_WEBHOOK_SECRET: the webhook endpoint's signing secret
 //   (whsec_ followed by the base64 key), read only by the webhook route.
 // Anything absent, malformed or a placeholder means email is unavailable: no
@@ -82,9 +82,16 @@ export const EMAIL_FROM_SETTING: ProviderSetting = Object.freeze({
   pattern:
     /^[A-Za-z0-9._%+-]{1,64}@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/,
 });
+// MVP-001 S11 D9: outside development the public origin must be https.
+const HTTPS_ORIGIN = /^https:\/\//;
+
 export const SITE_ORIGIN_SETTING: ProviderSetting = Object.freeze({
   name: "ROSUNO_AUTH_PUBLIC_ORIGIN",
   pattern: /^https?:\/\/[a-z0-9.-]{1,253}(?::[0-9]{1,5})?$/,
+  classPatterns: Object.freeze({
+    staging: HTTPS_ORIGIN,
+    production: HTTPS_ORIGIN,
+  }),
 });
 export const RESEND_WEBHOOK_SETTING: ProviderSetting = Object.freeze({
   name: "ROSUNO_RESEND_WEBHOOK_SECRET",

@@ -48,6 +48,8 @@ type CreateProps =
       readonly policyTypes: readonly Option[];
       readonly scopes: readonly Option[];
       readonly developmentAllowed: boolean;
+      // MVP-001 S11 D2: the Regulatory Modes of the offered jurisdictions.
+      readonly regulatoryModes: readonly Option[];
     }
   | {
       readonly mode: "successor";
@@ -69,6 +71,7 @@ export function CreatePolicyForm(props: CreateProps) {
       onReset={keepEntries([
         "policy_type",
         "scope",
+        "regulatory_mode",
         "version_label",
         "parameters",
         "effective_from",
@@ -107,6 +110,21 @@ export function CreatePolicyForm(props: CreateProps) {
               {props.scopes.map((scope) => (
                 <option key={scope.value} value={scope.value}>
                   {scope.label}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField
+              id={`${prefix}-mode`}
+              name="regulatory_mode"
+              label="Regulatory mode"
+              hint="Only for a policy type selected per regulatory mode, and only with the scope of the mode's own jurisdiction."
+              defaultValue=""
+              errors={errorsOf(state, "regulatory_mode")}
+            >
+              <option value="">None (the whole scope)</option>
+              {props.regulatoryModes.map((mode) => (
+                <option key={mode.value} value={mode.value}>
+                  {mode.label}
                 </option>
               ))}
             </SelectField>

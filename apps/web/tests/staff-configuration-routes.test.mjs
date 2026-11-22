@@ -123,6 +123,24 @@ const S11_STAFF_FILES = [
   "app/staff/reviews/page.tsx",
 ];
 
+// MVP-001 S11 pass 2: the operations and administration workspaces' staff
+// files outside the finance workspace (the financial activity summary is
+// admitted with the finance files below).
+const S11_OPERATIONS_STAFF_FILES = [
+  "app/staff/attorneys/[attorney]/page.tsx",
+  "app/staff/attorneys/actions.ts",
+  "app/staff/attorneys/forms.tsx",
+  "app/staff/audit/[event]/page.tsx",
+  "app/staff/audit/page.tsx",
+  "app/staff/clients/[client]/page.tsx",
+  "app/staff/clients/actions.ts",
+  "app/staff/clients/forms.tsx",
+  "app/staff/clients/page.tsx",
+  "app/staff/operations/page.tsx",
+  "app/staff/referrals/page.tsx",
+  "app/staff/system-health/page.tsx",
+];
+
 // Each list page: its use case. Each reads exactly one query value, page.
 const LIST_PAGES = {
   "app/staff/policies/page.tsx": "resolvePolicyWorkspace",
@@ -161,10 +179,53 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
       (f) =>
         !f.startsWith("app/staff/verification/") &&
         !f.startsWith("app/staff/finance/") &&
-        !S11_STAFF_FILES.includes(f),
+        !S11_STAFF_FILES.includes(f) &&
+        !S11_OPERATIONS_STAFF_FILES.includes(f),
     ),
     CONFIGURATION_FILES,
   );
+  // MVP-001 S11 pass 2: the operations and administration workspaces are
+  // their own staff surfaces, admitted by their exact files: server pages
+  // rendered per request and unindexed that read the operations adapter's
+  // sources and nothing this list forbids, client form modules that import no
+  // infrastructure, and server action modules.
+  assert.deepEqual(
+    filesIn("app/staff/").filter((f) => S11_OPERATIONS_STAFF_FILES.includes(f)),
+    S11_OPERATIONS_STAFF_FILES,
+  );
+  for (const file of [
+    ...S11_OPERATIONS_STAFF_FILES.filter((f) => f.endsWith("page.tsx")),
+    "app/staff/finance/summary/page.tsx",
+  ]) {
+    const source = read(file);
+    const code = codeOf(source);
+    assert.doesNotMatch(source, /["']use (?:client|server)["']/, file);
+    assert.match(code, /robots: \{ index: false, follow: false \},/, file);
+    assert.ok(code.indexOf("await connection();") > 0, file);
+    assert.doesNotMatch(code, FORBIDDEN_IN_PAGES, file);
+    assert.doesNotMatch(code, /STAFF_CONFIGURATION_SOURCES/, file);
+    assert.match(
+      code,
+      /import \{ (?:OPERATIONS_WORKSPACE_SOURCES|ADMINISTRATION_SOURCES) \} from "(?:\.\.\/)+src\/infrastructure\/staff\/operations-adapter\.ts";/,
+      file,
+    );
+  }
+  for (const file of S11_OPERATIONS_STAFF_FILES.filter((f) =>
+    f.endsWith("actions.ts"),
+  )) {
+    assert.match(read(file), /^"use server";\n/, file);
+  }
+  for (const file of S11_OPERATIONS_STAFF_FILES.filter((f) =>
+    f.endsWith("forms.tsx"),
+  )) {
+    assert.match(read(file), /^"use client";\n/, file);
+    assert.ok(
+      importsOf(read(file)).every(
+        (specifier) => !/infrastructure/.test(specifier),
+      ),
+      file,
+    );
+  }
   // MVP-001 S11: the completion workspaces are their own staff surfaces
   // (their own sources and use cases, like finance), admitted by their exact
   // files: server pages rendered per request and unindexed that read the
@@ -217,6 +278,9 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
     "app/staff/finance/exceptions/page.tsx",
     "app/staff/finance/forms.tsx",
     "app/staff/finance/page.tsx",
+    // MVP-001 S11 pass 2: the financial activity summary (checked with the
+    // operations pages above).
+    "app/staff/finance/summary/page.tsx",
   ]);
   for (const file of [
     "app/staff/finance/[payment]/page.tsx",

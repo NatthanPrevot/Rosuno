@@ -103,6 +103,10 @@ const GATED_ACTIONS = {
   "app/staff/reviews/actions.ts": "staff",
   "app/staff/complaints/actions.ts": "staff",
   "app/staff/legal-holds/actions.ts": "staff",
+  // MVP-001 S11 pass 2: attorney reinstatement and removal, and the client
+  // account-state change.
+  "app/staff/attorneys/actions.ts": "staff",
+  "app/staff/clients/actions.ts": "staff",
 };
 
 // ---------------------------------------------------------------------------
@@ -196,8 +200,22 @@ test("S2-R3. every attorney page and every staff page asks the step-up gate firs
   // and the attorney's request queue and request page. MVP-001 S9: and the
   // attorney's consultation list and consultation page. MVP-001 S10: and the
   // attorney's notification center. MVP-001 S11: and the attorney's reviews
-  // and reported problems, and the seven staff completion pages.
-  assert.equal(GATED_PAGES.length, 38);
+  // and reported problems, and the seven staff completion pages. MVP-001 S11
+  // pass 2: and the nine staff operations and administration pages.
+  assert.equal(GATED_PAGES.length, 47);
+  for (const file of [
+    "app/staff/operations/page.tsx",
+    "app/staff/system-health/page.tsx",
+    "app/staff/audit/page.tsx",
+    "app/staff/audit/[event]/page.tsx",
+    "app/staff/referrals/page.tsx",
+    "app/staff/finance/summary/page.tsx",
+    "app/staff/clients/page.tsx",
+    "app/staff/clients/[client]/page.tsx",
+    "app/staff/attorneys/[attorney]/page.tsx",
+  ]) {
+    assert.ok(GATED_PAGES.includes(file), file);
+  }
   for (const file of [
     "app/attorney/reviews/page.tsx",
     "app/attorney/complaints/page.tsx",
@@ -320,6 +338,10 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
       "app/staff/reviews/actions.ts": 1,
       "app/staff/complaints/actions.ts": 3,
       "app/staff/legal-holds/actions.ts": 2,
+      // MVP-001 S11 pass 2: reinstatement and removal (one action), and the
+      // client account-state change (one action).
+      "app/staff/attorneys/actions.ts": 1,
+      "app/staff/clients/actions.ts": 1,
     };
     const verification = file === "app/staff/verification/actions.ts";
     const offers = file === "app/attorney/offers/actions.ts";

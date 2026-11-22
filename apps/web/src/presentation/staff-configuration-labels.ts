@@ -124,7 +124,85 @@ export const SURFACE_LINKS: Readonly<
     summary:
       "Review the eligibility and jurisdiction changes that affect open requests and consultations.",
   },
+  // MVP-001 S11 pass 2.
+  operations: {
+    href: "/staff/operations",
+    title: "Operations dashboard",
+    summary:
+      "See counts of background jobs, notifications, review items, consultations and requests that need attention.",
+  },
+  "system-health": {
+    href: "/staff/system-health",
+    title: "System health",
+    summary:
+      "See the recorded environment, the scheduled sweeps and whether each provider is configured.",
+  },
+  audit: {
+    href: "/staff/audit",
+    title: "Audit and security events",
+    summary: "Search the audit record and the security events, read-only.",
+  },
+  clients: {
+    href: "/staff/clients",
+    title: "Client accounts",
+    summary:
+      "See client account details and counts, and suspend or reactivate an account.",
+  },
+  referrals: {
+    href: "/staff/referrals",
+    title: "Referral operations",
+    summary: "See referrals, their outcomes and the requests they led to.",
+  },
+  "finance-summary": {
+    href: "/staff/finance/summary",
+    title: "Financial activity summary",
+    summary:
+      "See ledger totals, transaction states, refunds and disputes for a chosen period.",
+  },
 });
+
+// MVP-001 S11 pass 2: the areas the staff home groups its links into, in
+// order, each with the surfaces it holds. Only the surfaces the caller holds
+// are listed, so an area without one is not shown.
+export const SURFACE_AREAS: readonly {
+  readonly id: string;
+  readonly title: string;
+  readonly surfaces: readonly StaffSurface[];
+}[] = Object.freeze([
+  {
+    id: "operations",
+    title: "Operations",
+    surfaces: ["operations", "consultations", "jobs"],
+  },
+  { id: "attorneys", title: "Attorneys", surfaces: ["verification"] },
+  {
+    id: "policy-and-launch",
+    title: "Policy and launch",
+    surfaces: ["policies", "jurisdictions", "launch", "catalog"],
+  },
+  {
+    id: "security-and-audit",
+    title: "Security and audit",
+    surfaces: ["capabilities", "audit"],
+  },
+  {
+    id: "clients",
+    title: "Clients",
+    surfaces: ["intake", "jurisdiction-review", "clients"],
+  },
+  { id: "referrals", title: "Referrals", surfaces: ["referrals"] },
+  {
+    id: "compliance",
+    title: "Compliance",
+    surfaces: ["compliance", "complaints", "reviews", "legal-holds"],
+  },
+  {
+    id: "finance",
+    title: "Finance",
+    surfaces: ["finance", "finance-summary"],
+  },
+  { id: "system-health", title: "System health", surfaces: ["system-health"] },
+]);
 
 // MVP-001 S2: the operational job states and the groups the job view lists.
 export const JOB_STATE_LABELS: Readonly<Record<JobState, Label>> =

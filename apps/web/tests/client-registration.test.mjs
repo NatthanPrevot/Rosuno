@@ -2803,6 +2803,8 @@ const CONFIGURATION_RPCS = Object.freeze([
   "staff_review_jurisdiction_assessment",
   "staff_jurisdiction_review_intakes",
   "staff_jurisdiction_review_assessments",
+  // MVP-001 S11 D2: the read of a jurisdiction's Regulatory Modes.
+  "staff_jurisdiction_regulatory_modes",
   "has_staff_capability",
 ]);
 // MVP-001 S2: the privileged module's only other calls are the three fixed
@@ -3059,6 +3061,33 @@ const COMPLETION_RPCS = Object.freeze([
   "staff_place_legal_hold",
   "staff_release_legal_hold",
 ]);
+// MVP-001 S11 pass 2: the staff operations adapter calls the database's own
+// audit reads, the counts-only operations summary, the referral reads, the
+// financial activity summary, the jurisdiction names, the client
+// administration reads and account-state command, the attorney profile read
+// and lifecycle command, the compliance reads and the PS-A2 environment
+// accessor (checked before a change), each exactly once and each as a
+// literal call through the request's own unprivileged session; it builds or
+// receives no privileged client, and no other file names any of the fifteen
+// functions.
+const OPERATIONS_ADAPTER = "src/infrastructure/staff/operations-adapter.ts";
+const OPERATIONS_RPCS = Object.freeze([
+  "staff_jurisdiction_names",
+  "staff_audit_events",
+  "staff_audit_event",
+  "staff_operations_summary",
+  "staff_referrals",
+  "staff_referral_counts",
+  "staff_finance_summary",
+  "staff_clients",
+  "staff_client",
+  "staff_change_client_account",
+  "staff_attorney_profile",
+  "staff_change_attorney_lifecycle",
+  "staff_compliance_summary",
+  "staff_compliance_records",
+  "staff_policy_changes",
+]);
 const PAYMENT_ADAPTER = "src/infrastructure/payments/payment-adapter.ts";
 const PAYMENT_RPCS = Object.freeze([
   "client_request_payment",
@@ -3131,6 +3160,9 @@ const RPC_OCCURRENCES = Object.freeze({
   // MVP-001 S11: the twenty-three completion functions, plus the environment
   // accessor.
   [COMPLETION_ADAPTER]: COMPLETION_RPCS.length + 1,
+  // MVP-001 S11 pass 2: the fifteen operations functions, plus the
+  // environment accessor.
+  [OPERATIONS_ADAPTER]: OPERATIONS_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -3375,6 +3407,33 @@ function assertQuotaRpcContract(codes) {
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
       );
     }
+    // MVP-001 S11 pass 2: the operations functions, as for the completion
+    // functions.
+    for (const name of OPERATIONS_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === OPERATIONS_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== OPERATIONS_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === OPERATIONS_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        OPERATIONS_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
     // MVP-001 S7: the payment functions, as for the offer functions.
     for (const name of PAYMENT_RPCS) {
       assert.equal(
@@ -3423,7 +3482,8 @@ function assertQuotaRpcContract(codes) {
         file === ATTORNEY_REQUEST_ADAPTER ||
         file === CONSULTATION_ADAPTER ||
         file === COMMUNICATION_ADAPTER ||
-        file === COMPLETION_ADAPTER
+        file === COMPLETION_ADAPTER ||
+        file === OPERATIONS_ADAPTER
         ? 1
         : 0,
       file,

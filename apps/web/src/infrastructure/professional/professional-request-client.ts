@@ -51,11 +51,17 @@ function ownField(value: unknown, key: string): unknown {
 // are excluded, since they can end a session around its commit. Anything
 // else (a transport failure, a gateway error without a database code, a
 // malformed body) leaves the outcome unknown.
+//
+// MVP-001 S11 (MB section 19): staff_change_profile_stage answers
+// review_required when an approval waits for an open rejoin review; the
+// profile's state does not allow the change now, so it is reported as
+// locked, and nothing changed.
 export function writeAnswerOf(result: unknown): WriteAnswer {
   const error = ownField(result, "error");
   if (error === null) {
     const data = ownField(result, "data");
-    const outcome = WRITE_OUTCOMES.find((entry) => entry === data);
+    const read = data === "review_required" ? "locked" : data;
+    const outcome = WRITE_OUTCOMES.find((entry) => entry === read);
     return outcome === undefined
       ? UNREADABLE_WRITE
       : Object.freeze({ kind: "outcome", outcome });

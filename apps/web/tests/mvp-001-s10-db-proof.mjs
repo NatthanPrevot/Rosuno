@@ -108,6 +108,20 @@ const S11_MIGRATIONS = Object.freeze([
   "20261127060000_mvp_001_s11_complaints.sql",
   "20261127070000_mvp_001_s11_notification_events.sql",
 ]);
+// MVP-001 S11 pass 2: the nine operations and administration migrations
+// follow the seven pass 1 migrations (applied by this proof as later
+// registered migrations; registered and checked by the S11 operations proof).
+const S11_OPERATIONS_MIGRATIONS = Object.freeze([
+  "20261127080000_mvp_001_s11_operations_integrity.sql",
+  "20261127090000_mvp_001_s11_audit_workspace.sql",
+  "20261127100000_mvp_001_s11_operations_dashboard.sql",
+  "20261127110000_mvp_001_s11_attorney_operations.sql",
+  "20261127120000_mvp_001_s11_client_administration.sql",
+  "20261127130000_mvp_001_s11_referral_finance_reads.sql",
+  "20261127140000_mvp_001_s11_policy_corrections.sql",
+  "20261127150000_mvp_001_s11_capture_gate.sql",
+  "20261127160000_mvp_001_s11_definer_search_path.sql",
+]);
 // The one migration that adds the PS-A5 column (its constraints and index).
 const S10_VERSIONING = "20261126050000_mvp_001_s10_document_versioning.sql";
 
@@ -461,7 +475,11 @@ function applyMigrations() {
   // registered unreviewed (sequences 50 to 54) and applied nowhere.
   const s9 = files.indexOf(S9_LAST);
   assert.ok(s9 >= 0, "the last S9 migration is present");
-  assert.deepEqual(files.slice(s9 + 1), [...S10_MIGRATIONS, ...S11_MIGRATIONS]);
+  assert.deepEqual(files.slice(s9 + 1), [
+    ...S10_MIGRATIONS,
+    ...S11_MIGRATIONS,
+    ...S11_OPERATIONS_MIGRATIONS,
+  ]);
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),

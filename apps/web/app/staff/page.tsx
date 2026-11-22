@@ -5,7 +5,10 @@
 // listed: only those the caller holds a current grant for. The page only
 // links to surfaces; each surface decides access again for itself and
 // offers no action the caller cannot run. It reads no route parameter,
-// query, header, or cookie of its own.
+// query, header, or cookie of its own. MVP-001 S11 pass 2: the links are
+// grouped by area (operations, attorneys, policy and launch, security and
+// audit, clients, referrals, compliance, finance, system health); an area
+// whose surfaces the caller holds none of is not shown.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -21,7 +24,10 @@ import {
   Surface,
   Text,
 } from "../../src/presentation/design-system.tsx";
-import { SURFACE_LINKS } from "../../src/presentation/staff-configuration-labels.ts";
+import {
+  SURFACE_AREAS,
+  SURFACE_LINKS,
+} from "../../src/presentation/staff-configuration-labels.ts";
 import { requireSteppedUp } from "../account/gate.ts";
 import { refusalPage, StaffFrame } from "./frame.tsx";
 
@@ -51,22 +57,44 @@ export default async function StaffHomePage() {
         </Alert>
       ) : (
         <Stack>
-          {view.surfaces.map((surface) => {
-            const link = SURFACE_LINKS[surface];
+          {SURFACE_AREAS.map((area) => {
+            const held = area.surfaces.filter((surface) =>
+              view.surfaces.includes(surface),
+            );
+            if (held.length === 0) {
+              return null;
+            }
             return (
-              <Surface key={surface} labelledBy={`staff-surface-${surface}`}>
-                <Stack gap="tight">
-                  <Heading as="h2" size="md" id={`staff-surface-${surface}`}>
-                    {link.title}
-                  </Heading>
-                  <Text tone="muted">{link.summary}</Text>
-                  <Cluster>
-                    <ButtonLink variant="secondary" href={link.href}>
-                      {`Open ${link.title.toLowerCase()}`}
-                    </ButtonLink>
-                  </Cluster>
-                </Stack>
-              </Surface>
+              <Stack key={area.id} gap="tight">
+                <Heading as="h2" size="md" id={`staff-area-${area.id}`}>
+                  {area.title}
+                </Heading>
+                {held.map((surface) => {
+                  const link = SURFACE_LINKS[surface];
+                  return (
+                    <Surface
+                      key={surface}
+                      labelledBy={`staff-surface-${surface}`}
+                    >
+                      <Stack gap="tight">
+                        <Heading
+                          as="h3"
+                          size="sm"
+                          id={`staff-surface-${surface}`}
+                        >
+                          {link.title}
+                        </Heading>
+                        <Text tone="muted">{link.summary}</Text>
+                        <Cluster>
+                          <ButtonLink variant="secondary" href={link.href}>
+                            {`Open ${link.title.toLowerCase()}`}
+                          </ButtonLink>
+                        </Cluster>
+                      </Stack>
+                    </Surface>
+                  );
+                })}
+              </Stack>
             );
           })}
         </Stack>

@@ -93,6 +93,20 @@ const S11_MIGRATIONS = Object.freeze([
   "20261127060000_mvp_001_s11_complaints.sql",
   "20261127070000_mvp_001_s11_notification_events.sql",
 ]);
+// MVP-001 S11 pass 2: the nine operations and administration migrations
+// follow (applied by this proof as later registered migrations; registered
+// and checked by the S11 operations proof).
+const S11_OPERATIONS_MIGRATIONS = Object.freeze([
+  "20261127080000_mvp_001_s11_operations_integrity.sql",
+  "20261127090000_mvp_001_s11_audit_workspace.sql",
+  "20261127100000_mvp_001_s11_operations_dashboard.sql",
+  "20261127110000_mvp_001_s11_attorney_operations.sql",
+  "20261127120000_mvp_001_s11_client_administration.sql",
+  "20261127130000_mvp_001_s11_referral_finance_reads.sql",
+  "20261127140000_mvp_001_s11_policy_corrections.sql",
+  "20261127150000_mvp_001_s11_capture_gate.sql",
+  "20261127160000_mvp_001_s11_definer_search_path.sql",
+]);
 // The one migration that inserts catalog rows (the five capability codes) and
 // the one that creates a relation (the PS section 21.1 reviews relation).
 const S11_INTEGRITY = "20261127010000_mvp_001_s11_completion_integrity.sql";
@@ -449,7 +463,10 @@ function applyMigrations() {
   // before it) and applied nowhere.
   const s10 = files.indexOf(S10_LAST);
   assert.ok(s10 >= 0, "the last S10 migration is present");
-  assert.deepEqual(files.slice(s10 + 1), [...S11_MIGRATIONS]);
+  assert.deepEqual(files.slice(s10 + 1), [
+    ...S11_MIGRATIONS,
+    ...S11_OPERATIONS_MIGRATIONS,
+  ]);
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),
@@ -2717,7 +2734,11 @@ async function migrationChecks() {
       );
       assert.equal(
         catalog,
-        "authorize_jurisdiction_launch,manage_attorney_verification,manage_complaints,manage_compliance_reviews,manage_consultation_operations,manage_financial_operations,manage_intake_configuration,manage_jurisdiction_configuration,manage_legal_holds,manage_operational_jobs,manage_policy_configuration,manage_staff_capabilities,moderate_reviews",
+        // MVP-001 S11 pass 2 re-pin: and exactly the four codes of the later
+        // registered S11 operations-integrity migration (20261127080000):
+        // manage_client_accounts, view_audit_events, view_operations and
+        // view_referral_operations.
+        "authorize_jurisdiction_launch,manage_attorney_verification,manage_client_accounts,manage_complaints,manage_compliance_reviews,manage_consultation_operations,manage_financial_operations,manage_intake_configuration,manage_jurisdiction_configuration,manage_legal_holds,manage_operational_jobs,manage_policy_configuration,manage_staff_capabilities,moderate_reviews,view_audit_events,view_operations,view_referral_operations",
       );
       assert.equal(
         sql(

@@ -755,6 +755,24 @@ const P3003_INFRASTRUCTURE = [
 // staff-configuration-routes.test.mjs).
 const MVP001_STAFF_APP = [
   "app/staff/actions.ts",
+  // MVP-001 S11 pass 2: the attorney lifecycle page, the audit workspace (list
+  // and one event), client administration (list and one account), the
+  // financial activity summary, the operations dashboard, referral
+  // operations and system health, each with its forms and its one server
+  // action module where it has any.
+  "app/staff/attorneys/[attorney]/page.tsx",
+  "app/staff/attorneys/actions.ts",
+  "app/staff/attorneys/forms.tsx",
+  "app/staff/audit/[event]/page.tsx",
+  "app/staff/audit/page.tsx",
+  "app/staff/clients/[client]/page.tsx",
+  "app/staff/clients/actions.ts",
+  "app/staff/clients/forms.tsx",
+  "app/staff/clients/page.tsx",
+  "app/staff/finance/summary/page.tsx",
+  "app/staff/operations/page.tsx",
+  "app/staff/referrals/page.tsx",
+  "app/staff/system-health/page.tsx",
   "app/staff/capabilities/[member]/page.tsx",
   "app/staff/capabilities/forms.tsx",
   "app/staff/capabilities/page.tsx",

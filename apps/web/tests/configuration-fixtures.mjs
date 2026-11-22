@@ -717,6 +717,32 @@ export function configurationReadsFor(world, authId) {
           }),
       );
     }),
+    // MVP-001 S11 D2: the Regulatory Modes mapped to a jurisdiction, for a
+    // holder of manage_policy_configuration covering it (world.regulatory_modes
+    // rows carry their jurisdiction; none by default).
+    regulatoryModesOf: call("regulatoryModesOf", async (jurisdictionId) =>
+      rows(
+        holdsFor(
+          world,
+          authId,
+          "manage_policy_configuration",
+          jurisdictionId,
+          false,
+        )
+          ? (world.regulatory_modes ?? [])
+              .filter((m) => m.jurisdiction_id === jurisdictionId)
+              .map((m) => ({
+                regulatory_mode_id: m.id,
+                code: m.code,
+                name: m.name,
+                status: m.status,
+                active_from: m.active_from,
+                active_until: m.active_until,
+                approval_status: m.approval_status,
+              }))
+          : [],
+      ),
+    ),
   };
 }
 

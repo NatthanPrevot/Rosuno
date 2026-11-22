@@ -71,9 +71,13 @@ const S2_MIGRATIONS = Object.freeze([
 // MVP-001 S11 re-pin: the later registered S11 completion-integrity migration
 // (20261127010000) adds exactly manage_complaints, manage_compliance_reviews,
 // manage_consultation_operations, manage_legal_holds and moderate_reviews.
+// MVP-001 S11 pass 2 re-pin: the later registered S11 operations-integrity
+// migration (20261127080000) adds exactly manage_client_accounts,
+// view_audit_events, view_operations and view_referral_operations.
 const CAPABILITIES = Object.freeze([
   "authorize_jurisdiction_launch",
   "manage_attorney_verification",
+  "manage_client_accounts",
   "manage_complaints",
   "manage_compliance_reviews",
   "manage_consultation_operations",
@@ -85,6 +89,9 @@ const CAPABILITIES = Object.freeze([
   "manage_policy_configuration",
   "manage_staff_capabilities",
   "moderate_reviews",
+  "view_audit_events",
+  "view_operations",
+  "view_referral_operations",
 ]);
 const V1_KEY = "intake-questions-v1";
 const V1 = JSON.parse(

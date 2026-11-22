@@ -384,7 +384,10 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // and outcome only), the participants' and staff completion actions (an
   // action not completed, with its fixed outcome only) and the completion
   // adapter (a failed call, with the call name and how it failed only) write
-  // lines too.
+  // lines too. MVP-001 S11 pass 2: the staff attorney lifecycle and client
+  // account actions (an action not completed, with its fixed outcome only)
+  // and the operations adapter (a failed call, with the call name and how it
+  // failed only) write lines too.
   assert.deepEqual(callers, [
     "app/attorney/complaints/actions.ts",
     "app/attorney/complaints/page.tsx",
@@ -415,6 +418,8 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/find-an-attorney/select/page.tsx",
     "app/sign-in/actions.ts",
     "app/staff/actions.ts",
+    "app/staff/attorneys/actions.ts",
+    "app/staff/clients/actions.ts",
     "app/staff/complaints/actions.ts",
     "app/staff/compliance/actions.ts",
     "app/staff/consultations/actions.ts",
@@ -444,6 +449,8 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     // call name and how it failed only, and the sign-out step's fixed
     // outcome).
     "src/infrastructure/scheduling/attorney-schedule-adapter.ts",
+    // MVP-001 S11 pass 2: the staff operations adapter.
+    "src/infrastructure/staff/operations-adapter.ts",
     "src/infrastructure/staff/staff-configuration-adapter.ts",
   ]);
   for (const file of callers) {

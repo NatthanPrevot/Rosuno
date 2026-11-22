@@ -108,6 +108,12 @@ export const STAFF_CAPABILITIES = Object.freeze([
   "manage_complaints",
   "manage_legal_holds",
   "manage_compliance_reviews",
+  // MVP-001 S11 pass 2: the audit workspace, the operations dashboard and
+  // system health, referral operations and client administration.
+  "view_audit_events",
+  "view_operations",
+  "view_referral_operations",
+  "manage_client_accounts",
 ] as const);
 export type StaffCapability = (typeof STAFF_CAPABILITIES)[number];
 
@@ -130,6 +136,13 @@ export const STAFF_SURFACES = Object.freeze([
   "complaints",
   "legal-holds",
   "compliance",
+  // MVP-001 S11 pass 2.
+  "operations",
+  "system-health",
+  "audit",
+  "clients",
+  "referrals",
+  "finance-summary",
 ] as const);
 export type StaffSurface = (typeof STAFF_SURFACES)[number];
 
@@ -564,6 +577,9 @@ export type ConfigurationReads = {
     count: number,
   ) => Promise<RowsResult>;
   readonly reviewAssessmentsOf: (intakeId: string) => Promise<RowsResult>;
+  // MVP-001 S11 D2: the Regulatory Modes mapped to one jurisdiction
+  // (staff_jurisdiction_regulatory_modes; manage_policy_configuration for it).
+  readonly regulatoryModesOf: (jurisdictionId: string) => Promise<RowsResult>;
 };
 
 export type PolicyVersionInput = {
@@ -1590,6 +1606,14 @@ export async function resolveStaffHome(
       ["manage_legal_holds", false],
       // MVP-001 S11: the compliance review items (global grant only).
       ["manage_compliance_reviews", false],
+      // MVP-001 S11 pass 2: the operations dashboard and system health and
+      // client administration (global grants only); the audit workspace and
+      // referral operations in any scope (the database scopes their rows by
+      // jurisdiction).
+      ["view_operations", false],
+      ["view_audit_events", true],
+      ["manage_client_accounts", false],
+      ["view_referral_operations", true],
     ];
     const answers: boolean[] = [];
     for (const [capability, anyJurisdiction] of asked) {
@@ -1615,6 +1639,10 @@ export async function resolveStaffHome(
       complaints,
       legalHolds,
       compliance,
+      operations,
+      audit,
+      clients,
+      referrals,
     ] = answers;
     const held: Readonly<Record<StaffSurface, boolean>> = {
       verification: verify,
@@ -1632,6 +1660,13 @@ export async function resolveStaffHome(
       complaints,
       "legal-holds": legalHolds,
       compliance,
+      operations,
+      "system-health": operations,
+      audit,
+      clients,
+      referrals,
+      // The financial activity summary belongs to the finance workspace.
+      "finance-summary": finance,
     };
     return Object.freeze({
       status: "ready",
@@ -1675,7 +1710,64 @@ export type PolicyWorkspaceView =
       // jurisdiction-free scope, offered only to a global grant.
       readonly scopes: readonly Option[];
       readonly scopesComplete: boolean;
+      // MVP-001 S11 D2: the Regulatory Modes mapped to the offered
+      // jurisdiction scopes, each labelled with its jurisdiction; a mode is
+      // valid only with its own jurisdiction's scope (checked again on
+      // creation and by the database's selection).
+      readonly regulatoryModes: readonly Option[];
     };
+
+// MVP-001 S11 D2: the Regulatory Modes of one jurisdiction, read strictly
+// (id, code, name, status, active period and approval status), or null when
+// unreadable.
+const REGULATORY_MODE_COLUMNS = Object.freeze([
+  "regulatory_mode_id",
+  "code",
+  "name",
+  "status",
+  "active_from",
+  "active_until",
+  "approval_status",
+]);
+
+type RegulatoryModeRecord = {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+};
+
+async function regulatoryModesOf(
+  reads: ConfigurationReads,
+  jurisdictionId: string,
+): Promise<readonly RegulatoryModeRecord[] | null> {
+  const rows = rowsOf(
+    await attempt(() => reads.regulatoryModesOf(jurisdictionId)),
+  );
+  if (rows === null || rows.length > 100) {
+    return null;
+  }
+  const modes: RegulatoryModeRecord[] = [];
+  for (const row of rows) {
+    const f = readExact(row, REGULATORY_MODE_COLUMNS);
+    const id = f?.get("regulatory_mode_id");
+    const code = f?.get("code");
+    const name = f?.get("name");
+    if (
+      f === null ||
+      !isUuid(id) ||
+      typeof code !== "string" ||
+      code.length === 0 ||
+      code.length > 64 ||
+      typeof name !== "string" ||
+      name.length === 0 ||
+      name.length > 200
+    ) {
+      return null;
+    }
+    modes.push(Object.freeze({ id, code, name }));
+  }
+  return Object.freeze(modes);
+}
 
 const GLOBAL_SCOPE_LABEL = "All jurisdictions (no jurisdiction)";
 
@@ -1771,6 +1863,22 @@ export async function resolvePolicyWorkspace(
         scopes.push(option(j.id, jurisdictionLabel(j)));
       }
     }
+    // MVP-001 S11 D2: an unreadable mode list offers no mode for that
+    // jurisdiction (the creation reads it again and refuses then).
+    const regulatoryModes: Option[] = [];
+    for (const j of jurisdictions.items) {
+      if (!scopes.some((scope) => scope.value === j.id)) {
+        continue;
+      }
+      for (const mode of (await regulatoryModesOf(reads, j.id)) ?? []) {
+        regulatoryModes.push(
+          option(
+            mode.id,
+            `${mode.name} (${mode.code}), ${jurisdictionLabel(j)}`,
+          ),
+        );
+      }
+    }
     const environment = await environmentOf(sources, reads);
     const typeNames = new Map(types.items.map((t) => [t.code, t.name]));
     const jurisdictionNames = new Map(
@@ -1791,6 +1899,7 @@ export async function resolvePolicyWorkspace(
       policyTypesComplete: types.complete,
       scopes: Object.freeze(scopes),
       scopesComplete: jurisdictions.complete,
+      regulatoryModes: Object.freeze(regulatoryModes),
     });
   } catch {
     return UNAVAILABLE;
@@ -3336,6 +3445,16 @@ export async function createPolicyVersion(
     if (development !== "" && development !== "yes") {
       return UNAVAILABLE;
     }
+    // MVP-001 S11 D2: an optional Regulatory Mode for a new version (a
+    // successor keeps its predecessor's).
+    const modeRaw = single(form, "regulatory_mode");
+    if (
+      modeRaw === null ||
+      (modeRaw !== "" && (supersedes !== null || !isUuid(modeRaw)))
+    ) {
+      return UNAVAILABLE;
+    }
+    const requestedMode = modeRaw === "" ? null : modeRaw;
     const collected = newCollected();
     let typeCode: string | null = null;
     let scope: string | null | undefined = undefined;
@@ -3412,6 +3531,27 @@ export async function createPolicyVersion(
       return refused("environment_refused");
     }
     let regulatoryModeId: string | null = null;
+    if (requestedMode !== null) {
+      if (scope === null || scope === undefined) {
+        return invalid({
+          regulatory_mode: [
+            "A regulatory mode needs the scope of its own jurisdiction.",
+          ],
+        });
+      }
+      const modes = await regulatoryModesOf(reads, scope);
+      if (modes === null) {
+        return UNAVAILABLE;
+      }
+      if (!modes.some((mode) => mode.id === requestedMode)) {
+        return invalid({
+          regulatory_mode: [
+            "Choose a regulatory mode listed for the chosen jurisdiction.",
+          ],
+        });
+      }
+      regulatoryModeId = requestedMode;
+    }
     if (supersedes !== null) {
       const previous = await oneOf(
         () => reads.policyVersionById(supersedes),

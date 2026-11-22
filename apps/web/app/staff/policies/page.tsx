@@ -150,6 +150,7 @@ export default async function PolicyConfigurationPage({
                 policyTypes={view.policyTypes}
                 scopes={view.scopes}
                 developmentAllowed={view.developmentAllowed}
+                regulatoryModes={view.regulatoryModes}
               />
             </Disclosure>
           )}

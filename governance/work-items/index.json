@@ -2561,7 +2561,16 @@
         "20261127040000_mvp_001_s11_reviews",
         "20261127050000_mvp_001_s11_legal_holds",
         "20261127060000_mvp_001_s11_complaints",
-        "20261127070000_mvp_001_s11_notification_events"
+        "20261127070000_mvp_001_s11_notification_events",
+        "20261127080000_mvp_001_s11_operations_integrity",
+        "20261127090000_mvp_001_s11_audit_workspace",
+        "20261127100000_mvp_001_s11_operations_dashboard",
+        "20261127110000_mvp_001_s11_attorney_operations",
+        "20261127120000_mvp_001_s11_client_administration",
+        "20261127130000_mvp_001_s11_referral_finance_reads",
+        "20261127140000_mvp_001_s11_policy_corrections",
+        "20261127150000_mvp_001_s11_capture_gate",
+        "20261127160000_mvp_001_s11_definer_search_path"
       ],
       "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",
