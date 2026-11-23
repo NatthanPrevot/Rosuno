@@ -32,7 +32,8 @@ FORBIDDEN_SCOPE:
 - supabase/config.toml
 - supabase/seed*
 - supabase/seeds/*
-- governance/*schema*.json
+- governance/decision-log.schema.json
+- governance/work-items/schema.json
 - governance/*template*.json
 - governance/control-fields.json
 - governance/dl-eng-1-engineering-process-rulings.md
@@ -44,6 +45,12 @@ FORBIDDEN_SCOPE:
 on owner branch `wi/MVP-001-technical-completion` and grants implementation. It is a Program Packet under DL-ENG-3 and
 is valid only with DL-ENG-3. It relies on the owner's exact-text approval of PS-A2 (§3), whose Lock Condition completes
 when slice S1 merges.**
+
+**Revision 1 (owner forward-only revision; records scope only).** `FORBIDDEN_SCOPE` replaces the glob
+`governance/*schema*.json` with the two JSON schema files it protects (`governance/decision-log.schema.json`,
+`governance/work-items/schema.json`). Under the guard's matching the glob also covered
+`governance/schema-drift/baseline.json`, which REC-1 (the P5-001 carry-forward set) and rule 15 (post-merge Staging
+application and new-baseline facts; DL-ENG-3 P5) require. Nothing else changes.
 
 Independent review is optional (DL-ENG-2 G1). Locked documents are cited by section only; no locked text is
 reproduced. Replit is on HOLD (§2 rule 14).

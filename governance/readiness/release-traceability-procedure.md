@@ -77,6 +77,8 @@ environment it was built for. The database artifact is the exact migration file 
 | Register sequence 16 (P5-001)             | `reviewed: false` / `none`, while `governance/evidence/mvp-001-s1-staging-reconciliation.json` records it as applied on Staging. Correcting the entry needs the owner's approval and application facts (Packet REC-1); until then the drift baseline stays at 15                                                                                                                                                      |
 | Designated approval facts                 | Not supplied for S1–S5 (recorded as pending); reviewer stated by the owner and time not supplied for S6–S10 (Decision Log, `DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM`). The entry's review line and the work item's scope, S11 acceptance criteria and validation commands were corrected by the Builder (the work item at `5283fda`, the Decision Log line in the working tree), pending owner confirmation |
 
+**State after the MVP-001 records update (2026-11-23).** The table above is the state at `5283fda` and `2a1b94f`. Since the records update: the register records sequences 2–76 as reviewed and applied to Staging (16: P5-001; 17–76: MVP-001 S1–S11); the release register holds 17 records, adding `REL-20261115-20261116-P5-001-STAGING-APPLICATION` and `REL-20261123-MVP-001-S1-S11-STAGING-APPLICATION`; the drift baseline is `rosuno-staging-mvp-001-s11-20261123-v1` (76 migrations, 15 accepted evidence files, `drift_status: clean`, checked 2026-11-23T13:35:17Z); PS-A6 is `active`; the designated approval facts for PRs #95–#106 are recorded.
+
 ## 6. Rollback references
 
 Every register entry carries a rollback plan; for MVP-001 migrations it reads, in substance, "before merge:

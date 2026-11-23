@@ -1,10 +1,10 @@
 {
   "version": 1,
   "product_schema_present": true,
-  "baseline_id": "rosuno-staging-p3-904-20261114-v1",
-  "baseline_digest": "sha256:ccaedb5d1bf6a4ec732e19e2c8732a5917bb96322a2bda82e1aaeb780a910791",
+  "baseline_id": "rosuno-staging-mvp-001-s11-20261123-v1",
+  "baseline_digest": "sha256:a3b789f1a75bb9317b5e74d12fdda01cf88aadba6a6e1991f329aab1d0e26234",
   "checked_environment": "staging",
-  "checked_at": "2026-11-14T00:42:35.801014Z",
+  "checked_at": "2026-11-23T13:35:17Z",
   "project": {
     "name": "Rosuno Staging",
     "project_ref": "mxjlvmowmodzdtdfgqpb"
@@ -99,6 +99,372 @@
       "migration_id": "20261106090000_p3_904_professional_write_boundary",
       "artifact_path": "supabase/migrations/20261106090000_p3_904_professional_write_boundary.sql",
       "sha256": "7f05e4066a245471a8e33d5cfb27a539373eb75b270a17990afced441e4ebbe1"
+    },
+    {
+      "sequence": 16,
+      "migration_id": "20261115140653_p5_001_client_intake_foundation",
+      "artifact_path": "supabase/migrations/20261115140653_p5_001_client_intake_foundation.sql",
+      "sha256": "104b76bb3933369619c8dbc7112277ec449648bbf7839280900194bf8b20c17b"
+    },
+    {
+      "sequence": 17,
+      "migration_id": "20261117010000_mvp_001_s1_environment_identity",
+      "artifact_path": "supabase/migrations/20261117010000_mvp_001_s1_environment_identity.sql",
+      "sha256": "358d3ac1248960ea91e757dad10d3a834dd5306883009a80d30b9619bf06302d"
+    },
+    {
+      "sequence": 18,
+      "migration_id": "20261117020000_mvp_001_s1_professional_conformance",
+      "artifact_path": "supabase/migrations/20261117020000_mvp_001_s1_professional_conformance.sql",
+      "sha256": "ea23635b404da8ce54bf82f572a27877df24a80c41da51a51c20fbb9300b5468"
+    },
+    {
+      "sequence": 19,
+      "migration_id": "20261117030000_mvp_001_s1_configuration_administration",
+      "artifact_path": "supabase/migrations/20261117030000_mvp_001_s1_configuration_administration.sql",
+      "sha256": "b49742750144a3ef1798a4a526f7a04dc759e9cf81c9a55d9f9eb3fdcede1788"
+    },
+    {
+      "sequence": 20,
+      "migration_id": "20261117040000_mvp_001_s1_availability_checks",
+      "artifact_path": "supabase/migrations/20261117040000_mvp_001_s1_availability_checks.sql",
+      "sha256": "c6c1b445f91e5788e550dc6df9ec0fd6a0fa0909d049386fa93f85861b09d0d1"
+    },
+    {
+      "sequence": 21,
+      "migration_id": "20261118010000_mvp_001_s2_operational_jobs",
+      "artifact_path": "supabase/migrations/20261118010000_mvp_001_s2_operational_jobs.sql",
+      "sha256": "dc7e22611f25b66db80b867c78204a34b46517f50e217b50b9f618b0bb7b4053"
+    },
+    {
+      "sequence": 22,
+      "migration_id": "20261118020000_mvp_001_s2_job_scheduler",
+      "artifact_path": "supabase/migrations/20261118020000_mvp_001_s2_job_scheduler.sql",
+      "sha256": "117880c51db21aa6ab7f53c526b2790d2cd62e3ec001c8e04ca3f23a1091e6c7"
+    },
+    {
+      "sequence": 23,
+      "migration_id": "20261118030000_mvp_001_s2_session_assurance",
+      "artifact_path": "supabase/migrations/20261118030000_mvp_001_s2_session_assurance.sql",
+      "sha256": "c557004bc949c44d4cc5e730ffb880d8010ac64ce87fa579249b3213b4c1fe20"
+    },
+    {
+      "sequence": 24,
+      "migration_id": "20261118040000_mvp_001_s2_authentication_abuse_control",
+      "artifact_path": "supabase/migrations/20261118040000_mvp_001_s2_authentication_abuse_control.sql",
+      "sha256": "cf2b6cd546d47129247871e765e14bc2cbac0a327a94a4458e458d724512e148"
+    },
+    {
+      "sequence": 25,
+      "migration_id": "20261119010000_mvp_001_s3_protected_storage",
+      "artifact_path": "supabase/migrations/20261119010000_mvp_001_s3_protected_storage.sql",
+      "sha256": "8c09135f4001e72822f8b8f8f0c2d1c914c76f8fa9f5d9317ef7c098134a022d"
+    },
+    {
+      "sequence": 26,
+      "migration_id": "20261119020000_mvp_001_s3_voice_memo_intake",
+      "artifact_path": "supabase/migrations/20261119020000_mvp_001_s3_voice_memo_intake.sql",
+      "sha256": "444abe4c4a2daf6a0d5cc758bd288c187974c6c968b03763833b4bc01a57e5ea"
+    },
+    {
+      "sequence": 27,
+      "migration_id": "20261119030000_mvp_001_s3_verification_artifacts",
+      "artifact_path": "supabase/migrations/20261119030000_mvp_001_s3_verification_artifacts.sql",
+      "sha256": "2ca89df856208ceddbcedc3ef4b01609246bc68efc01cc63d86bd338506aee37"
+    },
+    {
+      "sequence": 28,
+      "migration_id": "20261119040000_mvp_001_s3_intake_lifecycle",
+      "artifact_path": "supabase/migrations/20261119040000_mvp_001_s3_intake_lifecycle.sql",
+      "sha256": "6f412394f80641ce816a04546ec72d0e753da61ba4459b0e512d2e2b1a34f3e7"
+    },
+    {
+      "sequence": 29,
+      "migration_id": "20261119050000_mvp_001_s3_ai_suggestions",
+      "artifact_path": "supabase/migrations/20261119050000_mvp_001_s3_ai_suggestions.sql",
+      "sha256": "29346c49de9ee2abf2aac326607ad4c91818af4acdb09c5270d3ea16247ffb66"
+    },
+    {
+      "sequence": 30,
+      "migration_id": "20261119060000_mvp_001_s3_jurisdiction_assessment_review",
+      "artifact_path": "supabase/migrations/20261119060000_mvp_001_s3_jurisdiction_assessment_review.sql",
+      "sha256": "bef3748ac24804fbc867d1440942d298acb295bef240f9951a30b116f5ad124f"
+    },
+    {
+      "sequence": 31,
+      "migration_id": "20261119070000_mvp_001_s3_intake_lifecycle_correction",
+      "artifact_path": "supabase/migrations/20261119070000_mvp_001_s3_intake_lifecycle_correction.sql",
+      "sha256": "94874d4ecf9a6531121442ee0c80583a0b8fc43d975378c7478c95c15e04e876"
+    },
+    {
+      "sequence": 32,
+      "migration_id": "20261120010000_mvp_001_s4_scheduling_integrity",
+      "artifact_path": "supabase/migrations/20261120010000_mvp_001_s4_scheduling_integrity.sql",
+      "sha256": "ca6266923c26ab0d66065eb9b4e048b8070f086cdd3acf1d8734a1c68d0733cd"
+    },
+    {
+      "sequence": 33,
+      "migration_id": "20261120020000_mvp_001_s4_availability_instant",
+      "artifact_path": "supabase/migrations/20261120020000_mvp_001_s4_availability_instant.sql",
+      "sha256": "33095713adb2ca21a59d0b6c6a7030472663acba84994d5276dff172da77c8ae"
+    },
+    {
+      "sequence": 34,
+      "migration_id": "20261120030000_mvp_001_s4_holds_bookability",
+      "artifact_path": "supabase/migrations/20261120030000_mvp_001_s4_holds_bookability.sql",
+      "sha256": "af714220352ee1521310cb67a2d040b43154089cf671d99885ed7389809fadf3"
+    },
+    {
+      "sequence": 35,
+      "migration_id": "20261121010000_mvp_001_s5_referral_integrity",
+      "artifact_path": "supabase/migrations/20261121010000_mvp_001_s5_referral_integrity.sql",
+      "sha256": "855578275ff526d1970795bb1c5b70d4c86dbd953da4d3aa1f2e8ded7452d892"
+    },
+    {
+      "sequence": 36,
+      "migration_id": "20261121020000_mvp_001_s5_discovery",
+      "artifact_path": "supabase/migrations/20261121020000_mvp_001_s5_discovery.sql",
+      "sha256": "678240d025916e69fd65973f7293221a044803b2ac802e08e7f19375bd56bb35"
+    },
+    {
+      "sequence": 37,
+      "migration_id": "20261121030000_mvp_001_s5_referral",
+      "artifact_path": "supabase/migrations/20261121030000_mvp_001_s5_referral.sql",
+      "sha256": "4f01fc9c6b1162950e793e9664c03db2db88dde211b5ffbbab26074e66fa6bea"
+    },
+    {
+      "sequence": 38,
+      "migration_id": "20261122010000_mvp_001_s6_request_integrity",
+      "artifact_path": "supabase/migrations/20261122010000_mvp_001_s6_request_integrity.sql",
+      "sha256": "b9094eda325536c16028a9d67951abcda7130313a508cb3c5b29756d991251ee"
+    },
+    {
+      "sequence": 39,
+      "migration_id": "20261122020000_mvp_001_s6_pricing",
+      "artifact_path": "supabase/migrations/20261122020000_mvp_001_s6_pricing.sql",
+      "sha256": "d5557fc537649bcfc5d4063d6313286ef5f9e94c842c8807e05fddb2ef267b13"
+    },
+    {
+      "sequence": 40,
+      "migration_id": "20261122030000_mvp_001_s6_requests",
+      "artifact_path": "supabase/migrations/20261122030000_mvp_001_s6_requests.sql",
+      "sha256": "c88ff5f7734dd2f7693624db297b0a336eeaf968f56e0d6f2ac6788fde4c61c8"
+    },
+    {
+      "sequence": 41,
+      "migration_id": "20261122040000_mvp_001_s6_consultation_offers",
+      "artifact_path": "supabase/migrations/20261122040000_mvp_001_s6_consultation_offers.sql",
+      "sha256": "0e569f2ea7ad3985740024278ecebd56fba521920ee7d36711b293755a46bd33"
+    },
+    {
+      "sequence": 42,
+      "migration_id": "20261123010000_mvp_001_s7_payment_integrity",
+      "artifact_path": "supabase/migrations/20261123010000_mvp_001_s7_payment_integrity.sql",
+      "sha256": "d813d6f80254eaa534f642e527766abc921acdbada377d7e6bde572863bf93b3"
+    },
+    {
+      "sequence": 43,
+      "migration_id": "20261123020000_mvp_001_s7_payment_engine",
+      "artifact_path": "supabase/migrations/20261123020000_mvp_001_s7_payment_engine.sql",
+      "sha256": "3d52cd2c8c2da8a83121611982b1bdd22de711500e7d324c853189fab5852896"
+    },
+    {
+      "sequence": 44,
+      "migration_id": "20261124010000_mvp_001_s8_decision_integrity",
+      "artifact_path": "supabase/migrations/20261124010000_mvp_001_s8_decision_integrity.sql",
+      "sha256": "70d988d385a284c79f3f09c9feb5819e417d137133b264e3f1acda881460b462"
+    },
+    {
+      "sequence": 45,
+      "migration_id": "20261124020000_mvp_001_s8_attorney_decision",
+      "artifact_path": "supabase/migrations/20261124020000_mvp_001_s8_attorney_decision.sql",
+      "sha256": "f92333e7c0220bbead90d84faa3f511994d3978411938258199a944af8ea44f8"
+    },
+    {
+      "sequence": 46,
+      "migration_id": "20261124030000_mvp_001_s8_change_review",
+      "artifact_path": "supabase/migrations/20261124030000_mvp_001_s8_change_review.sql",
+      "sha256": "e5a4ca7ce50faf4a4782fef12515062f33db46aa1e902a52e13feb9f6a72ae72"
+    },
+    {
+      "sequence": 47,
+      "migration_id": "20261125010000_mvp_001_s9_media_integrity",
+      "artifact_path": "supabase/migrations/20261125010000_mvp_001_s9_media_integrity.sql",
+      "sha256": "fc2e881f0c9b74a0c17740a1de7b9a31da9276c0ccb2b2cc59294b8e4435036d"
+    },
+    {
+      "sequence": 48,
+      "migration_id": "20261125020000_mvp_001_s9_consultation_media",
+      "artifact_path": "supabase/migrations/20261125020000_mvp_001_s9_consultation_media.sql",
+      "sha256": "4a214c2f24d8c718fedcfa5a30dbe5ec7aa1dcc6102401edb14c7af93af97e86"
+    },
+    {
+      "sequence": 49,
+      "migration_id": "20261125030000_mvp_001_s9_media_evidence",
+      "artifact_path": "supabase/migrations/20261125030000_mvp_001_s9_media_evidence.sql",
+      "sha256": "89a7e0f539a3b347f613b8026914676e137ef1b1e2422aac6756dace18c0936a"
+    },
+    {
+      "sequence": 50,
+      "migration_id": "20261126010000_mvp_001_s10_communication_integrity",
+      "artifact_path": "supabase/migrations/20261126010000_mvp_001_s10_communication_integrity.sql",
+      "sha256": "f0389b272b7bb0ac4fae788920533754920fa40691cf8c55f34278fcaea25d0d"
+    },
+    {
+      "sequence": 51,
+      "migration_id": "20261126020000_mvp_001_s10_notifications",
+      "artifact_path": "supabase/migrations/20261126020000_mvp_001_s10_notifications.sql",
+      "sha256": "97da42731edce09abb43c05aefcda9ad54abbbf9db098c97f86613c5bcfe2fe8"
+    },
+    {
+      "sequence": 52,
+      "migration_id": "20261126030000_mvp_001_s10_messages",
+      "artifact_path": "supabase/migrations/20261126030000_mvp_001_s10_messages.sql",
+      "sha256": "59755e6cfa3cf5e54adce7951b9a2e90946e4342709ba060322d6607411fac5e"
+    },
+    {
+      "sequence": 53,
+      "migration_id": "20261126040000_mvp_001_s10_documents",
+      "artifact_path": "supabase/migrations/20261126040000_mvp_001_s10_documents.sql",
+      "sha256": "306ee7c2a719712d635a2f1c90b136b4c46cb29eb682b690839c33f89121dc29"
+    },
+    {
+      "sequence": 54,
+      "migration_id": "20261126050000_mvp_001_s10_document_versioning",
+      "artifact_path": "supabase/migrations/20261126050000_mvp_001_s10_document_versioning.sql",
+      "sha256": "02c24fc023d907c9e1bc72b1fc62dcc3967c5566be552efe961a8e2b96c002ed"
+    },
+    {
+      "sequence": 55,
+      "migration_id": "20261127010000_mvp_001_s11_completion_integrity",
+      "artifact_path": "supabase/migrations/20261127010000_mvp_001_s11_completion_integrity.sql",
+      "sha256": "379bbcb9f389671391c544e49767d431243819322649ead47bc594100234478d"
+    },
+    {
+      "sequence": 56,
+      "migration_id": "20261127020000_mvp_001_s11_completion",
+      "artifact_path": "supabase/migrations/20261127020000_mvp_001_s11_completion.sql",
+      "sha256": "3b7dcfb3622e0bf22b42f27590121ed5d3c4b3a2e71d4c71c8bb5bf90763c951"
+    },
+    {
+      "sequence": 57,
+      "migration_id": "20261127030000_mvp_001_s11_exception_families",
+      "artifact_path": "supabase/migrations/20261127030000_mvp_001_s11_exception_families.sql",
+      "sha256": "69a0167c858ad0fe336ad2283a450eea4dc057d66cf135e87be8834bf425ae9c"
+    },
+    {
+      "sequence": 58,
+      "migration_id": "20261127040000_mvp_001_s11_reviews",
+      "artifact_path": "supabase/migrations/20261127040000_mvp_001_s11_reviews.sql",
+      "sha256": "9d91fcbb90eac47ae552a33704202f9b5acdab072c161bd6f81bbddbecc6415e"
+    },
+    {
+      "sequence": 59,
+      "migration_id": "20261127050000_mvp_001_s11_legal_holds",
+      "artifact_path": "supabase/migrations/20261127050000_mvp_001_s11_legal_holds.sql",
+      "sha256": "fc103c9551add5d7b101288e38552e68f0532c05c718265457ece3e4d0a01bef"
+    },
+    {
+      "sequence": 60,
+      "migration_id": "20261127060000_mvp_001_s11_complaints",
+      "artifact_path": "supabase/migrations/20261127060000_mvp_001_s11_complaints.sql",
+      "sha256": "769b2bcd9ca4cf5ed5622b7fea1add9683ad0e8fcde95defce77d6d5e91e3f24"
+    },
+    {
+      "sequence": 61,
+      "migration_id": "20261127070000_mvp_001_s11_notification_events",
+      "artifact_path": "supabase/migrations/20261127070000_mvp_001_s11_notification_events.sql",
+      "sha256": "eac5237f9761274f5e17cbba1bb8462af8cd76099079ea89edeac66b5c0226e5"
+    },
+    {
+      "sequence": 62,
+      "migration_id": "20261127080000_mvp_001_s11_operations_integrity",
+      "artifact_path": "supabase/migrations/20261127080000_mvp_001_s11_operations_integrity.sql",
+      "sha256": "23fd8608d7c65bb1be89e7badd97a195c08ecaebdbf9f5cee68e05a232677773"
+    },
+    {
+      "sequence": 63,
+      "migration_id": "20261127090000_mvp_001_s11_audit_workspace",
+      "artifact_path": "supabase/migrations/20261127090000_mvp_001_s11_audit_workspace.sql",
+      "sha256": "0404e550989b7c64de823fcacefae10a2b0189ad8885d03cb3dc199bfc3150ed"
+    },
+    {
+      "sequence": 64,
+      "migration_id": "20261127100000_mvp_001_s11_operations_dashboard",
+      "artifact_path": "supabase/migrations/20261127100000_mvp_001_s11_operations_dashboard.sql",
+      "sha256": "cca29b81708cc21858e645bb4c30bd6de0f2e35a7de45aa39fda13d39e121795"
+    },
+    {
+      "sequence": 65,
+      "migration_id": "20261127110000_mvp_001_s11_attorney_operations",
+      "artifact_path": "supabase/migrations/20261127110000_mvp_001_s11_attorney_operations.sql",
+      "sha256": "b9367ba750d1d7567f2878be7254ad636e6bb1b8360fe8b0d63e2b96d670400e"
+    },
+    {
+      "sequence": 66,
+      "migration_id": "20261127120000_mvp_001_s11_client_administration",
+      "artifact_path": "supabase/migrations/20261127120000_mvp_001_s11_client_administration.sql",
+      "sha256": "945cfccc95357f9c67ba3cf81bb53510ec657b3a41b3eb90676c088e3a73e270"
+    },
+    {
+      "sequence": 67,
+      "migration_id": "20261127130000_mvp_001_s11_referral_finance_reads",
+      "artifact_path": "supabase/migrations/20261127130000_mvp_001_s11_referral_finance_reads.sql",
+      "sha256": "cfe2654351bbd525006315c69deda6b1b1053d9997151e063eb68160c5b381b0"
+    },
+    {
+      "sequence": 68,
+      "migration_id": "20261127140000_mvp_001_s11_policy_corrections",
+      "artifact_path": "supabase/migrations/20261127140000_mvp_001_s11_policy_corrections.sql",
+      "sha256": "4109f5cfbc1838866728209c3369b22a4b4079153f72b53bd64f788d82a14deb"
+    },
+    {
+      "sequence": 69,
+      "migration_id": "20261127150000_mvp_001_s11_capture_gate",
+      "artifact_path": "supabase/migrations/20261127150000_mvp_001_s11_capture_gate.sql",
+      "sha256": "9af38269acc0f02e1aff5e3275b47b6d325bfd1db4f14d20938ac084b28bc85b"
+    },
+    {
+      "sequence": 70,
+      "migration_id": "20261127160000_mvp_001_s11_definer_search_path",
+      "artifact_path": "supabase/migrations/20261127160000_mvp_001_s11_definer_search_path.sql",
+      "sha256": "d6c60b4b3d02c0197d72366c1d4cd935cf9805d72b8c716d58f3ff1736289adb"
+    },
+    {
+      "sequence": 71,
+      "migration_id": "20261127170000_mvp_001_s11_workspace_reads",
+      "artifact_path": "supabase/migrations/20261127170000_mvp_001_s11_workspace_reads.sql",
+      "sha256": "16693bfeff072837e3bd890ec7a71b8fa66eb59919f846a3b05eb4bd0765e2fa"
+    },
+    {
+      "sequence": 72,
+      "migration_id": "20261127180000_mvp_001_s11_review_corrections",
+      "artifact_path": "supabase/migrations/20261127180000_mvp_001_s11_review_corrections.sql",
+      "sha256": "d5eafdf8a510188043e9c7d9470d825cd5a39e3d7b3e92c0652b5eadfe2c8f54"
+    },
+    {
+      "sequence": 73,
+      "migration_id": "20261127190000_mvp_001_s11_break_glass",
+      "artifact_path": "supabase/migrations/20261127190000_mvp_001_s11_break_glass.sql",
+      "sha256": "5930b59c42d8a12a9c8fc79a546e7811f1bb8db10b022fc359f7f52556057de4"
+    },
+    {
+      "sequence": 74,
+      "migration_id": "20261127200000_mvp_001_s11_data_requests",
+      "artifact_path": "supabase/migrations/20261127200000_mvp_001_s11_data_requests.sql",
+      "sha256": "6a4df26e92b7759905f975823ff05b5e81990bfd27539c82090000390520a641"
+    },
+    {
+      "sequence": 75,
+      "migration_id": "20261127210000_mvp_001_s11_complaint_configuration",
+      "artifact_path": "supabase/migrations/20261127210000_mvp_001_s11_complaint_configuration.sql",
+      "sha256": "f74a32b6cb54f1e82109d1a8df29f43186cfbef3d248627e7792056201094842"
+    },
+    {
+      "sequence": 76,
+      "migration_id": "20261127220000_mvp_001_s11_offered_start_containment",
+      "artifact_path": "supabase/migrations/20261127220000_mvp_001_s11_offered_start_containment.sql",
+      "sha256": "48a81b347eb6e383137c2c669d8378243697d9475299e101c5c29e7f64ae5fd7"
     }
   ],
   "accepted_evidence": [
@@ -153,13 +519,21 @@
     {
       "path": "governance/evidence/p3-904-governance-lifecycle-closure.json",
       "sha256": "248452c3a69ddd4f5ff29abb523e34add2836cfafba94d73aa084a39bd4cce2e"
+    },
+    {
+      "path": "governance/evidence/p5-001-governance-lifecycle-closure.json",
+      "sha256": "5a0c8618c60cda292aa9012ce1f42f23c48645353fccc0843f5e8de78d892d44"
+    },
+    {
+      "path": "governance/evidence/mvp-001-s1-s11-staging-application.json",
+      "sha256": "97e6d48ad9c52b60e8b2e85478e95ffeff36945e30a79fcc939ec660de9fcaf7"
     }
   ],
   "catalog_fingerprint": {
     "format": "rosuno-p1-catalog-v1",
-    "sha256": "afd6e96d2b2d8c87c012878c1d5033af6da00f174c0747735a9c714a99aa106a",
-    "canonical_byte_length": 658560,
-    "row_count": 1970
+    "sha256": "bb6b8eca349139bb13eff20b7573695d09dbbb1505eafd3c24bc4d66dbf43965",
+    "canonical_byte_length": 783638,
+    "row_count": 2258
   },
   "evidence": [
     "governance/evidence/p1-003-jurisdiction-policy-launch-foundation.json",
@@ -174,7 +548,9 @@
     "governance/evidence/p1-010-governance-lifecycle-closure.json",
     "governance/evidence/p1-011-governance-lifecycle-closure.json",
     "governance/evidence/p2-007-governance-lifecycle-closure.json",
-    "governance/evidence/p3-904-governance-lifecycle-closure.json"
+    "governance/evidence/p3-904-governance-lifecycle-closure.json",
+    "governance/evidence/p5-001-governance-lifecycle-closure.json",
+    "governance/evidence/mvp-001-s1-s11-staging-application.json"
   ],
   "drift_status": "clean",
   "drift_items": []

@@ -79,6 +79,7 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54339;
@@ -410,7 +411,7 @@ function applyMigrations() {
     ),
   ).migrations;
   // S4 follows S3, contiguous and in order, and every S4 migration is
-  // registered unreviewed and applied nowhere. MVP-001 S5: the three S5
+  // registered in a consistent lifecycle state. MVP-001 S5: the three S5
   // migrations, contiguous and in order, follow S4; MVP-001 S6: then exactly
   // the three S6 migrations, contiguous and in order; MVP-001 S6 PS-A3: then
   // exactly the PS-A3 migration; MVP-001 S7: then exactly the two S7
@@ -495,8 +496,7 @@ function applyMigrations() {
     );
     assert.ok(row, `${file} is registered`);
     assert.equal(row.migration_id, id);
-    assert.equal(row.reviewed, false);
-    assert.equal(row.applied_environment, "none");
+    assertRegisteredLifecycle(row);
     assert.ok(program.migration_refs.includes(id), `${id} is a Program ref`);
   }
   sql(ROLES, "postgres");
@@ -1138,7 +1138,7 @@ const INTERNAL_FUNCTIONS = Object.freeze([
 
 async function inventoryChecks() {
   await check(
-    "MIG-1 the three S4 migrations follow S3 last and in order, are registered unreviewed and applied nowhere, are Program migration refs, and apply on plain PostgreSQL with the pg_cron step skipped",
+    "MIG-1 the three S4 migrations follow S3 last and in order, are registered in a consistent lifecycle state, are Program migration refs, and apply on plain PostgreSQL with the pg_cron step skipped",
     () => {
       const notice = report.migrations.notices[S4_MIGRATIONS[2]];
       assert.deepEqual(notice, [

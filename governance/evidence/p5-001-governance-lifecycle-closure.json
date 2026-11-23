@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "evidence_id": "P5-001-GOVERNANCE-CLOSURE-20261123",
+  "work_item_id": "WI-P2-P5-001-CLIENT-INTAKE-FOUNDATION",
+  "lifecycle": "P5-001 closure record (UOM v2.0 section 15), carried by the MVP-001 records update (Packet REC-1); canonical only when that PR merges",
+  "recorded_at": "2026-11-23T13:38:21Z",
+  "source_authority": {
+    "locked_originals": "The current LOCKED Rosuno originals remain external immutable authority; not copied or modified",
+    "adopted_uom": "UOM v2.0",
+    "adopted_cloud_builder": "C1 rev6.0",
+    "engineering_rulings": ["DL-ENG-1", "DL-ENG-2", "DL-ENG-3"],
+    "packet": {
+      "path": "docs/work-items/MVP-001/PACKET.md",
+      "owner_branch": "wi/MVP-001-technical-completion",
+      "revision_1_commit": "e20490631b32b385c141834bdf9b90802dec4808",
+      "blob": "77991607475eed6db764a8a2f4f846aebd342b57"
+    }
+  },
+  "repository": {
+    "owner": "NatthanPrevot/Rosuno",
+    "implementation_pr": 95,
+    "reviewed_head": "43dcab55827b532102c2a62b427548974d7d2efc",
+    "merge_commit": "91af560f2654f63ea20b19da75a166ca274d0ddf",
+    "merged_at": "2026-11-15T17:25:24Z",
+    "merge_tree_equals_reviewed_head_tree": true
+  },
+  "designated_approval": {
+    "reviewer": "Rosuno",
+    "state": "APPROVED",
+    "submitted_at": "2026-11-15T17:06:06Z",
+    "review_id": "PRR_kwDOUHT1sc8AAAABYF-1ww",
+    "sources": [
+      "2026-11-16 verified GitHub read-only record",
+      "owner-supplied GitHub timestamp (2026-11-23)",
+      "GitHub search: merged and reviewed-by Rosuno with an approving review"
+    ],
+    "required_checks": {
+      "p0_workflow_run": 43738846663,
+      "rosuno_guard_run": 43738980747,
+      "conclusion": "success"
+    }
+  },
+  "migration": {
+    "id": "20261115140653_p5_001_client_intake_foundation",
+    "sequence": 16,
+    "path": "supabase/migrations/20261115140653_p5_001_client_intake_foundation.sql",
+    "sha256": "104b76bb3933369619c8dbc7112277ec449648bbf7839280900194bf8b20c17b"
+  },
+  "rollback_only_validation": {
+    "result": "PASS",
+    "date": "2026-11-15",
+    "executor": "Builder session, Rosuno Supabase Staging connector",
+    "script_sha256": "76bbcac594c4b43c41fa6a142fe2e08b144b96c5dc824e64902aec0730df80d3",
+    "checks": "18 of 18",
+    "transaction": "2023, rolled back; restoration exact"
+  },
+  "application": {
+    "executor": "owner",
+    "tool": "Supabase CLI db push from 91af560 (dry run listing only this migration)",
+    "exit": 0,
+    "applied_after": "2026-11-15T19:48:26Z",
+    "applied_after_basis": "last read-only check before application: 15 history rows",
+    "applied_before": "2026-11-16T06:24:40Z",
+    "applied_before_basis": "read-only verification: 16 history rows including 20261115140653",
+    "actual_application_time": "UNKNOWN (not recorded)",
+    "note": "2026-11-16T06:24:40Z is the time by which the application was verified, not the application time"
+  },
+  "post_application_verification": {
+    "result": "PASS",
+    "observed": "2026-11-16T06:24:40Z to 06:27Z",
+    "checks": "11 of 11",
+    "history_rows": 16,
+    "whole_public_catalog_sha256": "3732664ba8f690b02484b4490a38896c6b451fce555037f106cb1c7a1c7420c3",
+    "fixed_scope_rosuno_p1_catalog_v1_sha256": "2e500bbbe59b5c2808234f81970a0ff04e9a6bf20198fb2e526875493dc8cf75",
+    "fixed_scope_bytes": 658506,
+    "fixed_scope_rows": 1970,
+    "security_advisor": "31 INFO and 22 WARN; the 7 new warnings are the P5-001 client and publication functions, by design"
+  },
+  "release_ref": "REL-20261115-20261116-P5-001-STAGING-APPLICATION",
+  "evidence_packages": {
+    "p5_001_staging_evidence_zip_sha256": "4a3e896e0c34d9a25180622b1d5884fca209d37f398fd393a503ed5c928870b3",
+    "files": 17,
+    "owner_retained": true,
+    "external_to_repository": true
+  },
+  "limitations": {
+    "actual_application_time": "UNKNOWN; recorded only as the evidenced window",
+    "production": "NOT_AUTHORIZED",
+    "hosting_deployment": "NOT_PERFORMED_SEPARATE_OWNER_GATE",
+    "question_set_publication": "NOT_PERFORMED_SEPARATE_OWNER_GATE"
+  },
+  "change_scope": {
+    "supabase_mutation_by_this_record": false,
+    "historical_migration_change": false
+  }
+}

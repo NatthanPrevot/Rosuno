@@ -59,6 +59,7 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54342;
@@ -475,7 +476,7 @@ function applyMigrations() {
     ),
   ).migrations;
   // S6 follows S5, contiguous and in order, and every S6 migration is
-  // registered unreviewed and applied nowhere. MVP-001 S6 PS-A3: then exactly
+  // registered in a consistent lifecycle state. MVP-001 S6 PS-A3: then exactly
   // the PS-A3 migration, registered the same way. MVP-001 S7: then exactly the
   // two S7 migrations (registered and checked by the S7 proof). MVP-001 S8:
   // then exactly the three S8 migrations (registered and checked by the S8
@@ -514,8 +515,7 @@ function applyMigrations() {
     );
     assert.ok(row, `${file} is registered`);
     assert.equal(row.migration_id, id);
-    assert.equal(row.reviewed, false);
-    assert.equal(row.applied_environment, "none");
+    assertRegisteredLifecycle(row);
     assert.ok(program.migration_refs.includes(id), `${id} is a Program ref`);
   }
   sql(ROLES, "postgres");

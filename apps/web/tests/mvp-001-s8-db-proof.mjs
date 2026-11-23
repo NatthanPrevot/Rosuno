@@ -67,6 +67,7 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54344;
@@ -501,7 +502,7 @@ function applyMigrations() {
     ),
   ).migrations;
   // S8 follows S7, contiguous and in order, and every S8 migration is
-  // registered unreviewed (sequences 44 to 46) and applied nowhere. MVP-001
+  // registered (sequences 44 to 46) in a consistent lifecycle state. MVP-001
   // S9: then exactly the three S9 migrations (registered and checked by the
   // S9 proof). MVP-001 S10: then exactly the five S10 migrations (registered
   // and checked by the S10 proof).
@@ -535,8 +536,7 @@ function applyMigrations() {
     assert.ok(row, `${file} is registered`);
     assert.equal(row.migration_id, id);
     assert.equal(row.sequence, 44 + index);
-    assert.equal(row.reviewed, false);
-    assert.equal(row.applied_environment, "none");
+    assertRegisteredLifecycle(row);
     assert.ok(program.migration_refs.includes(id), `${id} is a Program ref`);
   });
   sql(ROLES, "postgres");
@@ -1579,7 +1579,7 @@ const executors = (signature) =>
 
 async function migrationChecks() {
   await check(
-    "MIG-1 the three S8 migrations follow S7 in order, are registered unreviewed (sequences 44 to 46) and applied nowhere, are Program migration refs, and apply on plain PostgreSQL without notices, to a development and a production-class database",
+    "MIG-1 the three S8 migrations follow S7 in order, are registered (sequences 44 to 46) in a consistent lifecycle state, are Program migration refs, and apply on plain PostgreSQL without notices, to a development and a production-class database",
     () => {
       assert.deepEqual(report.migrations.s8, [...S8_MIGRATIONS]);
       for (const file of S8_MIGRATIONS) {

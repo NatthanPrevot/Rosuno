@@ -81,6 +81,7 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
 
 // MVP-001 S11 pass 2B (correction D14): the application's own strict readers
 // of the notification center and the delivery job context, run on rows the
@@ -514,8 +515,8 @@ function applyMigrations() {
     ),
   ).migrations;
   // S11 follows S10, contiguous and in order, and every S11 migration is
-  // registered unreviewed (sequences 55 to 61, each depending on the one
-  // before it) and applied nowhere.
+  // registered (sequences 55 to 61, each depending on the one before it)
+  // in a consistent lifecycle state.
   const s10 = files.indexOf(S10_LAST);
   assert.ok(s10 >= 0, "the last S10 migration is present");
   assert.deepEqual(files.slice(s10 + 1), [
@@ -543,8 +544,7 @@ function applyMigrations() {
     assert.ok(row, `${file} is registered`);
     assert.equal(row.migration_id, id);
     assert.equal(row.sequence, 55 + index);
-    assert.equal(row.reviewed, false);
-    assert.equal(row.applied_environment, "none");
+    assertRegisteredLifecycle(row);
     assert.deepEqual(row.depends_on, [
       (index === 0 ? S10_LAST : S11_MIGRATIONS[index - 1]).replace(
         /\.sql$/,
@@ -556,9 +556,9 @@ function applyMigrations() {
     );
     assert.ok(program.migration_refs.includes(id), `${id} is a Program ref`);
   });
-  // The nine pass 2 migrations follow pass 1 and are registered unreviewed
-  // (sequences 62 to 70, each depending on the one before it) and applied
-  // nowhere.
+  // The nine pass 2 migrations follow pass 1 and are registered
+  // (sequences 62 to 70, each depending on the one before it) in a consistent
+  // lifecycle state.
   S11_OPERATIONS_MIGRATIONS.forEach((file, index) => {
     const id = file.replace(/\.sql$/, "");
     const row = registered.find(
@@ -567,8 +567,7 @@ function applyMigrations() {
     assert.ok(row, `${file} is registered`);
     assert.equal(row.migration_id, id);
     assert.equal(row.sequence, 62 + index);
-    assert.equal(row.reviewed, false);
-    assert.equal(row.applied_environment, "none");
+    assertRegisteredLifecycle(row);
     assert.deepEqual(row.depends_on, [
       (index === 0
         ? S11_MIGRATIONS[S11_MIGRATIONS.length - 1]
@@ -581,8 +580,8 @@ function applyMigrations() {
     assert.ok(program.migration_refs.includes(id), `${id} is a Program ref`);
   });
   // MVP-001 S11 pass 2B: the workspace reads follow pass 2A and are
-  // registered unreviewed (sequence 71, depending on the last pass 2A
-  // migration) and applied nowhere.
+  // registered (sequence 71, depending on the last pass 2A
+  // migration) in a consistent lifecycle state.
   S11_SURFACES_MIGRATIONS.forEach((file, index) => {
     const id = file.replace(/\.sql$/, "");
     const row = registered.find(
@@ -591,8 +590,7 @@ function applyMigrations() {
     assert.ok(row, `${file} is registered`);
     assert.equal(row.migration_id, id);
     assert.equal(row.sequence, 71 + index);
-    assert.equal(row.reviewed, false);
-    assert.equal(row.applied_environment, "none");
+    assertRegisteredLifecycle(row);
     assert.deepEqual(row.depends_on, [
       (index === 0
         ? S11_OPERATIONS_MIGRATIONS[S11_OPERATIONS_MIGRATIONS.length - 1]
@@ -605,8 +603,8 @@ function applyMigrations() {
     assert.ok(program.migration_refs.includes(id), `${id} is a Program ref`);
   });
   // MVP-001 S11 review corrections: the correction migration follows pass 2B
-  // and is registered unreviewed (sequence 72, depending on the pass 2B
-  // migration) and applied nowhere.
+  // and is registered (sequence 72, depending on the pass 2B
+  // migration) in a consistent lifecycle state.
   S11_CORRECTIONS_MIGRATIONS.forEach((file, index) => {
     const id = file.replace(/\.sql$/, "");
     const row = registered.find(
@@ -615,8 +613,7 @@ function applyMigrations() {
     assert.ok(row, `${file} is registered`);
     assert.equal(row.migration_id, id);
     assert.equal(row.sequence, 72 + index);
-    assert.equal(row.reviewed, false);
-    assert.equal(row.applied_environment, "none");
+    assertRegisteredLifecycle(row);
     assert.deepEqual(row.depends_on, [
       (index === 0
         ? S11_SURFACES_MIGRATIONS[S11_SURFACES_MIGRATIONS.length - 1]
@@ -2975,7 +2972,7 @@ const triggersOf = (db) =>
 
 async function opsMigrationChecks() {
   await check(
-    "MIG-1 the nine S11 pass 2 migrations follow the seven pass 1 migrations in order, are registered unreviewed (sequences 62 to 70, each depending on the one before it, each with a rollback plan) and applied nowhere, are Program migration refs, and apply on plain PostgreSQL to a development and a production-class database without notices",
+    "MIG-1 the nine S11 pass 2 migrations follow the seven pass 1 migrations in order, are registered (sequences 62 to 70, each depending on the one before it, each with a rollback plan) in a consistent lifecycle state, are Program migration refs, and apply on plain PostgreSQL to a development and a production-class database without notices",
     () => {
       assert.deepEqual(report.migrations.s11_operations, [
         ...S11_OPERATIONS_MIGRATIONS,
@@ -6055,7 +6052,7 @@ const ownPaymentIds = (client) =>
 
 async function surfacesChecks() {
   await check(
-    "SURF-0 (Packet rules 8 and 16) the pass 2B migration follows pass 2A, is registered unreviewed (sequence 71, depending on the last pass 2A migration, with a rollback plan) and applied nowhere, is a Program migration ref, applies to a development and a production-class database without notices, creates exactly the six workspace reads and nothing else (no relation, column, type, constraint, index, row policy, policy type or table grant: the catalog equals the catalog after pass 1 in every listing; no insert, update or delete), and every read is stable security definer with search_path pg_catalog, pg_temp, executable by authenticated only and takes no identifier argument",
+    "SURF-0 (Packet rules 8 and 16) the pass 2B migration follows pass 2A, is registered (sequence 71, depending on the last pass 2A migration, with a rollback plan) in a consistent lifecycle state, is a Program migration ref, applies to a development and a production-class database without notices, creates exactly the six workspace reads and nothing else (no relation, column, type, constraint, index, row policy, policy type or table grant: the catalog equals the catalog after pass 1 in every listing; no insert, update or delete), and every read is stable security definer with search_path pg_catalog, pg_temp, executable by authenticated only and takes no identifier argument",
     () => {
       assert.deepEqual(report.migrations.s11_surfaces, [
         ...S11_SURFACES_MIGRATIONS,
@@ -6807,7 +6804,7 @@ const CORRECTED_FUNCTIONS = Object.freeze({
 
 async function correctionChecks() {
   await check(
-    "CORR-0 (Packet rules 8 and 16) the review corrections migration follows pass 2B, is registered unreviewed (sequence 72, depending on the pass 2B migration, with a rollback plan) and applied nowhere, is a Program migration ref, applies to a development and a production-class database without notices, adds no relation, column, type, constraint, index, row policy, policy type, table grant or trigger (the catalog listings still equal those after pass 1), creates exactly the eleven replaced functions and the one internal redaction function, keeps each replaced function's executors, security mode and pinned search_path (the volatile commands their 3s lock bound), and makes the new function executable by no API role",
+    "CORR-0 (Packet rules 8 and 16) the review corrections migration follows pass 2B, is registered (sequence 72, depending on the pass 2B migration, with a rollback plan) in a consistent lifecycle state, is a Program migration ref, applies to a development and a production-class database without notices, adds no relation, column, type, constraint, index, row policy, policy type, table grant or trigger (the catalog listings still equal those after pass 1), creates exactly the eleven replaced functions and the one internal redaction function, keeps each replaced function's executors, security mode and pinned search_path (the volatile commands their 3s lock bound), and makes the new function executable by no API role",
     () => {
       assert.deepEqual(report.migrations.s11_corrections, [
         ...S11_CORRECTIONS_MIGRATIONS,

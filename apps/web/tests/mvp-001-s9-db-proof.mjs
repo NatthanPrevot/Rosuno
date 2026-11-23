@@ -74,6 +74,7 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54345;
@@ -500,7 +501,7 @@ function applyMigrations() {
     ),
   ).migrations;
   // S9 follows S8, contiguous and in order, and every S9 migration is
-  // registered unreviewed (sequences 47 to 49) and applied nowhere. MVP-001
+  // registered (sequences 47 to 49) in a consistent lifecycle state. MVP-001
   // S10: then exactly the five S10 migrations (registered and checked by the
   // S10 proof).
   const s8 = files.indexOf(S8_LAST);
@@ -532,8 +533,7 @@ function applyMigrations() {
     assert.ok(row, `${file} is registered`);
     assert.equal(row.migration_id, id);
     assert.equal(row.sequence, 47 + index);
-    assert.equal(row.reviewed, false);
-    assert.equal(row.applied_environment, "none");
+    assertRegisteredLifecycle(row);
     assert.ok(program.migration_refs.includes(id), `${id} is a Program ref`);
   });
   sql(ROLES, "postgres");
@@ -1729,7 +1729,7 @@ const MEDIA_TABLES = Object.freeze([
 
 async function migrationChecks() {
   await check(
-    "MIG-1 the three S9 migrations follow S8 in order, are registered unreviewed (sequences 47 to 49) and applied nowhere, are Program migration refs, and apply on plain PostgreSQL to a development and a production-class database; the only notice is the consultation migration's pg_cron absence (the schedule is registered only where pg_cron exists)",
+    "MIG-1 the three S9 migrations follow S8 in order, are registered (sequences 47 to 49) in a consistent lifecycle state, are Program migration refs, and apply on plain PostgreSQL to a development and a production-class database; the only notice is the consultation migration's pg_cron absence (the schedule is registered only where pg_cron exists)",
     () => {
       assert.deepEqual(report.migrations.s9, [...S9_MIGRATIONS]);
       assert.deepEqual(report.migrations.notices, {

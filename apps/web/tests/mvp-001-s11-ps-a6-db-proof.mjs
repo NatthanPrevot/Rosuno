@@ -65,6 +65,7 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54351;
@@ -442,9 +443,9 @@ function applyMigrations() {
     ),
   ).migrations;
   // PS-A6 follows the S11 review corrections, contiguous and in order, and
-  // every PS-A6 migration is registered unreviewed (sequences 73 to 75, each
-  // depending on the one before it, citing PS-A6 and its adoption decision),
-  // applied nowhere and a Program migration ref.
+  // every PS-A6 migration is registered (sequences 73 to 75, each
+  // depending on the one before it, citing PS-A6 and its adoption decision)
+  // in a consistent lifecycle state, and is a Program migration ref.
   const last = files.indexOf(S11_CORRECTIONS_LAST);
   assert.ok(last >= 0, "the S11 review corrections migration is present");
   assert.deepEqual(files.slice(last + 1), [
@@ -468,8 +469,7 @@ function applyMigrations() {
     assert.ok(row, `${file} is registered`);
     assert.equal(row.migration_id, id);
     assert.equal(row.sequence, 73 + index);
-    assert.equal(row.reviewed, false);
-    assert.equal(row.applied_environment, "none");
+    assertRegisteredLifecycle(row);
     assert.deepEqual(row.depends_on, [
       (index === 0 ? S11_CORRECTIONS_LAST : PS_A6_MIGRATIONS[index - 1]).replace(
         /\.sql$/,
@@ -2079,7 +2079,7 @@ const procOf = (signature, db = DB) =>
 
 async function migrationChecks() {
   await check(
-    "MIG-1 the three PS-A6 migrations follow the S11 review corrections in order, are registered unreviewed (sequences 73 to 75, each depending on the one before it, citing PS-A6 and its adoption decision, each with a rollback plan) and applied nowhere, are Program migration refs, and apply on plain PostgreSQL to a development and a production-class database without notices",
+    "MIG-1 the three PS-A6 migrations follow the S11 review corrections in order, are registered (sequences 73 to 75, each depending on the one before it, citing PS-A6 and its adoption decision, each with a rollback plan) in a consistent lifecycle state, are Program migration refs, and apply on plain PostgreSQL to a development and a production-class database without notices",
     () => {
       assert.deepEqual(report.migrations.ps_a6, [...PS_A6_MIGRATIONS]);
       assert.deepEqual(
