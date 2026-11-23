@@ -72,6 +72,7 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54347;
@@ -482,8 +483,8 @@ function applyMigrations() {
     ),
   ).migrations;
   // S11 follows S10, contiguous and in order, and every S11 migration is
-  // registered unreviewed (sequences 55 to 61, each depending on the one
-  // before it) and applied nowhere.
+  // registered (sequences 55 to 61, each depending on the one before it)
+  // in a consistent lifecycle state.
   const s10 = files.indexOf(S10_LAST);
   assert.ok(s10 >= 0, "the last S10 migration is present");
   assert.deepEqual(files.slice(s10 + 1), [
@@ -511,8 +512,7 @@ function applyMigrations() {
     assert.ok(row, `${file} is registered`);
     assert.equal(row.migration_id, id);
     assert.equal(row.sequence, 55 + index);
-    assert.equal(row.reviewed, false);
-    assert.equal(row.applied_environment, "none");
+    assertRegisteredLifecycle(row);
     assert.deepEqual(row.depends_on, [
       (index === 0 ? S10_LAST : S11_MIGRATIONS[index - 1]).replace(
         /\.sql$/,
@@ -2642,7 +2642,7 @@ const columnsOf = (table) =>
 
 async function migrationChecks() {
   await check(
-    "MIG-1 the seven S11 migrations follow S10 in order, are registered unreviewed (sequences 55 to 61, each depending on the one before it, each with a rollback plan) and applied nowhere, are Program migration refs, and apply on plain PostgreSQL to a development and a production-class database without notices",
+    "MIG-1 the seven S11 migrations follow S10 in order, are registered (sequences 55 to 61, each depending on the one before it, each with a rollback plan) in a consistent lifecycle state, are Program migration refs, and apply on plain PostgreSQL to a development and a production-class database without notices",
     () => {
       assert.deepEqual(report.migrations.s11, [...S11_MIGRATIONS]);
       assert.deepEqual(

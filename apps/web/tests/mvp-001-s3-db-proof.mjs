@@ -62,6 +62,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54338;
@@ -427,7 +428,7 @@ function applyMigrations() {
     ),
   ).migrations;
   // S3 follows S2, contiguous and in order, and every S3 migration is
-  // registered unreviewed and applied nowhere.
+  // registered in a consistent lifecycle state.
   const s2 = files.indexOf(S2_LAST);
   assert.ok(s2 >= 0, "S2 migrations are present");
   assert.deepEqual(files.slice(s2 + 1, s2 + 1 + S3_MIGRATIONS.length), [
@@ -438,8 +439,7 @@ function applyMigrations() {
       (migration) => migration.artifact_path === `supabase/migrations/${file}`,
     );
     assert.ok(row, `${file} is registered`);
-    assert.equal(row.reviewed, false);
-    assert.equal(row.applied_environment, "none");
+    assertRegisteredLifecycle(row);
   }
   sql(ROLES, "postgres");
   sql(FIXTURE(DB), "postgres");
@@ -795,7 +795,7 @@ const P1_COLUMNS = Object.freeze({
 
 async function migrationChecks() {
   await check(
-    "MIG-1 the three S3 migrations apply after S2, in order, registered unreviewed and applied nowhere; without a storage schema the bucket step is skipped cleanly; no relation and no column is added to any relation S3 uses (later: exactly the PS-A5 lineage column of documents, MVP-001 S10)",
+    "MIG-1 the three S3 migrations apply after S2, in order, registered in a consistent lifecycle state; without a storage schema the bucket step is skipped cleanly; no relation and no column is added to any relation S3 uses (later: exactly the PS-A5 lineage column of documents, MVP-001 S10)",
     () => {
       assert.deepEqual(report.migrations.notices[S3_MIGRATIONS[0]], [
         "MVP-001 S3: no storage schema in this database; the private bucket is not created",
@@ -2247,7 +2247,7 @@ function changedRelations(before, after) {
 
 async function v2MigrationChecks() {
   await check(
-    "V2-MIG-1 the four S3 part 2 migrations follow the S3 part 1 migrations, in order, registered unreviewed (sequences 28 to 31) and applied nowhere; they add no relation, column, row policy, type, capability or policy type, and the columns of every relation they use are the P1 columns",
+    "V2-MIG-1 the four S3 part 2 migrations follow the S3 part 1 migrations, in order, registered (sequences 28 to 31) in a consistent lifecycle state; they add no relation, column, row policy, type, capability or policy type, and the columns of every relation they use are the P1 columns",
     () => {
       const files = migrationFiles();
       const at = files.indexOf(S3_MIGRATIONS[S3_MIGRATIONS.length - 1]);
@@ -2269,8 +2269,7 @@ async function v2MigrationChecks() {
         );
         assert.ok(row, file);
         assert.equal(row.sequence, 28 + index);
-        assert.equal(row.reviewed, false);
-        assert.equal(row.applied_environment, "none");
+        assertRegisteredLifecycle(row);
       });
       for (const file of V2_MIGRATIONS) {
         const text = fs.readFileSync(path.join(MIGRATIONS, file), "utf8");
