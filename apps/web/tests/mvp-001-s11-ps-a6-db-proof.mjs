@@ -3421,6 +3421,87 @@ async function dataRequestChecks() {
       return outcomes;
     },
   );
+
+  await check(
+    "DR-7 (PS-A6 section 3 rule 5; independent check of the review corrections) the Legal Hold rule matches the requester's Resources against the holds in one pass, not one coverage evaluation per Resource: for a client whose Consultation holds 8,000 documents of the attorney, with 400 unreleased holds on other subjects, one evaluation of the rule calls resource_under_legal_hold zero times and executes in under one second (the per-Resource form called it once per Resource and took seconds at this size, while the decision held the SHARE lock that placing and releasing a hold wait on for at most 3 seconds), and the rule does not apply; a user hold on the attorney then makes it apply, in agreement with resource_under_legal_hold for every one of those Resources, and after its release it does not",
+    () => {
+      const k = readyConsultation("S");
+      // Owner fixtures (synthetic): the attorney's documents in the
+      // Consultation, and unreleased holds whose scopes name nothing here.
+      sql(
+        `insert into public.resources (id, resource_kind, owner_user_id, intake_id, consultation_id, storage_bucket, storage_object_path, mime_type, byte_size, content_digest, visibility_state, retention_state)
+         select x.id, 'document', '${k.lawyer.user}', null, '${k.consultation}', 'rosuno-private-resources', 'resources/' || x.id || '/original', 'application/pdf', 100, 'sha256:' || encode(sha256(convert_to(x.id::text, 'UTF8')), 'hex'), 'available', 'active'
+         from (select gen_random_uuid() as id from generate_series(1, 8000)) as x;`,
+      );
+      const unrelated = sql(
+        `with placed as (
+           insert into public.legal_holds (scope_type, scope_id, status, reason, started_at, created_by_user_id)
+           select 'resource', gen_random_uuid(), 'active', 'Synthetic unrelated hold', clock_timestamp(), '${world.holds.user}'
+           from generate_series(1, 400)
+           returning id
+         )
+         select string_agg(id::text, ',') from placed;`,
+      ).split(",");
+      assert.equal(unrelated.length, 400);
+      const rule = () =>
+        sql(`select public.data_request_legal_hold_applies('${k.client.user}');`);
+      const executionMs = () => {
+        const plan = JSON.parse(
+          sql(
+            `explain (analyze, format json) select public.data_request_legal_hold_applies('${k.client.user}');`,
+          ),
+        );
+        return plan[0]["Execution Time"];
+      };
+      // The calls of the per-Resource coverage function made by one
+      // evaluation of the rule, counted in its own transaction.
+      const coverageCalls = () =>
+        sql(
+          `set track_functions = 'all';
+           begin;
+           select public.data_request_legal_hold_applies('${k.client.user}') is not null as evaluated \\gset
+           select coalesce(pg_stat_get_xact_function_calls('public.resource_under_legal_hold(uuid)'::regprocedure), 0);
+           commit;`,
+        );
+      rule();
+      const calls = coverageCalls();
+      const free = Math.min(executionMs(), executionMs(), executionMs());
+      const freeRule = rule();
+      const placed = placeHold(world.holds, "user", k.lawyer.user);
+      assert.equal(placed.outcome, "placed");
+      const held = agreement(k.client.user);
+      const heldMs = Math.min(executionMs(), executionMs(), executionMs());
+      assert.equal(releaseHold(world.holds, placed.hold), "released");
+      const released = agreement(k.client.user);
+      sql(
+        `update public.legal_holds set status = 'released', released_at = clock_timestamp(), released_by_user_id = '${world.holds.user}'
+         where id in (${unrelated.map((hold) => lit(hold)).join(", ")});`,
+      );
+      const outcome = {
+        coverage_calls: calls,
+        free_rule: freeRule,
+        free_under_one_second: free < 1000,
+        held_resources: held.resources,
+        held_count: held.held,
+        held_rule: held.rule,
+        held_under_one_second: heldMs < 1000,
+        released_held: released.held,
+        released_rule: released.rule,
+      };
+      assert.deepEqual(outcome, {
+        coverage_calls: "0",
+        free_rule: "f",
+        free_under_one_second: true,
+        held_resources: 8000,
+        held_count: 8000,
+        held_rule: true,
+        held_under_one_second: true,
+        released_held: 0,
+        released_rule: false,
+      });
+      return { ...outcome, free_ms: free, held_ms: heldMs };
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -30,9 +30,10 @@
 -- Consultation or a Referral of the requester (of the requester's Intakes, or one in which the requester is the
 -- attorney). Besides, such a Resource counts whenever the house resource coverage (resource_under_legal_hold,
 -- 20261127050000) reports it held, so a user hold on the counterparty of a Consultation or a hold on a verification
--- finding covers the request as it covers the Resource. The check runs in the guard (every role) and, first, in the
--- decision command, which takes a SHARE lock on public.legal_holds for that one decision so a hold placed or released
--- concurrently is decided before it.
+-- finding covers the request as it covers the Resource; those Resource scopes are gathered once and matched against
+-- the holds in one pass (not one coverage evaluation per Resource). The check runs in the guard (every role) and,
+-- first, in the decision command, which takes a SHARE lock on public.legal_holds for that one decision so a hold
+-- placed or released concurrently is decided before it.
 --
 -- Commands and reads (EXECUTE for authenticated only; security definer; search_path pinned; fixed outcomes; audited
 -- with codes and identifiers only, never the details):
@@ -174,6 +175,53 @@ as $function$
       where k.complainant_user_id = p_user_id
         or k.consultation_id in (select o.id from own_consultations as o)
         or k.referral_id in (select o.id from own_referrals as o)
+    ),
+    -- The requester's Resources, and the scopes resource_under_legal_hold (20261127050000) matches a hold against
+    -- for any of them, gathered once (one pass over the holds, never one evaluation per Resource).
+    own_resources as materialized (
+      select r.id, r.intake_id, r.consultation_id, r.owner_user_id
+      from public.resources as r
+      where r.owner_user_id = p_user_id
+        or r.intake_id in (select o.id from own_intakes as o)
+        or r.consultation_id in (select o.id from own_consultations as o)
+    ),
+    resource_any_scopes as (
+      select o.id from own_resources as o
+      union
+      select o.intake_id from own_resources as o where o.intake_id is not null
+      union
+      select o.consultation_id from own_resources as o where o.consultation_id is not null
+      union
+      select e.id
+      from public.verification_evidence as e
+      where e.source_type = 'uploaded_artifact'
+        and e.source_reference in (select o.id::text from own_resources as o)
+    ),
+    resource_case_scopes as (
+      select k.id
+      from public.complaint_cases as k
+      where k.consultation_id in (
+        select o.consultation_id from own_resources as o where o.consultation_id is not null
+      )
+    ),
+    resource_consultation_users as (
+      select cp.user_id as client_user_id, ap.user_id as attorney_user_id
+      from public.consultations as c
+      join public.client_profiles as cp on cp.id = c.client_id
+      join public.attorney_profiles as ap on ap.id = c.attorney_id
+      where c.id in (select o.consultation_id from own_resources as o where o.consultation_id is not null)
+    ),
+    resource_user_scopes as (
+      select o.owner_user_id as id from own_resources as o where o.owner_user_id is not null
+      union
+      select cp.user_id
+      from public.intakes as i
+      join public.client_profiles as cp on cp.id = i.client_id
+      where i.id in (select o.intake_id from own_resources as o where o.intake_id is not null)
+      union
+      select u.client_user_id from resource_consultation_users as u
+      union
+      select u.attorney_user_id from resource_consultation_users as u
     )
   select p_user_id is not null and (
     exists (
@@ -184,13 +232,13 @@ as $function$
     )
     or exists (
       select 1
-      from public.resources as r
-      where (
-          r.owner_user_id = p_user_id
-          or r.intake_id in (select o.id from own_intakes as o)
-          or r.consultation_id in (select o.id from own_consultations as o)
+      from public.legal_holds as h
+      where (h.released_at is null or h.released_at > statement_timestamp())
+        and (
+          h.scope_id in (select a.id from resource_any_scopes as a)
+          or (h.scope_type = 'complaint_case' and h.scope_id in (select k.id from resource_case_scopes as k))
+          or (h.scope_type = 'user' and h.scope_id in (select u.id from resource_user_scopes as u))
         )
-        and public.resource_under_legal_hold(r.id)
     )
   );
 $function$;

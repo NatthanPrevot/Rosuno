@@ -132,7 +132,15 @@ export function GrantDecisions({ children }: { readonly children: ReactNode }) {
       }}
     >
       <Stack>
-        {last === null ? null : (
+        {last === null ? (
+          // Before hydration (or without scripts) no submission is noted
+          // here; at most one action has an outcome then, and an idle state
+          // shows nothing.
+          <>
+            <Outcome state={approved} />
+            <Outcome state={revoked} />
+          </>
+        ) : (
           <Outcome state={last === "approve" ? approved : revoked} />
         )}
         {children}

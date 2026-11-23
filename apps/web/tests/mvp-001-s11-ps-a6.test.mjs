@@ -774,6 +774,13 @@ test("PSA6-9 (review corrections) the approval and revocation forms of the break
   assert.ok(decisions.includes("approveBreakGlassAction"));
   assert.ok(decisions.includes("revokeBreakGlassAction"));
   assert.ok(decisions.indexOf("<Outcome") < decisions.indexOf("{children}"));
+  // Before hydration (or without scripts) no submission is noted, so the
+  // slot shows whichever action has an outcome (an idle state shows nothing).
+  const fallback = decisions.indexOf("last === null ? (");
+  assert.ok(fallback > 0);
+  assert.ok(decisions.indexOf("<Outcome state={approved} />", fallback) > fallback);
+  assert.ok(decisions.indexOf("<Outcome state={revoked} />", fallback) > fallback);
+  assert.ok(decisions.indexOf("<Outcome state={revoked} />") < decisions.indexOf("{children}"));
   for (const name of ["ApproveAccessForm", "RevokeAccessForm"]) {
     assert.doesNotMatch(bodyOf(name), /useActionState|<Outcome|Action\b/, name);
   }
