@@ -3,3 +3,11 @@
 
 # No need to store the pnpm store twice.
 .local
+
+# P2-922: a deployment image never carries private authority, Builder residue
+# or local secrets, even when built from an unclean workspace.
+rosuno-authority/
+.rosuno/
+tmp/
+.env
+.env.*

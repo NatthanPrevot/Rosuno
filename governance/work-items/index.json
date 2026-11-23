@@ -2707,6 +2707,58 @@
       "rollback_reference": "Repository code only; no migration or database effect. A defect is corrected by forward commits under a separately authorized work item; merged history is never rewritten.",
       "created_at": "2026-11-17T01:40:55Z",
       "updated_at": "2026-11-17T01:40:55Z"
+    },
+    {
+      "work_item_id": "WI-P2-922-REPLIT-STAGING-HOSTING",
+      "title": "Replit Staging hosting configuration (P2-922 PROCESS)",
+      "objective": "Make owner main deployable to a fresh private Replit Autoscale app as Rosuno Staging, without changing application code, the database, dependencies or secrets, and record the owner's Replit reconciliation.",
+      "in_scope": [
+        ".replit: keep modules, workflows and agent sections byte-for-byte; add an Autoscale deployment section (build: pnpm install --frozen-lockfile && pnpm run build; run: pnpm --filter @rosuno/web exec next start --hostname 0.0.0.0 --port 3000) and one port mapping (3000 to 80).",
+        ".replitignore: keep .local and exclude rosuno-authority/, .rosuno/, tmp/, .env and .env.* from deployment images.",
+        "replit.md: the hosting contract (Replit's role, clean owner-main checkouts only, no Replit edits or pushes, Staging-only secret names, build and run commands, worker schedule and webhook paths).",
+        "Records: this work item, its decision, and the two Replit rows of governance/readiness/outstanding-items.md."
+      ],
+      "out_of_scope": [
+        "Creating, importing, configuring or publishing any Replit app; entering secrets; changing the existing Replit workspace.",
+        "Supabase Staging configuration (Auth site URL, redirect allow-list, email template, TOTP), the worker scheduler app, provider webhook registration, custom domains, and any Production or OLD project.",
+        "Application code, dependencies, lockfile, migrations, validators, guard, CI, environment-contract files and locked authority."
+      ],
+      "status": "in_progress",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "decision_refs": ["DEC-20261123-P2-922-REPLIT-STAGING-HOSTING"],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "The net diff against owner main is limited to the Packet copy, .replit, .replitignore, replit.md, governance/decision-log.json, governance/work-items/index.json and governance/readiness/outstanding-items.md.",
+        "The original .replit bytes remain an exact prefix of the new file, which parses as TOML with deploymentTarget autoscale, the build and run commands above and one port mapping; no environment value, secret or project identifier is present.",
+        "The exact build and run commands pass a local production-mode smoke test with no secrets: the server answers on the configured port with the security headers, and an unconfigured worker route fails closed.",
+        "All validation commands pass and the guard self-check prints ROSUNO-GUARD PASS."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "bash .github/scripts/rosuno-guard.sh <owner main SHA> HEAD wi/P2-922-replit-staging-hosting refs/rosuno/approved"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Before merge, close the PR. After merge, a forward-only PR restores the previous .replit, .replitignore and replit.md, and the owner unpublishes or deletes the new Replit app; no database or application change exists to undo.",
+      "created_at": "2026-11-23T16:29:13Z",
+      "updated_at": "2026-11-23T16:29:13Z"
     }
   ]
 }
