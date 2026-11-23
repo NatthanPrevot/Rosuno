@@ -65,6 +65,11 @@ export const BREAK_GLASS_NOTE =
 export const BREAK_GLASS_ACCESS_NOTE =
   "Read-only break-glass access. This view is recorded each time it is opened. Document contents are not available here.";
 
+// The refusal of the break-glass pages to a caller without an active Staff
+// Profile (the surface needs that profile, not a capability).
+export const BREAK_GLASS_STAFF_REQUIRED =
+  "Break-glass access is available only to staff members with an active staff profile. This account does not have one.";
+
 export const BREAK_GLASS_NOT_ACTIVE =
   "This break-glass access is not available: it is not one of your grants, it has not been approved, or it has expired or been revoked.";
 
@@ -83,7 +88,7 @@ export const GRANT_MESSAGES: Readonly<Record<GrantActionOutcome, Message>> =
     access_approved: {
       tone: "success",
       title: "Access approved",
-      body: "The access is active until the time shown.",
+      body: "The access is active for the duration you chose. It is listed under Active.",
     },
     own_request: {
       tone: "warning",
@@ -155,6 +160,10 @@ export const OUTCOME_LABELS: Readonly<Record<OutcomeCode, string>> =
     deferred: "Deferred",
     denied: "Denied",
   });
+
+// The client's list names the decision field as a record only (recording a
+// decision changes no data; PS-A6 section 3 rule 4).
+export const RECORDED_DECISION_LABEL = "Recorded decision";
 
 export const ACCOUNT_STATE_LABELS: Readonly<Record<AccountState, string>> =
   Object.freeze({

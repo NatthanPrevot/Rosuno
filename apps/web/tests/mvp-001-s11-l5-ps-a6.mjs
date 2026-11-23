@@ -515,14 +515,18 @@ insert into public.capability_grants (user_id, capability_code, granted_by_user_
   await app.page.fill(`#break-glass-minutes-${grantId}`, "30");
   await click(app.page, "Approve", grantForm(app.page));
   const approveAlerts = await alerts(app.page);
+  // The page is refreshed: the approved grant leaves the requested list
+  // (nothing offers to refuse it any more) while the message stays in view.
+  const stillOffered = await grantForm(app.page).count();
   const approved = sql(`select (approved_by_user_id = '${approver.userId}')::text || ':' || round(extract(epoch from expires_at - approved_at))::text from public.break_glass_grants where id = '${grantId}';`);
   step(
-    "a staff member without any capability finds break-glass access on the staff home and requests it for one consultation with a reason; another staff member holding approve_break_glass sees the request with its reason in the queue and approves it for 30 minutes",
-    { homeLinksBreakGlass: homeLinks.includes("/staff/break-glass"), requestAlerts, queued, approveAlerts, approved },
+    "a staff member without any capability finds break-glass access on the staff home and requests it for one consultation with a reason; another staff member holding approve_break_glass sees the request with its reason in the queue and approves it for 30 minutes; the page is refreshed, so the approved request leaves the requested list while the approval message stays in view",
+    { homeLinksBreakGlass: homeLinks.includes("/staff/break-glass"), requestAlerts, queued, approveAlerts, stillOffered, approved },
     homeLinks.includes("/staff/break-glass") &&
       requestAlerts.includes("Access requested") &&
       queued &&
       approveAlerts.includes("Access approved") &&
+      stillOffered === 0 &&
       approved === "true:1800" &&
       requesterForms >= 1,
   );
@@ -542,13 +546,15 @@ insert into public.capability_grants (user_id, capability_code, granted_by_user_
   await go(app.page, `${BASE}/staff/break-glass?state=active`);
   await click(app.page, "Revoke the access", grantForm(app.page));
   const revokeAlerts = await alerts(app.page);
+  const stillActive = await grantForm(app.page).count();
   await go(req.page, `${BASE}/staff/break-glass/${grantId}`);
   const afterText = await textOf(req.page);
   const afterAccess = auditCount("break_glass.accessed", grantId);
   step(
-    "the approver revokes the active access; the requester's next opening shows the fixed not-available message, no consultation data, and nothing is audited",
-    { revokeAlerts, notAvailable: afterText.includes("This break-glass access is not available"), leaksMessage: afterText.includes(MESSAGE), afterAccess, revoked: sql(`select revoked_at is not null from public.break_glass_grants where id = '${grantId}';`) },
+    "the approver revokes the active access (it leaves the active list while the message stays in view); the requester's next opening shows the fixed not-available message, no consultation data, and nothing is audited",
+    { revokeAlerts, stillActive, notAvailable: afterText.includes("This break-glass access is not available"), leaksMessage: afterText.includes(MESSAGE), afterAccess, revoked: sql(`select revoked_at is not null from public.break_glass_grants where id = '${grantId}';`) },
     revokeAlerts.includes("Access ended") &&
+      stillActive === 0 &&
       afterText.includes("This break-glass access is not available") &&
       !afterText.includes(MESSAGE) &&
       afterAccess === 2,
@@ -611,7 +617,8 @@ insert into public.capability_grants (user_id, capability_code, granted_by_user_
   const decided = sql(`select state || ':' || outcome_code from public.data_requests where id = '${deletion}';`);
   const clientAccount = sql(`select account_state from public.users where id = '${client.userId}';`);
   await go(me.page, `${BASE}/client/privacy`);
-  const clientSees = (await textOf(me.page)).includes("Decision: Allowed");
+  // MVP-001 S11 PS-A6 review correction: the field is the recorded decision.
+  const clientSees = (await textOf(me.page)).includes("Recorded decision: Allowed");
   await me.page.selectOption("#data-request-type", "export");
   await click(me.page, "Submit the request");
   await go(me.page, `${BASE}/client/privacy`);

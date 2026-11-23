@@ -1013,6 +1013,25 @@ test("S11-11. a client reports a problem about none or one of their own Consulta
     ).status,
     "ready",
   );
+  // MVP-001 S11 PS-A6 review correction: the statement is bounded in code
+  // points (char_length): 15,000 astral characters (30,000 UTF-16 units)
+  // render; 20,001 do not.
+  for (const [count, status] of [
+    [15000, "ready"],
+    [20001, "unavailable"],
+  ]) {
+    assert.equal(
+      (
+        await resolveClientComplaints(
+          complaintWorld({
+            mine: rows([{ ...own, statement: "\u{1F600}".repeat(count) }]),
+          }).client,
+        )
+      ).status,
+      status,
+      String(count),
+    );
+  }
   for (const row of [
     { ...own, state: "resolved" },
     { ...own, assigned_to_user_id: USER },
@@ -1219,11 +1238,33 @@ test("S11-15. every action outcome has a fixed message; nothing promises a refun
     labels.COMPLAINT_NOTE,
     labels.HOLD_NOTE,
     labels.PUBLIC_REVIEWS_NOTE,
+    // MVP-001 S11 PS-A6 section 5: the statement hint of the report forms.
+    labels.COMPLAINT_STATEMENT_HINT,
   ]);
   assert.doesNotMatch(
     text,
     /will be refunded|you will be charged|refund is due|daily|recommend|best attorney|approved by|licensed by|regulator/i,
   );
+  // MVP-001 S11 PS-A6 section 5 (Packet rule 11): the statement hint promises
+  // nothing about who sees the statement, and both report forms take it from
+  // this module (no inline wording).
+  assert.doesNotMatch(
+    labels.COMPLAINT_STATEMENT_HINT,
+    /seen|only by|confidential|private|never|shared|staff/i,
+  );
+  for (const file of [
+    "app/client/complaints/forms.tsx",
+    "app/attorney/complaints/forms.tsx",
+  ]) {
+    const source = read(file);
+    assert.ok(
+      source.includes(
+        "hint={`${COMPLAINT_STATEMENT_HINT} At most ${MAX_STATEMENT.toLocaleString(\"en-US\")} characters.`}",
+      ),
+      file,
+    );
+    assert.doesNotMatch(source, /Seen only|only by you/, file);
+  }
   for (const table of tables) {
     for (const message of Object.values(table)) {
       assert.ok(message.title.length > 0 && message.body.length > 0);

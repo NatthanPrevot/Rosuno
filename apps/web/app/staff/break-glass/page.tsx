@@ -24,6 +24,7 @@ import {
 import { BREAK_GLASS_SOURCES } from "../../../src/infrastructure/privacy/privacy-adapter.ts";
 import { utcText } from "../../../src/presentation/completion-labels.ts";
 import {
+  Alert,
   ButtonLink,
   Cluster,
   Heading,
@@ -34,12 +35,14 @@ import {
 } from "../../../src/presentation/design-system.tsx";
 import {
   BREAK_GLASS_NOTE,
+  BREAK_GLASS_STAFF_REQUIRED,
   GRANT_STATE_LABELS,
 } from "../../../src/presentation/privacy-labels.ts";
 import { requireSteppedUp } from "../../account/gate.ts";
 import { BackLink, refusalPage, StaffFrame } from "../frame.tsx";
 import {
   ApproveAccessForm,
+  GrantDecisions,
   RequestAccessForm,
   RevokeAccessForm,
 } from "./forms.tsx";
@@ -79,6 +82,17 @@ export default async function BreakGlassPage({
     state,
     page,
   );
+  if (view.status === "denied") {
+    // The surface needs an active Staff Profile, not a capability.
+    return (
+      <StaffFrame eyebrow="Security" title="Break-glass access not available">
+        <Alert tone="warning" title="No access" role="status">
+          {BREAK_GLASS_STAFF_REQUIRED}
+        </Alert>
+        <BackLink href="/staff">Staff tools</BackLink>
+      </StaffFrame>
+    );
+  }
   if (view.status !== "ready") {
     return refusalPage(view, "/staff/break-glass", "Break-glass access");
   }
@@ -145,50 +159,52 @@ export default async function BreakGlassPage({
               </ButtonLink>
             ))}
           </Cluster>
-          {queue.grants.length === 0 ? (
-            <Text>
-              {queue.pager.page === 1
-                ? "There is nothing in this list."
-                : "There is nothing on this page."}
-            </Text>
-          ) : (
-            queue.grants.map((grant) => (
-              <Surface key={grant.id} labelledBy={`grant-${grant.id}`}>
-                <Stack gap="tight">
-                  <Heading as="h3" size="sm" id={`grant-${grant.id}`}>
-                    {`Consultation ${grant.resourceId}`}
-                  </Heading>
-                  <Cluster>
-                    <Status tone={GRANT_STATE_LABELS[grant.state].tone}>
-                      {GRANT_STATE_LABELS[grant.state].label}
-                    </Status>
-                    {grant.requestedByMe ? (
-                      <Status tone="neutral">Requested by you</Status>
+          <GrantDecisions>
+            {queue.grants.length === 0 ? (
+              <Text>
+                {queue.pager.page === 1
+                  ? "There is nothing in this list."
+                  : "There is nothing on this page."}
+              </Text>
+            ) : (
+              queue.grants.map((grant) => (
+                <Surface key={grant.id} labelledBy={`grant-${grant.id}`}>
+                  <Stack gap="tight">
+                    <Heading as="h3" size="sm" id={`grant-${grant.id}`}>
+                      {`Consultation ${grant.resourceId}`}
+                    </Heading>
+                    <Cluster>
+                      <Status tone={GRANT_STATE_LABELS[grant.state].tone}>
+                        {GRANT_STATE_LABELS[grant.state].label}
+                      </Status>
+                      {grant.requestedByMe ? (
+                        <Status tone="neutral">Requested by you</Status>
+                      ) : null}
+                    </Cluster>
+                    <Text size="small">{`Reason: ${grant.reason}`}</Text>
+                    <Text size="small" tone="muted">
+                      {timesOf(grant)}
+                    </Text>
+                    {grant.state === "requested" && !grant.requestedByMe ? (
+                      <ApproveAccessForm grant={grant.id} />
                     ) : null}
-                  </Cluster>
-                  <Text size="small">{`Reason: ${grant.reason}`}</Text>
-                  <Text size="small" tone="muted">
-                    {timesOf(grant)}
-                  </Text>
-                  {grant.state === "requested" && !grant.requestedByMe ? (
-                    <ApproveAccessForm grant={grant.id} />
-                  ) : null}
-                  {grant.state === "requested" ? (
-                    <RevokeAccessForm
-                      grant={grant.id}
-                      label="Refuse the request"
-                    />
-                  ) : null}
-                  {grant.state === "active" ? (
-                    <RevokeAccessForm
-                      grant={grant.id}
-                      label="Revoke the access"
-                    />
-                  ) : null}
-                </Stack>
-              </Surface>
-            ))
-          )}
+                    {grant.state === "requested" ? (
+                      <RevokeAccessForm
+                        grant={grant.id}
+                        label="Refuse the request"
+                      />
+                    ) : null}
+                    {grant.state === "active" ? (
+                      <RevokeAccessForm
+                        grant={grant.id}
+                        label="Revoke the access"
+                      />
+                    ) : null}
+                  </Stack>
+                </Surface>
+              ))
+            )}
+          </GrantDecisions>
           <Cluster>
             {queue.pager.page > 1 ? (
               <ButtonLink

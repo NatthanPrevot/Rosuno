@@ -15,8 +15,9 @@
 -- - the Domain Model state is computed from the recorded columns whenever it is read (break_glass_state; PS-A6 section
 --   2 rule 2; PS P3): there is no state column and no scheduled job;
 -- - the three approval columns (approved_by_user_id, approved_at, expires_at) are written in one change and never
---   rewritten; approver and requester differ; the expiry falls after the approval instant and no more than 24 hours
---   later (PS-A6 section 2 rule 3);
+--   rewritten, and never once a revocation is recorded; approver and requester differ; the approval instant is not
+--   before requested_at and not later than the moment it is written; the expiry falls after the approval instant and
+--   no more than 24 hours later (PS-A6 section 2 rule 3);
 -- - the two revocation columns are written in one change, never rewritten, and not before requested_at (rule 4);
 -- - the reason holds between 1 and 2,000 characters, not only whitespace (rule 5);
 -- - rows are never deleted or truncated, and the requester, resource, reason, request instant, identifier and creation
@@ -90,7 +91,11 @@ create table public.break_glass_grants (
       and (approved_by_user_id is null or approved_by_user_id <> requested_by_user_id)
       and (
         approved_at is null
-        or (expires_at > approved_at and expires_at <= approved_at + interval '24 hours')
+        or (
+          approved_at >= requested_at
+          and expires_at > approved_at
+          and expires_at <= approved_at + interval '24 hours'
+        )
       )
     ),
   constraint break_glass_grants_revocation_v1_check
@@ -209,6 +214,21 @@ begin
      ) then
     raise exception 'a break-glass grant is approved once'
       using errcode = '55000';
+  end if;
+  if old.revoked_at is not null
+     and (
+       new.approved_by_user_id is distinct from old.approved_by_user_id
+       or new.approved_at is distinct from old.approved_at
+       or new.expires_at is distinct from old.expires_at
+     ) then
+    raise exception 'a revoked break-glass grant is never approved'
+      using errcode = '55000';
+  end if;
+  if old.approved_at is null
+     and new.approved_at is not null
+     and new.approved_at > clock_timestamp() then
+    raise exception 'a break-glass approval is not recorded ahead of its instant'
+      using errcode = '23514';
   end if;
   if old.revoked_at is not null
      and (

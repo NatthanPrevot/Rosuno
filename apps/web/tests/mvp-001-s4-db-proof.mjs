@@ -475,6 +475,9 @@ function applyMigrations() {
     "20261127190000_mvp_001_s11_break_glass.sql",
     "20261127200000_mvp_001_s11_data_requests.sql",
     "20261127210000_mvp_001_s11_complaint_configuration.sql",
+    // MVP-001 S11: the offered-start correction (registered and checked by
+    // the S6 proof).
+    "20261127220000_mvp_001_s11_offered_start_containment.sql",
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

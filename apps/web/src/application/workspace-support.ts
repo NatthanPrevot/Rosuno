@@ -221,3 +221,11 @@ const CODE = /^[a-z][a-z0-9_]{1,63}$/;
 export function isCode(value: unknown): value is string {
   return typeof value === "string" && CODE.test(value);
 }
+
+// Whether text read from the database is within a bound the database states in
+// characters (char_length counts Unicode code points). A string within the
+// bound in UTF-16 units is within it in code points; only a longer one (an
+// astral character takes two units) is counted.
+export function withinCharacters(value: string, maximum: number): boolean {
+  return value.length <= maximum || [...value].length <= maximum;
+}

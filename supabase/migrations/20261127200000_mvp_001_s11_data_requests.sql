@@ -27,15 +27,20 @@
 -- says (an unknown vocabulary fails closed, as S3), when its scope id is the requester's User, an Intake of the
 -- requester's Client Profile, a Consultation in which the requester is the client or the attorney, a Resource the
 -- requester owns or of such an Intake or Consultation, or a Complaint Case the requester opened or that links such a
--- Consultation. The check runs in the guard (every role) and, first, in the decision command, which takes a SHARE lock
--- on public.legal_holds for that one decision so a hold placed or released concurrently is decided before it.
+-- Consultation or a Referral of the requester (of the requester's Intakes, or one in which the requester is the
+-- attorney). Besides, such a Resource counts whenever the house resource coverage (resource_under_legal_hold,
+-- 20261127050000) reports it held, so a user hold on the counterparty of a Consultation or a hold on a verification
+-- finding covers the request as it covers the Resource. The check runs in the guard (every role) and, first, in the
+-- decision command, which takes a SHARE lock on public.legal_holds for that one decision so a hold placed or released
+-- concurrently is decided before it.
 --
 -- Commands and reads (EXECUTE for authenticated only; security definer; search_path pinned; fixed outcomes; audited
 -- with codes and identifiers only, never the details):
 -- - client_submit_data_request, client_withdraw_data_request and client_data_requests: the existing client admission
---   (an active User with a Client Profile, lock_current_client for the commands, any aal). The requester is always the
---   caller; another client's request and an unknown id answer alike (not_found). A second open request of one type
---   answers already_open and records nothing.
+--   (an active User with a Client Profile, lock_current_client for the commands) and the admission complaint_cases_mine
+--   uses (notification_caller: any aal for a client, aal2 for a User who also holds an Attorney or Staff Profile). The
+--   requester is always the caller; another client's request and an unknown id answer alike (not_found). A second open
+--   request of one type answers already_open and records nothing.
 -- - staff_data_request_queue, staff_data_request, staff_assign_data_request and staff_decide_data_request: staff
 --   holding manage_data_requests as a global grant at aal2 (a data request carries no jurisdiction). The assignee is
 --   always the caller (submitted -> in_review, or taking over a request in review; a repeated assignment to the caller
@@ -144,6 +149,13 @@ as $function$
       join public.attorney_profiles as ap on ap.id = c.attorney_id
       where cp.user_id = p_user_id or ap.user_id = p_user_id
     ),
+    own_referrals as (
+      select f.id
+      from public.referrals as f
+      join public.attorney_profiles as ap on ap.id = f.attorney_id
+      where f.intake_id in (select o.id from own_intakes as o)
+        or ap.user_id = p_user_id
+    ),
     scopes as (
       select p_user_id as id
       union all
@@ -161,12 +173,25 @@ as $function$
       from public.complaint_cases as k
       where k.complainant_user_id = p_user_id
         or k.consultation_id in (select o.id from own_consultations as o)
+        or k.referral_id in (select o.id from own_referrals as o)
     )
-  select p_user_id is not null and exists (
-    select 1
-    from public.legal_holds as h
-    where h.scope_id in (select s.id from scopes as s)
-      and (h.released_at is null or h.released_at > statement_timestamp())
+  select p_user_id is not null and (
+    exists (
+      select 1
+      from public.legal_holds as h
+      where h.scope_id in (select s.id from scopes as s)
+        and (h.released_at is null or h.released_at > statement_timestamp())
+    )
+    or exists (
+      select 1
+      from public.resources as r
+      where (
+          r.owner_user_id = p_user_id
+          or r.intake_id in (select o.id from own_intakes as o)
+          or r.consultation_id in (select o.id from own_consultations as o)
+        )
+        and public.resource_under_legal_hold(r.id)
+    )
   );
 $function$;
 
@@ -246,8 +271,8 @@ revoke all on table public.data_requests
 -- Client commands and read (EXECUTE for authenticated only; the existing client admission).
 -- ---------------------------------------------------------------------------
 
--- Outcomes: submitted (with the new request's id), invalid, denied (not an active client), already_open (an open
--- request of that type exists; nothing is recorded).
+-- Outcomes: submitted (with the new request's id), invalid, denied (not an active client, or a User who also holds an
+-- Attorney or Staff Profile without aal2), already_open (an open request of that type exists; nothing is recorded).
 create function public.client_submit_data_request(p_request_type text, p_details text)
 returns table (outcome text, data_request_id uuid)
 language plpgsql
@@ -270,7 +295,7 @@ begin
     return;
   end if;
   select l.user_id into v_user from public.lock_current_client() as l;
-  if v_user is null then
+  if v_user is null or public.notification_caller() is distinct from v_user then
     return query select 'denied'::text, null::uuid;
     return;
   end if;
@@ -311,7 +336,7 @@ begin
     return 'invalid';
   end if;
   select l.user_id into v_user from public.lock_current_client() as l;
-  if v_user is null then
+  if v_user is null or public.notification_caller() is distinct from v_user then
     return 'denied';
   end if;
   select d.* into v_before
@@ -338,8 +363,8 @@ begin
 end;
 $function$;
 
--- The caller's own requests (an active User with a Client Profile), the most recent first, at most 200, with their
--- details (the requester's own words).
+-- The caller's own requests (an active User with a Client Profile, admitted as complaint_cases_mine admits), the most
+-- recent first, at most 200, with their details (the requester's own words).
 create function public.client_data_requests()
 returns table (
   data_request_id uuid,
@@ -362,6 +387,7 @@ as $function$
   join public.data_requests as d on d.requester_user_id = u.id
   where u.auth_user_id = auth.uid()
     and u.account_state = 'active'
+    and u.id = public.notification_caller()
   order by d.submitted_at desc, d.id
   limit 200;
 $function$;
@@ -589,7 +615,7 @@ comment on column public.data_requests.details is
 comment on column public.data_requests.outcome_code is
   'PS-A6 section 3 rule 3: allowed, restricted, deferred or denied, written with the decision; allowed is refused for a deletion request while a Legal Hold covers the requester (rule 5).';
 comment on function public.data_request_legal_hold_applies(uuid) is
-  'PS-A6 section 3 rule 5 (internal): whether an unreleased Legal Hold (any scope type or status while released_at is unset or in the future) names the User, an Intake of their Client Profile, a Consultation they are the client or attorney of, a Resource they own or of such an Intake or Consultation, or a Complaint Case they opened or that links such a Consultation.';
+  'PS-A6 section 3 rule 5 (internal): whether an unreleased Legal Hold (any scope type or status while released_at is unset or in the future) names the User, an Intake of their Client Profile, a Consultation they are the client or attorney of, a Resource they own or of such an Intake or Consultation, or a Complaint Case they opened or that links such a Consultation or a Referral of theirs; or whether resource_under_legal_hold reports such a Resource held.';
 comment on function public.data_request_guard() is
   'PS-A6 section 3 (every role): refuses deletion and truncation, an insert not in state submitted, any change of the request facts, any move other than submitted to in_review or withdrawn and in_review to decided or withdrawn, any change after a terminal state, and allowed for a deletion request while a Legal Hold covers the requester.';
 comment on function public.client_submit_data_request(text, text) is

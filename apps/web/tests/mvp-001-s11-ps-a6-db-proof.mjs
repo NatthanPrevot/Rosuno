@@ -85,6 +85,11 @@ const PS_A6_MIGRATIONS = Object.freeze([
   "20261127200000_mvp_001_s11_data_requests.sql",
   "20261127210000_mvp_001_s11_complaint_configuration.sql",
 ]);
+// MVP-001 S11: the offered-start correction follows PS-A6 (registered and
+// checked by the S6 proof).
+const S11_OFFERED_START_MIGRATIONS = Object.freeze([
+  "20261127220000_mvp_001_s11_offered_start_containment.sql",
+]);
 const BREAK_GLASS_MIGRATION = PS_A6_MIGRATIONS[0];
 const DATA_REQUEST_MIGRATION = PS_A6_MIGRATIONS[1];
 const COMPLAINT_MIGRATION = PS_A6_MIGRATIONS[2];
@@ -442,7 +447,10 @@ function applyMigrations() {
   // applied nowhere and a Program migration ref.
   const last = files.indexOf(S11_CORRECTIONS_LAST);
   assert.ok(last >= 0, "the S11 review corrections migration is present");
-  assert.deepEqual(files.slice(last + 1), [...PS_A6_MIGRATIONS]);
+  assert.deepEqual(files.slice(last + 1), [
+    ...PS_A6_MIGRATIONS,
+    ...S11_OFFERED_START_MIGRATIONS,
+  ]);
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),
@@ -1776,9 +1784,10 @@ const decideDR = (staff, id, outcome, options = {}) =>
     options,
   );
 const drRow = (id) => rowOf("data_requests", `id = '${id}'`);
-// A data request of a client taken into review by a data request holder.
-function inReview(client, type, staff = world.dataStaff) {
-  const submitted = submitDR(client, type);
+// A data request of a client taken into review by a data request holder (a
+// dual-role requester submits at aal2: options {}).
+function inReview(client, type, staff = world.dataStaff, options = AAL1) {
+  const submitted = submitDR(client, type, null, options);
   assert.equal(submitted.outcome, "submitted", JSON.stringify(submitted));
   assert.equal(assignDR(staff, submitted.id), "applied");
   return submitted.id;
@@ -1879,6 +1888,33 @@ function placeHold(staff, type, id, reason = "Synthetic hold reason") {
 }
 const releaseHold = (staff, hold) =>
   asStaff(staff, `select public.staff_release_legal_hold(${lit(hold)}::uuid);`);
+// For a requester: the number of their resources (owned, or of their own
+// Intakes or Consultations as client or attorney), how many of them
+// resource_under_legal_hold reports held, and the data request rule; the rule
+// applies whenever one of them is held.
+function agreement(user) {
+  const facts = jsonOf(
+    `with own_intakes as (
+       select i.id from public.intakes i join public.client_profiles cp on cp.id = i.client_id where cp.user_id = '${user}'
+     ), own_consultations as (
+       select c.id from public.consultations c
+       join public.client_profiles cp on cp.id = c.client_id
+       join public.attorney_profiles ap on ap.id = c.attorney_id
+       where cp.user_id = '${user}' or ap.user_id = '${user}'
+     ), mine as (
+       select r.id from public.resources r
+       where r.owner_user_id = '${user}'
+         or r.intake_id in (select id from own_intakes)
+         or r.consultation_id in (select id from own_consultations)
+     )
+     select json_build_object(
+       'resources', (select count(*) from mine),
+       'held', (select count(*) from mine where public.resource_under_legal_hold(mine.id)),
+       'rule', public.data_request_legal_hold_applies('${user}'))::text;`,
+  );
+  assert.ok(facts.held === 0 || facts.rule === true, JSON.stringify(facts));
+  return facts;
+}
 
 // Row counts of the business relations a refusal or a decision must leave
 // unchanged.
@@ -2640,7 +2676,7 @@ async function breakGlassChecks() {
   );
 
   await check(
-    "BG-5 (PS-A6 section 2 rule 7) the one break-glass access path answers only the caller's own grant that is active now, for exactly the Consultation it names: its record (state, scheduled times, outcome), its visible Messages (equal to the participants' thread) and its documents' current versions (metadata only), and writes exactly one audit event with the grant's id per access and nothing else; a grant that is requested, expired or revoked, another staff member's grant, an unknown id, the requester at aal1 or without claims, a client and a holder of the approval capability get no row and no audit",
+    "BG-5 (PS-A6 section 2 rule 7) the one break-glass access path answers only the caller's own grant that is active now, for exactly the Consultation it names: its record (state, scheduled times, outcome), its visible Messages (equal to the participants' thread) and its documents' current versions (metadata only), and writes exactly one audit event with the grant's id per access and nothing else; a grant that is requested, expired or revoked, another staff member's grant, an unknown id, the requester at aal1 or without claims, a requester whose Staff Profile was deactivated or whose User was suspended after the approval, a client and a holder of the approval capability get no row and no audit",
     async () => {
       const { requester, grant } = activeGrant(c.consultation);
       const digest = businessDigest();
@@ -2692,6 +2728,23 @@ async function breakGlassChecks() {
       assert.equal(revokeBG(world.approver, revoked.grant), "ended");
       const expiring = activeGrant(c.consultation, 1);
       await untilPast(grantRow(expiring.grant).expires_at);
+      // Approved, then the requester's Staff Profile is deactivated or their
+      // User suspended (owner fixture): the grant still reads active, and it
+      // opens nothing.
+      const deactivatedLater = activeGrant(c.consultation);
+      const suspendedLater = activeGrant(c.consultation);
+      sql(
+        `update public.staff_profiles set staff_state = 'deactivated' where user_id = '${deactivatedLater.requester.user}';
+         update public.users set account_state = 'suspended' where id = '${suspendedLater.requester.user}';`,
+      );
+      for (const later of [deactivatedLater, suspendedLater]) {
+        assert.equal(
+          sql(
+            `select public.break_glass_state(approved_at, expires_at, revoked_at, clock_timestamp()) from public.break_glass_grants where id = '${later.grant}';`,
+          ),
+          "active",
+        );
+      }
       const audits = Number(sql("select count(*) from public.audit_events;"));
       const refused = {
         requested: accessBG(staffWith(), requested.grant).length,
@@ -2706,6 +2759,14 @@ async function breakGlassChecks() {
         unknown: accessBG(requester, uid()).length,
         aal1: accessBG(requester, grant, AAL1).length,
         no_claims: accessBG(requester, grant, NO_CLAIMS).length,
+        deactivated_after_approval: accessBG(
+          deactivatedLater.requester,
+          deactivatedLater.grant,
+        ).length,
+        suspended_after_approval: accessBG(
+          suspendedLater.requester,
+          suspendedLater.grant,
+        ).length,
         client: accessBG(c.client, grant, AAL1).length,
         anon: as("anon", null, `select count(*) from public.staff_break_glass_consultation('${grant}');`),
       };
@@ -2719,6 +2780,8 @@ async function breakGlassChecks() {
         unknown: 0,
         aal1: 0,
         no_claims: 0,
+        deactivated_after_approval: 0,
+        suspended_after_approval: 0,
         client: 0,
         anon: "ERROR 42501",
       });
@@ -2768,7 +2831,7 @@ async function breakGlassChecks() {
   );
 
   await check(
-    "BG-7 (PS-A6 section 2 rules 1 to 6) the guard and constraints hold for every role, the database owner included: a grant is never deleted or truncated; it is recorded as a request (no approval or revocation at insert) naming one existing Consultation with resource_type consultation and a reason that is not blank and holds at most 2,000 characters; the approval triple is set together, once, by someone other than the requester, with an expiry after the approval and at most 24 hours after it; the revocation pair is set together, once, at or after the request; the requester, resource, reason, request instant, identifier and creation instant never change",
+    "BG-7 (PS-A6 section 2 rules 1 to 6) the guard and constraints hold for every role, the database owner included: a grant is never deleted or truncated; it is recorded as a request (no approval or revocation at insert) naming one existing Consultation with resource_type consultation and a reason that is not blank and holds at most 2,000 characters; the approval triple is set together, once, never on a revoked (refused) request, by someone other than the requester, with an approval instant not before the request and not ahead of the moment it is written, and an expiry after the approval and at most 24 hours after it; the revocation pair is set together, once, at or after the request; the requester, resource, reason, request instant, identifier and creation instant never change",
     () => {
       const requester = staffWith();
       const g = requestBG(requester, c.consultation).grant;
@@ -2798,6 +2861,8 @@ async function breakGlassChecks() {
         self_approval: refused(upd(`approved_by_user_id = '${requester.user}', approved_at = now(), expires_at = now() + interval '1 hour'`)),
         over_24h: refused(upd(`approved_by_user_id = '${world.approver.user}', approved_at = now(), expires_at = now() + interval '24 hours 1 second'`)),
         not_after: refused(upd(`approved_by_user_id = '${world.approver.user}', approved_at = now(), expires_at = now()`)),
+        approved_before_request: refused(upd(`approved_by_user_id = '${world.approver.user}', approved_at = requested_at - interval '1 second', expires_at = requested_at + interval '1 hour'`)),
+        approved_in_future: refused(upd(`approved_by_user_id = '${world.approver.user}', approved_at = now() + interval '1 hour', expires_at = now() + interval '2 hours'`)),
         partial_revocation: refused(upd(`revoked_at = now()`)),
         revoked_before_request: refused(upd(`revoked_by_user_id = '${world.approver.user}', revoked_at = requested_at - interval '1 second'`)),
         reason_change: refused(upd("reason = 'Changed reason'")),
@@ -2806,6 +2871,14 @@ async function breakGlassChecks() {
         requested_at_change: refused(upd("requested_at = requested_at - interval '1 second'")),
         created_at_change: refused(upd("created_at = created_at - interval '1 second'")),
       };
+      // A refused request (revoked without an approval) is never approved.
+      const refusedGrant = requestBG(staffWith(), c.consultation).grant;
+      sql(
+        `update public.break_glass_grants set revoked_by_user_id = '${world.approver.user}', revoked_at = now() where id = '${refusedGrant}';`,
+      );
+      outcomes.approve_revoked = refused(
+        `update public.break_glass_grants set approved_by_user_id = '${world.approver.user}', approved_at = now(), expires_at = now() + interval '1 hour' where id = '${refusedGrant}';`,
+      );
       // The owner may record an approval once (exactly 24 hours is the bound)
       // and a revocation once; neither changes again.
       acceptedThenRolledBack(ins());
@@ -2829,6 +2902,8 @@ async function breakGlassChecks() {
         self_approval: "23514",
         over_24h: "23514",
         not_after: "23514",
+        approved_before_request: "23514",
+        approved_in_future: "23514",
         partial_revocation: "23514",
         revoked_before_request: "23514",
         reason_change: "55000",
@@ -2836,6 +2911,7 @@ async function breakGlassChecks() {
         requester_change: "55000",
         requested_at_change: "55000",
         created_at_change: "55000",
+        approve_revoked: "55000",
         approve_twice: "55000",
         unapprove: "55000",
         revoke_twice: "55000",
@@ -2852,7 +2928,7 @@ async function breakGlassChecks() {
 
 async function dataRequestChecks() {
   await check(
-    "DR-1 (PS-A6 section 3 rules 1, 6 and 8) an active client (any aal) submits a request of one of the five types with optional details (trimmed; an empty one is none; at most 20,000 characters): it is recorded submitted with its details and nothing else; one open request per type answers already_open and records nothing (another type is accepted); after a withdrawal the type can be requested again; a malformed type or overlong details are invalid; an attorney without a Client Profile, a staff member, a suspended client and a caller without a User are denied; anon is refused; the submission is audited once with codes only, never the details",
+    "DR-1 (PS-A6 section 3 rules 1, 6 and 8) an active client (any aal) submits a request of one of the five types with optional details (trimmed; an empty one is none; at most 20,000 characters): it is recorded submitted with its details and nothing else; one open request per type answers already_open and records nothing (another type is accepted); after a withdrawal the type can be requested again; a malformed type or overlong details are invalid; an attorney without a Client Profile, a staff member, a suspended client and a caller without a User are denied; anon is refused; the submission is audited once with codes only, never the details; a client who also holds an Attorney or Staff Profile is admitted as complaint_cases_mine admits (aal2 only): at aal1 the submission and the withdrawal are denied and the own list is empty, at aal2 all three are admitted",
     () => {
       const client = newClient();
       const details = "Synthetic details: please correct the synthetic record.";
@@ -2918,7 +2994,52 @@ async function dataRequestChecks() {
         no_user: "denied",
         anon: "ERROR 42501",
       });
-      return outcomes;
+      // Dual role (owner fixture: a Client Profile plus an Attorney or Staff
+      // Profile on one User): admitted at aal2 only, as complaint_cases_mine.
+      const dualAttorney = newClient();
+      sql(
+        `insert into public.attorney_profiles (id, user_id, profile_state, display_name, years_experience) values ('${uid()}', '${dualAttorney.user}', 'approved', 'Synthetic Dual Attorney', 7);`,
+      );
+      const dualStaff = newClient();
+      sql(
+        `insert into public.staff_profiles (user_id, staff_state) values ('${dualStaff.user}', 'active');`,
+      );
+      const dual = {};
+      for (const [key, account] of [
+        ["attorney", dualAttorney],
+        ["staff", dualStaff],
+      ]) {
+        const requests = Number(sql("select count(*) from public.data_requests;"));
+        dual[`${key}_aal1_submit`] = submitDR(account, "access").outcome;
+        assert.equal(
+          Number(sql("select count(*) from public.data_requests;")),
+          requests,
+        );
+        const made = submitDR(account, "access", "Synthetic dual details", {});
+        dual[`${key}_aal2_submit`] = made.outcome;
+        dual[`${key}_aal1_list`] = myDR(account).length;
+        dual[`${key}_aal2_list`] = myDR(account, {}).length;
+        dual[`${key}_aal1_withdraw`] = withdrawDR(account, made.id);
+        dual[`${key}_aal1_state`] = drRow(made.id).state;
+        dual[`${key}_aal2_withdraw`] = withdrawDR(account, made.id, {});
+      }
+      assert.deepEqual(dual, {
+        attorney_aal1_submit: "denied",
+        attorney_aal2_submit: "submitted",
+        attorney_aal1_list: 0,
+        attorney_aal2_list: 1,
+        attorney_aal1_withdraw: "denied",
+        attorney_aal1_state: "submitted",
+        attorney_aal2_withdraw: "withdrawn",
+        staff_aal1_submit: "denied",
+        staff_aal2_submit: "submitted",
+        staff_aal1_list: 0,
+        staff_aal2_list: 1,
+        staff_aal1_withdraw: "denied",
+        staff_aal1_state: "submitted",
+        staff_aal2_withdraw: "withdrawn",
+      });
+      return { ...outcomes, ...dual };
     },
   );
 
@@ -3084,7 +3205,7 @@ async function dataRequestChecks() {
   );
 
   await check(
-    "DR-5 (PS-A6 section 3 rule 5; PM row 48) with an unreleased Legal Hold on the requester's User, Intake, Consultation, owned resource or Complaint Case (the five S11 scope types: user, intake, consultation, resource, complaint_case), recording a deletion request as allowed answers legal_hold and nothing changes; another outcome is recorded; another type may be allowed under the hold; once the hold is released the deletion can be allowed; the guard refuses the same update by the database owner",
+    "DR-5 (PS-A6 section 3 rule 5; PM row 48) with an unreleased Legal Hold on the requester's User, Intake, Consultation, owned resource or Complaint Case (the five S11 scope types: user, intake, consultation, resource, complaint_case), recording a deletion request as allowed answers legal_hold and nothing changes; another outcome is recorded; another type may be allowed under the hold; once the hold is released the deletion can be allowed; the guard refuses the same update by the database owner; the rule also covers what the house resource coverage covers (a user hold on the Consultation's counterparty, for a client and, mirrored, for a dual-role attorney), a hold on the attorney's document in the client's Consultation, and a case the attorney opened about the Consultation or about the client's Referral only; for every fixture resource of the requester the rule agrees with resource_under_legal_hold (a held resource means the rule applies; after release neither does)",
     () => {
       const results = {};
       for (const scope of ["user", "intake", "consultation", "resource", "complaint_case"]) {
@@ -3100,6 +3221,7 @@ async function dataRequestChecks() {
         }[scope];
         const { outcome, hold } = placeHold(world.holds, scope, scopeId);
         assert.equal(outcome, "placed", scope);
+        assert.equal(agreement(s.client.user).rule, true, scope);
         const deletion = inReview(s.client, "deletion");
         const access = inReview(s.client, "access");
         assert.equal(oneDR(world.dataStaff, deletion)[0].legal_hold_applies, true, scope);
@@ -3128,9 +3250,79 @@ async function dataRequestChecks() {
         `insert into public.client_profiles (id, user_id) values ('${uid()}', '${d.lawyer.user}');`,
       );
       const h2 = placeHold(world.holds, "consultation", d.consultation).hold;
-      const attorneyDeletion = inReview(d.lawyer, "deletion");
+      // A dual-role requester is admitted at aal2 only (DB-4 admission).
+      const attorneyDeletion = inReview(d.lawyer, "deletion", world.dataStaff, {});
       results.attorney_consultation = decideDR(world.dataStaff, attorneyDeletion, "allowed");
       releaseHold(world.holds, h2);
+      // Coverage through the house resource rule and the requester's
+      // Referrals: each hold below covers the requester's request while it is
+      // unreleased (legal_hold, staff see legal_hold_applies) and not after.
+      const underHold = (requester, scope, scopeId, options = AAL1) => {
+        const placed = placeHold(world.holds, scope, scopeId);
+        assert.equal(placed.outcome, "placed", `${scope} ${scopeId}`);
+        const held = agreement(requester.user);
+        const deletion = inReview(requester, "deletion", world.dataStaff, options);
+        const applies = oneDR(world.dataStaff, deletion)[0].legal_hold_applies;
+        const decision = decideDR(world.dataStaff, deletion, "allowed");
+        assert.equal(releaseHold(world.holds, placed.hold), "released");
+        const free = agreement(requester.user);
+        const released = oneDR(world.dataStaff, deletion)[0].legal_hold_applies;
+        const afterRelease = decideDR(world.dataStaff, deletion, "allowed");
+        return {
+          applies,
+          decision,
+          released,
+          afterRelease,
+          held_rule: held.rule,
+          free_rule: free.rule,
+          free_held_resources: free.held,
+        };
+      };
+      const covered = {
+        applies: true,
+        decision: "legal_hold",
+        released: false,
+        afterRelease: "applied",
+        held_rule: true,
+        free_rule: false,
+        free_held_resources: 0,
+      };
+      // A user hold on the counterparty (the attorney) covers the client's
+      // Consultation document (resource_under_legal_hold), so it covers the
+      // client's request.
+      const k = readyConsultation("S");
+      const clientDoc = uploadDocument(k.client, k.consultation, AAL1);
+      const attorneyDoc = uploadDocument(k.lawyer, k.consultation);
+      const counterpartyHold = placeHold(world.holds, "user", k.lawyer.user);
+      assert.equal(
+        sql(`select public.resource_under_legal_hold('${clientDoc}');`),
+        "t",
+      );
+      assert.equal(agreement(k.client.user).held, 2);
+      releaseHold(world.holds, counterpartyHold.hold);
+      results.counterparty_user = underHold(k.client, "user", k.lawyer.user);
+      // A hold on the attorney's own document in the client's Consultation.
+      results.attorney_resource = underHold(k.client, "resource", attorneyDoc);
+      // A case the attorney opened about the Consultation, and one the
+      // attorney opened about the Referral only (no Consultation linked).
+      const consultationCase = openComplaint(k.lawyer, { consultation: k.consultation }, {});
+      assert.equal(consultationCase.outcome, "opened");
+      results.attorney_consultation_case = underHold(k.client, "complaint_case", consultationCase.id);
+      const referralCase = openComplaint(k.lawyer, { referral: k.referral }, {});
+      assert.equal(referralCase.outcome, "opened");
+      assert.equal(
+        sql(`select consultation_id is null and referral_id = '${k.referral}' from public.complaint_cases where id = '${referralCase.id}';`),
+        "t",
+      );
+      results.attorney_referral_case = underHold(k.client, "complaint_case", referralCase.id);
+      // The mirror for a dual-role attorney: a user hold on the client covers
+      // the client's document in the attorney's Consultation.
+      const m = readyConsultation("S");
+      uploadDocument(m.client, m.consultation, AAL1);
+      sql(
+        `insert into public.client_profiles (id, user_id) values ('${uid()}', '${m.lawyer.user}');`,
+      );
+      results.dual_counterparty_user = underHold(m.lawyer, "user", m.client.user, {});
       const expected = {
         refusedDecision: "legal_hold",
         owner: "55000",
@@ -3145,6 +3337,11 @@ async function dataRequestChecks() {
         complaint_case: expected,
         denied_under_hold: "applied",
         attorney_consultation: "legal_hold",
+        counterparty_user: covered,
+        attorney_resource: covered,
+        attorney_consultation_case: covered,
+        attorney_referral_case: covered,
+        dual_counterparty_user: covered,
       });
       return results;
     },
@@ -3277,9 +3474,12 @@ function walk(id, activate = true) {
   return steps;
 }
 
+// Distinct lower-snake codes c_1 .. c_n (synthetic).
+const manyCodes = (n) => Array.from({ length: n }, (_, i) => `c_${i + 1}`);
+
 async function complaintChecks() {
   await check(
-    "CV-1 (PS-A6 section 4; PS section 8.4) approval validation: complaint parameters hold only category_codes and resolution_codes, each an array of one or more unique lower-snake codes of 2 to 64 characters; every malformed form is refused before approval; every other policy type keeps its earlier branch",
+    "CV-1 (PS-A6 section 4; PS section 8.4) approval validation: complaint parameters hold only category_codes and resolution_codes, each an array of 1 to 500 unique lower-snake codes of 2 to 64 characters (500 per list: a fixed technical ceiling, 501 refused); every malformed form is refused before approval; every other policy type keeps its earlier branch",
     () => {
       const ok = (p) =>
         sql(
@@ -3301,6 +3501,11 @@ async function complaintChecks() {
         not_list: ok({ category_codes: "ab", resolution_codes: ["cd"] }),
         extra_key: ok({ ...COMPLAINT_CODES, default_code: "ab" }),
         empty: ok({}),
+        // The fixed technical ceiling: 500 codes per list, never 501.
+        most_categories: ok({ category_codes: manyCodes(500), resolution_codes: ["cd"] }),
+        most_resolutions: ok({ category_codes: ["ab"], resolution_codes: manyCodes(500) }),
+        too_many_categories: ok({ category_codes: manyCodes(501), resolution_codes: ["cd"] }),
+        too_many_resolutions: ok({ category_codes: ["ab"], resolution_codes: manyCodes(501) }),
       };
       assert.deepEqual(cases, {
         valid: "truetrue",
@@ -3318,7 +3523,17 @@ async function complaintChecks() {
         not_list: "falsefalse",
         extra_key: "falsefalse",
         empty: "falsefalse",
+        most_categories: "truetrue",
+        most_resolutions: "truetrue",
+        too_many_categories: "falsefalse",
+        too_many_resolutions: "falsefalse",
       });
+      assert.equal(
+        sql(
+          `select public.complaint_parameters_valid(${lit({ category_codes: manyCodes(500), resolution_codes: manyCodes(500) })}::jsonb)::text || public.complaint_parameters_valid(${lit({ category_codes: manyCodes(501), resolution_codes: ["cd"] })}::jsonb)::text;`,
+        ),
+        "truefalse",
+      );
       const others = sql(
         `select concat_ws(',', public.policy_parameters_approvable('retention', null, '{}'::jsonb), public.policy_parameters_approvable('bookability', null, '{}'::jsonb), public.policy_parameters_approvable('bookability', null, '{"presence_window_seconds": 600}'::jsonb), public.policy_parameters_approvable('referral', '${world.J.S}', '{"outcome_codes": ["synthetic_closed"]}'::jsonb), public.policy_parameters_approvable('fee', null, '{}'::jsonb));`,
       );

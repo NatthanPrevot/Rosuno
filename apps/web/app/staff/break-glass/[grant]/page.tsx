@@ -31,6 +31,7 @@ import {
 import {
   BREAK_GLASS_ACCESS_NOTE,
   BREAK_GLASS_NOT_ACTIVE,
+  BREAK_GLASS_STAFF_REQUIRED,
   PARTICIPANT_ROLE_LABELS,
   SHARING_LABELS,
 } from "../../../../src/presentation/privacy-labels.ts";
@@ -62,6 +63,17 @@ export default async function BreakGlassViewPage({
         <Alert tone="warning" title="Not available" role="status">
           {BREAK_GLASS_NOT_ACTIVE}
         </Alert>
+      </StaffFrame>
+    );
+  }
+  if (view.status === "denied") {
+    // The surface needs an active Staff Profile, not a capability.
+    return (
+      <StaffFrame eyebrow="Security" title="Break-glass view not available">
+        <Alert tone="warning" title="No access" role="status">
+          {BREAK_GLASS_STAFF_REQUIRED}
+        </Alert>
+        <BackLink href="/staff">Staff tools</BackLink>
       </StaffFrame>
     );
   }

@@ -125,6 +125,11 @@ const S11_PS_A6_MIGRATIONS = Object.freeze([
   "20261127200000_mvp_001_s11_data_requests.sql",
   "20261127210000_mvp_001_s11_complaint_configuration.sql",
 ]);
+// MVP-001 S11: the offered-start correction follows PS-A6 (registered and
+// checked by the S6 proof).
+const S11_OFFERED_START_MIGRATIONS = Object.freeze([
+  "20261127220000_mvp_001_s11_offered_start_containment.sql",
+]);
 // The one migration that inserts catalog rows (the five capability codes) and
 // the one that creates a relation (the PS section 21.1 reviews relation).
 const S11_INTEGRITY = "20261127010000_mvp_001_s11_completion_integrity.sql";
@@ -487,6 +492,7 @@ function applyMigrations() {
     ...S11_SURFACES_MIGRATIONS,
     ...S11_CORRECTIONS_MIGRATIONS,
     ...S11_PS_A6_MIGRATIONS,
+    ...S11_OFFERED_START_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(

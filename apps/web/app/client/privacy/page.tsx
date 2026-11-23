@@ -44,6 +44,7 @@ import {
 import {
   DATA_REQUEST_NOTE,
   OUTCOME_LABELS,
+  RECORDED_DECISION_LABEL,
   REQUEST_STATE_LABELS,
   REQUEST_TYPE_LABELS,
 } from "../../../src/presentation/privacy-labels.ts";
@@ -163,7 +164,7 @@ export default async function ClientDataPage() {
                 </Status>
                 {request.outcome === null ? null : (
                   <Status tone="neutral">
-                    {`Decision: ${OUTCOME_LABELS[request.outcome]}`}
+                    {`${RECORDED_DECISION_LABEL}: ${OUTCOME_LABELS[request.outcome]}`}
                   </Status>
                 )}
               </Cluster>

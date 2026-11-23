@@ -50,6 +50,7 @@ import {
   type ActionState,
   type CommandAnswer,
   type StaffPager,
+  withinCharacters,
 } from "./workspace-support.ts";
 
 // ---------------------------------------------------------------------------
@@ -222,7 +223,7 @@ const nullableTime = (value: unknown): value is string | null =>
 const isReason = (value: unknown): value is string =>
   typeof value === "string" &&
   value.trim() !== "" &&
-  value.length <= MAX_REASON;
+  withinCharacters(value, MAX_REASON);
 
 export type OwnGrant = {
   readonly id: string;
@@ -332,7 +333,7 @@ function readMessage(value: unknown): AccessMessage | null {
     !isUuid(message.id) ||
     !isOneOf(PARTICIPANT_ROLES, message.senderRole) ||
     typeof message.body !== "string" ||
-    message.body.length > MAX_MESSAGE_BODY ||
+    !withinCharacters(message.body, MAX_MESSAGE_BODY) ||
     !isTimestamp(message.sentAt)
   ) {
     return null;

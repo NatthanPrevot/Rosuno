@@ -63,6 +63,7 @@ import {
   type Admission,
   type CommandAnswer,
   type StaffPager,
+  withinCharacters,
 } from "./workspace-support.ts";
 
 // ---------------------------------------------------------------------------
@@ -257,7 +258,7 @@ const isStatement = (value: unknown): value is string | null =>
   value === null ||
   (typeof value === "string" &&
     value.trim() !== "" &&
-    value.length <= MAX_STATEMENT);
+    withinCharacters(value, MAX_STATEMENT));
 
 function readOwn(row: unknown): OwnComplaint | null {
   const f = readExact(row, OWN_CASE_COLUMNS);

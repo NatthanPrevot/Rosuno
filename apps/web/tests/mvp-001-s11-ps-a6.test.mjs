@@ -69,6 +69,24 @@ function filesIn(directory) {
     .sort();
 }
 
+// The result columns of one function, as its migration declares them.
+const BREAK_GLASS_MIGRATION = "20261127190000_mvp_001_s11_break_glass.sql";
+const DATA_REQUEST_MIGRATION = "20261127200000_mvp_001_s11_data_requests.sql";
+function resultColumnsOf(migration, name) {
+  const source = readFileSync(
+    new URL(`../../../supabase/migrations/${migration}`, import.meta.url),
+    "utf8",
+  );
+  const start = source.indexOf(`create function public.${name}(`);
+  assert.ok(start >= 0, name);
+  const open = source.indexOf("returns table (\n", start);
+  const close = source.indexOf("\n)\n", open);
+  return source
+    .slice(open + "returns table (\n".length, close)
+    .split(",\n")
+    .map((line) => line.trim().split(/\s+/)[0]);
+}
+
 const SUBJECT = "6f1c2d3e-4a5b-4c6d-8e7f-901234567890";
 const USER = "11111111-1111-4111-8111-111111111111";
 const CLIENT = "22222222-2222-4222-8222-222222222222";
@@ -83,6 +101,8 @@ const T = "2026-11-20T10:00:00+00:00";
 const LATER = "2026-11-20T11:00:00+00:00";
 
 const rows = (list) => ({ kind: "rows", rows: list });
+// One astral character: one code point, two UTF-16 units.
+const ASTRAL = "\u{1F600}";
 const answer = (outcome) => ({ kind: "answer", outcome });
 const DEV = rows([{ environment_class: "development", project_ref: null }]);
 
@@ -260,6 +280,12 @@ test("PSA6-1 (PS-A6 section 2) the break-glass page needs an active Staff Profil
     "denied",
   );
   assert.deepEqual(deactivated.calls, []);
+  // The database bounds the reason in code points (char_length): 1,500
+  // astral characters (3,000 UTF-16 units) are a reason; 2,001 are not.
+  const astral = breakGlassWorld({ mine: rows([ownGrant({ reason: ASTRAL.repeat(1500) })]) });
+  assert.equal((await resolveBreakGlassWorkspace(astral.sources, "requested")).status, "ready");
+  const overlong = breakGlassWorld({ mine: rows([ownGrant({ reason: ASTRAL.repeat(2001) })]) });
+  assert.equal((await resolveBreakGlassWorkspace(overlong.sources, "requested")).status, "unavailable");
 });
 
 test("PSA6-2 (PS-A6 section 2 rule 7) the read-only view reads one row strictly through the audited access path: the record, the Messages and the documents' metadata; no row is the fixed not-active answer; a malformed id reads nothing; a malformed or mismatched row is unavailable", async () => {
@@ -291,6 +317,15 @@ test("PSA6-2 (PS-A6 section 2 rule 7) the read-only view reads one row strictly 
       "unavailable",
     );
   }
+  // A Message body is bounded in code points: 10,001 astral characters
+  // (20,002 UTF-16 units) render; 20,001 do not.
+  const message = (body) => accessRow({ messages: [{ message_id: MESSAGE, sender_role: "client", body, sent_at: T }] });
+  const astral = breakGlassWorld({ access: rows([message(ASTRAL.repeat(10001))]) });
+  const astralView = await resolveBreakGlassAccess(astral.sources, GRANT);
+  assert.equal(astralView.status, "ready");
+  assert.equal([...astralView.consultation.messages[0].body].length, 10001);
+  const overlong = breakGlassWorld({ access: rows([message(ASTRAL.repeat(20001))]) });
+  assert.equal((await resolveBreakGlassAccess(overlong.sources, GRANT)).status, "unavailable");
   assert.equal(breakGlassPathFor(GRANT), `/staff/break-glass/${GRANT}`);
   assert.throws(() => breakGlassPathFor("x"));
 });
@@ -345,7 +380,7 @@ test("PSA6-3 (PS-A6 section 2 rules 3, 5 and 8) requesting needs an active Staff
     x.grantStaff("approve_break_glass");
     assert.deepEqual(await approveBreakGlass(x.sources, form({ grant: GRANT, minutes: "1" })), { status: "outcome", outcome });
   }
-  for (const [db, outcome] of Object.entries({ refused: "request_refused", ended: "access_ended", already_expired: "already_expired" })) {
+  for (const [db, outcome] of Object.entries({ refused: "request_refused", ended: "access_ended", already_expired: "already_expired", already_revoked: "already_revoked", not_found: "not_found" })) {
     const x = breakGlassWorld({ revoke: answer(db) });
     x.grantStaff("approve_break_glass");
     assert.deepEqual(await revokeBreakGlass(x.sources, form({ grant: GRANT })), { status: "outcome", outcome });
@@ -495,6 +530,10 @@ test("PSA6-4 (PS-A6 section 3 rules 1, 2, 6 and 8) the verified client submits o
   for (const bad of [ownRequest({ state: "decided" }), ownRequest({ outcome_code: "allowed" }), ownRequest({ details: " " }), ownRequest({ request_type: "erasure" }), { ...ownRequest(), requester_user_id: USER }]) {
     assert.equal((await resolveClientDataRequests(dataWorld({ mine: rows([bad]) }).client)).status, "unavailable");
   }
+  // Details are bounded in code points: 15,000 astral characters (30,000
+  // UTF-16 units) render; 20,001 do not.
+  assert.equal((await resolveClientDataRequests(dataWorld({ mine: rows([ownRequest({ details: ASTRAL.repeat(15000) })]) }).client)).status, "ready");
+  assert.equal((await resolveClientDataRequests(dataWorld({ mine: rows([ownRequest({ details: ASTRAL.repeat(20001) })]) }).client)).status, "unavailable");
 });
 
 test("PSA6-5 (PS-A6 section 3 rules 3 to 5 and 8; global grant) the staff queue and one request need the global manage_data_requests grant (a scoped one is denied and reads nothing); the queue never carries the details; assignment and decision send exactly the request and one of the four outcome codes; legal_hold and the other database outcomes map to fixed states", async () => {
@@ -527,6 +566,10 @@ test("PSA6-5 (PS-A6 section 3 rules 3 to 5 and 8; global grant) the staff queue 
     x.grantStaff("manage_data_requests");
     assert.equal((await resolveDataRequest(x.staff, REQUEST)).status, "unavailable");
   }
+  // Details are bounded in code points: 15,000 astral characters render.
+  const astral = dataWorld({ request: rows([staffRequest({ details: ASTRAL.repeat(15000) })]) });
+  astral.grantStaff("manage_data_requests");
+  assert.equal((await resolveDataRequest(astral.staff, REQUEST)).status, "ready");
 });
 
 // ---------------------------------------------------------------------------
@@ -642,7 +685,25 @@ test("PSA6-7 (Packet rule 11) every state, type, outcome and action outcome has 
     text,
     /entitle|right to|rights|GDPR|CCPA|law requires|legally|within \d+|days|retain|retention|guarantee|stripe|daily\.co|resend|supabase/i,
   );
-  // The columns the reads expect are the database's.
+  // The columns the reads expect are the database's: the same names, in the
+  // order each function's migration declares them.
+  const columns = {
+    [BREAK_GLASS_MIGRATION]: {
+      staff_break_glass_grants_mine: MINE_COLUMNS,
+      staff_break_glass_queue: QUEUE_COLUMNS,
+      staff_break_glass_consultation: ACCESS_COLUMNS,
+    },
+    [DATA_REQUEST_MIGRATION]: {
+      client_data_requests: OWN_REQUEST_COLUMNS,
+      staff_data_request_queue: DR_QUEUE_COLUMNS,
+      staff_data_request: REQUEST_COLUMNS,
+    },
+  };
+  for (const [migration, functions] of Object.entries(columns)) {
+    for (const [name, expected] of Object.entries(functions)) {
+      assert.deepEqual([...expected], resultColumnsOf(migration, name), name);
+    }
+  }
   assert.equal(MINE_COLUMNS.length, 9);
   assert.equal(QUEUE_COLUMNS.length, 11);
   assert.equal(ACCESS_COLUMNS.length, 16);
@@ -693,4 +754,53 @@ test("PSA6-8 the new pages ask the step-up gate first (staff) or re-verify the c
     "app/staff/break-glass/forms.tsx",
     "app/staff/break-glass/page.tsx",
   ]);
+});
+
+test("PSA6-9 (review corrections) the approval and revocation forms of the break-glass list keep their fixed message in one slot outside the list, and the page is refreshed after every outcome; the approval message names no time that is not on screen; a caller without an active Staff Profile gets the break-glass surface's own refusal; the client's list names the decision field as the recorded decision", () => {
+  const actions = codeOf(read("app/staff/break-glass/actions.ts")).replace(/\s+/g, " ");
+  assert.doesNotMatch(actions, /refresh/);
+  assert.ok(actions.includes('if (state.status === "outcome") { revalidatePath("/staff/break-glass"); }'));
+  for (const call of ["requestBreakGlass", "approveBreakGlass", "revokeBreakGlass"]) {
+    assert.ok(actions.includes(`return gated(() => ${call}(BREAK_GLASS_SOURCES, formData)); }`), call);
+  }
+  const forms = codeOf(read("app/staff/break-glass/forms.tsx"));
+  const bodyOf = (name) => {
+    const start = forms.indexOf(`export function ${name}(`);
+    assert.ok(start >= 0, name);
+    const next = forms.indexOf("\nexport function ", start + 1);
+    return forms.slice(start, next < 0 ? undefined : next);
+  };
+  const decisions = bodyOf("GrantDecisions");
+  assert.ok(decisions.includes("approveBreakGlassAction"));
+  assert.ok(decisions.includes("revokeBreakGlassAction"));
+  assert.ok(decisions.indexOf("<Outcome") < decisions.indexOf("{children}"));
+  for (const name of ["ApproveAccessForm", "RevokeAccessForm"]) {
+    assert.doesNotMatch(bodyOf(name), /useActionState|<Outcome|Action\b/, name);
+  }
+  const page = codeOf(read("app/staff/break-glass/page.tsx"));
+  const open = page.indexOf("<GrantDecisions>");
+  const close = page.indexOf("</GrantDecisions>");
+  assert.ok(open > 0 && close > open);
+  assert.ok(page.indexOf("queue.grants.map(") > open && page.indexOf("queue.grants.map(") < close);
+  for (const form of ["<ApproveAccessForm", "<RevokeAccessForm"]) {
+    const at = [...page.matchAll(new RegExp(form, "g"))].map((m) => m.index);
+    assert.ok(at.length > 0 && at.every((index) => index > open && index < close), form);
+  }
+  assert.doesNotMatch(labels.GRANT_MESSAGES.access_approved.body, /time shown|until/i);
+  // A caller without an active Staff Profile: the surface's own refusal
+  // (never the configuration pages' "a staff profile alone grants none").
+  assert.match(labels.BREAK_GLASS_STAFF_REQUIRED, /active staff profile/);
+  assert.doesNotMatch(labels.BREAK_GLASS_STAFF_REQUIRED, /alone|capabilit/i);
+  for (const file of ["app/staff/break-glass/page.tsx", "app/staff/break-glass/[grant]/page.tsx"]) {
+    const code = codeOf(read(file));
+    const denied = code.indexOf('if (view.status === "denied") {');
+    assert.ok(denied > 0, file);
+    assert.ok(denied < code.indexOf("return refusalPage("), file);
+    assert.ok(code.slice(denied, code.indexOf("return refusalPage(")).includes("{BREAK_GLASS_STAFF_REQUIRED}"), file);
+  }
+  // The client's list: the recorded decision, never a bare "Decision".
+  assert.equal(labels.RECORDED_DECISION_LABEL, "Recorded decision");
+  const privacy = codeOf(read("app/client/privacy/page.tsx"));
+  assert.ok(privacy.includes("`${RECORDED_DECISION_LABEL}: ${OUTCOME_LABELS[request.outcome]}`"));
+  assert.doesNotMatch(privacy, /Decision: /);
 });

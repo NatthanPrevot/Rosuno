@@ -50,6 +50,7 @@ import {
   type ActionState,
   type CommandAnswer,
   type StaffPager,
+  withinCharacters,
 } from "./workspace-support.ts";
 
 // ---------------------------------------------------------------------------
@@ -213,7 +214,7 @@ const isDetails = (value: unknown): value is string | null =>
   value === null ||
   (typeof value === "string" &&
     value.trim() !== "" &&
-    value.length <= MAX_DETAILS);
+    withinCharacters(value, MAX_DETAILS));
 
 type RequestBase = {
   readonly id: string;

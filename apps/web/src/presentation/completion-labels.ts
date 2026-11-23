@@ -158,6 +158,10 @@ export const PUBLIC_REVIEWS_NOTE =
   "Reviews come from clients of completed consultations and are published after review. The count and average cover every published review.";
 export const COMPLAINT_NOTE =
   "Reporting a problem does not change a consultation or a payment. Rosuno reviews every report; the other participant does not see it.";
+// MVP-001 S11 PS-A6 section 5: the hint of the optional statement on the
+// report forms (neutral; it promises nothing about who sees it).
+export const COMPLAINT_STATEMENT_HINT =
+  "Optional. Describe the problem in your own words.";
 export const CANCEL_NOTE =
   "You can cancel before the consultation starts. The other participant is told. Any payment is reviewed by Rosuno staff; nothing is refunded or charged automatically here.";
 // MVP-001 S11 correction pass (A7): the cancellation is asked for in two

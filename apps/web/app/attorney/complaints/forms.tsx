@@ -15,6 +15,7 @@ import {
   type OpenActionState,
 } from "../../../src/application/complaints.ts";
 import {
+  COMPLAINT_STATEMENT_HINT,
   messageOf,
   OPEN_MESSAGES,
 } from "../../../src/presentation/completion-labels.ts";
@@ -74,7 +75,7 @@ export function ReportForm({
           id="report-statement"
           name="statement"
           label="What happened (optional)"
-          hint={`At most ${MAX_STATEMENT.toLocaleString("en-US")} characters. Seen only by you and the Rosuno staff who handle reported problems.`}
+          hint={`${COMPLAINT_STATEMENT_HINT} At most ${MAX_STATEMENT.toLocaleString("en-US")} characters.`}
           maxLength={MAX_STATEMENT}
         />
         <Cluster>

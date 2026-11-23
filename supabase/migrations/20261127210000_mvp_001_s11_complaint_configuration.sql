@@ -9,8 +9,9 @@
 --
 -- Complaint vocabularies (PS-A6 section 4):
 -- - complaint_parameters_valid (internal): the parameters are an object whose only keys are category_codes and
---   resolution_codes, each an array holding one or more unique codes of the form complaint_cases already checks
---   (lower-snake, 2 to 64 characters);
+--   resolution_codes, each an array holding 1 to 500 unique codes of the form complaint_cases already checks
+--   (lower-snake, 2 to 64 characters); 500 per list is a fixed technical ceiling (as the S5 referral outcome codes
+--   are capped at 100), not a policy value, and matches what the staff pages read;
 -- - policy_parameters_approvable (20261127140000, replaced forward with its signature, volatility, security mode,
 --   search_path, owner, privileges and comment; every existing branch kept exactly) validates complaint versions with
 --   it before approval (PS section 8.4);
@@ -48,8 +49,8 @@ values ('complaint', 'Complaint');
 -- Complaint vocabularies (PS-A6 section 4).
 -- ---------------------------------------------------------------------------
 
--- Whether complaint parameters hold only category_codes and resolution_codes, each an array of one or more unique
--- lower-snake codes.
+-- Whether complaint parameters hold only category_codes and resolution_codes, each an array of 1 to 500 unique
+-- lower-snake codes (500: a fixed technical ceiling).
 create function public.complaint_parameters_valid(p_parameters jsonb)
 returns boolean
 language sql
@@ -66,7 +67,7 @@ as $function$
       select 1
       from unnest(array['category_codes', 'resolution_codes']) as k(key)
       where jsonb_typeof(p_parameters -> k.key) is distinct from 'array'
-         or jsonb_array_length(p_parameters -> k.key) < 1
+         or jsonb_array_length(p_parameters -> k.key) not between 1 and 500
          or exists (
            select 1 from jsonb_array_elements(p_parameters -> k.key) as c
            where jsonb_typeof(c) <> 'string' or (c #>> '{}') collate "C" !~ '^[a-z][a-z0-9_]{1,63}$'
@@ -473,7 +474,7 @@ $privileges$;
 -- ---------------------------------------------------------------------------
 
 comment on function public.complaint_parameters_valid(jsonb) is
-  'PS-A6 section 4 (internal): whether complaint policy parameters hold only category_codes and resolution_codes, each an array of one or more unique lower-snake codes. Executable by no API role.';
+  'PS-A6 section 4 (internal): whether complaint policy parameters hold only category_codes and resolution_codes, each an array of 1 to 500 unique lower-snake codes (a fixed technical ceiling). Executable by no API role.';
 comment on function public.complaint_vocabulary(uuid, timestamptz) is
   'PS-A6 section 4 (internal): the category and resolution codes of the complaint version policy_select_version picks for a case''s jurisdiction (the platform scope for a case without one) at an instant; configuration_unavailable when none is selectable or its parameters fail validation. No vocabulary is seeded or defaulted.';
 comment on column public.complaint_cases.statement is

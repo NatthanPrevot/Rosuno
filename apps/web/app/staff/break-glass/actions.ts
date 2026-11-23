@@ -26,12 +26,11 @@ import { logRequestEvent } from "../../../src/infrastructure/observability/reque
 import { BREAK_GLASS_SOURCES } from "../../../src/infrastructure/privacy/privacy-adapter.ts";
 import { stepUpRefusal } from "../../account/gate.ts";
 
-// After a request the page is refreshed (the caller's list shows it); after an
-// approval or a revocation, which moves the grant out of the list it was
-// decided from, the fixed outcome stays in view until the next load.
+// After each outcome the page is refreshed: a request appears in the caller's
+// list, and an approved or revoked grant leaves the list it was decided from
+// (the forms keep the fixed outcome in view in a slot outside that list).
 async function gated(
   operation: () => Promise<GrantActionState>,
-  refresh = true,
 ): Promise<GrantActionState> {
   const refusal = await stepUpRefusal("staff");
   if (refusal !== null) {
@@ -43,7 +42,7 @@ async function gated(
       outcome: state.status,
     });
   }
-  if (state.status === "outcome" && refresh) {
+  if (state.status === "outcome") {
     revalidatePath("/staff/break-glass");
   }
   return state;
@@ -60,12 +59,12 @@ export async function approveBreakGlassAction(
   _previous: GrantActionState,
   formData: FormData,
 ): Promise<GrantActionState> {
-  return gated(() => approveBreakGlass(BREAK_GLASS_SOURCES, formData), false);
+  return gated(() => approveBreakGlass(BREAK_GLASS_SOURCES, formData));
 }
 
 export async function revokeBreakGlassAction(
   _previous: GrantActionState,
   formData: FormData,
 ): Promise<GrantActionState> {
-  return gated(() => revokeBreakGlass(BREAK_GLASS_SOURCES, formData), false);
+  return gated(() => revokeBreakGlass(BREAK_GLASS_SOURCES, formData));
 }

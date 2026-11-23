@@ -7,9 +7,17 @@
 // default); the revocation form names only the grant. The server re-checks
 // the caller's step-up, identity and capability, and the database decides
 // again. Each form shows only the fixed message for the state its action
-// returns.
+// returns: the request form above its fields, the approval and revocation
+// forms of the list in one slot above it (GrantDecisions), which stays
+// mounted while the page is refreshed and the decided grant leaves the list.
 
-import { useActionState } from "react";
+import {
+  createContext,
+  useActionState,
+  useContext,
+  useState,
+  type ReactNode,
+} from "react";
 
 import {
   INITIAL_GRANT_STATE,
@@ -81,15 +89,63 @@ export function RequestAccessForm() {
   );
 }
 
-export function ApproveAccessForm({ grant }: { readonly grant: string }) {
-  const [state, action, pending] = useActionState<GrantActionState, FormData>(
-    approveBreakGlassAction,
-    INITIAL_GRANT_STATE,
-  );
+type Decision = "approve" | "revoke";
+
+type Decisions = {
+  readonly approve: (formData: FormData) => void;
+  readonly revoke: (formData: FormData) => void;
+  readonly pending: boolean;
+  readonly submitted: (decision: Decision) => void;
+};
+
+const DecisionsContext = createContext<Decisions | null>(null);
+
+function useDecisions(): Decisions {
+  const decisions = useContext(DecisionsContext);
+  if (decisions === null) {
+    throw new Error("a decision form is rendered inside GrantDecisions");
+  }
+  return decisions;
+}
+
+// The approval and revocation forms of the list share one message slot above
+// it. A decision moves the grant out of the list it was decided from (the
+// action refreshes the page), so the slot stays mounted outside the list and
+// shows the fixed message for the last decision submitted here.
+export function GrantDecisions({ children }: { readonly children: ReactNode }) {
+  const [approved, approve, approving] = useActionState<
+    GrantActionState,
+    FormData
+  >(approveBreakGlassAction, INITIAL_GRANT_STATE);
+  const [revoked, revoke, revoking] = useActionState<
+    GrantActionState,
+    FormData
+  >(revokeBreakGlassAction, INITIAL_GRANT_STATE);
+  const [last, setLast] = useState<Decision | null>(null);
   return (
-    <form action={action}>
+    <DecisionsContext.Provider
+      value={{
+        approve,
+        revoke,
+        pending: approving || revoking,
+        submitted: setLast,
+      }}
+    >
+      <Stack>
+        {last === null ? null : (
+          <Outcome state={last === "approve" ? approved : revoked} />
+        )}
+        {children}
+      </Stack>
+    </DecisionsContext.Provider>
+  );
+}
+
+export function ApproveAccessForm({ grant }: { readonly grant: string }) {
+  const { approve, pending, submitted } = useDecisions();
+  return (
+    <form action={approve} onSubmit={() => submitted("approve")}>
       <Stack gap="tight">
-        <Outcome state={state} />
         <input type="hidden" name="grant" value={grant} />
         <TextField
           id={`break-glass-minutes-${grant}`}
@@ -121,14 +177,10 @@ export function RevokeAccessForm({
   readonly grant: string;
   readonly label: string;
 }) {
-  const [state, action, pending] = useActionState<GrantActionState, FormData>(
-    revokeBreakGlassAction,
-    INITIAL_GRANT_STATE,
-  );
+  const { revoke, pending, submitted } = useDecisions();
   return (
-    <form action={action}>
+    <form action={revoke} onSubmit={() => submitted("revoke")}>
       <Stack gap="tight">
-        <Outcome state={state} />
         <input type="hidden" name="grant" value={grant} />
         <Cluster>
           <Button variant="secondary" type="submit" disabled={pending}>

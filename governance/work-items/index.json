@@ -2582,7 +2582,8 @@
         "20261127180000_mvp_001_s11_review_corrections",
         "20261127190000_mvp_001_s11_break_glass",
         "20261127200000_mvp_001_s11_data_requests",
-        "20261127210000_mvp_001_s11_complaint_configuration"
+        "20261127210000_mvp_001_s11_complaint_configuration",
+        "20261127220000_mvp_001_s11_offered_start_containment"
       ],
       "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",
