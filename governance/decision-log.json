@@ -1316,7 +1316,6 @@
       ],
       "expiry": null
     },
-
     {
       "decision_id": "DEC-20261012-P2-900-CLOUD-BUILDER-KIT-REV5-1-INSTALL",
       "title": "Authorize bounded Cloud Builder revision 5.1 PROCESS installation",
@@ -1380,7 +1379,6 @@
       ],
       "expiry": null
     },
-
     {
       "decision_id": "DEC-20261019-P2-903-FORWARD-MIGRATION-FAST-CONTROL-CLOSURE",
       "title": "Record P2-903 Forward Migration Fast-Control Governance Closure",
@@ -1767,12 +1765,12 @@
       "owner": "NatthanPrevot",
       "reviewer": {
         "identity": "Rosuno",
-        "status": "pending"
+        "status": "approved"
       },
       "created_at": "2026-11-15T04:30:26Z",
-      "updated_at": "2026-11-17T01:40:55Z",
+      "updated_at": "2026-11-23T13:38:21Z",
       "supersedes": [],
-      "impact": "Work item: the Packet's register entry WI-P5-001-CLIENT-INTAKE-FOUNDATION is recorded as WI-P2-P5-001-CLIENT-INTAKE-FOUNDATION, the identifier the work-item register format requires. PS-A1 is registered here by identifier and SHA-256 with status pending_lock_condition; it becomes formally LOCKED only when its owner-held authority-manifest record exists and this registration is on owner main. One forward-only migration candidate (unreviewed, unapplied) adding two relations, client and configuration functions, one capability-catalog code and narrowed direct privileges on intakes and jurisdiction_assessments; new authenticated client workspace routes. Security and integrity obligations: own-client access only, actor from the authenticated session, fixed search_path and restricted function execution, immutable revisions and configuration versions, serialized lifecycle with stale-write rejection, atomic audit evidence without intake content, and no direct writes by API roles or service credentials. Persistent application requires completion of the PS-A1 Lock Condition and a separate owner database authorization; publishing any configuration version on a persistent environment is a separate owner-authorized, audited operation. Production intake collection is not enabled while the counsel-gated RMS REG-CA-035 determination (pre-collection notices, minimum information, pre-acceptance disclosure) remains unresolved. P5-001 acceptance is not M5 completion: AI Suggestions, voice memos and Storage, privacy and help surfaces, counsel-gated intake notices and disclosures, attorney-decline and referral retry verification, and the remaining M5 criteria stay outstanding.",
+      "impact": "Work item: the Packet's register entry WI-P5-001-CLIENT-INTAKE-FOUNDATION is recorded as WI-P2-P5-001-CLIENT-INTAKE-FOUNDATION, the identifier the work-item register format requires. PS-A1 is registered here by identifier and SHA-256 with status pending_lock_condition; it becomes formally LOCKED only when its owner-held authority-manifest record exists and this registration is on owner main. One forward-only migration candidate (unreviewed, unapplied) adding two relations, client and configuration functions, one capability-catalog code and narrowed direct privileges on intakes and jurisdiction_assessments; new authenticated client workspace routes. Security and integrity obligations: own-client access only, actor from the authenticated session, fixed search_path and restricted function execution, immutable revisions and configuration versions, serialized lifecycle with stale-write rejection, atomic audit evidence without intake content, and no direct writes by API roles or service credentials. Persistent application requires completion of the PS-A1 Lock Condition and a separate owner database authorization; publishing any configuration version on a persistent environment is a separate owner-authorized, audited operation. Production intake collection is not enabled while the counsel-gated RMS REG-CA-035 determination (pre-collection notices, minimum information, pre-acceptance disclosure) remains unresolved. P5-001 acceptance is not M5 completion: AI Suggestions, voice memos and Storage, privacy and help surfaces, counsel-gated intake notices and disclosures, attorney-decline and referral retry verification, and the remaining M5 criteria stay outstanding. Post-merge: PR #95 approved by Rosuno; the migration was applied to Rosuno Staging only, at an unknown time between 2026-11-15T19:48:26Z and 2026-11-16T06:24:40Z (release REL-20261115-20261116-P5-001-STAGING-APPLICATION). No Production application, hosting deployment or published question-set version.",
       "evidence": [
         "Owner decisions D1 and D2 and the Privacy/Help deferral: P5-001 owner directions in the Builder session (the messages carry no timestamps)",
         "Owner exact-text approval of PS-A1 (SHA-256 1612e751d6d94ffdf4c7c13f168d9e97bd85f793b03ccc5aa41e3d48eb1e803e, 21,425 bytes): express owner adoption authorization in the Builder session, received at about 2026-11-14T19:55:55Z by the session clock; the authority-manifest record is owner-held and is not evidenced in this repository",
@@ -1780,7 +1778,11 @@
         "Optional independent review: not performed",
         "Post-merge record (MVP-001 S1 records, Packet REC-1): merged to owner main through PR #95 as two-parent merge commit 91af560f2654f63ea20b19da75a166ca274d0ddf (committed 2026-11-15T17:25:23Z; parents bc54701c0af9ea9f5e5b40e7d5dac99fec8bdd00 and 43dcab55827b532102c2a62b427548974d7d2efc; merge tree equals the head tree). The PR #95 designated approval facts (reviewer, review identifier and time) have not been supplied by the owner and are not recorded; the reviewer status stays pending until they are.",
         "PS-A1 Lock Condition complete: this registration of PHYSICAL-SPECIFICATION-AMENDMENT-PS-A1-LOCKED is on owner main from merge commit 91af560f2654f63ea20b19da75a166ca274d0ddf, and owner-adopted DL-ENG-3 P6 item 4 (governance/dl-eng-3-program-packets.txt) records the PS-A1 Lock Condition as completed. Register status set to active in the MVP-001 S1 records, as the owner-adopted MVP-001 Packet REC-1 directs.",
-        "Migration 20261115140653_p5_001_client_intake_foundation: no record evidences application to any persistent environment; applied_environment stays none. Closure (DL-ENG-2 G4) waits for the PR #95 approval facts and for Staging application or an owner decision not to apply it yet."
+        "Migration 20261115140653_p5_001_client_intake_foundation: no record evidences application to any persistent environment; applied_environment stays none. Closure (DL-ENG-2 G4) waits for the PR #95 approval facts and for Staging application or an owner decision not to apply it yet.",
+        "PR #95 designated approval: Rosuno, APPROVED, 2026-11-15T17:06:06Z (review PRR_kwDOUHT1sc8AAAABYF-1ww; reviewed head 43dcab55827b532102c2a62b427548974d7d2efc); required checks successful (P0 workflow run 43738846663; rosuno-guard run 43738980747), per the 2026-11-16 verified record, the owner-supplied GitHub timestamp and GitHub search. This supersedes the earlier statement that the PR #95 approval facts were not supplied.",
+        "Rollback-only validation on Rosuno Staging, 2026-11-15 (Builder, Staging connector): script sha256 76bbcac594c4b43c41fa6a142fe2e08b144b96c5dc824e64902aec0730df80d3, 18 of 18 checks, catalog diff equal to the 78-entry allowlist, transaction 2023 rolled back, restoration exact.",
+        "Staging application: owner-executed Supabase CLI db push from 91af560 (dry run listing only this migration; exit 0). It happened at an unknown time between 2026-11-15T19:48:26Z (last read-only check: 15 history rows) and 2026-11-16T06:24:40Z (read-only verification: 16 history rows); the actual application time was not recorded. 2026-11-16T06:24:40Z is the time by which the application was verified, not the application time. Release REL-20261115-20261116-P5-001-STAGING-APPLICATION.",
+        "Read-only post-application verification 2026-11-16T06:24:40Z to 06:27Z: 11 of 11 checks; whole-public catalog 3732664ba8f690b02484b4490a38896c6b451fce555037f106cb1c7a1c7420c3 and fixed-scope rosuno-p1-catalog-v1 2e500bbbe59b5c2808234f81970a0ff04e9a6bf20198fb2e526875493dc8cf75 at that time (the drift baseline now records the later state after migration 76); 7 new security-advisor warnings by design. Owner-retained evidence ZIP sha256 4a3e896e0c34d9a25180622b1d5884fca209d37f398fd393a503ed5c928870b3."
       ],
       "expiry": null
     },
@@ -1851,10 +1853,10 @@
       "owner": "NatthanPrevot",
       "reviewer": {
         "identity": "Rosuno",
-        "status": "pending"
+        "status": "approved"
       },
       "created_at": "2026-11-17T00:50:55Z",
-      "updated_at": "2026-11-17T00:50:55Z",
+      "updated_at": "2026-11-23T13:38:21Z",
       "supersedes": [],
       "expiry": null,
       "decision_id": "DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM",
@@ -1872,7 +1874,7 @@
         "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED"
       ],
       "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
-      "impact": "S1 adds four forward-only migrations and application changes; nothing is applied to a persistent environment by merge.",
+      "impact": "S1 adds four forward-only migrations and application changes; nothing is applied to a persistent environment by merge. Post-merge: all eleven slices were merged with designated approval, and migrations 17-76 were applied to Rosuno Staging only (2026-11-23, release REL-20261123-MVP-001-S1-S11-STAGING-APPLICATION), with Staging's environment class recorded once as staging. No Production application, hosting deployment, Replit change or provider activation.",
       "evidence": [
         "Owner adoption commit b17aaf8a4ac03c98ea107834793d41f861072a7e on owner branch wi/MVP-001-technical-completion (2026-11-17T00:19:22Z)",
         "Owner implementation grant received in the Builder session on 2026-11-17, naming the Packet blob, the adoption commit and the approved SHA-256 values",
@@ -1886,7 +1888,15 @@
         "Slice S8 merged: PR #103 into owner main at merge commit f5973d6326b47a2eca709efebc3c7c62e6c515c0 (committed 2026-11-18T18:06:28Z; parents 210a99e30e850747256ebf299f7e7839f9a55c5d and f3c8fda861cf89bace1158eb31d8ede2c4f7dd5d; merge tree equals the reviewed S8 head tree), confirmed by the express owner statement 'S8 MERGE CONFIRMED / S9 CONTINUATION' and recorded at 2026-11-18T19:00:09Z (session clock); designated reviewer Rosuno approved, as stated by the owner (approval time not supplied); the independent review requested in the S8 directive was performed by a separate review agent and its three confirmed defects were corrected before publication; S8 migrations not applied to any persistent environment (Staging application is handled by a separate owner-authorized session)",
         "Slice S9 merged: PR #104 into owner main at merge commit d3e62969bfa1fdaedb843b1c873fbcb0040f0ede (committed 2026-11-18T22:28:39Z; parents f5973d6326b47a2eca709efebc3c7c62e6c515c0 and 0f55677e963098b1dca2b74ed02042f4efa08975; merge tree equals the reviewed S9 head tree), confirmed by the express owner statement 'S9 MERGE VERIFIED / PROCEED TO S10' and recorded at 2026-11-18T23:01:41Z (session clock); designated reviewer Rosuno approved, as stated by the owner (approval time not supplied); the Daily integration is recorded as implemented with room, token, presence, meeting and deletion operations verified at L4 and a real participant join and signed webhook delivery outstanding at L4 (Packet section 5); the independent review requested in the S9 directive was performed by a separate review agent and its confirmed defects were corrected before publication; S9 migrations not applied to any persistent environment (Staging application is handled by a separate owner-authorized session)",
         "Slice S10 merged: PR #105 into owner main at merge commit b3205cdb0c2792801714be6c67a758e4c7bf11de (committed 2026-11-19T04:13:10Z; parents d3e62969bfa1fdaedb843b1c873fbcb0040f0ede and 1cb365dc6b45dd34a7575cee494d90f9e15282f9; merge tree equals the reviewed S10 head tree), confirmed by the express owner statement 'S10 MERGE VERIFIED / PROCEED TO S11' and recorded at 2026-11-19T04:24:30Z (session clock); designated reviewer Rosuno approved, as stated by the owner (approval time not supplied); the Resend integration is recorded as implemented with sending, provider idempotency and refusal mapping verified at L4 and signed webhook delivery and delivery-status reads outstanding at L4 (Packet section 5); PS-A5 document versioning is included and its Lock Condition is complete; the independent reviews requested in the S10 directives were performed by separate review agents and their confirmed defects were corrected before publication; S10 migrations not applied to any persistent environment (Staging application is handled by a separate owner-authorized session)",
-        "Optional independent review: none is recorded in this entry for S1 to S7; for S8, S9 and S10 the owner-requested reviews by separate review agents are recorded in their lines above; no external review (ChatGPT or the Independent Backup) is recorded"
+        "Optional independent review: none is recorded in this entry for S1 to S7; for S8, S9 and S10 the owner-requested reviews by separate review agents are recorded in their lines above; no external review (ChatGPT or the Independent Backup) is recorded",
+        "Slice S11 merged: PR #106 into owner main at merge commit 6bac9cb4723d8aacd7c519abc0ea0e8cf6ecbaf6 (committed 2026-11-23T01:32:33Z; parents b3205cdb0c2792801714be6c67a758e4c7bf11de and 6c8c5c00b2d53b14b079f242087267f99ca31765; merge tree equals the reviewed S11 head tree)",
+        "Designated approval facts, all by Rosuno (APPROVED): PR #96 (S1) 2026-11-17T06:02:37Z; PR #97 (S2) 2026-11-17T16:47:22Z; PR #98 (S3) 2026-11-17T21:05:32Z; PR #99 (S4) 2026-11-17T23:44:12Z; PR #100 (S5) 2026-11-18T01:52:42Z; PR #101 (S6) 2026-11-18T07:02:11Z; PR #102 (S7) 2026-11-18T14:30:41Z; PR #103 (S8) 2026-11-18T18:04:26Z; PR #104 (S9) 2026-11-18T22:22:22Z; PR #105 (S10) 2026-11-19T04:12:22Z; PR #106 (S11) 2026-11-23T01:30:57Z. Timestamps supplied by the owner from GitHub; reviewer, approval state and dates confirmed through GitHub search and the PR pages, and each time lies between the PR head commit and its merge. This supersedes the 'not supplied' and 'recorded as pending' statements in the slice lines above.",
+        "Packet revision 1: owner forward-only revision commit e20490631b32b385c141834bdf9b90802dec4808 on owner branch wi/MVP-001-technical-completion (parent b17aaf8a4ac03c98ea107834793d41f861072a7e; Packet blob 77991607475eed6db764a8a2f4f846aebd342b57). FORBIDDEN_SCOPE names governance/decision-log.schema.json and governance/work-items/schema.json instead of governance/*schema*.json, so the drift baseline that REC-1 and rule 15 require is in scope. Carried byte for byte on the Program branch.",
+        "Staging application of migrations 17-76 to Rosuno Staging (mxjlvmowmodzdtdfgqpb), owner-executed under the owner's separate authorizations with rosuno-staging-apply-slice.sh v2.1 (S1-S7, sha256 1b2cf2c863eb8925e600361d6fea7378fa7dde08c1380a650d70376c9e169a6e) and v2.2 (S8-S11, sha256 3b701f27dcf9b39e491036391d53615f91d9ba485b72f24631f182c62d799844), Supabase CLI 2.116.0, direct host, exact file versions, one slice at a time, each checkpoint verified read-only by Claude through the Staging connector before the next slice (UTC, 2026-11-23): S1 push 05:08:24Z, checkpoint PASS 05:11:43Z, history 20; S2 push 05:18:59Z, checkpoint PASS 05:20:58Z, history 24; S3 push 05:23:07Z, checkpoint PASS 05:24:39Z, history 31; S4 push 05:27:09Z, checkpoint PASS 05:28:44Z, history 34; S5 push 05:32:52Z, checkpoint PASS 05:34:36Z, history 37; S6 push 05:37:12Z, checkpoint PASS 05:39:56Z, history 41; S7 push 05:42:33Z, checkpoint PASS 05:44:42Z, history 43; S8 push 06:22:26Z, checkpoint PASS 06:23:59Z, history 46; S9 push 06:26:38Z, checkpoint PASS 06:28:42Z, history 49; S10 push 06:31:48Z, checkpoint PASS 06:33:41Z, history 54; S11 push 06:36:18Z, checkpoint PASS 06:38:42Z, history 76. Release REL-20261123-MVP-001-S1-S11-STAGING-APPLICATION.",
+        "PS-A2 environment record on Staging, made once after S1 passed: 2026-11-23T05:13:38Z, deployment_environment 8f321579-94ba-4911-8ecc-512875cbceac (class staging, project mxjlvmowmodzdtdfgqpb), audit event 8fe693d5-66e8-4ba8-915a-2432c005ae5a (actor database_owner); a second initialization, update, delete and truncate refused and the anon accessor refused, in a separately aborted transaction.",
+        "Final verified Staging state (2026-11-23T06:38:42Z): 76 history rows; schema fingerprint equal to the PostgreSQL 17.11 replay of migrations 1-76; 69 tables all with RLS; five anon-executable functions (the public discovery and review reads); all 226 security-definer functions on search_path pg_catalog, pg_temp; five pg_cron jobs with no failed run; 37 reference rows; zero Auth users; production_financial_gate permitted false (environment_not_production) with zero policy, payment, ledger and other financial rows; security advisors 0 errors.",
+        "Recorded exceptions: the first S1 attempt (script v2) stopped at its dry-run check with no change; Claude's S5 expectation of four anonymous functions was a prediction error (three were correct); one S6 diagnostic field was disregarded; forward-only recovery was accepted by the owner without managed backups or PITR, and no recovery was needed.",
+        "New Staging drift baseline rosuno-staging-mvp-001-s11-20261123-v1 (migrations 1-76): the canonical rosuno-p1-catalog-v1 extractor (sha256 81a3c52a3567ba68b19b4451dd624d0d8d152a52c8550322dbf3b463284324ca, from the owner-retained P3-904 Gate 5/6 evidence ZIP) run unmodified, read-only, through the Staging connector behind a transport guard; the first attempt was aborted by the guard before the extractor ran (the connector transport decoded its literal unicode escapes), the second ran with the guard confirming the exact bytes: sha256 bb6b8eca349139bb13eff20b7573695d09dbbb1505eafd3c24bc4d66dbf43965, 783638 bytes, 2258 rows."
       ]
     },
     {
@@ -1986,7 +1996,10 @@
     {
       "status": "accepted",
       "owner": "NatthanPrevot",
-      "reviewer": { "identity": "Rosuno", "status": "pending" },
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
       "created_at": "2026-11-19T02:13:01Z",
       "updated_at": "2026-11-19T02:13:01Z",
       "supersedes": [],

@@ -1,0 +1,296 @@
+{
+  "version": 1,
+  "evidence_id": "MVP-001-S1-S11-STAGING-APPLICATION-20261123",
+  "work_item_id": "WI-P2-MVP-001-TECHNICAL-COMPLETION",
+  "scope": "Summary of the standalone dated evidence of the owner-authorized Staging application of migrations 17-76 (Packet rule 15; DL-ENG-3 P5); canonical only when the records PR merges",
+  "recorded_at": "2026-11-23T13:38:21Z",
+  "source_authority": {
+    "locked_originals": "The current LOCKED Rosuno originals remain external immutable authority; not copied or modified",
+    "adopted_uom": "UOM v2.0",
+    "adopted_cloud_builder": "C1 rev6.0",
+    "engineering_rulings": ["DL-ENG-1", "DL-ENG-2", "DL-ENG-3"],
+    "packet": {
+      "path": "docs/work-items/MVP-001/PACKET.md",
+      "owner_branch": "wi/MVP-001-technical-completion",
+      "revision_1_commit": "e20490631b32b385c141834bdf9b90802dec4808",
+      "blob": "77991607475eed6db764a8a2f4f846aebd342b57"
+    }
+  },
+  "environment": {
+    "project_url": "https://mxjlvmowmodzdtdfgqpb.supabase.co",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "server_version": "17.11",
+    "verification_access": "read-only queries through the Rosuno Supabase Staging connector"
+  },
+  "method": {
+    "executor": "owner (macOS), one slice at a time, typed confirmation per slice",
+    "tool": "Supabase CLI 2.116.0 db push --db-url (exact file versions; no seeds; no roles)",
+    "scripts": {
+      "v2.1": {
+        "sha256": "1b2cf2c863eb8925e600361d6fea7378fa7dde08c1380a650d70376c9e169a6e",
+        "slices": "S1-S7"
+      },
+      "v2.2": {
+        "sha256": "3b701f27dcf9b39e491036391d53615f91d9ba485b72f24631f182c62d799844",
+        "slices": "S8-S11"
+      }
+    },
+    "connection": "direct host db.mxjlvmowmodzdtdfgqpb.supabase.co:5432; the URL was held only in the owner's shell and never recorded",
+    "checkpoint": "Claude verified each checkpoint read-only (history digests, 11-category schema fingerprint against a PostgreSQL 17.11 replay, jobs, privileges, environment record, financial gate, rows, security advisors) before the next slice",
+    "recovery": "forward-only, accepted by the owner (no managed backups or PITR on the plan); no recovery needed"
+  },
+  "migration_inventory_17_76_sha256": "60e792e61b1d94d3d4a23982da148055b479f7b6f4a62d8f4e89f62ca5692e67",
+  "slices": [
+    {
+      "slice": "S1",
+      "pr": 96,
+      "merge_commit": "b7dc44758db05f4492a7d87d17448fcd062e853c",
+      "files": 4,
+      "designated_approval": {
+        "reviewer": "Rosuno",
+        "approved_at": "2026-11-17T06:02:37Z"
+      },
+      "script": "v2.1",
+      "push_exit_0_at": "2026-11-23T05:08:24Z",
+      "checkpoint_pass_at": "2026-11-23T05:11:43Z",
+      "history_rows": 20
+    },
+    {
+      "slice": "S2",
+      "pr": 97,
+      "merge_commit": "3490dbdf6618e11e0d6a4a74a66292a32990bd80",
+      "files": 4,
+      "designated_approval": {
+        "reviewer": "Rosuno",
+        "approved_at": "2026-11-17T16:47:22Z"
+      },
+      "script": "v2.1",
+      "push_exit_0_at": "2026-11-23T05:18:59Z",
+      "checkpoint_pass_at": "2026-11-23T05:20:58Z",
+      "history_rows": 24
+    },
+    {
+      "slice": "S3",
+      "pr": 98,
+      "merge_commit": "f7f6bbdffc78a28748a5bcb8b889a2ae198a3eef",
+      "files": 7,
+      "designated_approval": {
+        "reviewer": "Rosuno",
+        "approved_at": "2026-11-17T21:05:32Z"
+      },
+      "script": "v2.1",
+      "push_exit_0_at": "2026-11-23T05:23:07Z",
+      "checkpoint_pass_at": "2026-11-23T05:24:39Z",
+      "history_rows": 31
+    },
+    {
+      "slice": "S4",
+      "pr": 99,
+      "merge_commit": "e4ee0837d7c3af7536a29937edd3c7b9ad6dc01e",
+      "files": 3,
+      "designated_approval": {
+        "reviewer": "Rosuno",
+        "approved_at": "2026-11-17T23:44:12Z"
+      },
+      "script": "v2.1",
+      "push_exit_0_at": "2026-11-23T05:27:09Z",
+      "checkpoint_pass_at": "2026-11-23T05:28:44Z",
+      "history_rows": 34
+    },
+    {
+      "slice": "S5",
+      "pr": 100,
+      "merge_commit": "3372bb425f35606529d4991e6eb19bda3e3367af",
+      "files": 3,
+      "designated_approval": {
+        "reviewer": "Rosuno",
+        "approved_at": "2026-11-18T01:52:42Z"
+      },
+      "script": "v2.1",
+      "push_exit_0_at": "2026-11-23T05:32:52Z",
+      "checkpoint_pass_at": "2026-11-23T05:34:36Z",
+      "history_rows": 37
+    },
+    {
+      "slice": "S6",
+      "pr": 101,
+      "merge_commit": "8dfeaf6698067808275dfd86cb655d88148b7660",
+      "files": 4,
+      "designated_approval": {
+        "reviewer": "Rosuno",
+        "approved_at": "2026-11-18T07:02:11Z"
+      },
+      "script": "v2.1",
+      "push_exit_0_at": "2026-11-23T05:37:12Z",
+      "checkpoint_pass_at": "2026-11-23T05:39:56Z",
+      "history_rows": 41
+    },
+    {
+      "slice": "S7",
+      "pr": 102,
+      "merge_commit": "210a99e30e850747256ebf299f7e7839f9a55c5d",
+      "files": 2,
+      "designated_approval": {
+        "reviewer": "Rosuno",
+        "approved_at": "2026-11-18T14:30:41Z"
+      },
+      "script": "v2.1",
+      "push_exit_0_at": "2026-11-23T05:42:33Z",
+      "checkpoint_pass_at": "2026-11-23T05:44:42Z",
+      "history_rows": 43
+    },
+    {
+      "slice": "S8",
+      "pr": 103,
+      "merge_commit": "f5973d6326b47a2eca709efebc3c7c62e6c515c0",
+      "files": 3,
+      "designated_approval": {
+        "reviewer": "Rosuno",
+        "approved_at": "2026-11-18T18:04:26Z"
+      },
+      "script": "v2.2",
+      "push_exit_0_at": "2026-11-23T06:22:26Z",
+      "checkpoint_pass_at": "2026-11-23T06:23:59Z",
+      "history_rows": 46
+    },
+    {
+      "slice": "S9",
+      "pr": 104,
+      "merge_commit": "d3e62969bfa1fdaedb843b1c873fbcb0040f0ede",
+      "files": 3,
+      "designated_approval": {
+        "reviewer": "Rosuno",
+        "approved_at": "2026-11-18T22:22:22Z"
+      },
+      "script": "v2.2",
+      "push_exit_0_at": "2026-11-23T06:26:38Z",
+      "checkpoint_pass_at": "2026-11-23T06:28:42Z",
+      "history_rows": 49
+    },
+    {
+      "slice": "S10",
+      "pr": 105,
+      "merge_commit": "b3205cdb0c2792801714be6c67a758e4c7bf11de",
+      "files": 5,
+      "designated_approval": {
+        "reviewer": "Rosuno",
+        "approved_at": "2026-11-19T04:12:22Z"
+      },
+      "script": "v2.2",
+      "push_exit_0_at": "2026-11-23T06:31:48Z",
+      "checkpoint_pass_at": "2026-11-23T06:33:41Z",
+      "history_rows": 54
+    },
+    {
+      "slice": "S11",
+      "pr": 106,
+      "merge_commit": "6bac9cb4723d8aacd7c519abc0ea0e8cf6ecbaf6",
+      "files": 22,
+      "designated_approval": {
+        "reviewer": "Rosuno",
+        "approved_at": "2026-11-23T01:30:57Z"
+      },
+      "script": "v2.2",
+      "push_exit_0_at": "2026-11-23T06:36:18Z",
+      "checkpoint_pass_at": "2026-11-23T06:38:42Z",
+      "history_rows": 76
+    }
+  ],
+  "approval_sources": "timestamps supplied by the owner from GitHub; reviewer, approval state and dates confirmed through GitHub search and the PR pages; each lies between the PR head commit and its merge",
+  "environment_record": {
+    "recorded_at": "2026-11-23T05:13:38Z",
+    "deployment_environment_id": "8f321579-94ba-4911-8ecc-512875cbceac",
+    "class": "staging",
+    "project_ref": "mxjlvmowmodzdtdfgqpb",
+    "audit_event_id": "8fe693d5-66e8-4ba8-915a-2432c005ae5a",
+    "behaviour_checks": "second initialization, update, delete, truncate refused (55000); anon accessor refused (42501); issuer match ok, other issuer environment_mismatch; checks in a separately aborted transaction"
+  },
+  "final_state": {
+    "observed_at": "2026-11-23T06:38:42Z",
+    "history_rows": 76,
+    "schema_fingerprint_equals_replay_1_76": true,
+    "tables": 69,
+    "tables_without_rls": 0,
+    "anon_executable_functions": [
+      "public_attorney_directory",
+      "public_attorney_offers",
+      "public_attorney_profile",
+      "public_attorney_reviews",
+      "public_discovery_filters"
+    ],
+    "anon_table_privileges": 0,
+    "security_definer_functions": {
+      "total": 226,
+      "search_path": "pg_catalog, pg_temp (all)"
+    },
+    "pg_cron_jobs": [
+      "rosuno_operational_jobs_sweep",
+      "rosuno_intake_expiry_sweep",
+      "rosuno_scheduling_expiry_sweep",
+      "rosuno_request_expiry_sweep",
+      "rosuno_consultation_media_sweep"
+    ],
+    "pg_cron_failed_runs": 0,
+    "reference_rows": {
+      "capability_definitions": 19,
+      "policy_types": 16,
+      "deployment_environment": 1,
+      "audit_events": 1
+    },
+    "auth_users": 0,
+    "storage": {
+      "buckets": 1,
+      "objects": 0,
+      "storage_policies": 0
+    },
+    "financial_gate": {
+      "permitted": false,
+      "reason": "environment_not_production",
+      "financial_rows": 0
+    },
+    "security_advisors": {
+      "error": 0,
+      "warn_anon_security_definer": 5,
+      "warn_authenticated_security_definer": 178,
+      "info_rls_enabled_no_policy": 25
+    }
+  },
+  "drift_baseline": {
+    "baseline_id": "rosuno-staging-mvp-001-s11-20261123-v1",
+    "extractor_sha256": "81a3c52a3567ba68b19b4451dd624d0d8d152a52c8550322dbf3b463284324ca",
+    "extractor_source": "owner-retained P3-904 Gate 5/6 evidence ZIP sha256 6e36c85a10862546d9af5a90df7c80f35057101fdb3f6f225b8b41e1aaf61809",
+    "run": "unmodified, read-only (transaction_read_only on), through the Staging connector behind a transport guard that rebuilt the received extractor and required its exact sha256 and length",
+    "attempts": "1: aborted by the guard before the extractor ran (the connector transport decoded the extractor's literal unicode escapes; received 16326 bytes, sha256 d1b24d5cf402c35099298633b4b527027a7415e4dcc322f7b977ab0367c9c7ff); 2: guard passed, extractor ran once",
+    "measured_at": "2026-11-23T13:35:17Z (container clock immediately after the run; the extractor returns no timestamp)",
+    "catalog_fingerprint": {
+      "format": "rosuno-p1-catalog-v1",
+      "sha256": "bb6b8eca349139bb13eff20b7573695d09dbbb1505eafd3c24bc4d66dbf43965",
+      "canonical_byte_length": 783638,
+      "row_count": 2258
+    }
+  },
+  "exceptions": [
+    "The first S1 attempt (script v2) stopped at its dry-run check with no change; v2.1 pinned the CLI output mode.",
+    "Claude's S5 expectation of four anonymous functions was a prediction error; three were correct and matched the replay.",
+    "One S6 diagnostic query field was not meaningful and was disregarded.",
+    "The documented set_updated_at() carriage-return variant on Staging remains an accepted exception."
+  ],
+  "evidence_packages": {
+    "s1_s7_application_zip_sha256": "624375c758df69b7b4c09e2a1623d416851d6abf584d1596c1852902d4aac226",
+    "s8_s11_preparation_zip_sha256": "14a35436b21b0de1d192ea0fa30ee8898e8dd1a0e126bad0d87c06b1f4b0d1d4",
+    "s1_s11_consolidated_zip_sha256": "2c2caba308fbd94c555fd6ee4a0b82aee6d2fc18be9f0cf009c62a01173961c4",
+    "owner_retained": true,
+    "external_to_repository": true
+  },
+  "release_ref": "REL-20261123-MVP-001-S1-S11-STAGING-APPLICATION",
+  "limitations": {
+    "production": "NOT_AUTHORIZED",
+    "hosting_deployment": "L6 HOLD (Packet rule 14)",
+    "provider_sandbox_l4": "outstanding (governance/readiness/outstanding-items.md)",
+    "staging_configuration": "catalogs, staff grants and intake question publication need a separate owner-authorized session"
+  },
+  "change_scope": {
+    "supabase_mutation_by_this_record": false,
+    "historical_migration_change": false
+  }
+}

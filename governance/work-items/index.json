@@ -2368,11 +2368,11 @@
         "Application to Staging, Production or any persistent database, publication of any question-set version to a persistent environment, and any release or deployment.",
         "AI Suggestions, voice memos and Storage, privacy and help surfaces, intake notices and disclosures (RMS REG-CA-035), intake expiry, post-submission revision, discovery and referral, and attorney or staff access to intake data."
       ],
-      "status": "in_progress",
+      "status": "completed",
       "owner": "NatthanPrevot",
       "reviewer": {
         "identity": "Rosuno",
-        "status": "pending"
+        "status": "approved"
       },
       "priority": "P2",
       "authority_refs": [
@@ -2396,7 +2396,8 @@
         "The P5-001 disposable PostgreSQL proof passes on the final head, including isolation, immutability, publication authority and digest, version selection, the practice-area Not sure contract, concurrency, rate limits, atomic audit, historical meaning, rollback and catalog reconciliation, and the application end-to-end flow.",
         "The re-pinned M4, P3-904 and registration abuse-control proofs, p0:validate, the P0 suite, typecheck and build pass on the final head, and the guard self-check prints ROSUNO-GUARD PASS.",
         "Designated human review approves the exact head before merge.",
-        "Post-merge record (MVP-001 S1 records, Packet REC-1): merged to owner main through PR #95, two-parent merge commit 91af560f2654f63ea20b19da75a166ca274d0ddf (committed 2026-11-15T17:25:23Z; merge tree equals the head tree). The PR #95 designated approval facts have not been supplied by the owner and are not recorded; the migration is not applied to any persistent environment. The PS-A1 Lock Condition is complete and its register status is active. Closure (DL-ENG-2 G4) waits for the approval facts and for Staging application or an owner decision not to apply yet."
+        "Post-merge record (MVP-001 S1 records, Packet REC-1): merged to owner main through PR #95, two-parent merge commit 91af560f2654f63ea20b19da75a166ca274d0ddf (committed 2026-11-15T17:25:23Z; merge tree equals the head tree). The PR #95 designated approval facts have not been supplied by the owner and are not recorded; the migration is not applied to any persistent environment. The PS-A1 Lock Condition is complete and its register status is active. Closure (DL-ENG-2 G4) waits for the approval facts and for Staging application or an owner decision not to apply yet.",
+        "Post-merge record (REC-1): PR #95 approved by Rosuno (2026-11-15T17:06:06Z) and merged as 91af560; the unchanged migration was applied to Rosuno Staging at an unknown time between 2026-11-15T19:48:26Z and 2026-11-16T06:24:40Z after rollback-only validation, and verified read-only by 2026-11-16T06:24:40Z (release REL-20261115-20261116-P5-001-STAGING-APPLICATION). Production, hosting deployment and question-set publication remain separate owner gates."
       ],
       "validation_commands": [
         "pnpm install --frozen-lockfile",
@@ -2412,12 +2413,12 @@
         "node apps/web/tests/m4-db-proof.mjs",
         "node apps/web/tests/registration-abuse-db-proof.mjs"
       ],
-      "environment": "none",
-      "release_refs": [],
+      "environment": "staging",
+      "release_refs": ["REL-20261115-20261116-P5-001-STAGING-APPLICATION"],
       "migration_refs": ["20261115140653_p5_001_client_intake_foundation"],
-      "rollback_reference": "Merged to owner main (91af560f2654f63ea20b19da75a166ca274d0ddf); the migration is historical (DL-ENG-1 R8) and not applied to any persistent environment. A defect is corrected only by a separately reviewed forward corrective migration; no destructive rollback, and no intake revision, question-set version, jurisdiction assessment or audit row is removed.",
+      "rollback_reference": "Applied to Rosuno Staging only. A verified defect requires a separately authorized, reviewed forward-only corrective migration; no intake revision, question-set version, jurisdiction assessment or audit row is removed.",
       "created_at": "2026-11-15T04:30:26Z",
-      "updated_at": "2026-11-17T01:40:55Z"
+      "updated_at": "2026-11-23T13:38:21Z"
     },
     {
       "work_item_id": "WI-P2-MVP-001-TECHNICAL-COMPLETION",
@@ -2435,7 +2436,7 @@
       "owner": "NatthanPrevot",
       "reviewer": {
         "identity": "Rosuno",
-        "status": "pending"
+        "status": "approved"
       },
       "priority": "P2",
       "authority_refs": [
@@ -2492,7 +2493,8 @@
         "S10: the earlier proofs, the application tests (Resend adapter and webhook contract tests, communications and the amended fences), p0:validate, the P0 suite, typecheck and build pass on the final head, the L4 Resend runner passes against the real Resend API with any L4 item not run recorded as outstanding, the local browser journey passes, and the guard self-check prints ROSUNO-GUARD PASS.",
         "S11: the MVP-001 S11 and S11 operations disposable PostgreSQL proofs pass on the final head, including completion types with their payment-matrix treatments, the server-qualified review flow, complaints, Legal Holds, audit and operations reads, attorney lifecycle operations (waitlist, rejoin prevention, audited suspension, reinstatement and removal), client administration, workspace reads with own-data-only and guessed-identifier refusals, and the four-way gate matrix with a production-class negative test for every gated operation; the non-production backup/restore proof passes.",
         "S11: the earlier proofs, the application tests (completion, operations, workspaces and the amended fences), p0:validate, the P0 suite, typecheck and build pass on the final head, the local browser journeys (completion, operations, workspaces) pass, the readiness pack is recorded under governance/readiness, and the guard self-check prints ROSUNO-GUARD PASS.",
-        "S11 (PS-A6): the MVP-001 S11 PS-A6 disposable PostgreSQL proof passes on the final head, covering break-glass grants (PS-A6 section 2: request, approval by another capability holder within 24 hours, revocation, derived states, the single audited read-only access path, guards for every role), data requests (PS-A6 section 3: client submission and withdrawal, staff assignment and decision, the Legal Hold rule for deletion, no executor), the complaint policy type (PS-A6 section 4: validation, selection, classify and resolve with configured codes) and the complaint statement (PS-A6 section 5: limits, immutability, restriction), with real concurrency; the S6 proof covers the offered-start containment (20261127220000); the PS-A6 local browser journey passes, and the earlier proofs, application tests and journeys pass on the final head."
+        "S11 (PS-A6): the MVP-001 S11 PS-A6 disposable PostgreSQL proof passes on the final head, covering break-glass grants (PS-A6 section 2: request, approval by another capability holder within 24 hours, revocation, derived states, the single audited read-only access path, guards for every role), data requests (PS-A6 section 3: client submission and withdrawal, staff assignment and decision, the Legal Hold rule for deletion, no executor), the complaint policy type (PS-A6 section 4: validation, selection, classify and resolve with configured codes) and the complaint statement (PS-A6 section 5: limits, immutability, restriction), with real concurrency; the S6 proof covers the offered-start containment (20261127220000); the PS-A6 local browser journey passes, and the earlier proofs, application tests and journeys pass on the final head.",
+        "Post-merge record: all eleven slice PRs (#96-#106) approved by Rosuno and merged; migrations 17-76 applied to Rosuno Staging only on 2026-11-23 under the owner's separate authorizations and verified read-only at every checkpoint (release REL-20261123-MVP-001-S1-S11-STAGING-APPLICATION); Staging's environment class recorded once as staging. Open items stay in governance/readiness/outstanding-items.md (L4 sandbox runs, the L6 HOLD, owner and counsel gates)."
       ],
       "validation_commands": [
         "pnpm install --frozen-lockfile",
@@ -2523,8 +2525,8 @@
         "node apps/web/tests/m4-db-proof.mjs",
         "node apps/web/tests/registration-abuse-db-proof.mjs"
       ],
-      "environment": "none",
-      "release_refs": [],
+      "environment": "staging",
+      "release_refs": ["REL-20261123-MVP-001-S1-S11-STAGING-APPLICATION"],
       "migration_refs": [
         "20261117010000_mvp_001_s1_environment_identity",
         "20261117020000_mvp_001_s1_professional_conformance",
@@ -2587,9 +2589,9 @@
         "20261127210000_mvp_001_s11_complaint_configuration",
         "20261127220000_mvp_001_s11_offered_start_containment"
       ],
-      "rollback_reference": "Before merge: forward-only correction commits on the Program branch. After merge: separately reviewed forward corrective migrations; no historical row is removed.",
+      "rollback_reference": "Migrations 17-76 are applied to Rosuno Staging only. A verified defect requires a separately authorized, reviewed forward corrective migration; no migration or history is rewritten and no historical row is removed.",
       "created_at": "2026-11-17T00:50:55Z",
-      "updated_at": "2026-11-23T01:03:44Z"
+      "updated_at": "2026-11-23T13:38:21Z"
     },
     {
       "work_item_id": "WI-P2-005-EXISTING-ACCOUNT-AUTHENTICATION-ENTRY",

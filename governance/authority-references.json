@@ -197,7 +197,7 @@
       "reinterpreted": false,
       "integrity": "sha256:34e7fcff469470a80baaf1dd6dbab35aa124c1734aadc2b5979efb9adff331c7",
       "usage": "reference-only",
-      "status": "pending_lock_condition"
+      "status": "active"
     }
   ]
 }
