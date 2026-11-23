@@ -3,7 +3,9 @@
 Read-only assessment of the committed tree at the S11 head `5283fda` (branch `wi/MVP-001-technical-completion`; owner
 `main` `b3205cd` plus the S11 records commit `cc22b8f`, S11 pass 1 `8e5d70a`, pass 2A `a3f68c5`, pass 2B with the
 ARCH-D14 correction `e6d45c6`, and the independent-review corrections `5283fda`). This is a verification of the
-existing architecture, not a redesign.
+existing architecture, not a redesign. The PS-A6 revision (`a3f6ddc` adoption records, `c445960` implementation,
+`d9d1151` review corrections and the S6 offered-start correction, `2a1b94f` verification corrections) is assessed at
+`2a1b94f` in section 7.4; a statement elsewhere describes `5283fda` unless it names a later commit.
 
 ## 0. Method and evidence standard
 
@@ -129,7 +131,8 @@ counts.
 - **Replace-forward functions.** 560 function definitions for 476 distinct functions (442 for 392 at S10). S11 adds 84
   functions and replaces 34 definitions forward. `policy_parameters_approvable` is defined six times (latest
   `20261127140000:175`), `payment_confirm_authorization` four times (latest `20261127180000:361`), `consultation_end`
-  three times (latest `20261127180000:1092`). S11 performs no `drop function`.
+  three times (latest `20261127180000:1092`). Up to `5283fda` S11 performed no `drop function`; at `2a1b94f`
+  `20261127210000` drops and re-creates three functions (section 7.4).
 - **Setting changes without restating bodies.** `20261127160000` alters the `search_path` of fifteen definer
   functions with `alter function … set` (D8) and changes no body, signature, owner or privilege, as S6 and S8 did for
   three trigger functions (`20261122010000:287–294`, `20261124010000:359–362`).
@@ -142,9 +145,12 @@ counts.
   S11 adds one relation, `reviews`, with exactly the PS §21.1 columns (`20261127040000`; S11 MIG-2), and no other
   relation or column: operations MIG-2, SURF-0 and CORR-0 assert that the catalog after each later S11 migration
   equals the catalog after pass 1 in every relation, column, type, constraint, index, row policy, policy type and
-  table-grant listing. PS-A6 is not adopted and nothing of it exists.
+  table-grant listing. At `5283fda` PS-A6 was not adopted and nothing of it existed; it was adopted in `a3f6ddc` and
+  implemented at `2a1b94f` with exactly two relations, one column, one policy type row and two capability rows and no
+  row policy (ps-a6 MIG-2; section 7.4).
 - **Function-only writes.** `reviews` (SELECT for authenticated under one row policy), `complaint_cases` and
-  `legal_holds` (no API role privilege) are written only through functions (S11 PRIV-1).
+  `legal_holds` (no API role privilege) are written only through functions (S11 PRIV-1); at `2a1b94f` so are
+  `break_glass_grants` and `data_requests` (no API role privilege; ps-a6 MIG-3).
 - **Function privileges.** Every S11 command and read is security definer with a pinned search_path and executable
   by `authenticated` only, except `public_attorney_reviews` (`anon` and `authenticated`, `20261127040000:534`); every
   internal, guard and trigger function S11 adds or replaces is executable by no API role, including
@@ -481,7 +487,7 @@ and cancellation entitlements, DOC-DEL and retention). S11 adds:
 | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | PM rows 11–16, 18, 21, 22 (cancellation, no-show, failure treatments) | Cancellations and the staff no-show and mid-consultation failure outcomes leave the payment as it is and open one review exception; no "late" classification. Exception: `neither_connected` (PM row 17, settled) releases an uncaptured authorization. An early completion follows row 20 with no refund | S11 STAFF-5, STAFF-6, CAN-1, CAN-2, EARLY-1    |
 | Review moderation rules                                               | Human publication by `moderate_reviews` holders; nothing automatic                                                                                                                                                                                                                                        | S11 REV-2, MBS16-3                             |
-| Complaint vocabularies (PS-A6 policy type)                            | `complaint_vocabulary` answers no selected vocabulary; classify and resolve answer `configuration_unavailable`                                                                                                                                                                                            | S11 CMP-4                                      |
+| Complaint vocabularies (PS-A6 §4 policy type; at `2a1b94f`)           | `complaint_vocabulary` (`20261127210000:164`) takes the version `policy_select_version` selects for the case's jurisdiction, or at platform scope for a case without one; none selectable, a conflict or invalid parameters answer `configuration_unavailable`; nothing seeded                            | S11 CMP-4; ps-a6 CV-1–CV-4                     |
 | Release or keep holding an authorization under a closed capture gate  | `capture_gate_closed` exception; nothing released automatically                                                                                                                                                                                                                                           | operations GATE-2, GATE-3                      |
 | Payment confirmed after a Consultation ended unperformed              | No capture and no Engagement; one high review item for a human (review correction R1)                                                                                                                                                                                                                     | S11 CORR-R1b, CORR-R1c                         |
 
@@ -541,15 +547,16 @@ adapters and the enumerating gate test S11B-1. The step-up gate pins 53 pages (`
 
 ### 6.5 The proof harness
 
-- 17 proof files, each with its own copy of the cluster bootstrap; S11 uses ports 54347 and 54348; the restore proof
-  uses 54350.
+- 17 proof files (18 at `2a1b94f`), each with its own copy of the cluster bootstrap; S11 uses ports 54347 and 54348 (and
+  54351 for the PS-A6 proof); the restore proof uses 54350.
 - Proofs are explicit-run only; CI (`.github/workflows/p0-controls.yml`) runs format, typecheck, build, the P0
   validator, the tool tests, the application tests, the secret scan and, in a separate job, the dependency audit; it
   runs no L2 proof, no L4 runner and no L5 journey.
 - Proofs run on PostgreSQL 16 without `pg_cron` and without the Storage schema; the hosted platform runs PostgreSQL 17.
-- **L5 scripts.** Three journey scripts are committed, all explicit-run, loopback and development class only:
-  `apps/web/tests/mvp-001-s11-l5-journey.mjs` (9 steps), `mvp-001-s11-l5-operations.mjs` (9 steps) and
-  `mvp-001-s11-l5-workspaces.mjs` (6 steps). No S1–S10 journey script is committed; their results are PR prose.
+- **L5 scripts.** Three journey scripts are committed (four at `2a1b94f`, with `mvp-001-s11-l5-ps-a6.mjs`, 8 steps), all
+  explicit-run, loopback and development class only: `apps/web/tests/mvp-001-s11-l5-journey.mjs` (9 steps),
+  `mvp-001-s11-l5-operations.mjs` (9 steps) and `mvp-001-s11-l5-workspaces.mjs` (6 steps). No S1–S10 journey script is
+  committed; their results are PR prose.
 - **Evidence summaries.** `governance/evidence/mvp-001-verification-evidence.json` (this pack) summarizes the recorded
   runs per slice and level. L4 result documents remain outside the repository.
 
@@ -619,6 +626,9 @@ upload path above 1 MB.
 | ARCH-D14 | S11 notification types unknown to the application readers           | **Fixed (`e6d45c6`)**                                    | `src/application/notifications.ts:62–74, 249, 282–297`; `src/application/notification-center.ts:71–72, 141–144`; `src/presentation/communication-labels.ts:326–330`                                      | S11C-14, S11C-15, S11C-16; operations SURF-8; L5 workspaces step 3                 |
 | R1–R6    | Independent review findings on the code (section 7.3)               | **Fixed (`5283fda`)**                                    | `20261127180000`                                                                                                                                                                                         | S11 CORR-R1a, R1b, R1c, R2, R5, R6; operations CORR-0, CORR-R3, CORR-R4            |
 | A1–A7    | Independent review findings on the application (section 7.3)        | **Fixed (`5283fda`)**                                    | Application files                                                                                                                                                                                        | S11B-7, S11B-11, S11B-19, S11C-7, S11C-12, S11C-17; S11-3, S11-15                  |
+| PS-A6    | PS-A6 review findings DB-1–DB-4, APP-1–APP-6 (section 7.4)          | **Fixed (`d9d1151`)**                                    | `20261127190000`, `20261127200000`, `20261127210000`; application files                                                                                                                                  | ps-a6 BG-5, BG-7, DR-1, DR-5, CV-1; PSA6-9                                         |
+| S6 start | Offered starts across two adjacent windows (S11 verification)       | **Fixed (`d9d1151`)**                                    | `request_slot_starts` `20261127220000:28`                                                                                                                                                                | S6 QUOTE-3 (added), QUOTE-2                                                        |
+| Recheck  | Legal Hold rule evaluated once per Resource (check of `d9d1151`)    | **Fixed (`2a1b94f`)**                                    | `data_request_legal_hold_applies` `20261127200000:132`                                                                                                                                                   | ps-a6 DR-7 (added), DR-5, CC-6                                                     |
 
 ### 7.2 Notes per item
 
@@ -628,8 +638,8 @@ upload path above 1 MB.
 - **ARCH-D2.** Creating Regulatory Modes and mapping them stay out of scope (M14; ARCH-F1).
 - **ARCH-D3.** Under a closed gate the payment stays authorized, no capture or capture job is created, and one
   critical `capture_gate_closed` exception records the problem; release or holding stays a human decision.
-- **ARCH-D4.** Committed now: the three L5 scripts and the restore proof; this pack adds the dated evidence summary.
-  Still outside the repository: the L4 result documents and any S1–S10 journey script.
+- **ARCH-D4.** Committed now: the L5 scripts (three at `5283fda`, four at `2a1b94f`) and the restore proof; this pack
+  adds the dated evidence summary. Still outside the repository: the L4 result documents and any S1–S10 journey script.
 - **ARCH-D5.** Remaining: `else true` for types with no reader (nothing to validate) and no scope-per-type rule
   (ARCH-F28).
 - **ARCH-D6.** Every application audit row is written inside a definer function (`20261127090000` header), but the
@@ -672,6 +682,172 @@ application files; the pack's own findings are applied in this revision.
 | R6    | A repeated complaint assignment was audited again                                                                                                                                                                                        | A repeated assignment to the current assignee changes and audits nothing (S11 CORR-R6)                                                                                                             |
 | A1–A7 | Application: pager parameter, week view across zones, compliance sections failing independently, complaint message, stale upcoming entries, system health requiring webhook settings, log lines and a two-step cancellation confirmation | S11B-19, S11C-12, S11C-17, S11B-11, S11C-7, S11B-7                                                                                                                                                 |
 
+### 7.4 PS-A6 implementation and the offered-start correction (assessed at `2a1b94f`)
+
+PS-A6 was adopted in `a3f6ddc` (authority register `PHYSICAL-SPECIFICATION-AMENDMENT-PS-A6-LOCKED`, status
+`pending_lock_condition`; Decision Log `DEC-20261122-PS-A6-BREAK-GLASS-DATA-REQUESTS-COMPLAINTS`), implemented in
+`c445960`, corrected in `d9d1151` (which also carries the S6 offered-start correction) and corrected again in
+`2a1b94f` after a further check. Four migrations follow the review corrections, each depending on the one before it,
+all `reviewed: false` and applied nowhere (ps-a6 MIG-1 for sequences 73–75; S6 MIG-1 for sequence 76). Sizes and
+SHA-256 at `2a1b94f`:
+
+| Sequence | File                                                       | Bytes  | SHA-256                                                            |
+| -------- | ---------------------------------------------------------- | ------ | ------------------------------------------------------------------ |
+| 73       | `20261127190000_mvp_001_s11_break_glass.sql`               | 37,555 | `5930b59c42d8a12a9c8fc79a546e7811f1bb8db10b022fc359f7f52556057de4` |
+| 74       | `20261127200000_mvp_001_s11_data_requests.sql`             | 31,039 | `6a4df26e92b7759905f975823ff05b5e81990bfd27539c82090000390520a641` |
+| 75       | `20261127210000_mvp_001_s11_complaint_configuration.sql`   | 23,501 | `f74a32b6cb54f1e82109d1a8df29f43186cfbef3d248627e7792056201094842` |
+| 76       | `20261127220000_mvp_001_s11_offered_start_containment.sql` | 4,519  | `48a81b347eb6e383137c2c669d8378243697d9475299e101c5c29e7f64ae5fd7` |
+
+At `d9d1151` sequence 74 was 28,636 bytes (SHA-256
+`8f3c902f3fb6438e2cd727fb068e7dc41b7f975d6efbfb593971816854fa5b8c`); `2a1b94f`, a forward commit on the unpublished
+branch, changed it in place. The other three files are unchanged since `d9d1151`.
+
+**What exists.**
+
+- **Break-glass (PS-A6 §2; `20261127190000`).** One relation, `break_glass_grants` (`:55`), with row level security
+  (`:108`), no privilege for any API role (`:259–260`) and one guard function for every role, the database owner
+  included (`:172`; triggers `:245, 250`). The states requested, active, expired and revoked are computed when read
+  (`break_glass_state`, `:132`); there is no state column and no job. A grant is approved by a holder of the new
+  capability `approve_break_glass` (`:123–124`) other than the requester, with a duration the approver supplies, 1
+  second to 24 hours with no default (`staff_approve_break_glass`, `:409`, bound at `:425–426`); the scope is the
+  existing `has_staff_capability` rule with the Consultation's jurisdiction (header `:33–35`). Revocation:
+  `staff_revoke_break_glass` (`:472`). The reason is not blank, at most 2,000 characters (`:85–86`) and never changed.
+  The one access path, `staff_break_glass_consultation(p_break_glass_id)` (`:649`), answers only the caller's own grant
+  that is active at statement time, for its one Consultation, and writes one audit event `break_glass.accessed` with
+  the grant id per access (`:796–801`); it returns the Consultation record, the newest 500 Messages and the document
+  list (metadata and current versions only). **Limitation:** document content is not served through break-glass,
+  because no existing server path can serve it under a break-glass-named authorization without widening a general
+  predicate (`:44–45`); this is listed as an optional enhancement. Break-glass is added to no general predicate,
+  storage policy or capability check (`:5–9`; ps-a6 BG-6). Surfaces: `app/staff/break-glass/page.tsx` and
+  `app/staff/break-glass/[grant]/page.tsx`, linked from the staff home for every active staff member
+  (`src/application/staff-configuration.ts:1701–1704`).
+- **Data requests (PS-A6 §3; `20261127200000`).** One relation, `data_requests` (`:59`), with row level security
+  (`:103`), no privilege for any API role (`:315–316`) and a guard for every role (`:250`; triggers `:301, 306`). Types
+  access, correction, deletion, export and restriction; states submitted → in_review → decided, with withdrawal before a
+  decision; outcomes allowed, restricted, deferred and denied; details at most 20,000 characters (`:99–100`), never
+  changed, shown only to the requester and to holders. The staff capability `manage_data_requests` (`:125–126`) needs a
+  global grant. The client commands and read (`:324, 371, 416`) use the client admission plus the `complaint_cases_mine`
+  admission, aal2 for a User who also holds an Attorney or Staff Profile (header `:40–43`). **The decision records an
+  outcome only:** no deletion, export, correction or restriction is executed (header `:22–23`); no executor exists, and
+  executors need separate authorization. **Legal Hold rule** (PS-A6 §3 rule 5): `deletion` with `allowed` is refused
+  while an unreleased Legal Hold covers the requester (`data_request_legal_hold_applies`, `:132`), for all five
+  `legal_holds` scope types (user, intake, consultation, resource, complaint_case), including Complaint Cases on the
+  requester's Consultations or Referrals and any requester Resource that `resource_under_legal_hold` reports held (for
+  example a user hold on the Consultation's counterparty); since `2a1b94f` those Resource scopes are gathered once and
+  matched against the holds in one pass (`:179`), with the coverage unchanged. It is enforced in the decision command
+  under a SHARE lock on `legal_holds` (`:599`) and in the guard (`:289–294`). Surfaces: `app/client/privacy/page.tsx`
+  (request form, own requests, withdrawal; neutral fixed labels, "Recorded decision"),
+  `app/staff/data-requests/page.tsx` and `app/staff/data-requests/[request]/page.tsx`.
+- **Complaint policy type (PS-A6 §4; `20261127210000`).** The catalog row `complaint` (`:45–46`). Approval validation
+  (`policy_parameters_approvable`, `:82`, branch `:155`) requires `category_codes` and `resolution_codes`, each 1 to 500
+  unique lower-snake codes (`complaint_parameters_valid`, `:54`; 500 is a fixed technical ceiling, not a policy value).
+  `complaint_vocabulary` (`:164`) selects the version through `policy_select_version` (`:179`) for the case's
+  jurisdiction, or at platform scope when the case names none; no selectable version answers
+  `configuration_unavailable`. Nothing is seeded and no code is a default. The staff policy pages can create, approve
+  and activate a complaint version, and the staff complaint page offers the configured codes (ps-a6 CV-2, CV-4; L5
+  ps-a6).
+- **Complaint statement (PS-A6 §5; `20261127210000`).** `complaint_cases.statement` (`:202–205`: null, or not blank
+  and at most 20,000 characters), written only at open (`complaint_open`, `:282`) and never changed
+  (`complaint_case_guard`, `:208`); returned only to the complainant (`complaint_cases_mine`, `:344`) and to
+  `manage_complaints` holders in scope (`staff_complaint_case`, `:369`); never to the other participant, any list, log,
+  notification or audit event (ps-a6 CV-5, CV-6).
+
+**The S6 offered-start correction (`20261127220000`).** `request_slot_starts` offered starts whose duration spanned two
+adjacent availability windows (for example rules 09:00–12:00 and 12:00–17:00 offered 11:30 for 60 minutes; a day
+ending at 24:00 next to one starting at 00:00 offered a start across midnight), which request creation then refused as
+`outside_availability` (header `:6–12`). It now keeps a start only when one window of
+`scheduling_expand_availability` contains the whole slot, as `scheduling_slot_problem` requires (`:14–22`), with
+`jit = off` for its own run (`:38`). Bookability, evidence, the discovery display and privileges are unchanged (header
+`:24–26`). The Builder's validation found it (S6 REQ-2 failed when run between 22:00 and 22:30 UTC on 2026-11-22); S6
+QUOTE-3 (new) and a containment check in QUOTE-2 cover it. It is a defect in a merged slice found during S11
+verification and fixed.
+
+**Counts at `2a1b94f`** (static, the method of section 0; deltas from `5283fda` in parentheses).
+
+- Migrations: 76 files, 49,448 lines (+4, +2,162); S11 is 22 files and 10,526 lines, register sequences 55–76.
+- Relations: 69 from 71 `create table` statements (+2: `break_glass_grants`, `data_requests`), plus one column,
+  `complaint_cases.statement`.
+- Functions: 590 definitions for 499 distinct functions (+30, +23). The PS-A6 migrations add 23 functions
+  (`20261127190000` 13, `20261127200000` 9, `20261127210000` 1) and replace seven: four with `create or replace`
+  (`policy_parameters_approvable`, now defined seven times, latest `20261127210000:82`; `complaint_vocabulary`;
+  `complaint_case_guard`; and `request_slot_starts`, `20261127220000:28`) and three with `drop function` and `create`
+  (`complaint_open`, gaining the optional statement; `complaint_cases_mine`; `staff_complaint_case`;
+  `20261127210000:280, 342, 367`). S11 now adds 107 functions and replaces 41 definitions forward. No replaced function
+  changes its security mode.
+- Security mode: 226 security definer and 273 security invoker (+14: the seven break-glass and seven data-request
+  commands and reads; +9: their internal and guard functions and `complaint_parameters_valid`). Every PS-A6 command and
+  read is security definer with `search_path` `pg_catalog, pg_temp`, executable by `authenticated` only, the volatile
+  ones with lock waits bounded at 3 s; every internal, guard and trigger function is executable by no API role, and
+  `anon` and `service_role` are refused alike (ps-a6 PRIV-1).
+- Triggers: 181 `create trigger` statements (+5: two on `break_glass_grants`; three on `data_requests`, one of them the
+  house `set_updated_at`).
+- Row policies: 49 (unchanged; ps-a6 MIG-2 asserts no row policy).
+- Catalog rows: 19 capability codes (+2: `approve_break_glass`, `manage_data_requests`); one policy type (`complaint`).
+- Application: 89 pages, 33 action modules, 37 form modules, 47 client modules and 17 label modules (+4, +3, +3, +3,
+  +1: `src/presentation/privacy-labels.ts`); new use cases `src/application/break-glass.ts` and `data-requests.ts`
+  and the adapter `src/infrastructure/privacy/privacy-adapter.ts`, which calls its thirteen functions through the
+  request's own client (PSA6-6); the step-up gate pins 57 pages (`tests/step-up-routes.test.mjs:211`).
+- Tests: 18 L2 proof files with 687 checks (ps-a6 32, new, port 54351, DR-7 added in `2a1b94f`; S6 33 with QUOTE-3); 57
+  L1/L3 files, the application suite 726 tests (+9: PSA6-1–PSA6-9); four L5 journey scripts
+  (`apps/web/tests/mvp-001-s11-l5-ps-a6.mjs` added, 8 steps).
+- The restore drill's live catalog at `d9d1151` moved by the same amounts: functions 478 → 501, relations 68 → 70,
+  triggers 171 → 176, row policies 47 → 47 (`backup-restore-procedure.md`, runs 5 and 6). `2a1b94f` adds or removes no
+  object.
+
+**Independent review of the PS-A6 implementation.** `c445960` was independently reviewed on 2026-11-22 by two separate
+review agents (database migrations and proofs; application code and tests). Its findings, cited with the review's own
+identifiers (distinct from the findings DB-1 to DB-8 of section 2), were all accepted and corrected in `d9d1151`:
+
+| Review finding | What                                                                                                                                                                  | Correction                                                                           |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| DB-1           | Medium, reproduced: the Legal Hold rule missed resources the house resource coverage reports held                                                                     | Covered in `d9d1151`; matched in one pass since `2a1b94f` (`20261127200000:132`)     |
+| DB-2           | Complaint Cases on the requester's Referrals were not counted                                                                                                         | Counted (`20261127200000:132`)                                                       |
+| DB-3           | The break-glass guard allowed approval changes on a revoked grant and an approval instant ahead of the clock; the approval check lacked `approved_at >= requested_at` | Guard `20261127190000:218–232`; check `:95`                                          |
+| DB-4           | Dual-role Users were admitted to client data-request commands at aal1                                                                                                 | aal2 for a User who also holds an Attorney or Staff Profile (`20261127200000:40–43`) |
+| BG-5, DR-5     | Proof gaps: a requester deactivated or suspended after approval; counterparty paths                                                                                   | ps-a6 BG-5 and DR-5 extended                                                         |
+| APP-1          | Medium: application readers measured UTF-16 units where the database counts characters                                                                                | Corrected                                                                            |
+| APP-2          | No page refresh after approval or revocation                                                                                                                          | Refreshed (PSA6-9)                                                                   |
+| APP-3          | No database ceiling on code lists                                                                                                                                     | 500 per list (`20261127210000:54`)                                                   |
+| APP-4          | A statement hint making a promise                                                                                                                                     | A neutral hint                                                                       |
+| APP-5          | "Decision" label                                                                                                                                                      | "Recorded decision"                                                                  |
+| APP-6          | Wrong refusal for a caller without an active Staff Profile                                                                                                            | Corrected                                                                            |
+| PSA6-7; revoke | Test gaps: column names; untested revoke outcomes                                                                                                                     | Tested                                                                               |
+
+Against the uncorrected migrations the amended PS-A6 proof fails BG-7, DR-1, DR-5 and CV-1.
+
+A further independent check of the correction commit `d9d1151` was performed on 2026-11-23 by a separate review agent
+(disposable cluster, all 76 migrations). Its findings:
+
+- **Medium, reproduced and fixed in `2a1b94f`.** Problem: `data_request_legal_hold_applies` evaluated
+  `resource_under_legal_hold` once per Resource of the requester. With 5,000 documents and 200 unreleased holds this
+  took 2.4–2.6 s per evaluation, run twice per decision while it held the SHARE lock on `legal_holds`; a concurrent
+  hold placement with `lock_timeout` 3s failed with 55P03. Fix: the Resource scopes are gathered once and matched
+  against the holds in one pass, with the coverage unchanged (`20261127200000:132`, scopes from `:179`). New proof
+  check ps-a6 DR-7: 8,000 Resources and 400 unrelated holds; zero calls of `resource_under_legal_hold` per evaluation;
+  under one second (about 117 ms measured); agreement with `resource_under_legal_hold`. DR-7 fails against the
+  per-Resource form: 8,000 calls, over one second.
+- **Low, fixed in `2a1b94f`.** The break-glass approval and revocation outcome slot depended on client script; it now
+  shows the server-rendered outcome before hydration (`app/staff/break-glass/forms.tsx`). L1 PSA6-9 is extended.
+- **Low, assessed as not a defect.** An upload committed concurrently with a deletion decision can make a counterparty
+  user hold cover the client only after the decision. That is equivalent to the decision coming first, and PS-A6 §3
+  rule 5 governs holds at decision time.
+- **Informational, no change.** The database owner can write approval and revocation in one statement (the result
+  reads revoked, with no access), and a `revoked_at` in the future is accepted for the owner only; no API role or
+  definer path does either.
+- **Low, already listed.** Dual-role Users at aal1 see an empty privacy list and a denied submission, with no step-up
+  hint (an optional enhancement; `outstanding-items.md`, section 13.3).
+- **Nothing found** on `request_slot_starts` (4,200 randomized cases across 16 time zones and DST transitions, 0
+  mismatches against the bookability reference; ACL, owner and volatility unchanged), on `withinCharacters`
+  (`src/application/workspace-support.ts:229`) against `char_length`, on the `notification_caller` admission, or on
+  the test amendments (no assertion removed or loosened).
+
+The ps-a6 proof, with DR-7, passed 32/32 on 2026-11-23 on the `2a1b94f` tree (Builder record). L5 was not re-run after
+`2a1b94f`: the change is an internal SQL rewrite with the same coverage plus a no-script fallback, covered by L2
+(ps-a6 DR-5, DR-7, CC-6) and L1 (PSA6-9).
+
+No external review (ChatGPT or the Independent Backup) was performed. The IMP §40 security review has not been
+performed.
+
 ---
 
 ## 8. FOLLOW-UP items
@@ -703,7 +879,7 @@ ARCH-F1 to ARCH-F19 are the S1–S10 follow-ups, updated for S11; ARCH-F20 onwar
 | ARCH-F21 | Waitlist and pre-existing Referrals                  | A Request created from a Referral made before its jurisdiction moved to the waitlist is not blocked; open Requests at that move (pass 2A owner question 7).                                      |
 | ARCH-F22 | Verification page outcome `review_required`          | Shown as locked on the verification page (pass 2A owner question 4).                                                                                                                             |
 | ARCH-F23 | D9 remainder                                         | The two route readers accept `http://` in every class; one shared reader with the class rule (pass 2A owner question 5).                                                                         |
-| ARCH-F24 | PS-A6 features                                       | Break-glass, data requests, complaint vocabulary and statement: built only after the owner approves PS-A6 (decision note, not approved).                                                         |
+| ARCH-F24 | PS-A6 features                                       | **Closed**: implemented at `2a1b94f` (section 7.4). Left as optional: break-glass document content; data-request executors need separate authorization.                                          |
 | ARCH-F25 | Audit security group                                 | No action code records a step-up or a privileged denial (pass 2A owner question 2).                                                                                                              |
 | ARCH-F26 | Account administration boundaries                    | Staff accounts and, since R3, Users holding an Attorney Profile are excluded from client administration, fail-closed choices (pass 2A question 3; correction-pass question 8).                   |
 | ARCH-F27 | Early completion confirmation                        | The attorney's recorded declaration is the agreement; a two-party confirmation needs a lifecycle state (S11 pass 1 owner question).                                                              |
@@ -727,14 +903,33 @@ ARCH-F1 to ARCH-F19 are the S1–S10 follow-ups, updated for S11; ARCH-F20 onwar
   R5 revision changes only production-class paths): `mvp-001-s11-l5-journey.mjs` 9/9, `mvp-001-s11-l5-operations.mjs`
   9/9, `mvp-001-s11-l5-workspaces.mjs` 6/6; no CSP or console errors. Earlier pass runs: pass 1 7/7, pass 2A 8/8,
   pass 2B 5/5, 7/7 and 8/8.
-- **Restore drill** (`apps/web/tests/mvp-001-s11-restore-proof.mjs`, disposable PostgreSQL 16): final run at
-  `5283fda` (2026-11-22T19:04:02Z, 72 migrations, 7/7 PASS); earlier runs at `e6d45c6` (71 migrations) and three
-  against 61 migrations (`backup-restore-procedure.md`).
+- **PS-A6 validation** on the `d9d1151` tree (Builder run, 2026-11-22 between 22:59 and 23:13 UTC): `format:check`,
+  `typecheck`, `build` and `p0:validate` pass; `p0:test` 1,354/1,354 and the application L1 suite 726/726;
+  `secrets:check` passed (623 files); `dependency:check` no known vulnerabilities. DB proofs: ps-a6 31 (new), operations
+  55, S11 57, S10 55, S9 48, S8 51, S7 36, S6 33, offers 18, S5 29, S4 46, S3 35, S2 40, S1 27, p5-001 41, p3-904 37, m4
+  13, registration-abuse 34 (cleanup clean) (686), all passing. S2 (ABUSE-3, ABUSE-4) and S9 (TIME-4) first failed in
+  that run because their fixtures cross UTC midnight when run between 23:00 and 24:00 UTC; the unmodified `c445960` tree
+  failed identically at that hour, and both passed in full when re-run on 2026-11-23 between 00:01 and 00:03 UTC (a
+  proof-fixture time-of-day dependence in merged slices, not a product defect). On the `2a1b94f` tree the ps-a6 proof,
+  with DR-7, passed 32/32 on 2026-11-23; the final re-run of every DB proof and the restore proof on that migration set
+  goes to the evidence JSON.
+- **L5 for the PS-A6 revision** on a fresh local stack with all 76 migrations and a development-class record
+  (2026-11-22): `mvp-001-s11-l5-ps-a6.mjs` 8/8, journey 9/9, operations 9/9, workspaces 6/6; no console errors, no CSP
+  violations. The first ps-a6 attempt refused to run because the reset database had no environment record (the
+  documented prerequisite), then passed. L5 was not re-run after `2a1b94f` (section 7.4).
+- **Restore drill** (`apps/web/tests/mvp-001-s11-restore-proof.mjs`, disposable PostgreSQL 16): run 7 at
+  `2a1b94f` (2026-11-23T00:46:26Z, 76 migrations, the final set, 7/7 PASS); run 6 at `d9d1151`
+  (2026-11-23T00:07:05Z, 76 migrations, 7/7 PASS); earlier runs at `5283fda` (2026-11-22T19:04:02Z, 72
+  migrations, 7/7 PASS), at `e6d45c6` (71 migrations) and three against 61 migrations (`backup-restore-procedure.md`).
 - **Independent review** of the code and of this pack: performed 2026-11-22 by three separate review agents; findings
-  fixed in `5283fda` and in this revision (section 7.3). No external review (ChatGPT or the Independent Backup).
+  fixed in `5283fda` and in this revision (section 7.3). The PS-A6 implementation `c445960`: reviewed 2026-11-22 by two
+  separate review agents; findings fixed in `d9d1151`. The correction commit `d9d1151`: checked 2026-11-23 by a separate
+  review agent; findings fixed in `2a1b94f` or assessed (section 7.4). No external review (ChatGPT or the Independent
+  Backup).
 - **For this document**: static reads and counts of the committed tree at `5283fda` (and, to calibrate the counting
-  method, of `b3205cd` and `a3f68c5`); `pnpm exec prettier`, `pnpm run secrets:check` and `pnpm run p0:validate` on the
-  pack. No build, test, proof, server or network call was run for this document itself.
+  method, of `b3205cd` and `a3f68c5`), and of `2a1b94f` for section 7.4 (the counting method reproduces the `5283fda`
+  figures exactly); `pnpm exec prettier`, `pnpm run secrets:check` and `pnpm run p0:validate` on the pack. No build,
+  test, proof, server or network call was run for this document itself.
 
 ### Not verified
 

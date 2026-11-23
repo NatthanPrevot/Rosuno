@@ -476,6 +476,32 @@
           "content": "Corrections of the independent review: R1 to R6 in migration 20261127180000_mvp_001_s11_review_corrections (register sequence 72; eleven functions replaced; one internal function added; no relation, column, policy, policy type or seed) and A1 to A7 in application files",
           "l1_l3": "S11B-7, S11B-11, S11B-19, S11C-7, S11C-12, S11C-17, S11-3, S11-15",
           "l2": "apps/web/tests/mvp-001-s11-db-proof.mjs CORR-R1a, CORR-R1b, CORR-R1c, CORR-R2, CORR-R5, CORR-R6; apps/web/tests/mvp-001-s11-operations-db-proof.mjs CORR-0, CORR-R3, CORR-R4"
+        },
+        {
+          "pass": "PS-A6 implementation",
+          "commit": "c4459601fb07a1eff0ad3bc534c972d602bf79bc",
+          "committed_at": "2026-11-22T22:10:44Z",
+          "content": "PS-A6 sections 2 to 5, adopted in a3f6ddc (authority register PHYSICAL-SPECIFICATION-AMENDMENT-PS-A6-LOCKED, status pending_lock_condition; Decision Log DEC-20261122-PS-A6-BREAK-GLASS-DATA-REQUESTS-COMPLAINTS): break-glass grants with one audited read-only access path, data requests with the Legal Hold rule (a decision records an outcome only; nothing is executed), the complaint policy type and the complaint statement (migrations 20261127190000 to 20261127210000; register sequences 73 to 75); staff pages /staff/break-glass and /staff/data-requests and the client privacy page's request form",
+          "l1_l3": "apps/web/tests/mvp-001-s11-ps-a6.test.mjs (8 tests at c445960; PSA6-1 to PSA6-9 at d9d1151)",
+          "l2": "apps/web/tests/mvp-001-s11-ps-a6-db-proof.mjs (31 checks at c445960 and d9d1151: MIG-1 to MIG-4, PRIV-1, BG-1 to BG-7, DR-1 to DR-6, CV-1 to CV-6, CC-1 to CC-7; 32 at 2a1b94f with DR-7)",
+          "l5_script": "apps/web/tests/mvp-001-s11-l5-ps-a6.mjs (committed; explicit-run, loopback and development class only; 8 steps)"
+        },
+        {
+          "pass": "PS-A6 review corrections and the S6 offered-start correction",
+          "commit": "d9d115110b1049dd637e3a2c99ab45b58012cc78",
+          "committed_at": "2026-11-23T00:06:02Z",
+          "content": "Corrections of the independent PS-A6 review (DB-1 to DB-4, the proof gaps BG-5 and DR-5, APP-1 to APP-6, the test gaps PSA6-7 and untested revoke outcomes) in the three PS-A6 migrations and application files; migration 20261127220000_mvp_001_s11_offered_start_containment (register sequence 76): request_slot_starts keeps an offered start only when one availability window contains the whole slot, with jit off for its own run (a defect in S6 found by the Builder's validation during S11 verification)",
+          "l1_l3": "apps/web/tests/mvp-001-s11-ps-a6.test.mjs PSA6-9 (added), PSA6-1 to PSA6-5 and PSA6-7 (amended); apps/web/tests/mvp-001-s11-completion.test.mjs S11-11 and S11-15 (amended)",
+          "l2": "apps/web/tests/mvp-001-s11-ps-a6-db-proof.mjs BG-5, BG-7, DR-1, DR-5, CV-1 (amended; against the uncorrected migrations the amended proof fails BG-7, DR-1, DR-5 and CV-1); apps/web/tests/mvp-001-s6-db-proof.mjs QUOTE-3 (added) and a containment check in QUOTE-2"
+        },
+        {
+          "pass": "PS-A6 verification corrections",
+          "commit": "2a1b94f82c3377fd2544b2402ea8852c13d0b017",
+          "committed_at": "2026-11-23T00:34:10Z",
+          "content": "Corrections from the further independent check of d9d1151: data_request_legal_hold_applies gathers the Resource scopes once and matches them against the holds in one pass, with the coverage unchanged (migration 20261127200000_mvp_001_s11_data_requests changed in place on the unpublished branch: 31,039 bytes, sha256 6a4df26e92b7759905f975823ff05b5e81990bfd27539c82090000390520a641; 28,636 bytes, sha256 8f3c902f3fb6438e2cd727fb068e7dc41b7f975d6efbfb593971816854fa5b8c at d9d1151); the break-glass approval and revocation outcome slot shows the server-rendered outcome before hydration",
+          "l1_l3": "apps/web/tests/mvp-001-s11-ps-a6.test.mjs PSA6-9 (extended)",
+          "l2": "apps/web/tests/mvp-001-s11-ps-a6-db-proof.mjs DR-7 (added: 8,000 Resources and 400 unrelated holds; zero calls of resource_under_legal_hold per evaluation; under one second, about 117 ms measured; agreement with resource_under_legal_hold; fails against the per-Resource form: 8,000 calls, over one second)",
+          "l5": "Not re-run after 2a1b94f: an internal SQL rewrite with the same coverage plus a no-script fallback, covered by L2 DR-5, DR-7 and CC-6 and by L1"
         }
       ],
       "final_validation": {
@@ -524,6 +550,85 @@
         "outcome": "Confirmed code defects R1 to R6 and A1 to A7 corrected in 5283fda; the pack's own findings applied in this revision",
         "external_review": "None (no ChatGPT or Independent Backup review)",
         "imp_section_40_security_review": "Not performed"
+      },
+      "validation_ps_a6_d9d1151": {
+        "commit": "d9d115110b1049dd637e3a2c99ab45b58012cc78",
+        "tree": "The tree of d9d1151",
+        "date": "2026-11-22, between 22:59 and 23:13 UTC; the S2 and S9 proofs re-run on 2026-11-23 between 00:01 and 00:03 UTC",
+        "format_typecheck_build_validate": "pnpm run format:check, typecheck, build and p0:validate pass",
+        "secrets_check": "Passed (623 files)",
+        "dependency_check": "No known vulnerabilities",
+        "tool_tests": "1,354/1,354",
+        "application_tests": "726/726",
+        "proofs": {
+          "mvp-001-s11-ps-a6": "31 PASS (new)",
+          "mvp-001-s11-operations": "55 PASS",
+          "mvp-001-s11": "57 PASS",
+          "mvp-001-s10": "55 PASS",
+          "mvp-001-s9": "48 PASS (on the re-run)",
+          "mvp-001-s8": "51 PASS",
+          "mvp-001-s7": "36 PASS",
+          "mvp-001-s6": "33 PASS",
+          "mvp-001-s6-offers": "18 PASS",
+          "mvp-001-s5": "29 PASS",
+          "mvp-001-s4": "46 PASS",
+          "mvp-001-s3": "35 PASS",
+          "mvp-001-s2": "40 PASS (on the re-run)",
+          "mvp-001-s1": "27 PASS",
+          "p5-001": "41 PASS",
+          "p3-904": "37 PASS",
+          "m4": "13 PASS",
+          "registration-abuse": "34 PASS (cleanup clean)",
+          "total_checks": 686
+        },
+        "proof_time_of_day_dependence": "S2 (ABUSE-3, ABUSE-4) and S9 (TIME-4) first failed in the 2026-11-22 run because their fixtures cross UTC midnight when run between 23:00 and 24:00 UTC; the unmodified c445960 tree failed identically at that hour; both passed in full when re-run on 2026-11-23 between 00:01 and 00:03 UTC. A proof-fixture time-of-day dependence in merged slices, not a product defect; the DB proofs are explicit-run (not CI); an optional follow-up (FIX Packet recommended)",
+        "migrations": "76 (S11: 22 files, register sequences 55 to 76; sequences 73 to 76 reviewed false, applied nowhere)",
+        "l5_journeys": {
+          "date": "2026-11-22",
+          "environment": "Fresh local stack with all 76 migrations, development-class record",
+          "apps/web/tests/mvp-001-s11-l5-ps-a6.mjs": "8/8 PASS",
+          "apps/web/tests/mvp-001-s11-l5-journey.mjs": "9/9 PASS",
+          "apps/web/tests/mvp-001-s11-l5-operations.mjs": "9/9 PASS",
+          "apps/web/tests/mvp-001-s11-l5-workspaces.mjs": "6/6 PASS",
+          "ps_a6_journey": "Break-glass request by one staff member and approval by another, read-only access audited per access, revocation and refusal after; client data request submitted, assigned and decided, deletion-allowed refused under a Legal Hold, withdrawal; a complaint with a statement seen by staff and not by the counterparty; a complaint policy version created, approved and activated through the staff policy pages, then classification and resolution with its codes. The journey script's step 3b now uses a real complaint policy version (no synthetic function fixture)",
+          "observations": "No console errors and no CSP violations. The first ps-a6 attempt refused to run because the reset database had no environment record (the documented prerequisite), then passed. The stack was stopped and the scratch configuration restored afterwards"
+        },
+        "l4": "No L4 run",
+        "guard_self_check": "Not stated in the source",
+        "source": "Builder record"
+      },
+      "independent_review_ps_a6": {
+        "performed": "2026-11-22",
+        "reviewed": "The PS-A6 implementation, c4459601fb07a1eff0ad3bc534c972d602bf79bc",
+        "by": "Two separate review agents: database migrations and proofs; application code and tests",
+        "findings": "DB-1 (medium, reproduced) the Legal Hold rule missed resources the house resource coverage reports held; DB-2 Complaint Cases on the requester's Referrals were not counted; DB-3 the break-glass guard allowed approval changes on a revoked grant and an approval instant ahead of the clock, and the approval check lacked approved_at >= requested_at; DB-4 dual-role Users were admitted to client data-request commands at aal1; proof gaps BG-5 (deactivated or suspended requester after approval) and DR-5 (counterparty paths); APP-1 (medium) application readers measured UTF-16 units where the database counts characters; APP-2 no page refresh after approval or revocation; APP-3 no database ceiling on code lists (now 500); APP-4 a statement hint making a promise (now a neutral hint); APP-5 the label Decision (now Recorded decision); APP-6 wrong refusal for a caller without an active Staff Profile; test gaps PSA6-7 (column names) and untested revoke outcomes",
+        "outcome": "All findings accepted and corrected in d9d115110b1049dd637e3a2c99ab45b58012cc78; against the uncorrected migrations the amended PS-A6 proof fails BG-7, DR-1, DR-5 and CV-1",
+        "external_review": "None (no ChatGPT or Independent Backup review)",
+        "imp_section_40_security_review": "Not performed",
+        "source": "Builder record"
+      },
+      "independent_check_d9d1151": {
+        "performed": "2026-11-23",
+        "checked": "The correction commit d9d115110b1049dd637e3a2c99ab45b58012cc78",
+        "by": "A separate review agent (disposable cluster, all 76 migrations)",
+        "findings": [
+          "Medium, reproduced and fixed in 2a1b94f: data_request_legal_hold_applies evaluated resource_under_legal_hold once per Resource of the requester; with 5,000 documents and 200 unreleased holds this took 2.4 to 2.6 s per evaluation, run twice per decision while it held the SHARE lock on legal_holds, and a concurrent hold placement with lock_timeout 3s failed with 55P03. Fix: the Resource scopes are gathered once and matched against the holds in one pass, with coverage unchanged. New proof DR-7",
+          "Low, fixed in 2a1b94f: the break-glass approval and revocation outcome slot depended on client script; it now shows the server-rendered outcome before hydration; L1 PSA6-9 extended",
+          "Low, assessed as not a defect: an upload committed concurrently with a deletion decision can make a counterparty user hold cover the client only after the decision, which is equivalent to the decision coming first; PS-A6 section 3 rule 5 governs holds at decision time",
+          "Informational, no change: the database owner can write approval and revocation in one statement (the result reads revoked, no access), and a revoked_at in the future is accepted for the owner only; no API role or definer path does either",
+          "Low, already listed: dual-role Users at aal1 see an empty privacy list and a denied submission, with no step-up hint (optional enhancement)",
+          "Nothing found on: request_slot_starts (4,200 randomized cases across 16 time zones and DST transitions, 0 mismatches against the bookability reference; ACL, owner and volatility unchanged); withinCharacters against char_length; the notification_caller admission; the test amendments (no assertion removed or loosened)"
+        ],
+        "external_review": "None (no ChatGPT or Independent Backup review)",
+        "imp_section_40_security_review": "Not performed",
+        "source": "Builder record"
+      },
+      "validation_ps_a6_2a1b94f": {
+        "commit": "2a1b94f82c3377fd2544b2402ea8852c13d0b017",
+        "ps_a6_proof": "apps/web/tests/mvp-001-s11-ps-a6-db-proof.mjs 32/32 PASS on 2026-11-23 on the tree of 2a1b94f",
+        "final_l2_rerun": "2026-11-23 00:33:49–00:46:32 UTC, all 18 proofs PASS, 687/687 checks (ps-a6 32, operations 55, s11 57, s10 55, s9 48, s8 51, s7 36, s6 33, s6-offers 18, s5 29, s4 46, s3 35, s2 40, s1 27, p5-001 41, p3-904 37, m4 13, registration-abuse 34), each cluster removed; restore run 7 PASS 7/7",
+        "l5": "Not re-run after 2a1b94f: the change is an internal SQL rewrite with the same coverage plus a no-script fallback, covered by L2 DR-5, DR-7 and CC-6 and by L1",
+        "source": "Builder record"
       }
     }
   ],
@@ -571,7 +676,7 @@
         "result": "PASS"
       },
       {
-        "run": "5 (final)",
+        "run": "5 (at 5283fda)",
         "commit": "5283fdab79ceaa182cab8a4365a9976853f4edfa",
         "started_at": "2026-11-22T19:04:02Z",
         "migrations": 72,
@@ -583,9 +688,49 @@
         "environment_record": "class development restored unchanged; the environment-record hazard check passes",
         "checks": "7/7 PASS",
         "result": "PASS"
+      },
+      {
+        "run": "6 (at d9d1151)",
+        "commit": "d9d115110b1049dd637e3a2c99ab45b58012cc78",
+        "started_at": "2026-11-23T00:07:05Z",
+        "migrations": 76,
+        "last_migration": "20261127220000_mvp_001_s11_offered_start_containment",
+        "migration_set_sha256": "dede44cbe2ae7ea6ff46b9370d1a190cf16807e0d9f2b96a31c56623d0d4389c",
+        "catalog_overall_sha256": "7264fe266200f7fa706218a3888e0723152608939cc46563e16fb5f834e2a154",
+        "dump": "custom format, 1,936,508 bytes, sha256 prefix a9411351bd0f, 2,378 table-of-contents entries",
+        "catalog": "501 functions, 70 relations, 672 columns, 606 constraints, 200 indexes, 176 triggers, 47 row policies",
+        "rows": "70 tables, 54 synthetic rows",
+        "postgresql": "16.15",
+        "pg_restore": "exit 0, no error lines",
+        "environment_record": "class development restored unchanged; the environment-record hazard check passes",
+        "hosted_only_steps": "Not performed (L6, HOLD)",
+        "checks": "7/7 PASS",
+        "result": "PASS",
+        "total_time": "4,904 ms",
+        "date_source": "Start instant recorded by the Builder"
+      },
+      {
+        "run": "7 (final, at 2a1b94f)",
+        "commit": "2a1b94f82c3377fd2544b2402ea8852c13d0b017",
+        "started_at": "2026-11-23T00:46:26Z",
+        "migrations": 76,
+        "last_migration": "20261127220000_mvp_001_s11_offered_start_containment",
+        "migration_set_sha256": "e652545f9f5c605a50bbc7a912db0bd69986992b411e8b270e4ca45d8256e9b9",
+        "catalog_overall_sha256": "3d16f951e7727621d075a5005134758c658638aa114afc34256350958657d6b6",
+        "dump": "custom format, 1,938,795 bytes, sha256 e8fce4bc29113e0da5add8da32d710e1cf461ba8b88c014d545229ea350d7a56, 2,378 table-of-contents entries",
+        "catalog": "501 functions, 70 relations, 672 columns, 606 constraints, 200 indexes, 176 triggers, 47 row policies",
+        "rows": "70 tables, 54 synthetic rows",
+        "postgresql": "16.15",
+        "pg_restore": "exit 0, no error lines",
+        "environment_record": "class development restored unchanged; the environment-record hazard check passes",
+        "hosted_only_steps": "Not performed (L6, HOLD)",
+        "checks": "7/7 PASS",
+        "result": "PASS",
+        "total_time": "5,516 ms",
+        "date_source": "Start instant recorded by the Builder"
       }
     ],
-    "date_source": "Runs 1 to 3: file dates (UTC) of the run report documents; runs 4 and 5: start instants; all recorded by the Builder (the reports stay outside the repository)"
+    "date_source": "Runs 1 to 3: file dates (UTC) of the run report documents; runs 4 to 7: start instants; all recorded by the Builder (the reports stay outside the repository)"
   },
   "not_run": [
     "Any L6 (hosted) verification",

@@ -9,7 +9,10 @@ This is preparation, not authorization: configuring production, making a jurisdi
 payments are outside the Program (Packet §4).
 
 State: the S11 head `5283fda`. Re-verified with `git grep -n "process.env" 5283fda -- apps/web` and the setting
-declarations of each adapter. Paths are relative to `apps/web/`.
+declarations of each adapter. Re-checked at `2a1b94f`: the PS-A6 revision adds no `process.env` read under
+`apps/web/src` or `apps/web/app` (`git diff 5283fda 2a1b94f -- apps/web/src apps/web/app`), so the application reads no
+new setting; the revision's only new reader of settings is the explicit-run PS-A6 L5 script (section 3). Paths are
+relative to `apps/web/`.
 
 ## 1. Kinds and the common rule
 
@@ -68,7 +71,8 @@ configured (gate D-4).
 `ROSUNO_S7_STRIPE_L4`, `ROSUNO_S9_DAILY_L4`, `ROSUNO_S10_RESEND_L4` (L4 opt-in switches), `STRIPE_SECRET_KEY` (a
 fallback of the S7 L4 runner), `ROSUNO_L5_BASE_URL`, `ROSUNO_L5_DATABASE_PORT`, `ROSUNO_L5_PLAYWRIGHT_MODULE`,
 `ROSUNO_L5_PSQL`, `ROSUNO_L5_SERVER_LOG`, `PGPASSWORD`, and the local stack's own values of
-`NEXT_PUBLIC_SUPABASE_URL` and `ROSUNO_SUPABASE_ADMIN_KEY` (the three S11 L5 scripts; loopback and development class
+`NEXT_PUBLIC_SUPABASE_URL` and `ROSUNO_SUPABASE_ADMIN_KEY` (the S11 L5 scripts, four at `2a1b94f` with
+`apps/web/tests/mvp-001-s11-l5-ps-a6.mjs`, which reads only names already listed here; loopback and development class
 only), and `ROSUNO_REPOSITORY_ROOT` (read only by `apps/web/tests/mvp-001-s11-restore-proof.mjs`: an optional override
 of the repository root, never printed). None belongs in a production configuration.
 
@@ -103,6 +107,8 @@ is not verified (ARCH-F17; L6, HOLD); a build is promoted only to the environmen
 | Regulatory Modes and mappings   | Reviewed migrations only until M14 (`20261117030000:1458–1460`); staff read them (`20261127140000:49`)                             | M14 is outside the Program                                                                   |
 | Intake question sets            | Staff intake configuration surface (`staff_publish_intake_question_set`)                                                           | Owner-approved content                                                                       |
 | Catalog rows                    | Policy types and capability codes are reference data seeded by migration                                                           | Unchanged                                                                                    |
+| Complaint policy versions       | Staff policy surface; type `complaint` with `category_codes` and `resolution_codes` (PS-A6 §4; validated at approval)              | Approved, active, verified version per scope, else `configuration_unavailable`; none seeded  |
+| PS-A6 capability grants         | Staff capability surface: `approve_break_glass` (scoped or global) and `manage_data_requests` (global only)                        | Least privilege, to named staff; none seeded                                                 |
 
 Gated values (G-1…G-5, CA-* items, fee values, scheduling values, the messaging window, critical notification types,
 the Referral outcome taxonomy, refund and cancellation treatments, complaint vocabularies) stay configuration with no

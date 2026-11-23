@@ -3,8 +3,9 @@
 Production financial activity requires all four conditions at once; three are not enough (MBS §§6, 19; IMP §29;
 Packet §4 "Four-way gate"). This file lists the conditions, every function that anchors or applies the gate with its
 migration, and every negative test, existing and S11-added, showing that each gated operation has a production-class
-negative test. State: the S11 head `5283fda`. Proof names as in [`README.md`](README.md) ("operations" is
-`apps/web/tests/mvp-001-s11-operations-db-proof.mjs`).
+negative test. State: the S11 head `5283fda`; the PS-A6 revision is checked at `2a1b94f` (section 3). Proof names as in
+[`README.md`](README.md) ("operations" is `apps/web/tests/mvp-001-s11-operations-db-proof.mjs`; "ps-a6" is
+`apps/web/tests/mvp-001-s11-ps-a6-db-proof.mjs`).
 
 ## 1. The four conditions
 
@@ -51,6 +52,7 @@ shared helpers: for each recorded version they refuse development configuration 
 | Capture on a confirmed authorization                  | `payment_confirm_authorization` `20261127180000:361` (gate at `:446`)                                                                                                                                                             | Capture `at_authorization`, or `at_attorney_acceptance` after a late authorization of an accepted Request                                 | **operations GATE-2 and GATE-3 (added; correction D3)**: payment stays authorized, no capture or capture job, one critical `capture_gate_closed` exception; nothing released                          |
 | Post-consultation communication window                | `communication_window` `20261126030000:99` (gate at `:158`), used by `message_send`, `consultation_messaging`, `document_begin_upload`, `document_finalize_upload`, `document_begin_replacement`, `document_finalize_replacement` | The window after completion needs the gate for the engagement version                                                                     | S10 MSG-7 (existing; messages)                                                                                                                                                                        |
 | Critical notification configuration                   | `notification_configured_types` `20261126020000:152`                                                                                                                                                                              | Policy selection (not the financial gate)                                                                                                 | S10 NOT-10 (existing)                                                                                                                                                                                 |
+| Complaint vocabulary (at `2a1b94f`)                   | `complaint_vocabulary` `20261127210000:164` (`policy_select_version` at `:179`)                                                                                                                                                   | Policy selection (not the financial gate)                                                                                                 | ps-a6 CV-3: a development complaint version is selected in a development database and never in a production-class one                                                                                 |
 
 **Completeness (operations GATE-5).** The check scans every function definition in every migration whose body calls
 `production_financial_gate`, `media_production_problem` or `payment_capture_gate_problem` and asserts that each has an
@@ -59,6 +61,14 @@ entry in its inventory: `client_authorize_payment`, `attorney_accept_request`, `
 `consultation_apply_completion`, `consultation_ready_if_due`, `payment_confirm_authorization`, and the three building
 blocks. A new gated function without an inventory entry fails the proof. The check does not itself run the probes; the
 inventory names the checks (listed above) that do.
+
+**PS-A6 and the offered-start correction (at `2a1b94f`).** No function in `20261127190000`–`20261127220000` applies or
+anchors the gate: none calls `production_financial_gate`, `media_production_problem` or `payment_capture_gate_problem`
+(static search), so the GATE-5 inventory is unchanged, and operations GATE-5 passed on the `d9d1151` tree (55/55,
+Builder record); `2a1b94f` changes one internal function that calls none of them. The break-glass and data-request
+functions consult no policy and no gate. `complaint_vocabulary` reaches the environment record only through
+`policy_select_version` (row above). `request_slot_starts` (`20261127220000:28`) changes only which offered starts it
+keeps; it consults no gate.
 
 ## 4. Each condition failing alone
 
@@ -81,6 +91,7 @@ inventory names the checks (listed above) that do.
 | Deferred Consultation creation on capture                              | `decision_payment_captured` `20261127180000:466`                                              | No                                                        | No gate test; since R1 a capture after a cancelled or unperformed Consultation records no Engagement (S11 CORR-R1c)                                                                               |
 | Referral, Request, quote and Hold creation; public discovery; offers   | `referral_create`, `request_create`, `pricing_quote`, `scheduling_acquire_hold`, public reads | No; policy selection only                                 | By design today; the S2–S6 proofs contain no production-class database. Only the `waitlist` state is consulted by discovery (operations WAIT-2). Owner decision pending (S5 question 1; ARCH-F13) |
 | The payment adapter in a production class                              | `stripe-provider.ts:74–95`                                                                    | Yes (S11 D1): no payment key or webhook value is accepted | S11B-16, S11B-17 (L1)                                                                                                                                                                             |
+| Break-glass access and data requests (PS-A6, at `2a1b94f`)             | `20261127190000`, `20261127200000`                                                            | No; no policy selection either                            | Not financial operations; no gate or policy in code (static search)                                                                                                                               |
 
 ## 6. Where this leaves MBS §26 point 22
 

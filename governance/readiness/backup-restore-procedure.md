@@ -135,7 +135,7 @@ the backup SHA-256 and row digests change on every run because synthetic identif
 
 The run facts below are recorded by the Builder (the report documents stay outside the repository). The three
 earliest runs were made with the proof before it was committed, from the Builder's working copy; their dates are the
-file dates (UTC) of their report documents. The two later runs carry the start instant the Builder recorded. A cell
+file dates (UTC) of their report documents. The four later runs carry the start instant the Builder recorded. A cell
 with a dash was not recorded for that run.
 
 | Run                                        | Date                         | Migrations                                     | Migration-set SHA-256 (prefix) | Catalog (functions / relations / columns / constraints / indexes / triggers / policies) | Overall fingerprint (prefix) | Rows (tables) | Backup size (bytes) | Checks   | Result | Total time |
@@ -144,14 +144,28 @@ with a dash was not recorded for that run.
 | 2 (repository root override)               | 2026-11-20                   | 61, last `20261127070000`                      | `d78d13eeec7b`                 | same as run 1                                                                           | `cd2684ad21e5`               | 47 (68)       | 1,751,983           | 7/7 PASS | PASS   | 6,076 ms   |
 | 3 (root from the script's future location) | 2026-11-20                   | 61, last `20261127070000`                      | `d78d13eeec7b`                 | same as run 1                                                                           | `cd2684ad21e5`               | 47 (68)       | 1,751,976           | 7/7 PASS | PASS   | 6,507 ms   |
 | 4 (at `e6d45c6`)                           | started 2026-11-22T17:10:56Z | 71, last `20261127170000` (S11 pass 2B)        | `b8e072367e76`                 | 477 / 68 / 647 / 588 / 192 / 171 / 47                                                   | `a4b5651f6635`               | 51 (68)       | 1,850,086           | 7/7 PASS | PASS   | 6,050 ms   |
-| 5, final (at `5283fda`)                    | started 2026-11-22T19:04:02Z | 72, last `20261127180000` (review corrections) | `209ec267a110`                 | 478 / 68 / 647 / 588 / 192 / 171 / 47                                                   | `185c9c9a3e97`               | 51 (68)       | 1,859,183           | 7/7 PASS | PASS   | 5,151 ms   |
+| 5 (at `5283fda`)                           | started 2026-11-22T19:04:02Z | 72, last `20261127180000` (review corrections) | `209ec267a110`                 | 478 / 68 / 647 / 588 / 192 / 171 / 47                                                   | `185c9c9a3e97`               | 51 (68)       | 1,859,183           | 7/7 PASS | PASS   | 5,151 ms   |
+| 6 (at `d9d1151`)                           | started 2026-11-23T00:07:05Z | 76, last `20261127220000` (S6 correction)      | `dede44cbe2ae`                 | 501 / 70 / 672 / 606 / 200 / 176 / 47                                                   | `7264fe266200`               | 54 (70)       | 1,936,508           | 7/7 PASS | PASS   | 4,904 ms   |
+| 7, final (at `2a1b94f`)                    | started 2026-11-23T00:46:26Z | 76, last `20261127220000` (S6 correction)      | `e652545f9f5c`                 | 501 / 70 / 672 / 606 / 200 / 176 / 47                                                   | `3d16f951e772`               | 54 (70)       | 1,938,795           | 7/7 PASS | PASS   | 5,516 ms   |
 
-The final run's custom-format dump has SHA-256 prefix `3ce53134ae47` and 2,274 table-of-contents entries; its
-environment class `development` was restored unchanged and the environment-record hazard check passed. In the three
-earliest runs: PostgreSQL 16.15; `pg_restore` exit 0 with no error lines; the target had 0 relations before the
-restore; two CHECK constraints were re-parsed (`messages_body_v1_check`, `reviews_text_v1_check`); the behaviour on the
-restore equalled the source. In every run the hosted-only steps were not performed (L6, HOLD). The full migration-set
-SHA-256 of the final run is `209ec267a110bd19b2306ae754e07f9148b9b80d656a9045abd2d0a2e73f10bd`.
+Run 7, the final run (at `2a1b94f`, the final migration set: migration `20261127200000` corrected in place after run 6),
+used PostgreSQL 16.15; `pg_restore` exited 0 with no error lines; its custom-format dump has SHA-256
+`e8fce4bc29113e0da5add8da32d710e1cf461ba8b88c014d545229ea350d7a56` and 2,378 table-of-contents entries; its environment
+class `development` was restored unchanged and the environment-record hazard check passed; the cluster was removed.
+Its full migration-set SHA-256 is `e652545f9f5c605a50bbc7a912db0bd69986992b411e8b270e4ca45d8256e9b9` and its full
+overall fingerprint `3d16f951e7727621d075a5005134758c658638aa114afc34256350958657d6b6`. Run 6 (at `d9d1151`, the 76
+migrations including PS-A6 and the S6 offered-start correction) used
+PostgreSQL 16.15; `pg_restore` exited 0 with no error lines; its custom-format dump has SHA-256 prefix `a9411351bd0f`
+and 2,378 table-of-contents entries; its environment class `development` was restored unchanged and the
+environment-record hazard check passed. Its full migration-set SHA-256 is
+`dede44cbe2ae7ea6ff46b9370d1a190cf16807e0d9f2b96a31c56623d0d4389c` and its full overall fingerprint
+`7264fe266200f7fa706218a3888e0723152608939cc46563e16fb5f834e2a154`. Run 5 (at `5283fda`):
+dump SHA-256 prefix `3ce53134ae47`, 2,274 table-of-contents entries, environment class `development` restored
+unchanged, the hazard check passed, full migration-set SHA-256
+`209ec267a110bd19b2306ae754e07f9148b9b80d656a9045abd2d0a2e73f10bd`. In the three earliest runs: PostgreSQL 16.15;
+`pg_restore` exit 0 with no error lines; the target had 0 relations before the restore; two CHECK constraints were
+re-parsed (`messages_body_v1_check`, `reviews_text_v1_check`); the behaviour on the restore equalled the source. In
+every run the hosted-only steps were not performed (L6, HOLD).
 
 ## 8. Rollback and escalation
 

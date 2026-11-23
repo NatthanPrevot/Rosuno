@@ -2022,7 +2022,7 @@
         "status": "pending"
       },
       "created_at": "2026-11-22T20:34:05Z",
-      "updated_at": "2026-11-22T20:34:05Z",
+      "updated_at": "2026-11-23T00:10:35Z",
       "supersedes": [],
       "expiry": null,
       "decision_id": "DEC-20261122-PS-A6-BREAK-GLASS-DATA-REQUESTS-COMPLAINTS",
@@ -2046,7 +2046,8 @@
       "evidence": [
         "Express owner adoption statement 'PS-A6 APPROVAL / COMPLETE S11 MVP IMPLEMENTATION' (approver NatthanPrevot) naming revision 1, 13,290 bytes and SHA-256 34e7fcff469470a80baaf1dd6dbab35aa124c1734aadc2b5979efb9adff331c7, received in the Builder session and processed at 2026-11-22T20:34:05Z (session clock)",
         "Amendment file: rosuno-physical-specification-amendment-ps-a6.md, revision 1, 13,290 bytes, SHA-256 34e7fcff469470a80baaf1dd6dbab35aa124c1734aadc2b5979efb9adff331c7 (owner-held; not in the repository); byte length and digest re-verified by the Builder before registration",
-        "Lock Condition elements 2 and 3 carried by the S11 pull request (register status pending_lock_condition); not complete until that pull request merges"
+        "Lock Condition elements 2 and 3 carried by the S11 pull request (register status pending_lock_condition); not complete until that pull request merges",
+        "Implemented in the S11 pull request by migrations 20261127190000_mvp_001_s11_break_glass, 20261127200000_mvp_001_s11_data_requests and 20261127210000_mvp_001_s11_complaint_configuration (register sequences 73 to 75, reviewed false, applied_environment none), corrected after an independent review on 2026-11-22 and a further independent check on 2026-11-23; L2 proof apps/web/tests/mvp-001-s11-ps-a6-db-proof.mjs 32/32 and the PS-A6 local browser journey 8/8 recorded by the Builder (governance/readiness, governance/evidence)"
       ]
     }
   ]

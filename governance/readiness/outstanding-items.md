@@ -1,9 +1,10 @@
 # Outstanding items (MVP-001, checkpoint J)
 
-The consolidated list of what is still open at the S11 head `5283fda`. Each item says what it is, why it is open, who
-decides and what closes it. Sources: the slice PR descriptions (S1–S10), the S11 migration headers, the Packet ("P"),
-the architecture verification ("AV"), and records kept outside the repository by the Builder: the S11 pass and
-correction reports and the PS-A6 decision note.
+The consolidated list of what is still open at the S11 head `2a1b94f` (first assessed at `5283fda`; a statement "at
+`5283fda`" describes that commit). Each item says what it is, why it is open, who decides and what closes it. Sources:
+the slice PR descriptions (S1–S10), the S11 migration headers, the Packet ("P"), the architecture verification ("AV"),
+and records kept outside the repository by the Builder: the S11 pass and correction reports, the PS-A6 decision note
+and the PS-A6 validation and review reports.
 
 ## 1. L4 gaps — "implemented; sandbox verification outstanding" (Packet §5)
 
@@ -46,6 +47,9 @@ No integration is declared complete. Each slice merged under the Packet §5 exce
 | Work item scope (ARCH-D11)                                                                                                        | `in_scope`, `out_of_scope`, the S11 acceptance criteria and validation commands corrected by the Builder at `5283fda`; pending owner confirmation                                               | Owner confirms                                       | Confirmation with the S11 PR                                                                                                                 |
 | `set_updated_at()` carriage-return difference on Staging                                                                          | Accepted as a documented exception (Option A; S2)                                                                                                                                               | Owner (decided)                                      | Closed as an exception; kept visible                                                                                                         |
 | Catalogs, staff grants and intake question publication on Staging                                                                 | Need owner authorization (P §3)                                                                                                                                                                 | Owner                                                | Authorized configuration session                                                                                                             |
+| PS-A6 configuration on each environment                                                                                           | Grants of `approve_break_glass` and `manage_data_requests` and complaint policy versions per scope are needed; none is seeded, so classify and resolve answer `configuration_unavailable`       | Owner                                                | Authorized configuration session: grants to named staff; versions with category and resolution codes per scope                               |
+
+At `2a1b94f` the register still records no MVP-001 migration as applied (S1–S11, now sequences 17–76).
 
 ## 4. Counsel and owner gates (configuration seams built; values or decisions outstanding)
 
@@ -64,7 +68,8 @@ of them (AV, section 5.5).
 | Post-consultation messaging window value                                                   | `engagement` key, no default                                                                                                                                                                                                                                                      | S10                       |
 | Voice-memo limit; voice-memo sharing after acceptance; Intake visibility before acceptance | Server setting, unset refuses; nothing shared; nothing shown                                                                                                                                                                                                                      | S3, S8, S10               |
 | Review moderation rules; the 1–5 rating scale and review text limit                        | Human publication only; the scale and limit are fixed technical values                                                                                                                                                                                                            | S11 (`20261127040000`)    |
-| Complaint vocabularies                                                                     | Classification and resolution answer `configuration_unavailable` (needs PS-A6)                                                                                                                                                                                                    | S11 (`20261127060000`)    |
+| Complaint vocabularies                                                                     | `complaint` policy versions (PS-A6 §4) with category and resolution codes per scope, created, approved and activated by staff; with none selectable, classify and resolve answer `configuration_unavailable`; nothing seeded                                                      | S11 (`20261127210000`)    |
+| Data-request execution (deletion, export, correction, restriction) and any timelines       | No executor: a decision records an outcome only (`20261127200000` header, rule 4); executors need separate authorization and counsel                                                                                                                                              | S11 (`20261127200000`)    |
 | Early completion confirmation                                                              | The attorney's recorded declaration; the client can complain                                                                                                                                                                                                                      | S11 pass 1 owner question |
 | AI provider, capability and data authorization (D-4)                                       | Adapter unavailable                                                                                                                                                                                                                                                               | S3                        |
 | D-3 Intake expiry and revision versus new Intake; its configuration home                   | Expiry off; changes answer `not_configured`                                                                                                                                                                                                                                       | S3                        |
@@ -88,21 +93,25 @@ value or decision recorded as configuration (or a forward migration where the de
 | M14: activating a Regulatory Mode; Regulatory Mode rows written only by reviewed migrations; PS §28 relations not built | Excluded from the Program (P §1) | Owner       | A separate M14 work item     |
 | M15: the production decision; making a jurisdiction live; activating production payments                                | Never in the Program (P §1, §4)  | Owner       | The locked release procedure |
 
-## 6. PS-A6 (owner gate, not approved)
+## 6. PS-A6 (approved; implemented; Lock Condition completes at merge)
 
-The decision note (kept by the Builder outside the repository; it records the amendment file as revision 1 of 13,290
-bytes) asks the owner to approve PS-A6 as written. Until then these features wait and nothing of PS-A6 exists in the
-repository:
+**Lock Condition.** Element 1, the owner's approval of the exact bytes (revision 1, 13,290 bytes, SHA-256
+`34e7fcff…c331c7`), is complete (2026-11-22). Elements 2 and 3, the registration (authority register
+`PHYSICAL-SPECIFICATION-AMENDMENT-PS-A6-LOCKED`, status `pending_lock_condition`) and the Decision Log adoption
+(`DEC-20261122-PS-A6-BREAK-GLASS-DATA-REQUESTS-COMPLAINTS`), were recorded in `a3f6ddc`; they are carried by the S11 PR
+and complete when it merges, and the register status becomes `active` in the next records update. Persistent
+application of migrations 73–76 needs the completed Lock Condition and a separate database authorization.
 
-| Feature                                 | Without PS-A6 (state at `5283fda`)                                                                                                                       | With PS-A6                                                                             |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Break-glass access                      | Not built                                                                                                                                                | Request, approval by someone else, revocation, audited read-only access, staff surface |
-| Privacy and data requests               | The client privacy page (`/client/privacy`) shows the account's record categories and says requests cannot be made there yet; no form and no staff queue | Client request and withdrawal; staff queue and decision with the Legal Hold rule       |
-| Complaint classification and resolution | Open, assign, escalate, link to a Legal Hold; classify and resolve answer `configuration_unavailable`, so no case can be resolved in a real environment  | Configured categories and resolution codes; cases can be resolved                      |
-| Complaint narrative                     | Linkage and state only                                                                                                                                   | The complainant's own statement                                                        |
+| Feature                                 | At `5283fda`                                                                                                                                             | Implemented at `2a1b94f`                                                                                                                                                                                                                                     |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Break-glass access (PS-A6 §2)           | Not built                                                                                                                                                | Request by an active staff member, approval by a holder of `approve_break_glass` other than the requester for 1 second to 24 hours (no default), revocation, one audited read-only access path, `/staff/break-glass` (`20261127190000`); no document content |
+| Privacy and data requests (PS-A6 §3)    | The client privacy page (`/client/privacy`) shows the account's record categories and says requests cannot be made there yet; no form and no staff queue | Client request of five types, own list and withdrawal (`/client/privacy`); staff queue, assignment and decision with the Legal Hold rule (`/staff/data-requests`; `20261127200000`); a decision records an outcome only and executes nothing                 |
+| Complaint classification and resolution | Open, assign, escalate, link to a Legal Hold; classify and resolve answer `configuration_unavailable`, so no case can be resolved in a real environment  | The `complaint` policy type (PS-A6 §4; `20261127210000`): cases can be classified and resolved once a version is configured for their scope; without one they still answer `configuration_unavailable`                                                       |
+| Complaint narrative                     | Linkage and state only                                                                                                                                   | The complainant's own statement (PS-A6 §5; `complaint_cases.statement`), written only at open, never changed, shown only to the complainant and to `manage_complaints` holders in scope                                                                      |
 
-Who decides: the owner (Lock Condition element 1 is the approval of the exact bytes). What closes it: approval, then
-registration and the Decision Log adoption in the S11 PR, then the features under a later bounded scope.
+Who decides: the owner (designated approval and merge of the S11 PR; the database authorization). What closes it: the
+merge (elements 2 and 3), the register status `active` in the next records update and, for any persistent environment,
+the separate database authorization. The configuration each environment needs is in section 3.
 
 ## 7. ARCH-D6 — `service_role` INSERT on `audit_events`
 
@@ -116,6 +125,24 @@ refusals.
 None remains open. ARCH-D14 (found by this verification at `a3f68c5`) was fixed in `e6d45c6`, together with the second
 defect found while fixing it (the notification center rejected the database's `/complaints` link path). The
 independent review's findings R1–R6 and A1–A7 were fixed in `5283fda`. Evidence: AV, sections 7.1 to 7.3.
+
+The independent review of the PS-A6 implementation (`c445960`) found DB-1 to DB-4, the proof gaps BG-5 and DR-5,
+APP-1 to APP-6, the test gap PSA6-7 and untested revoke outcomes; all were accepted and corrected in `d9d1151` (AV,
+section 7.4). A further independent check of the correction commit `d9d1151` (2026-11-23, a separate review agent)
+found one medium defect, reproduced: the Legal Hold rule evaluated `resource_under_legal_hold` once per Resource of the
+requester, slow enough for many Resources and holds that a concurrent hold placement timed out on the decision's SHARE
+lock (55P03). `2a1b94f` matches the Resource scopes against the holds in one pass with the coverage unchanged (ps-a6
+DR-7, new), and shows the break-glass outcome without client script (low; PSA6-9 extended). Its other findings were
+assessed as no defect, informational or already listed (AV, section 7.4).
+
+A defect in a merged slice was found during S11 verification and fixed: `request_slot_starts` (S6) offered starts
+whose duration spanned two adjacent availability windows, which request creation then refused as
+`outside_availability`. The Builder's validation found it (S6 REQ-2 failed when run between 22:00 and 22:30 UTC on
+2026-11-22). `20261127220000` keeps a start only when one availability window contains the whole slot; S6 QUOTE-3
+(new) and a QUOTE-2 containment check cover it (AV, section 7.4).
+
+Not a product defect: the S2 (ABUSE-3, ABUSE-4) and S9 (TIME-4) proof fixtures cross UTC midnight when run between
+23:00 and 24:00 UTC (section 13.3).
 
 ## 9. Owner questions by slice
 
@@ -132,7 +159,7 @@ independent review's findings R1–R6 and A1–A7 were fixed in `5283fda`. Evide
 | S11 pass 1             | Early completion by the attorney's declaration; the 1–5 rating scale and the review text limit as fixed technical values; review qualification and moderation; cancellation, no-show and failure financial treatments (PM rows 11–16, 18, 21, 22); the staff outcome window rule and its fail-safe (the implemented choices are described in the headers of `20261127020000` and `20261127040000`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | S11 pass 2A            | 1 revoke `service_role` INSERT on `audit_events`; 2 audit codes for step-up and denial events; 3 staff accounts in client administration (excluded now); 4 the verification page showing `review_required` (shown as locked); 5 D9 for the two route readers; 6 further rejoin identity signals; 7 open Requests when a jurisdiction moves to the waitlist                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | S11 pass 2B            | 1 lead time for attorney compliance alerts (none applied); 2 client display-name editing (needs a command); 3 the client sign-in security offering (a password-change link restricted by a fence; an authenticator option); 4 `/attorney` as the dashboard (a fence change); 5 the `review_available` link target (Consultation page or reviews page); 6 attorneys seeing Consultations in `created`                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| S11 review corrections | 7 cancellation after the scheduled start but before the end; 8 administration of dual-role (client and attorney) accounts; 9 whether an authorization or capture confirmed after a completed Consultation is held for review (it proceeds now; the service was performed, PM rows 20–21); 10 free text stored in audit rows and status strings kept in snapshots; 11 `consultation_end` recording `normal` before the nominal end (early-by-agreement optional; PM row 21 pays as row 20); 12 releases (`neither_connected`, `staff_request_release`) not re-checking the gate (S7 precedent); 13 Legal Holds on complaint cases linked to no Consultation cover nothing; 15 complaint vocabulary without a configuration home until PS-A6 (resolution impossible in a real environment); question 14 (the rating scale and review text limit) is listed under pass 1 |     |
+| S11 review corrections | 7 cancellation after the scheduled start but before the end; 8 administration of dual-role (client and attorney) accounts; 9 whether an authorization or capture confirmed after a completed Consultation is held for review (it proceeds now; the service was performed, PM rows 20–21); 10 free text stored in audit rows and status strings kept in snapshots; 11 `consultation_end` recording `normal` before the nominal end (early-by-agreement optional; PM row 21 pays as row 20); 12 releases (`neither_connected`, `staff_request_release`) not re-checking the gate (S7 precedent); 13 Legal Holds on complaint cases linked to no Consultation cover nothing; 15 complaint vocabulary without a configuration home (answered by PS-A6 §4: the added `complaint` policy type); question 14 (the rating scale and review text limit) is listed under pass 1 |     |
 
 S1 and S2 list no open question (S2 records two owner decisions). Whether any of these was answered outside the PR
 descriptions is not visible in the repository. Who decides: the owner. What closes each: an answer recorded in the
@@ -166,4 +193,53 @@ facts, recorded in the register, the release register and a new drift baseline.
 ## 12. Architecture follow-ups
 
 ARCH-F1 to ARCH-F32 in [`architecture-verification.md`](architecture-verification.md), section 8. Those that are owner
-decisions also appear above (ARCH-F13 lifecycle gating, ARCH-F14 Referral outcomes, ARCH-F20 to ARCH-F27, ARCH-F31).
+decisions also appear above (ARCH-F13 lifecycle gating, ARCH-F14 Referral outcomes, ARCH-F20 to ARCH-F23, ARCH-F25 to
+ARCH-F27, ARCH-F31). ARCH-F24 (the PS-A6 features) is closed: implemented at `2a1b94f` (section 6).
+
+## 13. Decisions by when they are needed
+
+### 13.1 Needed for S11 acceptance (owner actions at the S11 PR)
+
+- Designated human review and approval of the S11 PR (mandatory).
+- Confirmation of the ARCH-D11 record corrections: the Program Decision Log review line; the work item's scope, S11
+  acceptance criteria and validation commands (section 3).
+- The merge, which completes PS-A6 Lock Condition elements 2 and 3 (section 6).
+
+No open owner question blocks S11 acceptance: every question in 13.2 and 13.3 has a documented, fail-closed
+implemented behaviour.
+
+### 13.2 Can wait until Staging configuration or launch
+
+- Every L4 gap (section 1) and every L6 or hosting item (section 2).
+- Staging application of the S1–S11 migrations (now sequences 17–76) with the environment record, the register facts,
+  a release record and a drift baseline (section 3).
+- Designated approval facts; catalogs, staff grants and intake question publication (section 3).
+- The PS-A6 configuration on each environment: grants of `approve_break_glass` and `manage_data_requests` to named
+  staff; complaint policy versions with category and resolution codes per scope, without which classify and resolve
+  stay `configuration_unavailable` (sections 3 and 6).
+- Data-request executors (deletion, export, correction, restriction) and any timelines, which need separate
+  authorization and counsel (section 4).
+- Every counsel and owner gate of section 4: G-1…G-5, the CA-* items, the PM treatments, refunds, DOC-DEL and
+  retention, windows, limits, public content, D-3, D-4, D-7, fee, scheduling and notification keys, rate limits and
+  live payment mode.
+- M14 and M15 (section 5).
+- The slice owner questions of section 9 that choose product behaviour: S3–S10, S11 pass 1, pass 2A questions 2–7,
+  pass 2B and review-correction questions 7–13.
+
+### 13.3 Optional enhancements
+
+- ARCH-D6: revoking `service_role` INSERT on `audit_events` (section 7).
+- The ARCH-F follow-ups (section 12).
+- Break-glass document content: the access path serves the Consultation record, its Messages and the document list
+  (metadata of current versions), not document content, because no existing server path can serve content under a
+  break-glass-named authorization without widening a general predicate (`20261127190000:44–45`); it needs a
+  break-glass-named server path.
+- Treating touching availability windows as one for bookability: it would change `scheduling_slot_problem`, the
+  bookability rule; today the offered starts follow that rule (`20261127220000` header).
+- Making the S2 and S9 proof fixtures independent of the UTC hour (a FIX Packet is recommended): S2 ABUSE-3 and
+  ABUSE-4 and S9 TIME-4 fail when run between 23:00 and 24:00 UTC, the unmodified `c445960` tree failed identically at
+  that hour, and both proofs passed in full when re-run after midnight. The DB proofs are explicit-run, not CI.
+- Code-point counting in the Legal Hold readers (`src/application/legal-holds.ts` still measures UTF-16 units,
+  consistently with its own input checks).
+- A step-up hint on the privacy page for dual-role Users at aal1.
+- Pass 2B items such as client display-name editing.

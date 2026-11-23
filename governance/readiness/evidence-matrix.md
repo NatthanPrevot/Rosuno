@@ -4,8 +4,11 @@ The 23 points of MBS §26, each mapped to the migrations and modules that implem
 levels reached and the gaps. Then the MBS §19 and IMP §29 technical conditions mapped to the points.
 
 State: the S11 head `5283fda` (pass 1 `8e5d70a`, pass 2A `a3f68c5`, pass 2B with the ARCH-D14 correction `e6d45c6`,
-independent-review corrections `5283fda`). Dated run summaries, including the Builder's final validation at
-`5283fda` (2026-11-22), are in [`../evidence/mvp-001-verification-evidence.json`](../evidence/mvp-001-verification-evidence.json).
+independent-review corrections `5283fda`), and the PS-A6 revision at `2a1b94f` (implementation `c445960`; review
+corrections and the S6 offered-start correction `d9d1151`; verification corrections `2a1b94f`), cited as such. Dated
+run summaries, including the Builder's final validation at `5283fda` (2026-11-22), the PS-A6 validation on the
+`d9d1151` tree (2026-11-22 and 2026-11-23) and the PS-A6 proof at `2a1b94f` (2026-11-23), are in
+[`../evidence/mvp-001-verification-evidence.json`](../evidence/mvp-001-verification-evidence.json).
 
 ## How to read it
 
@@ -13,19 +16,28 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
   repository area that carries the evidence, not the specification's wording.
 - **Proof names.** "S1" … "S10" are `apps/web/tests/mvp-001-s<N>-db-proof.mjs`; "offers" is
   `mvp-001-s6-offers-db-proof.mjs`; "S11" is `mvp-001-s11-db-proof.mjs` (57 checks); "operations" is
-  `mvp-001-s11-operations-db-proof.mjs` (55 checks); "m4", "p3-904", "p5-001" and "registration-abuse" are the
-  earlier proofs of those names. Identifiers repeat across proofs, so a check is always cited with its proof.
+  `mvp-001-s11-operations-db-proof.mjs` (55 checks); "ps-a6" is `mvp-001-s11-ps-a6-db-proof.mjs` (32 checks at
+  `2a1b94f`, 31 at `d9d1151`); "m4", "p3-904", "p5-001" and "registration-abuse" are the earlier proofs of those names.
+  Identifiers repeat across proofs, so a check is always cited with its proof.
 - **S11 L1 tests.** "S11-n" are the tests of `mvp-001-s11-completion.test.mjs` (16); "S11B-n" of
-  `mvp-001-s11-operations.test.mjs` (19); "S11C-n" of `mvp-001-s11-workspaces.test.mjs` (18).
-- **S11 L5 journeys.** Three committed explicit-run scripts (loopback and development class only), each run on a
-  disposable local stack; final runs recorded by the Builder on 2026-11-22: `apps/web/tests/mvp-001-s11-l5-journey.mjs`
-  9/9 (cancellation and freed slot; start, end and completed Booking; review submitted and published; complaint,
-  assignment and Legal Hold; staff outcome of a stale Consultation), `mvp-001-s11-l5-operations.mjs` 9/9 (staff home,
-  operations and system health, client administration, audit, referral operations and finance summary, attorney
-  lifecycle, refusals by direct URL) and `mvp-001-s11-l5-workspaces.mjs` 6/6 (client home, payments, messages,
-  settings and privacy; the ARCH-D14 notification; the attorney dashboard and pages; refusals by direct URL; the week
-  view across time zones). Earlier pass runs recorded by the Builder: pass 1 7/7, pass 2A 8/8, pass 2B 5/5, 7/7 and
-  8/8.
+  `mvp-001-s11-operations.test.mjs` (19); "S11C-n" of `mvp-001-s11-workspaces.test.mjs` (18); "PSA6-n" of
+  `mvp-001-s11-ps-a6.test.mjs` (9, at `2a1b94f`).
+- **S11 L5 journeys.** Three committed explicit-run scripts at `5283fda`, four at `2a1b94f` (loopback and development
+  class only), each run on a disposable local stack; final runs recorded by the Builder on 2026-11-22:
+  `apps/web/tests/mvp-001-s11-l5-journey.mjs` 9/9 (cancellation and freed slot; start, end and completed Booking; review
+  submitted and published; complaint, assignment and Legal Hold; staff outcome of a stale Consultation),
+  `mvp-001-s11-l5-operations.mjs` 9/9 (staff home, operations and system health, client administration, audit, referral
+  operations and finance summary, attorney lifecycle, refusals by direct URL) and `mvp-001-s11-l5-workspaces.mjs` 6/6
+  (client home, payments, messages, settings and privacy; the ARCH-D14 notification; the attorney dashboard and pages;
+  refusals by direct URL; the week view across time zones). Earlier pass runs recorded by the Builder: pass 1 7/7, pass
+  2A 8/8, pass 2B 5/5, 7/7 and 8/8. For the PS-A6 revision (2026-11-22, a fresh local stack with all 76 migrations,
+  development class): `apps/web/tests/mvp-001-s11-l5-ps-a6.mjs` 8/8 ("L5 ps-a6": break-glass request by one staff member
+  and approval by another, read-only access audited per access, revocation and refusal after; client data request
+  submitted, assigned and decided, deletion-allowed refused under a Legal Hold, withdrawal; a complaint statement seen
+  by staff and not by the counterparty; a complaint policy version created, approved and activated through the staff
+  policy pages, then classification and resolution with its codes), and the three scripts above again 9/9, 9/9 and 6/6,
+  all on the `d9d1151` tree. L5 was not re-run after `2a1b94f` (an internal SQL rewrite with the same coverage and a
+  no-script fallback, covered by ps-a6 DR-5, DR-7, CC-6 and PSA6-9).
 - **"L2 proof" means** the check exists in code and a run was recorded as passing (in the slice PR description or in
   the Builder's S11 records); dated run summaries are in the evidence JSON. L4 result documents are kept by the Builder
   and are not in the repository (ARCH-D4).
@@ -35,7 +47,7 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
 
 | Point | Label (this pack's own)                       | Levels reached               | Main gap                                                                         |
 | ----- | --------------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------- |
-| 1     | accounts, sessions, capabilities              | L1, L2, L5                   | Break-glass not built (PS-A6); `service_role` audit insert (ARCH-D6)             |
+| 1     | accounts, sessions, capabilities              | L1, L2, L5                   | Break-glass serves no document content; `service_role` audit insert (ARCH-D6)    |
 | 2     | row policies and privilege boundaries         | L1, L2, L5                   | aal1 direct reads on P1 participant policies                                     |
 | 3     | verification evidence, eligibility, lifecycle | L1, L2, L5                   | Rejoin detection uses licence numbers only                                       |
 | 4     | availability, Holds, bookability              | L1, L2, L5                   | Reschedule not built                                                             |
@@ -54,7 +66,7 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
 | 17    | audit events and the audit workspace          | L1, L2, L5                   | ARCH-D6; no action code for step-up or privileged denial                         |
 | 18    | operational jobs                              | L1, L2, L5                   | No hosted worker trigger; four sweeps not observed firing                        |
 | 19    | reviews                                       | L1, L2, L5                   | Moderation rules are an owner and counsel gate                                   |
-| 20    | complaints                                    | L1, L2, L5                   | Classification and resolution wait for a complaint vocabulary (PS-A6)            |
+| 20    | complaints                                    | L1, L2, L5                   | Classification and resolution need a configured complaint policy version         |
 | 21    | Regulatory Mode handling                      | L1, L2                       | Regulatory Mode administration is migration-only until M14                       |
 | 22    | launch gates and the four-way gate            | L1, L2, L5                   | `policy_not_current` outcome not asserted                                        |
 | 23    | public pages and the three workspaces         | L1, L2, L5                   | Public content gated; earlier pages keep page-local navigation                   |
@@ -63,31 +75,39 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
 
 ## Point 1 (accounts, sessions, capabilities)
 
-- **Implemented in.** P1 authorization foundation; S1 `20261117030000` (capability administration); S2
-  `20261118030000` (session assurance, aal2 in the database) and `20261118040000` (PS-A4 sign-in and recovery abuse
-  counters); S11 `20261127010000` and `20261127080000` (nine capability catalog rows, no grant), `20261127120000`
-  (client administration). Application: `src/application/client-registration.ts`, `account-recovery.ts`,
-  step-up modules, `src/application/administration-workspace.ts`; identity adapters under
-  `src/infrastructure/identity/`.
+- **Implemented in.** P1 authorization foundation; S1 `20261117030000` (capability administration); S2 `20261118030000`
+  (session assurance, aal2 in the database) and `20261118040000` (PS-A4 sign-in and recovery abuse counters); S11
+  `20261127010000` and `20261127080000` (nine capability catalog rows, no grant), `20261127120000` (client
+  administration); at `2a1b94f`, `20261127190000` (break-glass, PS-A6 §2: capability `approve_break_glass`) and
+  `20261127200000` (data requests, PS-A6 §3: capability `manage_data_requests`), no grant. Application:
+  `src/application/client-registration.ts`, `account-recovery.ts`, step-up modules,
+  `src/application/administration-workspace.ts`; identity adapters under `src/infrastructure/identity/`.
 - **L2.** S1 CAP-1 (grant, expiry, revocation, no self-grant), CAP-2, CAP-3, POL-3, LG-2. S2 AAL-1–8, ABUSE-1–14,
   JOB-13, JOB-14. p3-904 PRIV-1–5, R1-1–5, R2-1–2, C-1–10, R3-1–5. m4 SEC-1–3. registration-abuse C1–C29, T1–T4.
   Per-slice authorization: S6 AUTH-1, offers OFF-3 and OFF-5, S7 AUTHZ-1, S8 AUTHZ-1–2, S9 ACC-2 and ST-1, S10 MSG-1
   and DOC-4. S11 CAP-1 (five codes), STAFF-1, REV-2, CMP-3, HOLD-1. Operations CAP-1 (four codes), CLI-1 (client
   reads need the global `manage_client_accounts` grant at aal2), CLI-2 (suspend and reactivate, audited, never one's
   own account), CLI-3 (PM row 46), CONC-2 (suspension racing a client's Request creation), NAMES-1, CORR-R3 (Users
-  holding an Attorney Profile are outside client administration).
+  holding an Attorney Profile are outside client administration). ps-a6 BG-1–BG-7 (break-glass request, approval by
+  another holder in scope, revocation, derived states, the one audited access path, no other path honours a grant, the
+  guard for every role), DR-1, DR-3, PRIV-1, CC-1–CC-3, CC-5.
 - **L1.** `security-shell.test.mjs` 1–17; `authentication-session.test.mjs` 1–9; `authentication-entry.test.mjs`;
   `account-recovery.test.mjs`; `client-registration.test.mjs`; `attorney-access.test.mjs`;
   `attorney-application.test.mjs`; `client-principal-source.test.mjs`; `step-up.test.mjs` S2-A1–A13;
   `step-up-routes.test.mjs` S2-R1–R12 (53 step-up-gated pages, line 207); `authentication-abuse.test.mjs`
   1–22; `registration-abuse-control.test.mjs`; `m4-audit-authorization.test.mjs` M4-AZ1–AZ4;
   `staff-configuration.test.mjs` SC-1, SC-3, SC-10, SC-13. S11B-1 (every page and action under `app/client`,
-  `app/attorney` and `app/staff` enumerated from the file system and behind its gate), S11B-9, S11C-1.
+  `app/attorney` and `app/staff` enumerated from the file system and behind its gate), S11B-9, S11C-1. PSA6-1–PSA6-3,
+  PSA6-8, PSA6-9; `step-up-routes.test.mjs` pins 57 pages at `2a1b94f` (line 211).
 - **L5.** S1 (authentication flows; staff access with and without grants), S2 (throttling, suspicious sign-in, MFA
   enrolment and step-up). S11 operations journey (client suspension and reactivation; refusal by direct URL without
-  the capability); S11 workspaces journey (every new client and attorney page refuses the wrong user by direct URL).
+  the capability); S11 workspaces journey (every new client and attorney page refuses the wrong user by direct URL);
+  L5 ps-a6 (break-glass request, approval by another staff member, audited access, revocation and refusal after).
 - **Gaps.**
-  - Break-glass is not built: it needs the pending amendment PS-A6 (`break_glass_grants`), which is not adopted.
+  - Break-glass was not built at `5283fda`; it is built at `2a1b94f` (PS-A6 §2). Its one access path serves the
+    Consultation record, the newest 500 Messages and the document list (metadata of current versions), not document
+    content (`20261127190000:44–45`); serving content would need a break-glass-named server path (an optional
+    enhancement).
   - Registration stays default-deny (Packet §4); D-7 (password rule on reset) is gated (Packet §7).
   - No recovery path for a lost MFA device; access tokens issued before a suspicious-sign-in session end verify until
     expiry (S2 PR residual risks).
@@ -100,7 +120,8 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
 
 - **Implemented in.** Row level security on every relation; function-only writes with revoke-only privilege loops in
   every slice; S11 `20261127040000` (one SELECT row policy on `reviews`), restricted `complaint_cases` and
-  `legal_holds` (no API role privilege).
+  `legal_holds` (no API role privilege); at `2a1b94f`, restricted `break_glass_grants` and `data_requests` (no API role
+  privilege, no row policy).
 - **L2.** m4 RLS-1–3. p5-001 ISO-1–5, PRIV-1–4. S1 ENV-4, CAP-3. S2 PRIV-1–3. S3 PRIV-1–2, META-1, AUTH-1–3, ART-3,
   V2-PRIV-1–2, V2-AI-4, V2-JR-3–5. S4 PRIV-1–3. S5 PRIV-1–4, PUB-6–8, REF-3, REF-8. S6 PRIV-1–4, AUTH-1. Offers OFF-2,
   OFF-5, MSG-3. S7 PRIV-1–2, AUTHZ-1. S8 AUTHZ-1–2, VIS-1. S9 PRIV-1–2, ACC-2, ACC-5, EV-4. S10 PRIV-1–3, MSG-1–3,
@@ -110,7 +131,8 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
   command security definer with `pg_catalog, pg_temp`, authenticated only; internal functions by no API role), PRIV-2,
   AUD-1, AUD-2, REF-1, CLI-1, D8, SURF-0 (the six pass 2B reads: definer, authenticated only, no identifier
   argument), SURF-1–SURF-6 (own records only, minimum columns), SURF-7 (guessed identifiers and manipulated client
-  state answer nothing).
+  state answer nothing). ps-a6 MIG-3 (row level security on both PS-A6 relations; no privilege for `anon`,
+  `authenticated` or `service_role`), PRIV-1, BG-6, CV-6 (the statement only to the complainant and in-scope staff).
 - **L1.** `client-intake-routes.test.mjs` 3; `client-registration.test.mjs` 37 (privileged client and RPC fences);
   `discovery.test.mjs` S5-5, S5-6; `consultations.test.mjs` S9-5; S11B-1, S11B-2, S11B-12; S11-14, S11-16; S11C-1,
   S11C-3.
@@ -150,12 +172,14 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
 
 ## Point 4 (availability, Holds, bookability)
 
-- **Implemented in.** S4 `20261120010000`–`20261120030000`; S11 `20261127020000` (an ended Booking frees its slot).
-  Application: `src/application/attorney-schedule.ts`.
+- **Implemented in.** S4 `20261120010000`–`20261120030000`; S11 `20261127020000` (an ended Booking frees its slot);
+  since `d9d1151`, `20261127220000` (the S6 offered starts keep only a start that one availability window contains
+  whole, as the bookability check requires). Application: `src/application/attorney-schedule.ts`.
 - **L2.** S4, all 46 checks: MIG-1–2, PRIV-1–3, POL-0–1, AV-1–5, IN-1–4, BK-1–4, HO-1–7, CC-1–7 (the seven IMP §20
-  concurrency tests), INV-1–6 (MBS §9 invariants), INT-1–5, AUD-1. S1 SCH-3. S6 REQ-4, EXP-2, CC-2, CC-4. S8 REVAL-2, REVAL-3. S11 BOOK-1 and
-  CAN-1 (a cancelled or completed Booking no longer blocks its slot; another client's Request for it is created).
-  Operations D5 (bookability and the scheduling keys validated at approval).
+  concurrency tests), INV-1–6 (MBS §9 invariants), INT-1–5, AUD-1. S1 SCH-3. S6 REQ-4, EXP-2, CC-2, CC-4. S8 REVAL-2,
+  REVAL-3. S11 BOOK-1 and CAN-1 (a cancelled or completed Booking no longer blocks its slot; another client's Request
+  for it is created). Operations D5 (bookability and the scheduling keys validated at approval). S6 QUOTE-3 (added in
+  `d9d1151`: no offered start spans two adjacent windows or midnight) and the containment check in S6 QUOTE-2.
 - **L1.** `attorney-schedule.test.mjs` S4-A1–A11; S11C-12 and S11C-17 (the read-only week view, including windows
   of zones west and east of UTC).
 - **L5.** S4 (schedule page, zones, Instant mode, sign-out); S11 journey script (the slot is free again after a
@@ -187,8 +211,8 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
 
 - **Implemented in.** S6 `20261122010000`–`20261122040000` (PS-A3 offers); S11 `20261127140000` (D7: the quote,
   response-window, message-limit and offer-option readers cast through `numeric`).
-- **L2.** S6 all 32 checks. Offers all 18 (OFF-1–6, CFG-1–3, CUR-1, APR-1, MSG-1–4, PUB-1, CC-1–2). S8 CC-7.
-  Operations D7.
+- **L2.** S6 all 32 checks at `5283fda`, 33 since `d9d1151` (QUOTE-3 added with the offered-start correction). Offers
+  all 18 (OFF-1–6, CFG-1–3, CUR-1, APR-1, MSG-1–4, PUB-1, CC-1–2). S8 CC-7. Operations D7.
 - **L1.** `consultation-request.test.mjs` S6-1–S6-14; `consultation-offers.test.mjs` OFFERS-1–7;
   `discovery.test.mjs` S5-14.
 - **L5.** S6 (eight steps).
@@ -290,11 +314,14 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
   `src/application/protected-resources.ts`, `legal-holds.ts`; the attorney's document list (`/attorney/documents`,
   `attorney_documents`, `20261127170000`).
 - **L2.** S3 CON-1–2, HOLD-1, PRIV-1–2, VM-1–3, AUTH-1–3, META-1, ART-1–3, STO-1, AUD-1. S10 DOC-1–14, CONC-4,
-  CONC-8–11. S11 HOLD-1–3, CONC-8, MBS16-5. Operations SURF-5 (document metadata only, no storage path).
+  CONC-8–11. S11 HOLD-1–3, CONC-8, MBS16-5. Operations SURF-5 (document metadata only, no storage path). ps-a6 DR-5 (a
+  deletion request cannot be decided allowed while an unreleased Legal Hold covers the requester, for each of the five
+  scope types and the counterparty paths), DR-7 (since `2a1b94f`: the rule in one pass with 8,000 Resources and 400
+  holds, agreeing with `resource_under_legal_hold`) and CC-6 (a hold racing that decision, both orders).
 - **L1.** `protected-resources.test.mjs` S3-M1–M4, S3-V1–V6, S3-A1–A4, S3-L1; `protected-resources-infrastructure.test.mjs`
   S3-I1–I7; `communications.test.mjs` S10-C3, S10-C4, S10-C9, S10-C10; `security-headers.test.mjs` 5; S11-13; S11C-9.
 - **L5.** S3, S10 (database-authorized short-lived link; revocation removes access); S11 journey script (Legal Hold
-  placed from a complaint case).
+  placed from a complaint case); L5 ps-a6 (a deletion request refused while a Legal Hold covers the client).
 - **Gaps.** No deletion feature (DOC-DEL unresolved); `retention_rules` has no reader or writer. Signed links are
   bearer links for 60 seconds; rejected upload bytes stay in private Storage; the owner role can delete a current
   document version when no hold applies (S3, S10 PRs). 1 MB ceiling; no upload rate limit (S10 question 6). A Legal
@@ -369,9 +396,11 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
   event). Operations PRIV-2 (anon and authenticated refused 42501; `service_role` grant recorded as retained), AUD-1
   (scope), AUD-2 (one event), AUD-3 (filters and paging), AUD-4 (each read audited once), AUD-5 (security group over
   existing codes), CORR-R4 (free text redacted on read by `audit_snapshot_redacted`, `20261127180000:862`; stored rows
-  unchanged).
+  unchanged). ps-a6 BG-5 (one `break_glass.accessed` event with the grant id per access, `20261127190000:796–801`),
+  CV-6 (no audit event carries the complaint statement).
 - **L1.** `m4-audit-authorization.test.mjs` M4-AU1–AU6; `observability.test.mjs` 1–8; S11B-4, S11B-5.
-- **L5.** S1 (each staff step checked against its audit row); S11 operations journey (audit page with filters).
+- **L5.** S1 (each staff step checked against its audit row); S11 operations journey (audit page with filters); L5
+  ps-a6 (each break-glass opening audited once with the grant's id).
 - **Gaps.** `service_role` keeps INSERT on `audit_events` (ARCH-D6; pinned by m4 AUD-1 and p3-904 PRIV-2; owner
   question 1). No action code records a step-up or a privileged denial, so the security group lists none (owner
   question 2). Free text (notes, profile text, reasons) stays stored in audit rows; the workspace only redacts it on
@@ -406,21 +435,30 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
 
 - **Implemented in.** S11 `20261127060000`: `complaint_open` `:327` (the complainant is the caller; PM row 47: nothing
   else changes), restricted reads, staff assignment and escalation; classification and resolution behind the
-  `complaint_vocabulary` seam. Application: `src/application/complaints.ts`; pages `app/client/complaints/`,
+  `complaint_vocabulary` seam. At `2a1b94f`, `20261127210000` (PS-A6 §§4–5): the `complaint` policy type
+  (`complaint_vocabulary` `:164` selects through `policy_select_version`; approval validation
+  `complaint_parameters_valid` `:54`) and `complaint_cases.statement` (`:202–205`; `complaint_open` re-created with
+  the optional statement, `:282`). Application: `src/application/complaints.ts`; pages `app/client/complaints/`,
   `app/attorney/complaints/`, `app/staff/complaints/`.
 - **L2.** S11 CMP-1–5, MBS16-5 (evidence preserved, access controls respected), CORR-R6 (a repeated assignment
   changes and audits nothing), CONC-7, EXIT-1. Operations CMPL-1 (complaint counts for `manage_complaints` holders).
-- **L1.** S11-11, S11-12.
-- **L5.** S11 journey script (problem reported, case assigned, Legal Hold placed).
-- **Gaps.** Classification and resolution answer `configuration_unavailable` until a complaint vocabulary can be
-  selected; the `complaint` policy type and the `complaint_cases.statement` column are part of PS-A6, which is not
-  adopted, so a case cannot be resolved in a real environment until then. The case records linkage and state only.
+  ps-a6 CV-1 (approval validation both ways), CV-2 (the staff policy surfaces), CV-3 (selection by jurisdiction or
+  platform scope; a development version never selected in a production-class database), CV-4 (classification and
+  resolution with the configured codes), CV-5 and CV-6 (the statement: bounds, immutability, restriction).
+- **L1.** S11-11, S11-12; PSA6-7.
+- **L5.** S11 journey script (problem reported, case assigned, Legal Hold placed; at `2a1b94f` its step 3b classifies
+  and resolves through a real complaint policy version, with no synthetic function fixture); L5 ps-a6 (a statement seen
+  by staff and not by the counterparty; a complaint version created, approved and activated through the staff policy
+  pages, then classification and resolution with its codes).
+- **Gaps.** Classification and resolution work once a `complaint` policy version is configured for the case's scope;
+  nothing is seeded, so until an environment is configured they answer `configuration_unavailable`. At `5283fda` the
+  policy type and the statement did not exist; both are implemented at `2a1b94f`.
 
 ## Point 21 (Regulatory Mode handling)
 
 - **Evidence.**
   - None of the PS §28 relations is created by any migration, and none is referenced (69 `create table` statements for
-    67 relations; S7 MIG-2 asserts that `payouts` does not exist).
+    67 relations at `5283fda`, 71 for 69 at `2a1b94f`; S7 MIG-2 asserts that `payouts` does not exist).
   - Payments record the jurisdiction's single active Regulatory Mode; none or two refuses (S7 FP1-1, FP1-2).
   - Eligibility selection treats a mode-specific version as undetermined (`eligibility-assessment.test.mjs` M4-E2,
     M4-E3; `20261117020000:65–80`).
@@ -452,7 +490,9 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
 
 ## Point 23 (public pages and the three workspaces)
 
-- **Evidence at `5283fda`.** 85 pages (`app/**/page.tsx`), 30 action modules, 34 form modules, 5 route handlers.
+- **Evidence at `5283fda`.** 85 pages (`app/**/page.tsx`), 30 action modules, 34 form modules, 5 route handlers. At
+  `2a1b94f`: 89 pages, 33 action modules, 37 form modules, 5 route handlers (the four staff break-glass and data-request
+  pages; the client privacy page gained its form).
   - Public: `/`, `/find-an-attorney`, `/attorneys/[attorney]` (with published reviews since S11), `/find-an-attorney/select`,
     `/how-it-works`, `/for-attorneys`, `/about`, `/help`, `/contact`, `/privacy`, `/terms`, `/disclosures`, sign-in,
     sign-up, password recovery.
@@ -467,16 +507,19 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
     launch, catalog, capabilities, intake configuration, jurisdiction review, jobs, finance (payments, detail,
     exceptions, summary), operations, system health, audit and one event, compliance, attorneys (lifecycle),
     clients and one client, referrals, consultations and one Consultation, reviews, complaints and one case, Legal
-    Holds.
+    Holds; at `2a1b94f`, break-glass and one grant (`/staff/break-glass`, `/staff/break-glass/[grant]`) and data
+    requests and one request (`/staff/data-requests`, `/staff/data-requests/[request]`).
   - Account: `/account/security`, `/account/step-up`.
 - **L1.** `public-site.test.mjs` S5-P1–P2; `public-entry-points.test.mjs` PE-1–4; `discovery.test.mjs` S5-2, S5-3,
   S5-12, S5-13; route tests per workspace; `security-headers.test.mjs` 1–6; `design-system.test.mjs` 1–23;
   `application-shell.test.mjs`; S11B-1 (MBS §18.6: every client, attorney and staff page and action is behind its gate,
   so a new unprotected surface fails), S11B-3 (staff home grouped by area), S11-16, S11C-1 (the pass 2B pages), S11C-2
-  (one navigation per workspace), S11C-4–S11C-13.
+  (one navigation per workspace), S11C-4–S11C-13. PSA6-8 (the PS-A6 pages ask the step-up gate first or re-verify the
+  client, and read only through their own use case).
 - **L2.** Unknown or guessed identifiers answer nothing: on the S11 staff reads (operations AUD-2, CLI-1, LIFE-2; S11
   STAFF-1, CMP-1); the six pass 2B reads take no identifier at all (operations SURF-0, SURF-7).
-- **L5.** Section 0.4 of the S1–S10 inventory as recorded in the evidence JSON; the three S11 journey scripts.
+- **L5.** Section 0.4 of the S1–S10 inventory as recorded in the evidence JSON; the three S11 journey scripts; L5
+  ps-a6.
 - **Client workspace (MBS §18.2), at `5283fda`.**
 
   | Surface                 | State                                                                                                                                                                                                                                                          | Evidence                   |
@@ -488,7 +531,7 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
   | Reviews and complaints  | Existed (S11 pass 1)                                                                                                                                                                                                                                           | S11 REV, CMP checks        |
   | Notifications           | Existed (S10); S11 types readable since the ARCH-D14 correction                                                                                                                                                                                                | S11C-16; SURF-8            |
   | Profile / settings      | Implemented read-only in pass 2B: display name, account state, created date, notification center link (`/client/settings`). No display-name edit: no function exists. `/account/security` refuses client accounts, so it is not linked                         | SURF-2; S11C-5             |
-  | Privacy / data controls | Implemented in pass 2B: counts of seven record categories, the public privacy page's approved sentence, a statement that requests about personal data cannot be made here yet, no form (`/client/privacy`, `client_account_overview`). Requests wait for PS-A6 | SURF-2; S11C-5, S11C-13    |
+  | Privacy / data controls | At `2a1b94f` (PS-A6 §3): a request form for the five types, the client's own requests with withdrawal, neutral fixed labels and "Recorded decision" (`/client/privacy`; PSA6-4; L5 ps-a6). At `5283fda`: counts of seven record categories and no request form | SURF-2; S11C-5; ps-a6 DR-1 |
   | Help / complaints       | Linked                                                                                                                                                                                                                                                         | S11C-2                     |
 
 - **Attorney workspace (MBS §18.3), at `5283fda`.**
@@ -511,7 +554,9 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
   waitlist, review items), jurisdictions, referral operations (read-only), complaints, payments, refunds (S7 staff
   refund), reconciliation exceptions, revenue and financial summary, clients, staff capabilities, security and audit,
   system health, policy management. Not presented: panels, surveys and other Regulatory-Mode-conditional sections
-  (`20261127110000` header). Not built: privacy and data requests (PS-A6).
+  (`20261127110000` header). Not built at `5283fda`: privacy and data requests (PS-A6). At `2a1b94f`: data requests
+  (`/staff/data-requests`, `manage_data_requests`, global grant) and break-glass access (`/staff/break-glass`, linked
+  from the staff home for every active staff member).
 - **Gaps.** The home page is still the interface-foundation demonstration and the eight public content pages render a
   fixed "not yet available" statement (content is owner and counsel gated). Pages that existed before pass 2B keep
   page-local navigation. Owner questions from pass 2B: compliance alert lead time (none applied), client display-name
@@ -526,21 +571,21 @@ independent-review corrections `5283fda`). Dated run summaries, including the Bu
 
 The thirteen technical conditions are cited by their position in IMP §29; the label in parentheses is this pack's own.
 
-| Position (label)            | Evidence at `5283fda`                                                                                                                                                                                                                                               | Gaps                                                                                                                    |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| 1 (client journey)          | L2: S9 EXIT-1, S10 EXIT-1, S11 EXIT-1 (function level, providers simulated). L5 per slice (S3, S5, S6, S7 unconfigured, S9, S10); S11 journey script and workspaces journey (client home, payments, messages, settings, privacy)                                    | No single browser journey from Intake to a completed, paid Consultation; no real hosted payment page in a browser       |
-| 2 (attorney journey)        | L5: S4, S6, S8, S9; S11 journey script (start, end); S11 workspaces journey (dashboard, history, week view, messages, documents, compliance); L2 EXIT-1 as above                                                                                                    | Application-to-approval journey not re-run in MVP-001                                                                   |
-| 3 (staff operations)        | L5: S1 (37 staff steps), S2, S7; S11 journey script (staff outcome) and operations journey (9/9). L2: S11 EXIT-1 (operations without direct database edits), operations LIFE, CLI, REJ, AUD, OPS; L1: S11B-1–S11B-19                                                | Regulatory Mode creation is migration-only (M14); privacy and data requests and break-glass wait for PS-A6              |
-| 4 (security)                | Points 1 and 2; `security-headers.test.mjs`; webhook authenticity S7-L3-5/7, S9-L3-6/8, S10-L3-5/7; D1 S11B-16/17; D8 operations D8; review corrections R1–R6                                                                                                       | `script-src 'unsafe-inline'`; ARCH-D6; D9 remainder; the IMP §40 security review not performed                          |
-| 5 (row-level security)      | Point 2 (`PRIV-*`, `ISO-*`, `RLS-*` checks in every proof; S11 PRIV-1; operations SURF-0–SURF-7)                                                                                                                                                                    | aal1 direct reads on P1 participant policies                                                                            |
-| 6 (concurrency)             | S4 CC-1–7; S5 CC-1–2; S6 CC-1–4, EXP-5; offers CC-1–2; S7 CC-1–4; S8 CC-1–9; S9 CC-1–6; S10 CONC-1–11; S11 CONC-1–9; operations CONC-1–5; p3-904 C-1–10; p5-001 CON-1–4; S2 JOB-3, ABUSE-5                                                                          | L2 only; PostgreSQL 16 (the hosted platform runs 17)                                                                    |
-| 7 (payments)                | Point 7                                                                                                                                                                                                                                                             | Point 7 gaps                                                                                                            |
-| 8 (reconciliation)          | Point 16                                                                                                                                                                                                                                                            | No scheduled reconciliation                                                                                             |
-| 9 (failing providers)       | S7 AUTH-2, CAP-2, REF-2, RECON-1; S9 MBS14-1, MBS14-3; S10 NOT-3–5, NOT-11; S11 MBS16-1, MBS16-2, NOT-2; adapter error mapping S7-L3-4, S10-L3-3                                                                                                                    | Simulated providers; real webhook paths unverified                                                                      |
-| 10 (jobs)                   | Point 18                                                                                                                                                                                                                                                            | No hosted trigger; four sweeps not observed firing                                                                      |
-| 11 (Storage)                | Point 12                                                                                                                                                                                                                                                            | Proofs use a stand-in for the Storage schema; real Storage only in L5 (S3, S10)                                         |
-| 12 (logging and monitoring) | `observability.test.mjs` 1–8; `src/infrastructure/observability/log.ts`, `request-log.ts`; correlation id in `proxy.ts`; staff job view; S11 operations dashboard and system health (counts only; operations OPS-1, OPS-2; S11B-6, S11B-7)                          | Hosted checks are outside the database view (L6 HOLD); alert delivery from `security.protection_unavailable` unverified |
-| 13 (backup and restore)     | [`backup-restore-procedure.md`](backup-restore-procedure.md): `apps/web/tests/mvp-001-s11-restore-proof.mjs`, final run at `5283fda` (2026-11-22, 72 migrations, 7/7 PASS) and earlier runs; P0-level `governance/evidence/p0-restore-validation.json` (2026-08-28) | Hosted backup and restore (Storage objects, identity data, `pg_cron`) is L6 and on HOLD                                 |
+| Position (label)            | Evidence at `5283fda`                                                                                                                                                                                                                                                                   | Gaps                                                                                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 1 (client journey)          | L2: S9 EXIT-1, S10 EXIT-1, S11 EXIT-1 (function level, providers simulated). L5 per slice (S3, S5, S6, S7 unconfigured, S9, S10); S11 journey script and workspaces journey (client home, payments, messages, settings, privacy)                                                        | No single browser journey from Intake to a completed, paid Consultation; no real hosted payment page in a browser       |
+| 2 (attorney journey)        | L5: S4, S6, S8, S9; S11 journey script (start, end); S11 workspaces journey (dashboard, history, week view, messages, documents, compliance); L2 EXIT-1 as above                                                                                                                        | Application-to-approval journey not re-run in MVP-001                                                                   |
+| 3 (staff operations)        | L5: S1 (37 staff steps), S2, S7; S11 journey script (staff outcome) and operations journey (9/9). L2: S11 EXIT-1 (operations without direct database edits), operations LIFE, CLI, REJ, AUD, OPS; L1: S11B-1–S11B-19; L5 ps-a6 (8/8)                                                    | Regulatory Mode creation is migration-only (M14); a data-request decision executes nothing (no executor)                |
+| 4 (security)                | Points 1 and 2; `security-headers.test.mjs`; webhook authenticity S7-L3-5/7, S9-L3-6/8, S10-L3-5/7; D1 S11B-16/17; D8 operations D8; review corrections R1–R6; PS-A6 at `2a1b94f`: ps-a6 MIG-3, PRIV-1, BG-6                                                                            | `script-src 'unsafe-inline'`; ARCH-D6; D9 remainder; the IMP §40 security review not performed                          |
+| 5 (row-level security)      | Point 2 (`PRIV-*`, `ISO-*`, `RLS-*` checks in every proof; S11 PRIV-1; operations SURF-0–SURF-7)                                                                                                                                                                                        | aal1 direct reads on P1 participant policies                                                                            |
+| 6 (concurrency)             | S4 CC-1–7; S5 CC-1–2; S6 CC-1–4, EXP-5; offers CC-1–2; S7 CC-1–4; S8 CC-1–9; S9 CC-1–6; S10 CONC-1–11; S11 CONC-1–9; operations CONC-1–5; p3-904 C-1–10; p5-001 CON-1–4; S2 JOB-3, ABUSE-5; ps-a6 CC-1–7 (at `2a1b94f`)                                                                 | L2 only; PostgreSQL 16 (the hosted platform runs 17)                                                                    |
+| 7 (payments)                | Point 7                                                                                                                                                                                                                                                                                 | Point 7 gaps                                                                                                            |
+| 8 (reconciliation)          | Point 16                                                                                                                                                                                                                                                                                | No scheduled reconciliation                                                                                             |
+| 9 (failing providers)       | S7 AUTH-2, CAP-2, REF-2, RECON-1; S9 MBS14-1, MBS14-3; S10 NOT-3–5, NOT-11; S11 MBS16-1, MBS16-2, NOT-2; adapter error mapping S7-L3-4, S10-L3-3                                                                                                                                        | Simulated providers; real webhook paths unverified                                                                      |
+| 10 (jobs)                   | Point 18                                                                                                                                                                                                                                                                                | No hosted trigger; four sweeps not observed firing                                                                      |
+| 11 (Storage)                | Point 12                                                                                                                                                                                                                                                                                | Proofs use a stand-in for the Storage schema; real Storage only in L5 (S3, S10)                                         |
+| 12 (logging and monitoring) | `observability.test.mjs` 1–8; `src/infrastructure/observability/log.ts`, `request-log.ts`; correlation id in `proxy.ts`; staff job view; S11 operations dashboard and system health (counts only; operations OPS-1, OPS-2; S11B-6, S11B-7)                                              | Hosted checks are outside the database view (L6 HOLD); alert delivery from `security.protection_unavailable` unverified |
+| 13 (backup and restore)     | [`backup-restore-procedure.md`](backup-restore-procedure.md): `apps/web/tests/mvp-001-s11-restore-proof.mjs`, run 7 at `2a1b94f` (2026-11-23, 76 migrations, 7/7 PASS), run 6 at `d9d1151` and the earlier runs; P0-level `governance/evidence/p0-restore-validation.json` (2026-08-28) | Hosted backup and restore (Storage objects, identity data, `pg_cron`) is L6 and on HOLD                                 |
 
 ### MBS §19 technical-complete requirements mapped to the points
 
