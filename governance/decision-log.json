@@ -2062,6 +2062,37 @@
         "Lock Condition elements 2 and 3 carried by the S11 pull request (register status pending_lock_condition); not complete until that pull request merges",
         "Implemented in the S11 pull request by migrations 20261127190000_mvp_001_s11_break_glass, 20261127200000_mvp_001_s11_data_requests and 20261127210000_mvp_001_s11_complaint_configuration (register sequences 73 to 75, reviewed false, applied_environment none), corrected after an independent review on 2026-11-22 and a further independent check on 2026-11-23; L2 proof apps/web/tests/mvp-001-s11-ps-a6-db-proof.mjs 32/32 and the PS-A6 local browser journey 8/8 recorded by the Builder (governance/readiness, governance/evidence)"
       ]
+    },
+    {
+      "decision_id": "DEC-20261123-P2-922-REPLIT-STAGING-HOSTING",
+      "title": "Reconcile Replit and host Rosuno Staging from a fresh private Replit Autoscale app",
+      "status": "accepted",
+      "scope": "Replit hosting for Rosuno Staging under the owner-adopted P2-922 PROCESS Packet: the reconciliation of the existing Replit workspace, the hosting target and deployment type, and the repository hosting configuration (.replit, .replitignore, replit.md). It does not create, import or publish a Replit app, enter secrets, change Supabase or configure providers.",
+      "decision": "1. The existing Replit app \"Rosuno\" (83ab90bb-a9ea-4302-bc30-2aeca40eb0f2) is a historical development workspace, not canonical; it is preserved unchanged and is never a hosting target. 2. Rosuno Staging is hosted from a new private Replit app imported from owner main, with Staging configuration only. 3. The deployment type is Replit Autoscale; a Reserved VM is used only if Autoscale proves unable to run the application, with the reason recorded. With this reconciliation recorded, the condition of MVP-001 Packet rule 14 (the Replit HOLD) is met; each hosting step remains a separate owner authorization.",
+      "rationale": "DL-ENG-1 R2 makes Replit a runtime, preview and deployment target only, deploying from owner main through the owner-controlled release path (IMP section 8). The read-only reconciliation found the existing workspace to be a modified snapshot of owner main at 78ad16c (24 merges behind) holding untracked private and Builder material, so it cannot be a clean deployment target. A fresh import from owner main gives a clean, reviewable tree. The application is a Node.js 24 / Next.js 16 server whose state is held in Supabase, which Autoscale can run.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-922-REPLIT-STAGING-HOSTING"],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-23T16:29:13Z",
+      "updated_at": "2026-11-23T16:29:13Z",
+      "supersedes": [],
+      "impact": "Repository hosting configuration only: .replit gains an Autoscale deployment section and one port mapping (existing sections unchanged), .replitignore excludes private authority, Builder residue and local secret files from deployment images, and replit.md states the hosting contract. No application code, dependency, migration, database, Supabase, provider, Replit app, Production or OLD change; the existing Replit workspace is untouched.",
+      "evidence": [
+        "Read-only Replit reconciliation on 2026-11-23 through the Replit connector: the app \"Rosuno\" (83ab90bb-a9ea-4302-bc30-2aeca40eb0f2, last updated 2026-11-14T01:17:23Z) had no current publication. Its tree matches owner main at 78ad16c: docs/work-items holds exactly P2-005 to P2-908 (a set found at no other first-parent commit) and apps/web/tests holds the same ten files.",
+        "Deviations found in that workspace: supabase/migrations empty, .replit modules adding python-base-3.13, .npmrc missing, extra npm, Yarn and Bun files, and untracked rosuno-authority/, .rosuno/ and tmp/ directories; none of these paths appears in any fetched owner or Builder ref. No secret value was read and no private authority content was opened.",
+        "Owner confirmation (2026-11-23): the existing Rosuno project is marked PRIVATE in Replit's project library, and the owner's read-only Git checks showed rosuno-authority/ and .rosuno/ untracked, with rosuno-authority/ locally excluded.",
+        "Owner adoption: the P2-922 Packet was added on owner branch wi/P2-922-replit-staging-hosting in bdd924a; the adopted head is 0976769 with a net diff against main 3ba9ad72c648b2cda3c0518aad6d37a520fb72d6 of exactly docs/work-items/P2-922/PACKET.md, Git blob c052d7eb5e20811b8b02b3a7401ffe54323b7782, SHA-256 f0a66f57b4b890aead3f8d3c0095b5e57248352eb1ef185d5366cbf464744cad.",
+        "Deployment syntax: Replit's documentation host was not reachable from the Builder session; the committed stanza follows the form of a Replit-generated .replit in the owner's earlier Replit app (deploymentTarget = \"autoscale\", array-form build and run, [[ports]] with localPort and externalPort 80), and parses as valid TOML.",
+        "Local production-mode evidence on the base tree: next start bound to an explicit host and port answers 200 with Content-Security-Policy, X-Frame-Options DENY, Referrer-Policy same-origin, X-Content-Type-Options nosniff and Strict-Transport-Security; an unconfigured POST /api/jobs/run answers 503 and GET answers 405."
+      ],
+      "expiry": null
     }
   ]
 }

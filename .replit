@@ -56,3 +56,12 @@ isValidation = true
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
+
+[deployment]
+deploymentTarget = "autoscale"
+build = ["sh", "-c", "pnpm install --frozen-lockfile && pnpm run build"]
+run = ["sh", "-c", "pnpm --filter @rosuno/web exec next start --hostname 0.0.0.0 --port 3000"]
+
+[[ports]]
+localPort = 3000
+externalPort = 80
