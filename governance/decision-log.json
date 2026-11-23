@@ -1885,7 +1885,8 @@
         "Slice S7 merged: PR #102 into owner main at merge commit 210a99e30e850747256ebf299f7e7839f9a55c5d (committed 2026-11-18T14:33:47Z; parents 8dfeaf6698067808275dfd86cb655d88148b7660 and 705359d916afde32a9ff8356f5b8118b0cfef890; merge tree equals the reviewed S7 head tree), confirmed by the express owner statement 'S7 MERGE CONFIRMED / S8 CONTINUATION' and recorded at 2026-11-18T14:43:38Z (session clock); designated reviewer Rosuno approved, as stated by the owner (approval time not supplied); the Stripe integration is recorded as implemented with provider operations verified at L4 and the signed webhook delivery outstanding at L4 (Packet section 5); S7 migrations not applied to any persistent environment (Staging application awaits separate owner authorization)",
         "Slice S8 merged: PR #103 into owner main at merge commit f5973d6326b47a2eca709efebc3c7c62e6c515c0 (committed 2026-11-18T18:06:28Z; parents 210a99e30e850747256ebf299f7e7839f9a55c5d and f3c8fda861cf89bace1158eb31d8ede2c4f7dd5d; merge tree equals the reviewed S8 head tree), confirmed by the express owner statement 'S8 MERGE CONFIRMED / S9 CONTINUATION' and recorded at 2026-11-18T19:00:09Z (session clock); designated reviewer Rosuno approved, as stated by the owner (approval time not supplied); the independent review requested in the S8 directive was performed by a separate review agent and its three confirmed defects were corrected before publication; S8 migrations not applied to any persistent environment (Staging application is handled by a separate owner-authorized session)",
         "Slice S9 merged: PR #104 into owner main at merge commit d3e62969bfa1fdaedb843b1c873fbcb0040f0ede (committed 2026-11-18T22:28:39Z; parents f5973d6326b47a2eca709efebc3c7c62e6c515c0 and 0f55677e963098b1dca2b74ed02042f4efa08975; merge tree equals the reviewed S9 head tree), confirmed by the express owner statement 'S9 MERGE VERIFIED / PROCEED TO S10' and recorded at 2026-11-18T23:01:41Z (session clock); designated reviewer Rosuno approved, as stated by the owner (approval time not supplied); the Daily integration is recorded as implemented with room, token, presence, meeting and deletion operations verified at L4 and a real participant join and signed webhook delivery outstanding at L4 (Packet section 5); the independent review requested in the S9 directive was performed by a separate review agent and its confirmed defects were corrected before publication; S9 migrations not applied to any persistent environment (Staging application is handled by a separate owner-authorized session)",
-        "Optional independent review: not performed"
+        "Slice S10 merged: PR #105 into owner main at merge commit b3205cdb0c2792801714be6c67a758e4c7bf11de (committed 2026-11-19T04:13:10Z; parents d3e62969bfa1fdaedb843b1c873fbcb0040f0ede and 1cb365dc6b45dd34a7575cee494d90f9e15282f9; merge tree equals the reviewed S10 head tree), confirmed by the express owner statement 'S10 MERGE VERIFIED / PROCEED TO S11' and recorded at 2026-11-19T04:24:30Z (session clock); designated reviewer Rosuno approved, as stated by the owner (approval time not supplied); the Resend integration is recorded as implemented with sending, provider idempotency and refusal mapping verified at L4 and signed webhook delivery and delivery-status reads outstanding at L4 (Packet section 5); PS-A5 document versioning is included and its Lock Condition is complete; the independent reviews requested in the S10 directives were performed by separate review agents and their confirmed defects were corrected before publication; S10 migrations not applied to any persistent environment (Staging application is handled by a separate owner-authorized session)",
+        "Optional independent review: none is recorded in this entry for S1 to S7; for S8, S9 and S10 the owner-requested reviews by separate review agents are recorded in their lines above; no external review (ChatGPT or the Independent Backup) is recorded"
       ]
     },
     {
@@ -2009,7 +2010,44 @@
         "Express owner adoption statement 'PS-A5 OWNER APPROVAL / COMPLETE S10' (approver NatthanPrevot) naming revision 1, 6,497 bytes and SHA-256 5415ab386ccf2913e2f3becf62cc1a6c78745ac7b1f8db57d28abf2b96ec3a74, received in the Builder session and processed at 2026-11-19T02:13:01Z (session clock)",
         "Amendment file: rosuno-physical-specification-amendment-ps-a5.md, revision 1, 6,497 bytes, SHA-256 5415ab386ccf2913e2f3becf62cc1a6c78745ac7b1f8db57d28abf2b96ec3a74 (owner-held; not in the repository); byte length and digest re-verified by the Builder before registration",
         "Lock Condition elements 2 and 3 carried by the S10 pull request (register status pending_lock_condition); not complete until that pull request merges",
+        "Lock Condition complete: the S10 PR (#105) registering this amendment and recording its adoption merged into owner main at merge commit b3205cdb0c2792801714be6c67a758e4c7bf11de (parents d3e62969bfa1fdaedb843b1c873fbcb0040f0ede and 1cb365dc6b45dd34a7575cee494d90f9e15282f9; merge tree equals the reviewed S10 head tree), confirmed by the express owner statement 'S10 MERGE VERIFIED / PROCEED TO S11' recorded at 2026-11-19T04:24:30Z (session clock); PHYSICAL-SPECIFICATION-AMENDMENT-PS-A5-LOCKED is therefore active",
         "Optional independent review: not performed"
+      ]
+    },
+    {
+      "status": "accepted",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-22T20:34:05Z",
+      "updated_at": "2026-11-23T00:10:35Z",
+      "supersedes": [],
+      "expiry": null,
+      "decision_id": "DEC-20261122-PS-A6-BREAK-GLASS-DATA-REQUESTS-COMPLAINTS",
+      "title": "Approve the exact text of Physical Specification amendment PS-A6, revision 1 (break-glass grants, data requests, complaint policy type, complaint statement)",
+      "scope": "Physical model, bounded: two relations (break_glass_grants, data_requests) with their rules, one policy type catalog row (complaint) whose versions hold the complaint category and resolution codes as configuration, one column complaint_cases.statement, and the capability catalog rows they need; nothing else (PS-A6 sections 1 to 8; DL-ENG-1 R9; MVP-001 Packet S11).",
+      "decision": "The owner expressly approves the complete, unchanged bytes of PS-A6 revision 1, rosuno-physical-specification-amendment-ps-a6.md, 13,290 bytes, SHA-256 34e7fcff469470a80baaf1dd6dbab35aa124c1734aadc2b5979efb9adff331c7 (Lock Condition element 1). Its registration in governance/authority-references.json (status pending_lock_condition) and this entry are carried by the S11 pull request; the Lock Condition completes when that pull request merges, after which the register status becomes active in the next records update. The amendment text stays in the external locked authority package; the Physical Specification V1.0 keeps its exact bytes. Persistent application of any migration implementing PS-A6 needs the completed Lock Condition and a separate database authorization.",
+      "rationale": "MBS sections 5, 16 and 18 and IMP section 27 require time-limited, justified and audited break-glass access, client privacy and data-request controls with an admin queue, and complaint classification and resolution handling; the Specification has no relation for a break-glass request or a data request, no policy type for the complaint vocabularies the Domain Model names, and no field for the complainant's statement, and no existing relation can hold them without duplicating meaning (PS-A6 sections 1 and 7).",
+      "authority_refs": [
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A6-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED",
+        "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-MVP-001-TECHNICAL-COMPLETION"],
+      "impact": "Forward-only S11 migrations implement PS-A6: the two relations with row level security, constraints and guards, function-only writes and reads, the complaint catalog row and approval validation, the statement column, and the capability catalog rows, with staff and client surfaces. Nothing is applied to a persistent environment by merge.",
+      "evidence": [
+        "Express owner adoption statement 'PS-A6 APPROVAL / COMPLETE S11 MVP IMPLEMENTATION' (approver NatthanPrevot) naming revision 1, 13,290 bytes and SHA-256 34e7fcff469470a80baaf1dd6dbab35aa124c1734aadc2b5979efb9adff331c7, received in the Builder session and processed at 2026-11-22T20:34:05Z (session clock)",
+        "Amendment file: rosuno-physical-specification-amendment-ps-a6.md, revision 1, 13,290 bytes, SHA-256 34e7fcff469470a80baaf1dd6dbab35aa124c1734aadc2b5979efb9adff331c7 (owner-held; not in the repository); byte length and digest re-verified by the Builder before registration",
+        "Lock Condition elements 2 and 3 carried by the S11 pull request (register status pending_lock_condition); not complete until that pull request merges",
+        "Implemented in the S11 pull request by migrations 20261127190000_mvp_001_s11_break_glass, 20261127200000_mvp_001_s11_data_requests and 20261127210000_mvp_001_s11_complaint_configuration (register sequences 73 to 75, reviewed false, applied_environment none), corrected after an independent review on 2026-11-22 and a further independent check on 2026-11-23; L2 proof apps/web/tests/mvp-001-s11-ps-a6-db-proof.mjs 32/32 and the PS-A6 local browser journey 8/8 recorded by the Builder (governance/readiness, governance/evidence)"
       ]
     }
   ]

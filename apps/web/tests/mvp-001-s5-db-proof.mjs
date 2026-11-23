@@ -416,6 +416,40 @@ function applyMigrations() {
     "20261126040000_mvp_001_s10_documents.sql",
     // MVP-001 S10 (PS-A5): the document version lineage.
     "20261126050000_mvp_001_s10_document_versioning.sql",
+    // MVP-001 S11: the seven S11 migrations (registered and checked by the
+    // S11 proof).
+    "20261127010000_mvp_001_s11_completion_integrity.sql",
+    "20261127020000_mvp_001_s11_completion.sql",
+    "20261127030000_mvp_001_s11_exception_families.sql",
+    "20261127040000_mvp_001_s11_reviews.sql",
+    "20261127050000_mvp_001_s11_legal_holds.sql",
+    "20261127060000_mvp_001_s11_complaints.sql",
+    "20261127070000_mvp_001_s11_notification_events.sql",
+    // MVP-001 S11 pass 2: the nine operations and administration
+    // migrations (registered and checked by the S11 operations proof).
+    "20261127080000_mvp_001_s11_operations_integrity.sql",
+    "20261127090000_mvp_001_s11_audit_workspace.sql",
+    "20261127100000_mvp_001_s11_operations_dashboard.sql",
+    "20261127110000_mvp_001_s11_attorney_operations.sql",
+    "20261127120000_mvp_001_s11_client_administration.sql",
+    "20261127130000_mvp_001_s11_referral_finance_reads.sql",
+    "20261127140000_mvp_001_s11_policy_corrections.sql",
+    "20261127150000_mvp_001_s11_capture_gate.sql",
+    "20261127160000_mvp_001_s11_definer_search_path.sql",
+    // MVP-001 S11 pass 2B: the participants' workspace reads (registered
+    // and checked by the S11 operations proof).
+    "20261127170000_mvp_001_s11_workspace_reads.sql",
+    // MVP-001 S11 review corrections (registered and checked by the S11
+    // operations proof).
+    "20261127180000_mvp_001_s11_review_corrections.sql",
+    // MVP-001 S11 PS-A6: break-glass, data requests and the complaint
+    // configuration (registered and checked by the S11 PS-A6 proof).
+    "20261127190000_mvp_001_s11_break_glass.sql",
+    "20261127200000_mvp_001_s11_data_requests.sql",
+    "20261127210000_mvp_001_s11_complaint_configuration.sql",
+    // MVP-001 S11: the offered-start correction (registered and checked by
+    // the S6 proof).
+    "20261127220000_mvp_001_s11_offered_start_containment.sql",
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -1136,7 +1170,10 @@ async function inventoryChecks() {
           file,
         );
       }
-      assert.equal(count("policy_types"), 15);
+      // MVP-001 S11 PS-A6 adds exactly one policy type, complaint (registered
+      // and checked by the S11 PS-A6 proof).
+      assert.equal(count("policy_types"), 16);
+      assert.equal(count("policy_types", "code = 'complaint'"), 1);
       assert.equal(
         sql(
           "select count(*) from pg_policies where schemaname = 'public' and tablename in ('referrals', 'referral_eligible_pool_entries', 'referral_presentations');",
@@ -1207,9 +1244,12 @@ async function inventoryChecks() {
       ).split(";");
       // MVP-001 S6 PS-A3 (20261122040000): the public offer read is the one
       // further anon function (inventoried by the S6 proofs).
+      // MVP-001 S11 (20261127040000): and exactly the public read of an
+      // attorney's published reviews (inventoried by the S11 proof).
       const expected = [
         ...Object.keys(PUBLIC_FUNCTIONS),
         "public_attorney_offers(uuid, uuid)",
+        "public_attorney_reviews(uuid)",
       ]
         .map((signature) =>
           sql(`select 'public.${signature}'::regprocedure::text;`),

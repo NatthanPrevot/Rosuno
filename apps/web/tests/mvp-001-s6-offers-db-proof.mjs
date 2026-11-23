@@ -110,6 +110,56 @@ const S10_MIGRATIONS = Object.freeze([
   "20261126050000_mvp_001_s10_document_versioning.sql",
 ]);
 
+// MVP-001 S11: the seven S11 migrations follow the S10 migrations (applied by
+// this proof as later registered migrations; registered and checked by the
+// S11 proof).
+const S11_MIGRATIONS = Object.freeze([
+  "20261127010000_mvp_001_s11_completion_integrity.sql",
+  "20261127020000_mvp_001_s11_completion.sql",
+  "20261127030000_mvp_001_s11_exception_families.sql",
+  "20261127040000_mvp_001_s11_reviews.sql",
+  "20261127050000_mvp_001_s11_legal_holds.sql",
+  "20261127060000_mvp_001_s11_complaints.sql",
+  "20261127070000_mvp_001_s11_notification_events.sql",
+]);
+// MVP-001 S11 pass 2: the nine operations and administration migrations
+// follow the seven pass 1 migrations (applied by this proof as later
+// registered migrations; registered and checked by the S11 operations proof).
+const S11_OPERATIONS_MIGRATIONS = Object.freeze([
+  "20261127080000_mvp_001_s11_operations_integrity.sql",
+  "20261127090000_mvp_001_s11_audit_workspace.sql",
+  "20261127100000_mvp_001_s11_operations_dashboard.sql",
+  "20261127110000_mvp_001_s11_attorney_operations.sql",
+  "20261127120000_mvp_001_s11_client_administration.sql",
+  "20261127130000_mvp_001_s11_referral_finance_reads.sql",
+  "20261127140000_mvp_001_s11_policy_corrections.sql",
+  "20261127150000_mvp_001_s11_capture_gate.sql",
+  "20261127160000_mvp_001_s11_definer_search_path.sql",
+]);
+// MVP-001 S11 pass 2B: the participants' workspace reads follow
+// (registered and checked by the S11 operations proof).
+const S11_SURFACES_MIGRATIONS = Object.freeze([
+  "20261127170000_mvp_001_s11_workspace_reads.sql",
+]);
+// MVP-001 S11 review corrections follow (registered and checked by the S11
+// operations proof).
+const S11_CORRECTIONS_MIGRATIONS = Object.freeze([
+  "20261127180000_mvp_001_s11_review_corrections.sql",
+]);
+// MVP-001 S11 PS-A6: the break-glass, data request and complaint
+// configuration migrations follow the review corrections (registered and
+// checked by the S11 PS-A6 proof).
+const S11_PS_A6_MIGRATIONS = Object.freeze([
+  "20261127190000_mvp_001_s11_break_glass.sql",
+  "20261127200000_mvp_001_s11_data_requests.sql",
+  "20261127210000_mvp_001_s11_complaint_configuration.sql",
+]);
+// MVP-001 S11: the offered-start correction follows PS-A6 (registered and
+// checked by the S6 proof).
+const S11_OFFERED_START_MIGRATIONS = Object.freeze([
+  "20261127220000_mvp_001_s11_offered_start_containment.sql",
+]);
+
 const report = {
   proof: "MVP-001 S6 PS-A3 disposable local PostgreSQL proof",
   migrations: {},
@@ -441,6 +491,12 @@ function applyMigrations() {
     ...S8_MIGRATIONS,
     ...S9_MIGRATIONS,
     ...S10_MIGRATIONS,
+    ...S11_MIGRATIONS,
+    ...S11_OPERATIONS_MIGRATIONS,
+    ...S11_SURFACES_MIGRATIONS,
+    ...S11_CORRECTIONS_MIGRATIONS,
+    ...S11_PS_A6_MIGRATIONS,
+    ...S11_OFFERED_START_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -2651,10 +2707,14 @@ async function publicChecks() {
         sql(
           "select string_agg(p.oid::regprocedure::text, ';' order by p.oid::regprocedure::text) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'EXECUTE');",
         ).split(";"),
+        // MVP-001 S11 re-pin: and exactly the public read of an attorney's
+        // published reviews of the later registered S11 reviews migration
+        // (20261127040000).
         [
           "public_attorney_directory(uuid,uuid,text,integer)",
           "public_attorney_offers(uuid,uuid)",
           "public_attorney_profile(uuid,uuid)",
+          "public_attorney_reviews(uuid)",
           "public_discovery_filters()",
         ],
       );

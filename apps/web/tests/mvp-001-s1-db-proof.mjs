@@ -69,10 +69,14 @@ const S1_MIGRATIONS = Object.freeze([
   "20261117030000_mvp_001_s1_configuration_administration.sql",
   "20261117040000_mvp_001_s1_availability_checks.sql",
 ]);
+// MVP-001 S11 PS-A6 re-pin: the later registered complaint configuration
+// migration (20261127210000) adds exactly the complaint policy type (PS-A6
+// section 4).
 const POLICY_TYPES = Object.freeze([
   "automated_referral_quality",
   "bookability",
   "cancellation",
+  "complaint",
   "eligibility",
   "engagement",
   "fee",

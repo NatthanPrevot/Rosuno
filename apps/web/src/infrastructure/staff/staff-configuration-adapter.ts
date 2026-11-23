@@ -634,6 +634,16 @@ export function createConfigurationReads(
               p_intake_id: intakeId,
             }),
           ),
+        // MVP-001 S11 D2: the database's own read of a jurisdiction's
+        // Regulatory Modes (manage_policy_configuration for it, aal2).
+        regulatoryModesOf: async (jurisdictionId: string) =>
+          isUuid(jurisdictionId)
+            ? observedRead("regulatoryModesOf", deadlineMs, () =>
+                client.rpc("staff_jurisdiction_regulatory_modes", {
+                  p_jurisdiction_id: jurisdictionId,
+                }),
+              )
+            : UNREADABLE_ROWS,
       } satisfies ConfigurationReads,
       deadlineMs,
     );

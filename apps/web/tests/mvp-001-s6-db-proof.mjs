@@ -129,6 +129,56 @@ const S10_MIGRATIONS = Object.freeze([
   "20261126050000_mvp_001_s10_document_versioning.sql",
 ]);
 
+// MVP-001 S11: the seven S11 migrations follow the S10 migrations (applied by
+// this proof as later registered migrations; registered and checked by the
+// S11 proof).
+const S11_MIGRATIONS = Object.freeze([
+  "20261127010000_mvp_001_s11_completion_integrity.sql",
+  "20261127020000_mvp_001_s11_completion.sql",
+  "20261127030000_mvp_001_s11_exception_families.sql",
+  "20261127040000_mvp_001_s11_reviews.sql",
+  "20261127050000_mvp_001_s11_legal_holds.sql",
+  "20261127060000_mvp_001_s11_complaints.sql",
+  "20261127070000_mvp_001_s11_notification_events.sql",
+]);
+// MVP-001 S11 pass 2: the nine operations and administration migrations
+// follow the seven pass 1 migrations (applied by this proof as later
+// registered migrations; registered and checked by the S11 operations proof).
+const S11_OPERATIONS_MIGRATIONS = Object.freeze([
+  "20261127080000_mvp_001_s11_operations_integrity.sql",
+  "20261127090000_mvp_001_s11_audit_workspace.sql",
+  "20261127100000_mvp_001_s11_operations_dashboard.sql",
+  "20261127110000_mvp_001_s11_attorney_operations.sql",
+  "20261127120000_mvp_001_s11_client_administration.sql",
+  "20261127130000_mvp_001_s11_referral_finance_reads.sql",
+  "20261127140000_mvp_001_s11_policy_corrections.sql",
+  "20261127150000_mvp_001_s11_capture_gate.sql",
+  "20261127160000_mvp_001_s11_definer_search_path.sql",
+]);
+// MVP-001 S11 pass 2B: the participants' workspace reads follow
+// (registered and checked by the S11 operations proof).
+const S11_SURFACES_MIGRATIONS = Object.freeze([
+  "20261127170000_mvp_001_s11_workspace_reads.sql",
+]);
+// MVP-001 S11 review corrections follow (registered and checked by the S11
+// operations proof).
+const S11_CORRECTIONS_MIGRATIONS = Object.freeze([
+  "20261127180000_mvp_001_s11_review_corrections.sql",
+]);
+// MVP-001 S11 PS-A6: the break-glass, data request and complaint
+// configuration migrations follow the review corrections (registered and
+// checked by the S11 PS-A6 proof).
+const S11_PS_A6_MIGRATIONS = Object.freeze([
+  "20261127190000_mvp_001_s11_break_glass.sql",
+  "20261127200000_mvp_001_s11_data_requests.sql",
+  "20261127210000_mvp_001_s11_complaint_configuration.sql",
+]);
+// MVP-001 S11: the offered-start correction follows PS-A6 (registered and
+// checked by the S6 proof).
+const S11_OFFERED_START_MIGRATIONS = Object.freeze([
+  "20261127220000_mvp_001_s11_offered_start_containment.sql",
+]);
+
 const report = {
   proof: "MVP-001 S6 disposable local PostgreSQL proof",
   migrations: {},
@@ -460,6 +510,12 @@ function applyMigrations() {
     ...S8_MIGRATIONS,
     ...S9_MIGRATIONS,
     ...S10_MIGRATIONS,
+    ...S11_MIGRATIONS,
+    ...S11_OPERATIONS_MIGRATIONS,
+    ...S11_SURFACES_MIGRATIONS,
+    ...S11_CORRECTIONS_MIGRATIONS,
+    ...S11_PS_A6_MIGRATIONS,
+    ...S11_OFFERED_START_MIGRATIONS,
   ]);
   const workItems = JSON.parse(
     fs.readFileSync(
@@ -470,7 +526,13 @@ function applyMigrations() {
   const program = workItems.find(
     (item) => item.work_item_id === "WI-P2-MVP-001-TECHNICAL-COMPLETION",
   );
-  for (const file of [...S6_MIGRATIONS, PS_A3_MIGRATION]) {
+  // MVP-001 S11: the offered-start correction is registered the same way and
+  // depends on the last PS-A6 migration.
+  for (const file of [
+    ...S6_MIGRATIONS,
+    PS_A3_MIGRATION,
+    ...S11_OFFERED_START_MIGRATIONS,
+  ]) {
     const id = file.replace(/\.sql$/, "");
     const row = registered.find(
       (migration) => migration.artifact_path === `supabase/migrations/${file}`,
@@ -480,6 +542,14 @@ function applyMigrations() {
     assert.equal(row.reviewed, false);
     assert.equal(row.applied_environment, "none");
     assert.ok(program.migration_refs.includes(id), `${id} is a Program ref`);
+    if (S11_OFFERED_START_MIGRATIONS.includes(file)) {
+      assert.deepEqual(row.depends_on, [
+        S11_PS_A6_MIGRATIONS[S11_PS_A6_MIGRATIONS.length - 1].replace(
+          /\.sql$/,
+          "",
+        ),
+      ]);
+    }
   }
   sql(ROLES, "postgres");
   sql(FIXTURE, "postgres");
@@ -1284,8 +1354,9 @@ const CLIENT_FUNCTIONS = Object.freeze({
     "s|search_path=pg_catalog, pg_temp|TABLE(referral_id uuid, attorney_display_name text, request_path text, request_id uuid, requestable boolean, message_maximum_characters integer)",
   "request_options(uuid)":
     "s|search_path=pg_catalog, pg_temp|TABLE(modality text, duration_minutes integer)",
+  // MVP-001 S11 (20261127220000): replaced with jit off for its own run.
   "request_slot_starts(uuid, text, integer)":
-    "s|search_path=pg_catalog, pg_temp|TABLE(slot_start timestamp with time zone, slot_end timestamp with time zone)",
+    "s|search_path=pg_catalog, pg_temp;jit=off|TABLE(slot_start timestamp with time zone, slot_end timestamp with time zone)",
   "request_quote_preview(uuid, text, text, integer, timestamptz)":
     "s|search_path=pg_catalog, pg_temp|TABLE(outcome text, attorney_listed_price_minor bigint, client_fee_minor bigint, tax_or_other_required_fee_minor bigint, total_client_amount_minor bigint, currency_code text, quote_validity_seconds integer)",
   // MVP-001 S6 PS-A3: with the optional client message (the five-argument
@@ -1440,7 +1511,10 @@ async function inventoryChecks() {
         "id,attorney_id,modality,duration_minutes,listed_price_minor,currency_code,created_at,withdrawn_at",
       );
       assert.equal(count("attorney_consultation_offers"), 0);
-      assert.equal(count("policy_types"), 15);
+      // MVP-001 S11 PS-A6 adds exactly one policy type, complaint (registered
+      // and checked by the S11 PS-A6 proof).
+      assert.equal(count("policy_types"), 16);
+      assert.equal(count("policy_types", "code = 'complaint'"), 1);
       assert.equal(
         sql(
           "select string_agg(tablename || '.' || policyname, ',' order by tablename, policyname) from pg_policies where schemaname = 'public' and tablename in ('consultation_requests', 'fee_calculations', 'slot_holds', 'attorney_consultation_offers');",
@@ -1525,10 +1599,14 @@ async function inventoryChecks() {
       const executable = sql(
         "select string_agg(p.oid::regprocedure::text, ';' order by p.oid::regprocedure::text) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'EXECUTE');",
       ).split(";");
+      // MVP-001 S11 re-pin: and exactly the public read of an attorney's
+      // published reviews of the later registered S11 reviews migration
+      // (20261127040000).
       assert.deepEqual(executable, [
         "public_attorney_directory(uuid,uuid,text,integer)",
         "public_attorney_offers(uuid,uuid)",
         "public_attorney_profile(uuid,uuid)",
+        "public_attorney_reviews(uuid)",
         "public_discovery_filters()",
       ]);
       assert.equal(
@@ -2275,6 +2353,23 @@ async function pricingChecks() {
           assert.ok(start > Date.parse(starts[index - 1].slot_start));
         }
       }
+      // MVP-001 S11 (20261127220000): every offered start lies inside one
+      // expanded availability window and is accepted by the bookability check.
+      const contained = containedStarts(world.ada, world.J.A, starts);
+      const checkedAt = Date.now();
+      for (const [index, entry] of starts.entries()) {
+        assert.equal(contained[index].inside, true, entry.slot_start);
+        // Only the first start can meet the notice boundary, and only when
+        // the clock passed it between the read and this check.
+        if (index === 0 && contained[index].problem === "notice") {
+          assert.ok(
+            Date.parse(entry.slot_start) < checkedAt + 3600 * 1000,
+            entry.slot_start,
+          );
+        } else {
+          assert.equal(contained[index].problem, "none", entry.slot_start);
+        }
+      }
       assert.deepEqual(
         readStarts(
           scheduledCase.client,
@@ -2306,6 +2401,129 @@ async function pricingChecks() {
       return { first_start: starts[0].slot_start, starts: starts.length };
     },
   );
+  await check(
+    "QUOTE-3 MVP-001 S11 (20261127220000): an offered start never spans two availability windows: with two adjacent one-time rules (10:00 to 11:00 and 11:00 to 12:00 UTC) the 60-minute starts are exactly 10:00 and 11:00 (never 10:30, which the bookability check refuses as outside_availability) while the 30-minute starts keep every half hour; with one day's rule ending at 24:00 and the next day's starting at 00:00 the 60-minute start at 23:30 is not offered; every offered start is accepted by the bookability check; the days are fixed days ahead, so the answer does not depend on the time of day",
+    () => {
+      const ivy = attorney({
+        name: "Ivy Synthetic",
+        jurisdictions: [world.J.A],
+        available: false,
+      });
+      offer(ivy, "synthetic_video", 30, 5000);
+      offer(ivy, "synthetic_video", 60, 9000);
+      const day = at(3, 0).slice(0, 10);
+      const next = at(4, 0).slice(0, 10);
+      for (const [date, from, to] of [
+        [day, "10:00", "11:00"],
+        [day, "11:00", "12:00"],
+        [day, "22:00", "24:00"],
+        [next, "00:00", "02:00"],
+      ]) {
+        sql(
+          `insert into public.availability_rules (attorney_id, rule_kind, timezone_name, specific_date, local_start_time, local_end_time, active)
+           values ('${ivy.profile}', 'one_time', 'UTC', '${date}', '${from}', '${to}', true);`,
+        );
+      }
+      const ivyCase = scenario({
+        jurisdiction: world.J.A,
+        lawyer: ivy,
+        path: "scheduled",
+      });
+      const before = evidenceCounts();
+      const startsOf = (duration) =>
+        readStarts(
+          ivyCase.client,
+          ivyCase.referral,
+          "synthetic_video",
+          duration,
+        );
+      const hourly = startsOf(60);
+      assert.deepEqual(
+        hourly.map((entry) => Date.parse(entry.slot_start)),
+        [
+          at(3, 10),
+          at(3, 11),
+          at(3, 22),
+          at(3, 22, 30),
+          at(3, 23),
+          at(4, 0),
+          at(4, 0, 30),
+          at(4, 1),
+        ].map((value) => Date.parse(value)),
+      );
+      for (const entry of hourly) {
+        assert.equal(
+          Date.parse(entry.slot_end) - Date.parse(entry.slot_start),
+          60 * 60000,
+        );
+      }
+      assert.deepEqual(
+        startsOf(30).map((entry) => Date.parse(entry.slot_start)),
+        [
+          at(3, 10),
+          at(3, 10, 30),
+          at(3, 11),
+          at(3, 11, 30),
+          at(3, 22),
+          at(3, 22, 30),
+          at(3, 23),
+          at(3, 23, 30),
+          at(4, 0),
+          at(4, 0, 30),
+          at(4, 1),
+          at(4, 1, 30),
+        ].map((value) => Date.parse(value)),
+      );
+      // The starts left out are exactly the ones the bookability check
+      // refuses; every offered one lies inside one window and is accepted.
+      for (const start of [at(3, 10, 30), at(3, 23, 30)]) {
+        assert.equal(
+          sql(
+            `select public.scheduling_slot_problem('${ivy.profile}', ${lit(start)}::timestamptz, ${lit(plusMinutes(start, 60))}::timestamptz, '${world.J.A}');`,
+          ),
+          "outside_availability",
+          start,
+        );
+      }
+      assert.deepEqual(
+        containedStarts(ivy, world.J.A, hourly),
+        hourly.map(() => ({ inside: true, problem: "none" })),
+      );
+      assert.deepEqual(evidenceCounts(), before);
+      return {
+        day,
+        hourly_starts: hourly.length,
+        refused_starts_left_out: ["10:30", "23:30"],
+      };
+    },
+  );
+}
+
+// MVP-001 S11 (20261127220000): for each offered start, whether one expanded
+// availability window of the attorney contains the whole slot (as the
+// bookability check tests it) and the bookability check's answer ("none" when
+// the slot is accepted), read by the owner in one statement.
+function containedStarts(lawyer, jurisdiction, starts) {
+  if (starts.length === 0) {
+    return [];
+  }
+  const values = starts
+    .map(
+      (entry, index) =>
+        `(${index}, ${lit(entry.slot_start)}::timestamptz, ${lit(entry.slot_end)}::timestamptz)`,
+    )
+    .join(", ");
+  return sql(
+    `select json_build_object('inside', exists (
+         select 1
+         from public.scheduling_expand_availability('${lawyer.profile}', (v.s at time zone 'UTC')::date - 1, (v.e at time zone 'UTC')::date + 1) as w
+         where w.window_start <= v.s and w.window_end >= v.e
+       ), 'problem', coalesce(public.scheduling_slot_problem('${lawyer.profile}', v.s, v.e, '${jurisdiction}'), 'none'))::text
+     from (values ${values}) as v(i, s, e)
+     order by v.i;`,
+  )
+    .split("\n")
+    .map((line) => JSON.parse(line));
 }
 
 // ---------------------------------------------------------------------------

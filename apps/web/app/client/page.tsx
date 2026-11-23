@@ -11,13 +11,25 @@
 // Intake is left out unseen. Refused and unavailable requests each see one
 // fixed message and no Intake data; an unavailable workspace also writes one
 // log line with no client or Intake data.
+//
+// MVP-001 S11 pass 2B (MBS section 18.2 "home / dashboard"): an admitted
+// client also sees the Consultations in progress or ready now and the next
+// upcoming one, from the client's own Consultation list (the existing S11
+// read, decided again by the database), "Find an attorney", and one link to
+// every client area (the same set as the workspace navigation).
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 
 import { resolveClientWorkspace } from "../../src/application/client-intake.ts";
+import {
+  resolveClientConsultations,
+  type ClientConsultationEntry,
+} from "../../src/application/consultation-outcomes.ts";
+import { clientHomeOf } from "../../src/application/participant-workspaces.ts";
 import { CLIENT_INTAKE_SOURCES } from "../../src/infrastructure/client/client-intake-adapter.ts";
+import { CLIENT_OUTCOME_SOURCES } from "../../src/infrastructure/consultations/completion-adapter.ts";
 import { logRequestEvent } from "../../src/infrastructure/observability/request-log.ts";
 import {
   Alert,
@@ -33,6 +45,17 @@ import {
   Text,
 } from "../../src/presentation/design-system.tsx";
 import { INTAKE_STATE_LABELS } from "../../src/presentation/client-intake-labels.ts";
+import {
+  CLIENT_STATE_LABELS,
+  modalityText,
+  PATH_LABELS,
+} from "../../src/presentation/consultation-labels.ts";
+import {
+  CLIENT_HOME_HEADING,
+  CLIENT_HOME_NONE,
+  FIND_ATTORNEY_LABEL,
+  utcText,
+} from "../../src/presentation/workspace-labels.ts";
 import { StartIntakeForm } from "./forms.tsx";
 
 export const metadata: Metadata = {
@@ -70,6 +93,27 @@ function pageHref(page: number): string {
   return page === 1 ? "/client" : `/client?page=${page}`;
 }
 
+function ConsultationLine({
+  entry,
+}: {
+  readonly entry: ClientConsultationEntry;
+}) {
+  const state = CLIENT_STATE_LABELS[entry.readyDue ? "ready" : entry.state];
+  return (
+    <Cluster>
+      <Status tone={state.tone}>{state.label}</Status>
+      <Text size="small">
+        {entry.bookingStart !== null
+          ? `${modalityText(entry.modality)}, ${utcText(entry.bookingStart)}`
+          : `${modalityText(entry.modality)}, ${PATH_LABELS[entry.path]}`}
+      </Text>
+      <ButtonLink variant="tertiary" href={`/client/consultations/${entry.id}`}>
+        Open the consultation
+      </ButtonLink>
+    </Cluster>
+  );
+}
+
 export default async function ClientWorkspacePage({
   searchParams,
 }: {
@@ -82,8 +126,37 @@ export default async function ClientWorkspacePage({
   if (view.status === "ready") {
     const first = (view.page - 1) * view.pageSize + 1;
     const last = first + view.intakes.length - 1;
+    const home = clientHomeOf(
+      await resolveClientConsultations(CLIENT_OUTCOME_SOURCES),
+      Date.now(),
+    );
     return (
       <WorkspaceFrame title="Your Intakes">
+        <Heading as="h2" size="md" id="client-home-consultations">
+          {CLIENT_HOME_HEADING}
+        </Heading>
+        {home === null ? (
+          <Text tone="muted">
+            Your consultations could not be shown right now.
+          </Text>
+        ) : home.active.length === 0 && home.next === null ? (
+          <Text tone="muted">{CLIENT_HOME_NONE}</Text>
+        ) : (
+          <Stack gap="tight">
+            {home.active.map((entry) => (
+              <ConsultationLine key={entry.id} entry={entry} />
+            ))}
+            {home.next === null ? null : <ConsultationLine entry={home.next} />}
+          </Stack>
+        )}
+        <Cluster>
+          <ButtonLink variant="primary" href="/find-an-attorney">
+            {FIND_ATTORNEY_LABEL}
+          </ButtonLink>
+        </Cluster>
+        <Heading as="h2" size="md" id="client-home-intakes">
+          Intakes
+        </Heading>
         <Text tone="muted">
           An Intake keeps what you tell us about your legal matter. Every time
           you save, a new version is kept; earlier versions are never changed or
@@ -170,8 +243,29 @@ export default async function ClientWorkspacePage({
           </Alert>
         )}
         <Cluster>
+          <ButtonLink variant="secondary" href="/client/consultations">
+            Your consultations
+          </ButtonLink>
+          <ButtonLink variant="secondary" href="/client/messages">
+            Messages
+          </ButtonLink>
+          <ButtonLink variant="secondary" href="/client/payments">
+            Payments
+          </ButtonLink>
+          <ButtonLink variant="secondary" href="/client/reviews">
+            Your reviews
+          </ButtonLink>
+          <ButtonLink variant="secondary" href="/client/complaints">
+            Report a problem
+          </ButtonLink>
           <ButtonLink variant="secondary" href="/client/notifications">
             Notifications
+          </ButtonLink>
+          <ButtonLink variant="secondary" href="/client/settings">
+            Profile and settings
+          </ButtonLink>
+          <ButtonLink variant="secondary" href="/client/privacy">
+            Privacy and data
           </ButtonLink>
           <ButtonLink variant="tertiary" href="/">
             Return to the home page

@@ -6,7 +6,8 @@
 // attorney principal source decide access through the unchanged Security
 // Shell. The database answers only the attorney's own in-app Notifications
 // (at aal2), newest first, each with its link (the attorney's own Request or
-// Consultation page) and the delivery state of its email twin. Nothing about
+// Consultation page, or, MVP-001 S11 correction D14, the attorney's own
+// reported problems page) and the delivery state of its email twin. Nothing about
 // an address, a provider or the client's identity is shown. An
 // acknowledgement-required Notification offers the acknowledge form; the
 // database decides again on submission.

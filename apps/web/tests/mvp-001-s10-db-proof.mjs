@@ -96,6 +96,55 @@ const S10_MIGRATIONS = Object.freeze([
   "20261126040000_mvp_001_s10_documents.sql",
   "20261126050000_mvp_001_s10_document_versioning.sql",
 ]);
+// MVP-001 S11: the seven S11 migrations follow the S10 migrations (applied by
+// this proof as later registered migrations; registered and checked by the
+// S11 proof).
+const S11_MIGRATIONS = Object.freeze([
+  "20261127010000_mvp_001_s11_completion_integrity.sql",
+  "20261127020000_mvp_001_s11_completion.sql",
+  "20261127030000_mvp_001_s11_exception_families.sql",
+  "20261127040000_mvp_001_s11_reviews.sql",
+  "20261127050000_mvp_001_s11_legal_holds.sql",
+  "20261127060000_mvp_001_s11_complaints.sql",
+  "20261127070000_mvp_001_s11_notification_events.sql",
+]);
+// MVP-001 S11 pass 2: the nine operations and administration migrations
+// follow the seven pass 1 migrations (applied by this proof as later
+// registered migrations; registered and checked by the S11 operations proof).
+const S11_OPERATIONS_MIGRATIONS = Object.freeze([
+  "20261127080000_mvp_001_s11_operations_integrity.sql",
+  "20261127090000_mvp_001_s11_audit_workspace.sql",
+  "20261127100000_mvp_001_s11_operations_dashboard.sql",
+  "20261127110000_mvp_001_s11_attorney_operations.sql",
+  "20261127120000_mvp_001_s11_client_administration.sql",
+  "20261127130000_mvp_001_s11_referral_finance_reads.sql",
+  "20261127140000_mvp_001_s11_policy_corrections.sql",
+  "20261127150000_mvp_001_s11_capture_gate.sql",
+  "20261127160000_mvp_001_s11_definer_search_path.sql",
+]);
+// MVP-001 S11 pass 2B: the participants' workspace reads follow
+// (registered and checked by the S11 operations proof).
+const S11_SURFACES_MIGRATIONS = Object.freeze([
+  "20261127170000_mvp_001_s11_workspace_reads.sql",
+]);
+// MVP-001 S11 review corrections follow (registered and checked by the S11
+// operations proof).
+const S11_CORRECTIONS_MIGRATIONS = Object.freeze([
+  "20261127180000_mvp_001_s11_review_corrections.sql",
+]);
+// MVP-001 S11 PS-A6: the break-glass, data request and complaint
+// configuration migrations follow the review corrections (registered and
+// checked by the S11 PS-A6 proof).
+const S11_PS_A6_MIGRATIONS = Object.freeze([
+  "20261127190000_mvp_001_s11_break_glass.sql",
+  "20261127200000_mvp_001_s11_data_requests.sql",
+  "20261127210000_mvp_001_s11_complaint_configuration.sql",
+]);
+// MVP-001 S11: the offered-start correction follows PS-A6 (registered and
+// checked by the S6 proof).
+const S11_OFFERED_START_MIGRATIONS = Object.freeze([
+  "20261127220000_mvp_001_s11_offered_start_containment.sql",
+]);
 // The one migration that adds the PS-A5 column (its constraints and index).
 const S10_VERSIONING = "20261126050000_mvp_001_s10_document_versioning.sql";
 
@@ -449,7 +498,15 @@ function applyMigrations() {
   // registered unreviewed (sequences 50 to 54) and applied nowhere.
   const s9 = files.indexOf(S9_LAST);
   assert.ok(s9 >= 0, "the last S9 migration is present");
-  assert.deepEqual(files.slice(s9 + 1), [...S10_MIGRATIONS]);
+  assert.deepEqual(files.slice(s9 + 1), [
+    ...S10_MIGRATIONS,
+    ...S11_MIGRATIONS,
+    ...S11_OPERATIONS_MIGRATIONS,
+    ...S11_SURFACES_MIGRATIONS,
+    ...S11_CORRECTIONS_MIGRATIONS,
+    ...S11_PS_A6_MIGRATIONS,
+    ...S11_OFFERED_START_MIGRATIONS,
+  ]);
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),
@@ -1689,6 +1746,11 @@ const EXPECTED_TRIGGERS = [
   "consultations.consultations_media_lifecycle",
   "consultations.consultations_no_truncate",
   "consultations.consultations_notification_events",
+  // MVP-001 S11 re-pin: exactly the outcome notification trigger
+  // (20261127070000) and the deferred outcome vocabulary check
+  // (20261127010000) of the later registered S11 migrations.
+  "consultations.consultations_outcome_notification_events",
+  "consultations.consultations_outcome_vocabulary",
   "consultations.consultations_payment_consistency",
   "consultations.consultations_relationship_consistency",
   "consultations.consultations_set_updated_at",
@@ -2320,7 +2382,9 @@ async function migrationChecks() {
         sql(
           "select string_agg(code, ',' order by code) from public.policy_types;",
         ),
-        "automated_referral_quality,bookability,cancellation,eligibility,engagement,fee,governance,notification,payment,payment_flow,referral,refund,reporting,retention,scheduling",
+        // MVP-001 S11 PS-A6 adds exactly one policy type, complaint
+        // (registered and checked by the S11 PS-A6 proof).
+        "automated_referral_quality,bookability,cancellation,complaint,eligibility,engagement,fee,governance,notification,payment,payment_flow,referral,refund,reporting,retention,scheduling",
       );
       assert.equal(
         sql(

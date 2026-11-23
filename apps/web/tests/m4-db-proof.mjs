@@ -105,6 +105,26 @@
 // consultation_documents are replaced or re-created under their own names
 // (already listed).
 //
+// MVP-001 S11 update: the seven S11 migrations follow. SEC-1 lists exactly
+// the twenty-six further definer functions, as exact assertions: the
+// participants' cancellation and the attorney's early completion; staff
+// outcome recording, the stale-Consultation queue and one Consultation; the
+// finance release and one family's review exceptions; the client's
+// Consultation list; the review submission, moderation, the four review
+// reads; the three Legal Hold functions; the complaint intake, the
+// complainant's list and the complaint workspace's five functions; the
+// deferred outcome vocabulary check and the outcome outbox trigger. None
+// writes an M4 relation; staff_finance_exceptions,
+// staff_assign_reconciliation_exception and
+// staff_resolve_reconciliation_exception are replaced under their own names
+// (already listed).
+//
+// MVP-001 S11 pass 2B update: the workspace reads migration follows. SEC-1
+// lists exactly the six further definer functions, as exact assertions: the
+// client's payment history and account overview, the participants' Message
+// threads, and the attorney's ended Consultations, documents and compliance
+// records. Each is a stable read that writes nothing.
+//
 // The probes exercise the real row policies, grants, constraints, triggers,
 // and the manage_attorney_verification scope predicate for synthetic
 // attorneys, staff, and grants (current, jurisdiction-scoped, expired,
@@ -1464,9 +1484,15 @@ function probes() {
           // read FOR SHARE by the S5 recorder).
           "attorney_accept_request:v",
           "attorney_change_practice_area_request:v",
+          // MVP-001 S11 pass 2B (20261127170000): the participants' own
+          // workspace reads (authenticated; the attorney reads at aal2), which
+          // write nothing.
+          "attorney_compliance_records:s",
           // MVP-001 S9 (20261125030000): the attorney's own Consultation reads
           // (authenticated, aal2), which write nothing.
           "attorney_consultation:s",
+          // MVP-001 S11 pass 2B (see attorney_compliance_records above).
+          "attorney_consultation_history:s",
           // MVP-001 S6 PS-A3 re-pin (20261122040000): the attorney's own offer
           // options and offer list reads (authenticated, aal2), which write
           // nothing.
@@ -1481,16 +1507,26 @@ function probes() {
           "attorney_create_blackout:v",
           "attorney_deactivate_availability_rule:v",
           "attorney_decline_request:v",
+          // MVP-001 S11 pass 2B (see attorney_compliance_records above).
+          "attorney_documents:s",
           "attorney_instant_status:s",
           // MVP-001 S7 re-pin (20261123020000): the attorney's own ledger-derived
           // earnings read (authenticated, aal2), which writes nothing.
           "attorney_payment_earnings:s",
+          // MVP-001 S11 pass 2 (20261127110000): the rejoin detection triggers,
+          // which write only Reconciliation Exceptions and audit events; no M4
+          // relation.
+          "attorney_rejoin_application_submitted:v",
+          "attorney_rejoin_license_saved:v",
           "attorney_remove_blackout:v",
           // MVP-001 S8 (20261124020000): the attorney's own request reads
           // (authenticated, aal2), which write nothing.
           "attorney_request:s",
           "attorney_request_practice_area:v",
           "attorney_requests:s",
+          // MVP-001 S11 (20261127040000): the attorney's own published reviews
+          // (authenticated, aal2), which writes nothing.
+          "attorney_reviews:s",
           "attorney_save_insurance_claim:v",
           "attorney_save_license_claim:v",
           "attorney_save_profile_details:v",
@@ -1517,6 +1553,10 @@ function probes() {
           // MVP-001 S1 re-pin (20261117030000): the staff read predicates for
           // the configuration row policies, which write nothing.
           "capability_admin_may_read_user:s",
+          // MVP-001 S11 pass 2B (20261127170000): the participants' own
+          // workspace reads (authenticated; the attorney reads at aal2), which
+          // write nothing.
+          "client_account_overview:s",
           // MVP-001 S7 re-pin (20261123020000): the client's payment
           // authorization (authenticated only), which writes only the payment
           // attempt, an operational job and audit events; no M4 relation.
@@ -1531,7 +1571,14 @@ function probes() {
           // MVP-001 S9 (20261125030000): the client's own Consultation read
           // (authenticated), which writes nothing.
           "client_consultation:s",
+          // MVP-001 S11 (20261127020000): the client's own Consultation list
+          // (authenticated), which writes nothing.
+          "client_consultations:s",
           "client_create_intake:v",
+          // MVP-001 S11 PS-A6 (20261127190000 and 20261127200000): break-glass
+          // access and data requests (authenticated; staff at aal2), which write
+          // only break_glass_grants, data_requests and audit events; no M4 relation.
+          "client_data_requests:s",
           "client_intake_jurisdictions:s",
           "client_intake_practice_areas:s",
           // MVP-001 S6 re-pin (20261122030000): the client's own Intake
@@ -1542,6 +1589,8 @@ function probes() {
           // and receipt reads (authenticated only), which write nothing.
           "client_payment_checkout:s",
           "client_payment_receipt:s",
+          // MVP-001 S11 pass 2B (see attorney_compliance_records above).
+          "client_payments:s",
           // MVP-001 S5 re-pin (20261121030000): the client's own attempt
           // list (authenticated only), which writes nothing.
           "client_referrals:s",
@@ -1562,8 +1611,27 @@ function probes() {
           // MVP-001 S6 re-pin (20261122020000): the client's request review
           // read (authenticated only), which writes nothing.
           "client_request_review:s",
+          // MVP-001 S11 (20261127040000): the client's own reviews and reviewable
+          // Consultations (authenticated), which writes nothing.
+          "client_reviews:s",
           "client_save_intake_revision:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "client_submit_data_request:v",
           "client_submit_intake:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "client_withdraw_data_request:v",
+          // MVP-001 S11 (20261127060000): the complainant's own Complaint Cases
+          // (authenticated), and a participant's complaint intake, which writes
+          // only one Complaint Case, the complainant's Notifications and an
+          // audit event; no M4 relation.
+          "complaint_cases_mine:s",
+          "complaint_open:v",
+          // MVP-001 S11 (20261127020000): a participant's cancellation
+          // (authenticated; the attorney at aal2), which writes only the
+          // Consultation, its Booking, the Media Room through the S9 lifecycle,
+          // a Reconciliation Exception, Notifications and audit events; no M4
+          // relation.
+          "consultation_cancel:v",
           // MVP-001 S10 (20261126030000, 20261126040000): the participants' own
           // Consultation communication reads (authenticated; the attorney at
           // aal2), which write nothing.
@@ -1576,12 +1644,22 @@ function probes() {
           // lifecycle trigger (no API role), which writes only Media Rooms,
           // jobs and audit events; no M4 relation.
           "consultation_end:v",
+          // MVP-001 S11 (20261127020000): the attorney's early completion by
+          // agreement (authenticated, aal2), which writes what consultation_end
+          // writes; no M4 relation.
+          "consultation_end_early:v",
           "consultation_media_access:v",
           "consultation_media_lifecycle:v",
           // MVP-001 S10 (see consultation_documents above).
           "consultation_messages:s",
           "consultation_messaging:s",
+          // MVP-001 S11 (20261127010000): the deferred outcome vocabulary check of
+          // consultations (trigger; no API role), which reads only its own row
+          // and writes nothing.
+          "consultation_outcome_integrity:v",
           "consultation_start:v",
+          // MVP-001 S11 pass 2B (see attorney_compliance_records above).
+          "consultation_threads:s",
           // MVP-001 S8 (20261124020000): the capture trigger (no API role),
           // which writes only Consultations, Engagements, payment associations
           // and audit events; no M4 relation.
@@ -1661,6 +1739,10 @@ function probes() {
           "notification_acknowledge:v",
           "notification_center:s",
           "notification_consultation_events:v",
+          // MVP-001 S11 (20261127070000): the outcome outbox trigger of
+          // consultations (no API role), which writes only Notifications, their
+          // delivery jobs and audit events; no M4 relation.
+          "notification_consultation_outcome_events:v",
           "notification_job_context:s",
           "notification_job_escalated:v",
           "notification_record_attempt:v",
@@ -1688,6 +1770,9 @@ function probes() {
           // (anon and authenticated), stable, which writes nothing.
           "public_attorney_offers:s",
           "public_attorney_profile:s",
+          // MVP-001 S11 (20261127040000): the public read of a listed attorney's
+          // published reviews (anon and authenticated), which writes nothing.
+          "public_attorney_reviews:s",
           "public_discovery_filters:s",
           // MVP-001 S5 re-pin (20261121030000): the client's selection
           // (authenticated only), which writes Referral evidence, audit
@@ -1735,6 +1820,10 @@ function probes() {
           "resource_begin_verification_artifact:v",
           "resource_begin_voice_memo:v",
           "resource_finalize_upload:v",
+          // MVP-001 S11 (20261127040000): the client's review submission
+          // (authenticated), which writes only one review and an audit event; no
+          // M4 relation.
+          "review_submit:v",
           "rosuno_environment_class:s",
           "rosuno_environment_status:s",
           // MVP-001 S4 re-pin (20261120020000): the application session
@@ -1745,6 +1834,9 @@ function probes() {
           // MVP-001 S1 re-pin (20261117030000): the configuration
           // administration functions, which write no M4 relation.
           "staff_add_policy_authority_reference:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "staff_approve_break_glass:v",
+          "staff_assign_data_request:v",
           // MVP-001 S7 re-pin (20261123020000): the finance workspace functions
           // (authenticated, aal2, manage_financial_operations): the reads
           // write nothing; the refund, reconciliation and exception functions
@@ -1753,13 +1845,56 @@ function probes() {
           "staff_assign_reconciliation_exception:v",
           // MVP-001 S2 re-pin (20261118010000): the staff job functions,
           // which write no M4 relation.
+          // MVP-001 S11 pass 2 (20261127110000, 20261127090000): one Attorney Profile
+          // for the lifecycle commands (authenticated, aal2, global
+          // manage_attorney_verification), which writes nothing; the audit
+          // workspace reads (authenticated, aal2, view_audit_events), which write
+          // only their own audit event; no M4 relation.
+          "staff_attorney_profile:s",
+          "staff_audit_event:v",
+          "staff_audit_events:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "staff_break_glass_consultation:v",
+          "staff_break_glass_grant:s",
+          "staff_break_glass_grants_mine:s",
+          "staff_break_glass_queue:s",
           "staff_cancel_job:v",
+          // MVP-001 S11 pass 2 (20261127110000, 20261127120000): reinstatement and
+          // removal (authenticated, aal2, global manage_attorney_verification), an
+          // operation-specific write of attorney_profiles.profile_state with its
+          // audit event, like staff_change_profile_stage; the client account-state
+          // command (authenticated, aal2, manage_client_accounts), which writes only
+          // users.account_state, Reconciliation Exceptions and audit events.
+          "staff_change_attorney_lifecycle:v",
+          "staff_change_client_account:v",
           "staff_change_jurisdiction_lifecycle:v",
           "staff_change_profile_stage:v",
+          // MVP-001 S11 (20261127060000): the complaint workspace (authenticated,
+          // aal2, manage_complaints): reads, and steps that write only Complaint
+          // Cases and audit events; no M4 relation.
+          "staff_classify_complaint:v",
+          // MVP-001 S11 pass 2 (20261127120000): client administration reads
+          // (authenticated, aal2, manage_client_accounts), which write nothing.
+          "staff_client:s",
+          "staff_clients:s",
+          "staff_complaint_case:s",
+          "staff_complaint_queue:s",
+          // MVP-001 S11 pass 2 (20261127110000): the compliance workspace reads
+          // (authenticated, aal2), which write nothing.
+          "staff_compliance_records:s",
+          "staff_compliance_summary:s",
+          // MVP-001 S11 (20261127020000): one Consultation for operations staff
+          // (authenticated, aal2, manage_consultation_operations), which writes
+          // nothing.
+          "staff_consultation:s",
           "staff_create_jurisdiction:v",
           "staff_create_policy_version:v",
           "staff_create_practice_area:v",
           "staff_create_service_area:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "staff_data_request:s",
+          "staff_data_request_queue:s",
+          "staff_decide_data_request:v",
           "staff_decide_policy_authority_reference:v",
           "staff_decide_practice_area:v",
           "staff_define_launch_gate:v",
@@ -1770,32 +1905,99 @@ function probes() {
           "staff_finance_payment:s",
           "staff_finance_payments:s",
           "staff_finance_receipts:s",
+          // MVP-001 S11 pass 2 (20261127130000): the financial activity summary
+          // (authenticated, aal2, manage_financial_operations), which writes
+          // nothing.
+          "staff_finance_summary:s",
           "staff_grant_capability:v",
           "staff_grant_launch_authorization:v",
           // MVP-001 S3 part 2 re-pin (20261119060000): the jurisdiction
           // assessment review reads, which write nothing.
+          // MVP-001 S11 pass 2 (20261127130000, 20261127140000): jurisdiction names
+          // for staff surfaces and the Regulatory Modes of a jurisdiction
+          // (authenticated, aal2), which write nothing.
+          "staff_jurisdiction_names:s",
+          "staff_jurisdiction_regulatory_modes:s",
           "staff_jurisdiction_review_assessments:s",
           "staff_jurisdiction_review_intakes:s",
+          // MVP-001 S11 (20261127050000): the Legal Hold list (authenticated,
+          // aal2, manage_legal_holds), which writes nothing.
+          "staff_legal_holds:s",
+          // MVP-001 S11 (20261127040000): review moderation (authenticated, aal2,
+          // moderate_reviews), which writes only reviews and audit events; no M4
+          // relation.
+          "staff_moderate_review:v",
+          // MVP-001 S11 (20261127050000): placing a Legal Hold (authenticated,
+          // aal2, manage_legal_holds), which writes only legal_holds and audit
+          // events; no M4 relation.
+          // MVP-001 S11 pass 2 (20261127100000): the counts-only operations summary
+          // (authenticated, aal2, view_operations), which writes nothing.
+          "staff_operations_summary:s",
+          "staff_place_legal_hold:v",
+          // MVP-001 S11 pass 2 (20261127110000): policy version status changes
+          // (authenticated, aal2, manage_policy_configuration), which writes nothing.
+          "staff_policy_changes:s",
           "staff_publish_intake_question_set:v",
+          // MVP-001 S11 (20261127020000): staff outcome recording (authenticated,
+          // aal2, manage_consultation_operations), which writes only the
+          // Consultation, payment transitions through the S7 release path,
+          // Reconciliation Exceptions, Notifications, jobs and audit events; no
+          // M4 relation.
+          "staff_record_consultation_outcome:v",
           "staff_record_discipline_finding:v",
           "staff_record_eligibility_evaluation:v",
           "staff_record_launch_gate_evaluation:v",
           "staff_record_source_unavailable:v",
           "staff_record_verification_finding:v",
+          // MVP-001 S11 (20261127050000): releasing a Legal Hold (authenticated,
+          // aal2, manage_legal_holds), which writes only legal_holds and audit
+          // events; no M4 relation.
+          // MVP-001 S11 pass 2 (20261127130000): referral operations reads
+          // (authenticated, aal2, view_referral_operations), which write nothing.
+          "staff_referral_counts:s",
+          "staff_referrals:s",
+          "staff_release_legal_hold:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "staff_request_break_glass:v",
           // MVP-001 S7 re-pin (20261123020000): finance writes, as above.
           "staff_request_reconciliation:v",
           "staff_request_refund:v",
+          // MVP-001 S11 (20261127020000): the finance release of an uncaptured
+          // attempt after a terminal outcome (authenticated, aal2,
+          // manage_financial_operations), which writes only the payment
+          // transition, a job and an audit event; no M4 relation.
+          "staff_request_release:v",
+          // MVP-001 S11 (20261127060000): complaint resolution (authenticated,
+          // aal2, manage_complaints), which writes only Complaint Cases and audit
+          // events; no M4 relation.
+          "staff_resolve_complaint:v",
           "staff_resolve_reconciliation_exception:v",
           "staff_retry_job:v",
+          // MVP-001 S11 (20261127030000): one family's review exceptions
+          // (authenticated, aal2, the family's capability), which writes nothing.
+          "staff_review_exceptions:s",
           // MVP-001 S3 part 2 re-pin (20261119060000): the review, which
           // writes only a jurisdiction assessment's review and its audit
           // event; no M4 relation.
           "staff_review_jurisdiction_assessment:v",
+          // MVP-001 S11 (20261127040000): the review moderation queue
+          // (authenticated, aal2, moderate_reviews), which writes nothing.
+          "staff_review_queue:s",
           "staff_revise_policy_draft:v",
+          // MVP-001 S11 PS-A6 (see client_data_requests above).
+          "staff_revoke_break_glass:v",
           "staff_revoke_capability:v",
           "staff_revoke_launch_authorization:v",
           "staff_set_practice_area_active:v",
+          // MVP-001 S11 (20261127020000): the undecided Consultations whose
+          // outcome may be recorded (authenticated, aal2,
+          // manage_consultation_operations), which writes nothing.
+          "staff_stale_consultations:s",
           "staff_transition_policy_version:v",
+          // MVP-001 S11 (20261127060000): complaint assignment and status
+          // (authenticated, aal2, manage_complaints), which writes only Complaint
+          // Cases and audit events; no M4 relation.
+          "staff_update_complaint:v",
         ].join(","),
       );
       assert.equal(
@@ -1837,11 +2039,23 @@ function probes() {
       // constraint triggers that never write an M4 relation (they read the
       // facts and open review Reconciliation Exceptions, 20261124030000),
       // pinned below to their function, deferral and timing.
+      // MVP-001 S11 pass 2 admits exactly two more, the rejoin detection of
+      // MB section 19 (20261127110000): one after a licence is inserted or
+      // its number or jurisdiction changes, one after a profile enters
+      // under_review. They never write an M4 relation (they read the licences
+      // and profiles and open rejoin_review Reconciliation Exceptions), pinned
+      // below to their function and timing.
       assert.equal(
         sql(
           `select coalesce(string_agg(c.relname || ':' || t.tgname, ',' order by c.relname, t.tgname), '') from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in (${m4}, 'audit_events') and not t.tgisinternal and t.tgname not like '%set_updated_at' and t.tgname <> 'audit_events_immutable';`,
         ),
-        "attorney_profiles:attorney_profiles_decision_review,discipline_records:discipline_records_decision_review,eligibility_evaluations:eligibility_evaluations_append_only,eligibility_evaluations:eligibility_evaluations_no_truncate,insurance_records:insurance_records_decision_review,licenses:licenses_decision_review,practice_area_authorisations:practice_area_authorisations_decision_review,verification_evidence:verification_evidence_artifact_guard,verification_evidence:verification_evidence_decision_review,verification_evidence_subjects:verification_evidence_subjects_decision_review",
+        "attorney_profiles:attorney_profiles_decision_review,attorney_profiles:attorney_profiles_rejoin_detection,discipline_records:discipline_records_decision_review,eligibility_evaluations:eligibility_evaluations_append_only,eligibility_evaluations:eligibility_evaluations_no_truncate,insurance_records:insurance_records_decision_review,licenses:licenses_decision_review,licenses:licenses_rejoin_detection,practice_area_authorisations:practice_area_authorisations_decision_review,verification_evidence:verification_evidence_artifact_guard,verification_evidence:verification_evidence_decision_review,verification_evidence_subjects:verification_evidence_subjects_decision_review",
+      );
+      assert.equal(
+        sql(
+          "select string_agg(t.tgname || '|' || p.proname || '|' || p.prosecdef::text || '|' || t.tgdeferrable::text || '|' || t.tgtype::text || '|' || (pg_get_triggerdef(t.oid) like '%WHEN (((new.profile_state = ''under_review''::text) AND (old.profile_state IS DISTINCT FROM ''under_review''::text)))%')::text, ',' order by t.tgname) from pg_trigger t join pg_proc p on p.oid = t.tgfoid where t.tgname like '%_rejoin_detection';",
+        ),
+        "attorney_profiles_rejoin_detection|attorney_rejoin_application_submitted|true|false|17|true,licenses_rejoin_detection|attorney_rejoin_license_saved|true|false|21|false",
       );
       assert.equal(
         sql(

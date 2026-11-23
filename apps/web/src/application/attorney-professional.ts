@@ -191,6 +191,9 @@ export type LicenseView = {
   readonly observedStatus: string | null;
   readonly verification: ClaimVerification;
   readonly editable: boolean;
+  // MVP-001 S11 (MB section 22): the licence's jurisdiction is on the
+  // waitlist (not open yet; no marketplace visibility there).
+  readonly waitlist: boolean;
 };
 
 export type InsuranceView = {
@@ -623,6 +626,22 @@ export async function resolveProfessionalSetup(
     const jurisdictionNames = new Map(
       jurisdictions.map((j) => [j.id, `${j.name} (${j.code})`]),
     );
+    // MVP-001 S11 (MB section 22): the jurisdictions on the waitlist, from
+    // the lifecycle state each row already carries (read strictly above).
+    const waitlisted = new Set(
+      (jurList ?? []).flatMap((row) => {
+        const fields = readExact(row, [
+          "id",
+          "code",
+          "name",
+          "lifecycle_state",
+        ]);
+        const id = fields?.get("id");
+        return fields?.get("lifecycle_state") === "waitlist" && isUuid(id)
+          ? [id]
+          : [];
+      }),
+    );
     const areaNames = new Map(areas.map((a) => [a.id, a.name]));
     const eligibility = eligibilityViewsOf(
       evaluations,
@@ -666,6 +685,7 @@ export async function resolveProfessionalSetup(
               editable &&
               verification === "awaiting_review" &&
               license.reportedStatus === null,
+            waitlist: waitlisted.has(license.jurisdictionId),
           });
         }),
       ),

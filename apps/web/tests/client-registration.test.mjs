@@ -2803,6 +2803,8 @@ const CONFIGURATION_RPCS = Object.freeze([
   "staff_review_jurisdiction_assessment",
   "staff_jurisdiction_review_intakes",
   "staff_jurisdiction_review_assessments",
+  // MVP-001 S11 D2: the read of a jurisdiction's Regulatory Modes.
+  "staff_jurisdiction_regulatory_modes",
   "has_staff_capability",
 ]);
 // MVP-001 S2: the privileged module's only other calls are the three fixed
@@ -3020,6 +3022,108 @@ const COMMUNICATION_RPCS = Object.freeze([
   "document_begin_replacement",
   "document_finalize_replacement",
 ]);
+// MVP-001 S11: the completion adapter calls the database's own participant
+// cancellation and early completion, the client's Consultation list, the
+// staff consultation operations (the stale queue, one Consultation, outcome
+// recording and one family's review items), the review functions (the
+// client's and the attorney's reads, the moderation queue, the public read,
+// submission and moderation), the complaint functions (the complainant's
+// list, the staff queue and case, intake, the case steps, classification and
+// resolution), the Legal Hold functions (the list, placing and releasing) and
+// the PS-A2 environment accessor (checked before a change), each exactly once
+// and each as a literal call through the request's own unprivileged session;
+// it builds or receives no privileged client, and no other file names any of
+// the twenty-three functions.
+const COMPLETION_ADAPTER =
+  "src/infrastructure/consultations/completion-adapter.ts";
+const COMPLETION_RPCS = Object.freeze([
+  "client_consultations",
+  "consultation_cancel",
+  "consultation_end_early",
+  "staff_stale_consultations",
+  "staff_consultation",
+  "staff_review_exceptions",
+  "staff_record_consultation_outcome",
+  "client_reviews",
+  "attorney_reviews",
+  "staff_review_queue",
+  "public_attorney_reviews",
+  "review_submit",
+  "staff_moderate_review",
+  "complaint_cases_mine",
+  "staff_complaint_queue",
+  "staff_complaint_case",
+  "complaint_open",
+  "staff_update_complaint",
+  "staff_classify_complaint",
+  "staff_resolve_complaint",
+  "staff_legal_holds",
+  "staff_place_legal_hold",
+  "staff_release_legal_hold",
+]);
+// MVP-001 S11 pass 2: the staff operations adapter calls the database's own
+// audit reads, the counts-only operations summary, the referral reads, the
+// financial activity summary, the jurisdiction names, the client
+// administration reads and account-state command, the attorney profile read
+// and lifecycle command, the compliance reads and the PS-A2 environment
+// accessor (checked before a change), each exactly once and each as a
+// literal call through the request's own unprivileged session; it builds or
+// receives no privileged client, and no other file names any of the fifteen
+// functions.
+const OPERATIONS_ADAPTER = "src/infrastructure/staff/operations-adapter.ts";
+const OPERATIONS_RPCS = Object.freeze([
+  "staff_jurisdiction_names",
+  "staff_audit_events",
+  "staff_audit_event",
+  "staff_operations_summary",
+  "staff_referrals",
+  "staff_referral_counts",
+  "staff_finance_summary",
+  "staff_clients",
+  "staff_client",
+  "staff_change_client_account",
+  "staff_attorney_profile",
+  "staff_change_attorney_lifecycle",
+  "staff_compliance_summary",
+  "staff_compliance_records",
+  "staff_policy_changes",
+]);
+// MVP-001 S11 pass 2B: the participant workspace adapter calls the
+// database's own six workspace reads (the client's payment history and
+// account overview, the participants' Message threads, the attorney's ended
+// Consultations, documents and compliance records), each exactly once and
+// each as a literal call through the request's own unprivileged session; it
+// builds or receives no privileged client, writes nothing, and no other file
+// names any of the six functions.
+const WORKSPACE_ADAPTER = "src/infrastructure/workspaces/workspace-adapter.ts";
+const WORKSPACE_RPCS = Object.freeze([
+  "client_payments",
+  "client_account_overview",
+  "consultation_threads",
+  "attorney_consultation_history",
+  "attorney_documents",
+  "attorney_compliance_records",
+]);
+// MVP-001 S11 PS-A6: the privacy and security actions adapter calls the six
+// break-glass and seven data request functions, each as a literal call
+// through the request's own unprivileged session; it builds or receives no
+// privileged client, and no other file names any of the thirteen functions.
+const PRIVACY_ADAPTER = "src/infrastructure/privacy/privacy-adapter.ts";
+const PRIVACY_RPCS = Object.freeze([
+  "staff_break_glass_grants_mine",
+  "staff_break_glass_queue",
+  "staff_break_glass_consultation",
+  "staff_request_break_glass",
+  "staff_approve_break_glass",
+  "staff_revoke_break_glass",
+  "client_data_requests",
+  "staff_data_request_queue",
+  "staff_data_request",
+  "client_submit_data_request",
+  "client_withdraw_data_request",
+  "staff_assign_data_request",
+  "staff_decide_data_request",
+]);
 const PAYMENT_ADAPTER = "src/infrastructure/payments/payment-adapter.ts";
 const PAYMENT_RPCS = Object.freeze([
   "client_request_payment",
@@ -3089,6 +3193,18 @@ const RPC_OCCURRENCES = Object.freeze({
   // (PS-A5: and the three versioning functions), plus the environment
   // accessor.
   [COMMUNICATION_ADAPTER]: COMMUNICATION_RPCS.length + 1,
+  // MVP-001 S11: the twenty-three completion functions, plus the environment
+  // accessor.
+  [COMPLETION_ADAPTER]: COMPLETION_RPCS.length + 1,
+  // MVP-001 S11 pass 2: the fifteen operations functions, plus the
+  // environment accessor.
+  [OPERATIONS_ADAPTER]: OPERATIONS_RPCS.length + 1,
+  // MVP-001 S11 pass 2B: the six workspace reads (no change, so no
+  // environment accessor).
+  [WORKSPACE_ADAPTER]: WORKSPACE_RPCS.length,
+  // MVP-001 S11 PS-A6: the thirteen privacy and security functions, plus the
+  // environment accessor.
+  [PRIVACY_ADAPTER]: PRIVACY_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -3306,6 +3422,114 @@ function assertQuotaRpcContract(codes) {
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
       );
     }
+    // MVP-001 S11: the completion functions, as for the communication
+    // functions.
+    for (const name of COMPLETION_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === COMPLETION_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== COMPLETION_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === COMPLETION_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        COMPLETION_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
+    // MVP-001 S11 pass 2: the operations functions, as for the completion
+    // functions.
+    for (const name of OPERATIONS_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === OPERATIONS_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== OPERATIONS_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === OPERATIONS_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        OPERATIONS_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
+    // MVP-001 S11 pass 2B: the workspace reads, as for the operations
+    // functions.
+    for (const name of WORKSPACE_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === WORKSPACE_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== WORKSPACE_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === WORKSPACE_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        WORKSPACE_RPCS.length,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(|deployment_environment_identity/i,
+      );
+    }
+    // MVP-001 S11 PS-A6: the privacy and security functions, as for the
+    // operations functions.
+    for (const name of PRIVACY_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === PRIVACY_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== PRIVACY_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === PRIVACY_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        PRIVACY_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
     // MVP-001 S7: the payment functions, as for the offer functions.
     for (const name of PAYMENT_RPCS) {
       assert.equal(
@@ -3353,7 +3577,11 @@ function assertQuotaRpcContract(codes) {
         file === PAYMENT_ADAPTER ||
         file === ATTORNEY_REQUEST_ADAPTER ||
         file === CONSULTATION_ADAPTER ||
-        file === COMMUNICATION_ADAPTER
+        file === COMMUNICATION_ADAPTER ||
+        file === COMPLETION_ADAPTER ||
+        file === OPERATIONS_ADAPTER ||
+        // MVP-001 S11 PS-A6: the privacy adapter's environment accessor.
+        file === PRIVACY_ADAPTER
         ? 1
         : 0,
       file,

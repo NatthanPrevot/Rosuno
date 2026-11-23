@@ -823,10 +823,13 @@ test("S9-6. every outcome has a fixed message, the provider is never named, and 
 });
 
 test("S9-7. the routes: server pages that opt out of prerendering (the attorney pages behind the step-up gate first), the frame only in the two client form modules with the fixed title and permissions, the token only in the action answer (never in a page, URL or log), and the pages read only the route segment (MVP-001 S10 PS-A5: and a Consultation page exactly one more value, which document's version history to show)", () => {
+  // MVP-001 S11 pass 2B: plus exactly the attorney's past consultations, a
+  // read-only server page behind the step-up gate (no form, no action).
   assert.deepEqual(filesIn("app/attorney/consultations/"), [
     "app/attorney/consultations/[consultation]/forms.tsx",
     "app/attorney/consultations/[consultation]/page.tsx",
     "app/attorney/consultations/actions.ts",
+    "app/attorney/consultations/history/page.tsx",
     "app/attorney/consultations/page.tsx",
   ]);
   for (const page of [
@@ -885,12 +888,31 @@ test("S9-7. the routes: server pages that opt out of prerendering (the attorney 
       file,
     );
   }
+  // MVP-001 S11 correction pass (A7), by exact admission: the client's
+  // cancellation action logs a cancellation not completed with its fixed
+  // outcome only (the observability test checks the line); nothing else in
+  // these modules logs, and the join action (whose answer carries the token)
+  // still logs nothing.
+  const CANCEL_LOG_IMPORT =
+    'import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";\n';
+  const CANCEL_LOG =
+    '  if (state.status === "unavailable" || state.status === "unconfirmed") {\n    await logRequestEvent("warn", "consultation.action_not_completed", {\n      operation: "cancelConsultation",\n      outcome: state.status,\n    });\n  }\n';
   for (const actions of [
     "app/client/consultations/actions.ts",
     "app/attorney/consultations/actions.ts",
   ]) {
-    const code = codeOf(read(actions));
+    let code = codeOf(read(actions));
     assert.match(read(actions), /^"use server";\n/, actions);
+    if (actions === "app/client/consultations/actions.ts") {
+      assert.equal(code.split(CANCEL_LOG_IMPORT).length, 2, actions);
+      assert.equal(code.split(CANCEL_LOG).length, 2, actions);
+      const cancel = code.slice(
+        code.indexOf("export async function cancelConsultationAction("),
+      );
+      assert.ok(cancel.includes(CANCEL_LOG), actions);
+      assert.doesNotMatch(cancel.slice(1), /\nexport /, actions);
+      code = code.replace(CANCEL_LOG_IMPORT, "").replace(CANCEL_LOG, "");
+    }
     assert.doesNotMatch(
       code,
       /logRequestEvent|console\.|redirect\(|cookies|headers\(/,

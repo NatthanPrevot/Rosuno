@@ -53,6 +53,12 @@ import { isUuid, readExact } from "./professional-records.ts";
 // Vocabulary (the database checks every value again)
 // ---------------------------------------------------------------------------
 
+// The seven S10 types and (MVP-001 S11, correction D14) the four S11 types
+// the database vocabulary gained in 20261127070000: a cancellation (the
+// other participant), a recorded outcome, a completed Consultation that can
+// be reviewed (the client) and a received complaint (the complainant). The
+// list equals the database's notification_types() (an L1 test parses the
+// latest migration that defines it).
 export const NOTIFICATION_TYPES = Object.freeze([
   "request_awaiting_decision",
   "request_accepted",
@@ -61,6 +67,10 @@ export const NOTIFICATION_TYPES = Object.freeze([
   "consultation_ready",
   "message_received",
   "document_shared",
+  "consultation_cancelled",
+  "consultation_outcome_recorded",
+  "review_available",
+  "complaint_received",
 ] as const);
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -266,6 +276,24 @@ export const EMAIL_TEMPLATES: Readonly<
   document_shared: {
     subject: "A document was shared with you",
     line: "A document was shared with you in your consultation.",
+  },
+  // MVP-001 S11 (correction D14): the same fixed minimal form; no name, no
+  // matter detail and no outcome.
+  consultation_cancelled: {
+    subject: "A consultation was cancelled",
+    line: "One of your consultations was cancelled.",
+  },
+  consultation_outcome_recorded: {
+    subject: "An update about your consultation",
+    line: "An outcome was recorded for one of your consultations.",
+  },
+  review_available: {
+    subject: "You can review your consultation",
+    line: "Your consultation has ended. You can now leave a review.",
+  },
+  complaint_received: {
+    subject: "We received your report",
+    line: "We received the problem you reported.",
   },
 });
 

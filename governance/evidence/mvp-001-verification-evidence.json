@@ -1,0 +1,743 @@
+{
+  "evidence_id": "MVP-001-VERIFICATION-EVIDENCE",
+  "work_item": "WI-P2-MVP-001-TECHNICAL-COMPLETION",
+  "kind": "verification_run_summary",
+  "summary": "Dated summary of the verification runs recorded for MVP-001 slices S1 to S11, per slice and evidence level (Packet section 5). It restates recorded results with their sources; it records no new run, declares no integration complete and is not a release or production-readiness record.",
+  "prepared_on": "2026-11-22",
+  "assessed_commit": "5283fdab79ceaa182cab8a4365a9976853f4edfa",
+  "owner_main": "b3205cdb0c2792801714be6c67a758e4c7bf11de",
+  "rules": [
+    "Only facts present in the slice PR descriptions as summarized for the readiness pack (S1 to S7), the S8, S9 and S10 PR descriptions, the git history and, for S11, the records the Builder keeps outside the repository (pass and correction reports, final validation, L5 and restore run reports) are used; the latter are marked 'Builder record'.",
+    "Commit and merge times are git commit times converted to whole-second UTC. A run date or start instant is given only where the source states one; otherwise the field says not stated.",
+    "Proof check identifiers repeat across proofs; a check is always cited with its proof file.",
+    "No provider identifier, host, address, key, account name or personal identity is recorded."
+  ],
+  "packet_section_5_exception": "implemented; sandbox verification outstanding",
+  "levels": {
+    "L1": "Unit and application tests, apps/web/tests/*.test.mjs (CI and local)",
+    "L2": "Disposable-database proofs, apps/web/tests/*-db-proof.mjs, PostgreSQL 16 (explicit run)",
+    "L3": "Mocked provider contract tests (adapter correctness only)",
+    "L4": "Sandbox-provider tests against the real providers: payments in test mode, the media provider's REST API, email to the provider's own test recipients (required to declare an integration complete)",
+    "L5": "Browser journeys against a local full stack (explicit-run scripts)",
+    "L6": "Hosted-environment verification: HOLD (Packet rule 14); no L6 run exists"
+  },
+  "proof_check_counts": {
+    "apps/web/tests/registration-abuse-db-proof.mjs": 34,
+    "apps/web/tests/m4-db-proof.mjs": 13,
+    "apps/web/tests/p3-904-db-proof.mjs": 37,
+    "apps/web/tests/p5-001-db-proof.mjs": 41,
+    "apps/web/tests/mvp-001-s1-db-proof.mjs": 27,
+    "apps/web/tests/mvp-001-s2-db-proof.mjs": 40,
+    "apps/web/tests/mvp-001-s3-db-proof.mjs": 35,
+    "apps/web/tests/mvp-001-s4-db-proof.mjs": 46,
+    "apps/web/tests/mvp-001-s5-db-proof.mjs": 29,
+    "apps/web/tests/mvp-001-s6-db-proof.mjs": 32,
+    "apps/web/tests/mvp-001-s6-offers-db-proof.mjs": 18,
+    "apps/web/tests/mvp-001-s7-db-proof.mjs": 36,
+    "apps/web/tests/mvp-001-s8-db-proof.mjs": 51,
+    "apps/web/tests/mvp-001-s9-db-proof.mjs": 48,
+    "apps/web/tests/mvp-001-s10-db-proof.mjs": 55,
+    "apps/web/tests/mvp-001-s11-db-proof.mjs": 57,
+    "apps/web/tests/mvp-001-s11-operations-db-proof.mjs": 55
+  },
+  "proof_check_total": 654,
+  "slices": [
+    {
+      "slice": "S1",
+      "pull_request": 96,
+      "head_commit": "8c40658cbfd89122793970c3673a280774489333",
+      "head_committed_at": "2026-11-17T05:47:48Z",
+      "merge_commit": "b7dc44758db05f4492a7d87d17448fcd062e853c",
+      "merged_at": "2026-11-17T06:04:21Z",
+      "l1_l3": "Counts recorded in the S1 PR description; not restated here.",
+      "l2": {
+        "new_proofs": ["apps/web/tests/mvp-001-s1-db-proof.mjs (27 checks)"],
+        "earlier_proofs_aligned": [
+          "apps/web/tests/p3-904-db-proof.mjs",
+          "apps/web/tests/m4-db-proof.mjs"
+        ],
+        "result_at_head": "Recorded in the S1 PR description; not restated here.",
+        "source": "S1 PR description"
+      },
+      "l4": [],
+      "l5": [
+        {
+          "journey": "Registration, confirmation, sign-in and recovery; the confirmation route direct and proxied; 37 staff-surface steps with database and audit checks",
+          "result": "Recorded as prose in the S1 PR description",
+          "limits": "One scripted step expected a message that is not rendered",
+          "script_committed": false,
+          "source": "S1 PR description"
+        }
+      ]
+    },
+    {
+      "slice": "S2",
+      "pull_request": 97,
+      "head_commit": "6f2c6258841c41871e7f011729012432453ed934",
+      "head_committed_at": "2026-11-17T16:19:47Z",
+      "merge_commit": "3490dbdf6618e11e0d6a4a74a66292a32990bd80",
+      "merged_at": "2026-11-17T16:48:38Z",
+      "l1_l3": "Counts recorded in the S2 PR description; not restated here.",
+      "l2": {
+        "new_proofs": ["apps/web/tests/mvp-001-s2-db-proof.mjs (40 checks)"],
+        "result_at_head": "Recorded in the S2 PR description; not restated here.",
+        "source": "S2 PR description"
+      },
+      "l4": [],
+      "l5": [
+        {
+          "journey": "Scheduler and worker route; authentication-abuse and MFA flows in a browser",
+          "result": "Recorded as prose in the S2 PR description",
+          "limits": "None recorded",
+          "script_committed": false,
+          "source": "S2 PR description"
+        }
+      ]
+    },
+    {
+      "slice": "S3",
+      "pull_request": 98,
+      "head_commit": "ee77e7cdfd9dfd63b339018f9d3bc7a9dcbd5c8e",
+      "head_committed_at": "2026-11-17T20:46:04Z",
+      "merge_commit": "f7f6bbdffc78a28748a5bcb8b889a2ae198a3eef",
+      "merged_at": "2026-11-17T21:08:36Z",
+      "l1_l3": "Counts recorded in the S3 PR description; not restated here.",
+      "l2": {
+        "new_proofs": ["apps/web/tests/mvp-001-s3-db-proof.mjs (35 checks)"],
+        "result_at_head": "Recorded in the S3 PR description; not restated here.",
+        "source": "S3 PR description"
+      },
+      "l4": [],
+      "l5": [
+        {
+          "journey": "Intake with AI unavailable; expiry; staff jurisdiction review; suggestion confirmation",
+          "result": "Recorded as prose in the S3 PR description",
+          "limits": "Expiry journey ran before the lifecycle correction; no AI provider; no pg_cron sweep observed",
+          "script_committed": false,
+          "source": "S3 PR description"
+        }
+      ]
+    },
+    {
+      "slice": "S4",
+      "pull_request": 99,
+      "head_commit": "534f0368ea6c83f9c12c502621603545d4586382",
+      "head_committed_at": "2026-11-17T22:45:26Z",
+      "merge_commit": "e4ee0837d7c3af7536a29937edd3c7b9ad6dc01e",
+      "merged_at": "2026-11-17T23:45:24Z",
+      "l1_l3": "Counts recorded in the S4 PR description; not restated here.",
+      "l2": {
+        "new_proofs": ["apps/web/tests/mvp-001-s4-db-proof.mjs (46 checks)"],
+        "result_at_head": "Recorded in the S4 PR description; not restated here.",
+        "source": "S4 PR description"
+      },
+      "l4": [],
+      "l5": [
+        {
+          "journey": "Attorney schedule, rules, blackouts, Instant mode, sign-out",
+          "result": "Recorded as prose in the S4 PR description",
+          "limits": "Holds and Bookings not exercised in a UI",
+          "script_committed": false,
+          "source": "S4 PR description"
+        }
+      ]
+    },
+    {
+      "slice": "S5",
+      "pull_request": 100,
+      "head_commit": "c7632bccb0f7a101208ba8d3859924d87e55a93a",
+      "head_committed_at": "2026-11-18T01:15:15Z",
+      "merge_commit": "3372bb425f35606529d4991e6eb19bda3e3367af",
+      "merged_at": "2026-11-18T01:53:20Z",
+      "l1_l3": "Counts recorded in the S5 PR description; not restated here.",
+      "l2": {
+        "new_proofs": ["apps/web/tests/mvp-001-s5-db-proof.mjs (29 checks)"],
+        "result_at_head": "Recorded in the S5 PR description; not restated here.",
+        "source": "S5 PR description"
+      },
+      "l4": [],
+      "l5": [
+        {
+          "journey": "Directory, profile, selection with sign-in handoff, eight content pages",
+          "result": "Recorded as prose in the S5 PR description",
+          "limits": "None recorded",
+          "script_committed": false,
+          "source": "S5 PR description"
+        }
+      ]
+    },
+    {
+      "slice": "S6",
+      "pull_request": 101,
+      "head_commit": "c4604e166b56ee79f89f3498d24d9ff0194274c0",
+      "head_committed_at": "2026-11-18T06:11:35Z",
+      "merge_commit": "8dfeaf6698067808275dfd86cb655d88148b7660",
+      "merged_at": "2026-11-18T07:03:02Z",
+      "l1_l3": "Counts recorded in the S6 PR description; not restated here.",
+      "l2": {
+        "new_proofs": [
+          "apps/web/tests/mvp-001-s6-db-proof.mjs (32 checks)",
+          "apps/web/tests/mvp-001-s6-offers-db-proof.mjs (18 checks)"
+        ],
+        "result_at_head": "Recorded in the S6 PR description; not restated here.",
+        "source": "S6 PR description"
+      },
+      "l4": [],
+      "l5": [
+        {
+          "journey": "Offers, public profile, review, scheduled request, withdrawals",
+          "result": "Recorded as prose in the S6 PR description",
+          "limits": "None recorded",
+          "script_committed": false,
+          "source": "S6 PR description"
+        }
+      ]
+    },
+    {
+      "slice": "S7",
+      "pull_request": 102,
+      "head_commit": "705359d916afde32a9ff8356f5b8118b0cfef890",
+      "head_committed_at": "2026-11-18T13:50:54Z",
+      "merge_commit": "210a99e30e850747256ebf299f7e7839f9a55c5d",
+      "merged_at": "2026-11-18T14:33:47Z",
+      "l1_l3": "Counts recorded in the S7 PR description; not restated here.",
+      "l2": {
+        "new_proofs": ["apps/web/tests/mvp-001-s7-db-proof.mjs (36 checks)"],
+        "result_at_head": "Recorded in the S7 PR description; not restated here.",
+        "source": "S7 PR description"
+      },
+      "l4": [
+        {
+          "provider_area": "payments (provider test mode)",
+          "runner": "apps/web/tests/mvp-001-s7-stripe-l4.mjs",
+          "date": "2026-11-18",
+          "commit": "Not stated in the source",
+          "scenarios": "C1 checkout session, A1 authorize and capture, A2 authorize and release, A3 declined, R1 refunds, D1 dispute, E1 events mapped",
+          "result": "7/7 scenarios, 42/42 assertions, 27 API calls",
+          "outstanding": "A real signed webhook delivery to a deployed route",
+          "packet_section_5": "implemented; sandbox verification outstanding",
+          "result_document_in_repository": false,
+          "source": "S7 PR description; Decision Log DEC-20261117-MVP-001-TECHNICAL-COMPLETION-PROGRAM evidence line for S7"
+        }
+      ],
+      "l5": [
+        {
+          "journey": "Payment step with payments unconfigured; simulated authorization and capture events; receipt; finance workspace",
+          "result": "Recorded as prose in the S7 PR description",
+          "limits": "The real hosted payment page was not exercised in a browser",
+          "script_committed": false,
+          "source": "S7 PR description"
+        }
+      ]
+    },
+    {
+      "slice": "S8",
+      "pull_request": 103,
+      "head_commit": "f3c8fda861cf89bace1158eb31d8ede2c4f7dd5d",
+      "head_committed_at": "2026-11-18T17:00:38Z",
+      "merge_commit": "f5973d6326b47a2eca709efebc3c7c62e6c515c0",
+      "merged_at": "2026-11-18T18:06:28Z",
+      "l1_l3": {
+        "tool_tests": "1,354 (pass)",
+        "application_tests": "624 (pass)",
+        "other_commands": "format:check, typecheck, build, p0:validate, secrets:check, dependency:check: pass",
+        "source": "S8 PR description, Tests"
+      },
+      "l2": {
+        "new_proofs": ["apps/web/tests/mvp-001-s8-db-proof.mjs (51 checks)"],
+        "results": {
+          "mvp-001-s8": "51/51",
+          "mvp-001-s7": "36/36",
+          "mvp-001-s6": "32/32",
+          "mvp-001-s6-offers": "18/18",
+          "mvp-001-s5": "29/29",
+          "mvp-001-s4": "46/46",
+          "mvp-001-s3": "35/35",
+          "mvp-001-s2": "40/40",
+          "mvp-001-s1": "27/27",
+          "p5-001": "41/41",
+          "p3-904": "37/37",
+          "m4": "13/13",
+          "registration-abuse": "34/34"
+        },
+        "conditions": "Disposable PostgreSQL clusters, one development-class and one production-class; synthetic data; development policies; payment events as synthetic observations through the real recording functions",
+        "source": "S8 PR description, Tests and Verification levels"
+      },
+      "l4": [],
+      "l5": [
+        {
+          "journey": "An attorney at aal2 accepts one scheduled Request and declines another; client view",
+          "result": "pass",
+          "limits": "Ran before the review corrections, which change only database paths the journey does not take; the S8 proof covers them",
+          "script_committed": false,
+          "source": "S8 PR description, Verification levels"
+        }
+      ]
+    },
+    {
+      "slice": "S9",
+      "pull_request": 104,
+      "head_commit": "0f55677e963098b1dca2b74ed02042f4efa08975",
+      "head_committed_at": "2026-11-18T21:47:18Z",
+      "merge_commit": "d3e62969bfa1fdaedb843b1c873fbcb0040f0ede",
+      "merged_at": "2026-11-18T22:28:39Z",
+      "l1_l3": {
+        "tool_tests": "1,354 (pass)",
+        "application_tests": "642 (pass)",
+        "l3": "daily-provider.test.mjs against a local fake HTTP server; webhook signature tests with locally generated values (simulated, not the provider)",
+        "other_commands": "format:check, typecheck, build, p0:validate, secrets:check, dependency:check: pass",
+        "source": "S9 PR description, Tests and Verification levels"
+      },
+      "l2": {
+        "new_proofs": ["apps/web/tests/mvp-001-s9-db-proof.mjs (48 checks)"],
+        "results": {
+          "mvp-001-s9": "48/48",
+          "mvp-001-s8": "51/51",
+          "mvp-001-s7": "36/36",
+          "mvp-001-s6": "32/32",
+          "mvp-001-s6-offers": "18/18",
+          "mvp-001-s5": "29/29",
+          "mvp-001-s4": "46/46",
+          "mvp-001-s3": "35/35",
+          "mvp-001-s2": "40/40",
+          "mvp-001-s1": "27/27",
+          "p5-001": "41/41",
+          "p3-904": "37/37",
+          "m4": "13/13",
+          "registration-abuse": "34/34"
+        },
+        "source": "S9 PR description, Tests"
+      },
+      "l4": [
+        {
+          "provider_area": "media (the real provider REST API)",
+          "runner": "apps/web/tests/mvp-001-s9-daily-l4.mjs",
+          "date": "Not stated in the source",
+          "commit": "Not stated in the source",
+          "scenarios": "R1 room create, R2 idempotent create, T1 meeting tokens for both participants, P1 presence and meetings, U1 expiry update, D1 delete, E1 unknown room",
+          "result": "7/7 scenarios, 13/13 assertions",
+          "outstanding": "A real participant join over WebRTC; a real signed webhook delivery (signature scheme implemented from secondary sources)",
+          "packet_section_5": "implemented; sandbox verification outstanding",
+          "result_document_in_repository": false,
+          "source": "S9 PR description, L4 status"
+        }
+      ],
+      "l5": [
+        {
+          "journey": "Waiting room, attorney start, Rosuno's join step for both participants, client reconnect, attorney end, client sees Ended, with the real provider REST API (room created and deleted)",
+          "result": "9/9 steps",
+          "limits": "The provider's room page itself never loaded from the Builder container, so no real participant join was observed; a real participant join is an outstanding L4 item",
+          "script_committed": false,
+          "source": "S9 PR description, Verification levels"
+        }
+      ]
+    },
+    {
+      "slice": "S10",
+      "pull_request": 105,
+      "head_commit": "1cb365dc6b45dd34a7575cee494d90f9e15282f9",
+      "head_committed_at": "2026-11-19T03:51:33Z",
+      "merge_commit": "b3205cdb0c2792801714be6c67a758e4c7bf11de",
+      "merged_at": "2026-11-19T04:13:10Z",
+      "l1_l3": {
+        "tool_tests": "1,354 (pass)",
+        "application_tests": "664 (pass)",
+        "l3": "resend-provider.test.mjs against a local fake HTTP server; signature tests with locally generated values (simulated, not the provider)",
+        "other_commands": "format:check, typecheck, build, p0:validate, secrets:check, dependency:check: pass",
+        "source": "S10 PR description, Tests and Verification levels"
+      },
+      "l2": {
+        "new_proofs": ["apps/web/tests/mvp-001-s10-db-proof.mjs (55 checks)"],
+        "results": {
+          "mvp-001-s10": "55/55",
+          "mvp-001-s9": "48/48",
+          "mvp-001-s8": "51/51",
+          "mvp-001-s7": "36/36",
+          "mvp-001-s6": "32/32",
+          "mvp-001-s6-offers": "18/18",
+          "mvp-001-s5": "29/29",
+          "mvp-001-s4": "46/46",
+          "mvp-001-s3": "35/35",
+          "mvp-001-s2": "40/40",
+          "mvp-001-s1": "27/27",
+          "p5-001": "41/41",
+          "p3-904": "37/37",
+          "m4": "13/13",
+          "registration-abuse": "34/34"
+        },
+        "source": "S10 PR description, Tests"
+      },
+      "l4": [
+        {
+          "provider_area": "email (real sends to the provider's own test recipients only)",
+          "runner": "apps/web/tests/mvp-001-s10-resend-l4.mjs",
+          "date": "Not stated in the source",
+          "commit": "Not stated in the source",
+          "scenarios": "Accepted sends (delivered and bounced test recipients), idempotent replay, idempotency conflict, unverified sender, status read refused with a send-only key, address rule, job handler end to end; one observation",
+          "result": "8/8 counted scenarios and one observation",
+          "outstanding": "A real signed webhook delivery; delivery-status reads",
+          "packet_section_5": "implemented; sandbox verification outstanding",
+          "result_document_in_repository": false,
+          "source": "S10 PR description, L4 status"
+        }
+      ],
+      "l5": [
+        {
+          "journey": "Messages both ways, client upload, attorney opens it through a database-authorized short-lived link, revocation, both notification centers, start and end with a synthetic messaging window, worker drain with accepted sends, a locally signed simulated webhook",
+          "result": "7/7 steps",
+          "limits": "Ran before the review corrections; their UI effect is limited to the older-items notes, pinned at L1",
+          "script_committed": false,
+          "source": "S10 PR description, Verification levels"
+        },
+        {
+          "journey": "Document versioning (PS-A5): a new version shared, history of both versions with their own bytes, sharing stopped for one version, unknown history id",
+          "result": "5/5 steps",
+          "limits": "Later wording corrections are pinned at L1",
+          "script_committed": false,
+          "source": "S10 PR description, Verification levels"
+        }
+      ]
+    },
+    {
+      "slice": "S11",
+      "pull_request": "Not yet opened",
+      "passes": [
+        {
+          "pass": "1",
+          "commit": "8e5d70a353769db73de7db06c39a21fbdaa5c772",
+          "committed_at": "2026-11-22T14:07:29Z",
+          "content": "Completion types, reviews, complaint foundation, Legal Holds, exception families, S11 notification events (migrations 20261127010000 to 20261127070000; register sequences 55 to 61)",
+          "l1_l3": "apps/web/tests/mvp-001-s11-completion.test.mjs (16 tests)",
+          "l2": "apps/web/tests/mvp-001-s11-db-proof.mjs (51 checks at pass 1; 57 at the S11 head)",
+          "l5": {
+            "journey": "Client cancels a scheduled Consultation and the slot is free again; start, end, completed Booking, review submitted and published with count and average; complaint, assignment and Legal Hold; staff outcome of a stale Consultation",
+            "result": "7/7 (pass run; the committed script now has 9 steps, final run below)",
+            "script": "apps/web/tests/mvp-001-s11-l5-journey.mjs (committed; explicit-run, loopback and development class only)",
+            "environment": "Disposable local stack",
+            "source": "Builder record"
+          }
+        },
+        {
+          "pass": "2A",
+          "commit": "a3f68c5bd9b5c3e7fda3e6683466298998ffba20",
+          "committed_at": "2026-11-22T16:00:23Z",
+          "content": "Audit workspace, operations dashboard and system health, compliance workspace, attorney reinstate and remove, waitlist, rejoin detection, client administration, referral operations, finance summary, corrections D1, D2, D3, D5, D7, D8 and part of D9, gate tests (migrations 20261127080000 to 20261127160000; register sequences 62 to 70)",
+          "l1_l3": "apps/web/tests/mvp-001-s11-operations.test.mjs (18 tests at pass 2A; 19 at the S11 head)",
+          "l2": "apps/web/tests/mvp-001-s11-operations-db-proof.mjs (43 checks at pass 2A; 55 at the S11 head)",
+          "validation_after_pass": {
+            "tool_tests": "1,354/1,354",
+            "application_tests": "698/698",
+            "proofs": {
+              "mvp-001-s11-operations": "43 PASS",
+              "mvp-001-s11": "51 PASS",
+              "mvp-001-s10": "55 PASS",
+              "mvp-001-s9": "48 PASS",
+              "mvp-001-s8": "51 PASS",
+              "mvp-001-s7": "36 PASS",
+              "mvp-001-s6": "32 PASS",
+              "mvp-001-s6-offers": "18 PASS",
+              "mvp-001-s5": "29 PASS",
+              "mvp-001-s4": "46 PASS",
+              "mvp-001-s3": "35 PASS",
+              "mvp-001-s2": "40 PASS",
+              "mvp-001-s1": "27 PASS",
+              "p5-001": "41 PASS",
+              "p3-904": "37 PASS",
+              "m4": "13 PASS",
+              "registration-abuse": "34 PASS"
+            },
+            "source": "Builder record (pass 2A report)"
+          },
+          "l5": {
+            "journey": "Staff home grouped by area; operations dashboard and system health; client administration with suspension and reactivation; audit workspace with filters; referral operations and finance summary; attorney suspend, reinstate and remove from the compliance workspace; refusal of every new page by direct URL without the capability",
+            "result": "8/8 (pass run with a scratch script)",
+            "script": "apps/web/tests/mvp-001-s11-l5-operations.mjs (committed in pass 2B; 9 steps; final run below)",
+            "environment": "Disposable local stack",
+            "source": "Builder record"
+          }
+        },
+        {
+          "pass": "2B",
+          "commit": "e6d45c64662f6e80a718e81223f1f5b08fc6758f",
+          "committed_at": "2026-11-22T17:10:40Z",
+          "content": "Client and attorney workspace surfaces (MBS sections 18.2 and 18.3): client home, payments, messages, settings and privacy; attorney dashboard, consultation history, week schedule, messages, documents and compliance; one shared navigation component per workspace; correction ARCH-D14 (the four S11 notification types in the application, and the notification center's complaints link rule). Migration 20261127170000_mvp_001_s11_workspace_reads (register sequence 71; six read-only definer reads)",
+          "l1_l3": "apps/web/tests/mvp-001-s11-workspaces.test.mjs (18 tests at the S11 head)",
+          "l2": "apps/web/tests/mvp-001-s11-operations-db-proof.mjs SURF-0 to SURF-8",
+          "l5": {
+            "result": "5/5, 7/7 and 8/8 (pass runs of the three scripts)",
+            "environment": "Disposable local stack",
+            "source": "Builder record"
+          }
+        },
+        {
+          "pass": "review corrections",
+          "commit": "5283fdab79ceaa182cab8a4365a9976853f4edfa",
+          "committed_at": "2026-11-22T19:03:52Z",
+          "content": "Corrections of the independent review: R1 to R6 in migration 20261127180000_mvp_001_s11_review_corrections (register sequence 72; eleven functions replaced; one internal function added; no relation, column, policy, policy type or seed) and A1 to A7 in application files",
+          "l1_l3": "S11B-7, S11B-11, S11B-19, S11C-7, S11C-12, S11C-17, S11-3, S11-15",
+          "l2": "apps/web/tests/mvp-001-s11-db-proof.mjs CORR-R1a, CORR-R1b, CORR-R1c, CORR-R2, CORR-R5, CORR-R6; apps/web/tests/mvp-001-s11-operations-db-proof.mjs CORR-0, CORR-R3, CORR-R4"
+        },
+        {
+          "pass": "PS-A6 implementation",
+          "commit": "c4459601fb07a1eff0ad3bc534c972d602bf79bc",
+          "committed_at": "2026-11-22T22:10:44Z",
+          "content": "PS-A6 sections 2 to 5, adopted in a3f6ddc (authority register PHYSICAL-SPECIFICATION-AMENDMENT-PS-A6-LOCKED, status pending_lock_condition; Decision Log DEC-20261122-PS-A6-BREAK-GLASS-DATA-REQUESTS-COMPLAINTS): break-glass grants with one audited read-only access path, data requests with the Legal Hold rule (a decision records an outcome only; nothing is executed), the complaint policy type and the complaint statement (migrations 20261127190000 to 20261127210000; register sequences 73 to 75); staff pages /staff/break-glass and /staff/data-requests and the client privacy page's request form",
+          "l1_l3": "apps/web/tests/mvp-001-s11-ps-a6.test.mjs (8 tests at c445960; PSA6-1 to PSA6-9 at d9d1151)",
+          "l2": "apps/web/tests/mvp-001-s11-ps-a6-db-proof.mjs (31 checks at c445960 and d9d1151: MIG-1 to MIG-4, PRIV-1, BG-1 to BG-7, DR-1 to DR-6, CV-1 to CV-6, CC-1 to CC-7; 32 at 2a1b94f with DR-7)",
+          "l5_script": "apps/web/tests/mvp-001-s11-l5-ps-a6.mjs (committed; explicit-run, loopback and development class only; 8 steps)"
+        },
+        {
+          "pass": "PS-A6 review corrections and the S6 offered-start correction",
+          "commit": "d9d115110b1049dd637e3a2c99ab45b58012cc78",
+          "committed_at": "2026-11-23T00:06:02Z",
+          "content": "Corrections of the independent PS-A6 review (DB-1 to DB-4, the proof gaps BG-5 and DR-5, APP-1 to APP-6, the test gaps PSA6-7 and untested revoke outcomes) in the three PS-A6 migrations and application files; migration 20261127220000_mvp_001_s11_offered_start_containment (register sequence 76): request_slot_starts keeps an offered start only when one availability window contains the whole slot, with jit off for its own run (a defect in S6 found by the Builder's validation during S11 verification)",
+          "l1_l3": "apps/web/tests/mvp-001-s11-ps-a6.test.mjs PSA6-9 (added), PSA6-1 to PSA6-5 and PSA6-7 (amended); apps/web/tests/mvp-001-s11-completion.test.mjs S11-11 and S11-15 (amended)",
+          "l2": "apps/web/tests/mvp-001-s11-ps-a6-db-proof.mjs BG-5, BG-7, DR-1, DR-5, CV-1 (amended; against the uncorrected migrations the amended proof fails BG-7, DR-1, DR-5 and CV-1); apps/web/tests/mvp-001-s6-db-proof.mjs QUOTE-3 (added) and a containment check in QUOTE-2"
+        },
+        {
+          "pass": "PS-A6 verification corrections",
+          "commit": "2a1b94f82c3377fd2544b2402ea8852c13d0b017",
+          "committed_at": "2026-11-23T00:34:10Z",
+          "content": "Corrections from the further independent check of d9d1151: data_request_legal_hold_applies gathers the Resource scopes once and matches them against the holds in one pass, with the coverage unchanged (migration 20261127200000_mvp_001_s11_data_requests changed in place on the unpublished branch: 31,039 bytes, sha256 6a4df26e92b7759905f975823ff05b5e81990bfd27539c82090000390520a641; 28,636 bytes, sha256 8f3c902f3fb6438e2cd727fb068e7dc41b7f975d6efbfb593971816854fa5b8c at d9d1151); the break-glass approval and revocation outcome slot shows the server-rendered outcome before hydration",
+          "l1_l3": "apps/web/tests/mvp-001-s11-ps-a6.test.mjs PSA6-9 (extended)",
+          "l2": "apps/web/tests/mvp-001-s11-ps-a6-db-proof.mjs DR-7 (added: 8,000 Resources and 400 unrelated holds; zero calls of resource_under_legal_hold per evaluation; under one second, about 117 ms measured; agreement with resource_under_legal_hold; fails against the per-Resource form: 8,000 calls, over one second)",
+          "l5": "Not re-run after 2a1b94f: an internal SQL rewrite with the same coverage plus a no-script fallback, covered by L2 DR-5, DR-7 and CC-6 and by L1"
+        }
+      ],
+      "final_validation": {
+        "commit": "5283fdab79ceaa182cab8a4365a9976853f4edfa",
+        "date": "2026-11-22",
+        "format_typecheck_build_validate_secrets_dependencies": "pnpm run format:check, typecheck, build, p0:validate, secrets:check and dependency:check all exit 0",
+        "tool_tests": "1,354/1,354",
+        "application_tests": "717/717",
+        "proofs": {
+          "mvp-001-s11-operations": "55 PASS",
+          "mvp-001-s11": "57 PASS",
+          "mvp-001-s10": "55 PASS",
+          "mvp-001-s9": "48 PASS",
+          "mvp-001-s8": "51 PASS",
+          "mvp-001-s7": "36 PASS",
+          "mvp-001-s6": "32 PASS",
+          "mvp-001-s6-offers": "18 PASS",
+          "mvp-001-s5": "29 PASS",
+          "mvp-001-s4": "46 PASS",
+          "mvp-001-s3": "35 PASS",
+          "mvp-001-s2": "40 PASS",
+          "mvp-001-s1": "27 PASS",
+          "p5-001": "41 PASS",
+          "p3-904": "37 PASS",
+          "m4": "13 PASS",
+          "registration-abuse": "34 PASS",
+          "total_checks": 654
+        },
+        "migrations": "72 (S11: 18 files, register sequences 55 to 72)",
+        "l5_journeys": {
+          "date": "2026-11-22",
+          "tree": "The correction-pass tree; the later R5 revision changes only production-class paths",
+          "environment": "Disposable local stack, development class",
+          "apps/web/tests/mvp-001-s11-l5-journey.mjs": "9/9 PASS",
+          "apps/web/tests/mvp-001-s11-l5-operations.mjs": "9/9 PASS",
+          "apps/web/tests/mvp-001-s11-l5-workspaces.mjs": "6/6 PASS",
+          "observations": "No CSP or console errors; nothing sensitive in the server log"
+        },
+        "l4": "No L4 run in S11",
+        "guard_self_check": "Not stated in the source",
+        "source": "Builder record"
+      },
+      "independent_review": {
+        "performed": "2026-11-22",
+        "by": "Three separate review agents: database migrations; application code and tests; readiness pack and records",
+        "outcome": "Confirmed code defects R1 to R6 and A1 to A7 corrected in 5283fda; the pack's own findings applied in this revision",
+        "external_review": "None (no ChatGPT or Independent Backup review)",
+        "imp_section_40_security_review": "Not performed"
+      },
+      "validation_ps_a6_d9d1151": {
+        "commit": "d9d115110b1049dd637e3a2c99ab45b58012cc78",
+        "tree": "The tree of d9d1151",
+        "date": "2026-11-22, between 22:59 and 23:13 UTC; the S2 and S9 proofs re-run on 2026-11-23 between 00:01 and 00:03 UTC",
+        "format_typecheck_build_validate": "pnpm run format:check, typecheck, build and p0:validate pass",
+        "secrets_check": "Passed (623 files)",
+        "dependency_check": "No known vulnerabilities",
+        "tool_tests": "1,354/1,354",
+        "application_tests": "726/726",
+        "proofs": {
+          "mvp-001-s11-ps-a6": "31 PASS (new)",
+          "mvp-001-s11-operations": "55 PASS",
+          "mvp-001-s11": "57 PASS",
+          "mvp-001-s10": "55 PASS",
+          "mvp-001-s9": "48 PASS (on the re-run)",
+          "mvp-001-s8": "51 PASS",
+          "mvp-001-s7": "36 PASS",
+          "mvp-001-s6": "33 PASS",
+          "mvp-001-s6-offers": "18 PASS",
+          "mvp-001-s5": "29 PASS",
+          "mvp-001-s4": "46 PASS",
+          "mvp-001-s3": "35 PASS",
+          "mvp-001-s2": "40 PASS (on the re-run)",
+          "mvp-001-s1": "27 PASS",
+          "p5-001": "41 PASS",
+          "p3-904": "37 PASS",
+          "m4": "13 PASS",
+          "registration-abuse": "34 PASS (cleanup clean)",
+          "total_checks": 686
+        },
+        "proof_time_of_day_dependence": "S2 (ABUSE-3, ABUSE-4) and S9 (TIME-4) first failed in the 2026-11-22 run because their fixtures cross UTC midnight when run between 23:00 and 24:00 UTC; the unmodified c445960 tree failed identically at that hour; both passed in full when re-run on 2026-11-23 between 00:01 and 00:03 UTC. A proof-fixture time-of-day dependence in merged slices, not a product defect; the DB proofs are explicit-run (not CI); an optional follow-up (FIX Packet recommended)",
+        "migrations": "76 (S11: 22 files, register sequences 55 to 76; sequences 73 to 76 reviewed false, applied nowhere)",
+        "l5_journeys": {
+          "date": "2026-11-22",
+          "environment": "Fresh local stack with all 76 migrations, development-class record",
+          "apps/web/tests/mvp-001-s11-l5-ps-a6.mjs": "8/8 PASS",
+          "apps/web/tests/mvp-001-s11-l5-journey.mjs": "9/9 PASS",
+          "apps/web/tests/mvp-001-s11-l5-operations.mjs": "9/9 PASS",
+          "apps/web/tests/mvp-001-s11-l5-workspaces.mjs": "6/6 PASS",
+          "ps_a6_journey": "Break-glass request by one staff member and approval by another, read-only access audited per access, revocation and refusal after; client data request submitted, assigned and decided, deletion-allowed refused under a Legal Hold, withdrawal; a complaint with a statement seen by staff and not by the counterparty; a complaint policy version created, approved and activated through the staff policy pages, then classification and resolution with its codes. The journey script's step 3b now uses a real complaint policy version (no synthetic function fixture)",
+          "observations": "No console errors and no CSP violations. The first ps-a6 attempt refused to run because the reset database had no environment record (the documented prerequisite), then passed. The stack was stopped and the scratch configuration restored afterwards"
+        },
+        "l4": "No L4 run",
+        "guard_self_check": "Not stated in the source",
+        "source": "Builder record"
+      },
+      "independent_review_ps_a6": {
+        "performed": "2026-11-22",
+        "reviewed": "The PS-A6 implementation, c4459601fb07a1eff0ad3bc534c972d602bf79bc",
+        "by": "Two separate review agents: database migrations and proofs; application code and tests",
+        "findings": "DB-1 (medium, reproduced) the Legal Hold rule missed resources the house resource coverage reports held; DB-2 Complaint Cases on the requester's Referrals were not counted; DB-3 the break-glass guard allowed approval changes on a revoked grant and an approval instant ahead of the clock, and the approval check lacked approved_at >= requested_at; DB-4 dual-role Users were admitted to client data-request commands at aal1; proof gaps BG-5 (deactivated or suspended requester after approval) and DR-5 (counterparty paths); APP-1 (medium) application readers measured UTF-16 units where the database counts characters; APP-2 no page refresh after approval or revocation; APP-3 no database ceiling on code lists (now 500); APP-4 a statement hint making a promise (now a neutral hint); APP-5 the label Decision (now Recorded decision); APP-6 wrong refusal for a caller without an active Staff Profile; test gaps PSA6-7 (column names) and untested revoke outcomes",
+        "outcome": "All findings accepted and corrected in d9d115110b1049dd637e3a2c99ab45b58012cc78; against the uncorrected migrations the amended PS-A6 proof fails BG-7, DR-1, DR-5 and CV-1",
+        "external_review": "None (no ChatGPT or Independent Backup review)",
+        "imp_section_40_security_review": "Not performed",
+        "source": "Builder record"
+      },
+      "independent_check_d9d1151": {
+        "performed": "2026-11-23",
+        "checked": "The correction commit d9d115110b1049dd637e3a2c99ab45b58012cc78",
+        "by": "A separate review agent (disposable cluster, all 76 migrations)",
+        "findings": [
+          "Medium, reproduced and fixed in 2a1b94f: data_request_legal_hold_applies evaluated resource_under_legal_hold once per Resource of the requester; with 5,000 documents and 200 unreleased holds this took 2.4 to 2.6 s per evaluation, run twice per decision while it held the SHARE lock on legal_holds, and a concurrent hold placement with lock_timeout 3s failed with 55P03. Fix: the Resource scopes are gathered once and matched against the holds in one pass, with coverage unchanged. New proof DR-7",
+          "Low, fixed in 2a1b94f: the break-glass approval and revocation outcome slot depended on client script; it now shows the server-rendered outcome before hydration; L1 PSA6-9 extended",
+          "Low, assessed as not a defect: an upload committed concurrently with a deletion decision can make a counterparty user hold cover the client only after the decision, which is equivalent to the decision coming first; PS-A6 section 3 rule 5 governs holds at decision time",
+          "Informational, no change: the database owner can write approval and revocation in one statement (the result reads revoked, no access), and a revoked_at in the future is accepted for the owner only; no API role or definer path does either",
+          "Low, already listed: dual-role Users at aal1 see an empty privacy list and a denied submission, with no step-up hint (optional enhancement)",
+          "Nothing found on: request_slot_starts (4,200 randomized cases across 16 time zones and DST transitions, 0 mismatches against the bookability reference; ACL, owner and volatility unchanged); withinCharacters against char_length; the notification_caller admission; the test amendments (no assertion removed or loosened)"
+        ],
+        "external_review": "None (no ChatGPT or Independent Backup review)",
+        "imp_section_40_security_review": "Not performed",
+        "source": "Builder record"
+      },
+      "validation_ps_a6_2a1b94f": {
+        "commit": "2a1b94f82c3377fd2544b2402ea8852c13d0b017",
+        "ps_a6_proof": "apps/web/tests/mvp-001-s11-ps-a6-db-proof.mjs 32/32 PASS on 2026-11-23 on the tree of 2a1b94f",
+        "final_l2_rerun": "2026-11-23 00:33:49–00:46:32 UTC, all 18 proofs PASS, 687/687 checks (ps-a6 32, operations 55, s11 57, s10 55, s9 48, s8 51, s7 36, s6 33, s6-offers 18, s5 29, s4 46, s3 35, s2 40, s1 27, p5-001 41, p3-904 37, m4 13, registration-abuse 34), each cluster removed; restore run 7 PASS 7/7",
+        "l5": "Not re-run after 2a1b94f: the change is an internal SQL rewrite with the same coverage plus a no-script fallback, covered by L2 DR-5, DR-7 and CC-6 and by L1",
+        "source": "Builder record"
+      }
+    }
+  ],
+  "restore_drill": {
+    "procedure": "governance/readiness/backup-restore-procedure.md",
+    "proof": "apps/web/tests/mvp-001-s11-restore-proof.mjs (committed in the S11 PR)",
+    "kind": "Local disposable PostgreSQL 16 drill (disposable-database evidence, the L2 kind); hosted drill L6 on HOLD",
+    "runs": [
+      {
+        "run": "1",
+        "date": "2026-11-20",
+        "migrations": 61,
+        "last_migration": "20261127070000_mvp_001_s11_notification_events",
+        "migration_set_sha256": "d78d13eeec7b5771d1effd7e8c8182552b39354f27765fe0d37c70fc95b990a5",
+        "catalog_overall_sha256": "cd2684ad21e5a8e7c2fd81758ee21f2345a19eb9a8539b0da118d7628f7203ce",
+        "checks": "7/7 PASS",
+        "result": "PASS"
+      },
+      {
+        "run": "2",
+        "date": "2026-11-20",
+        "migrations": 61,
+        "last_migration": "20261127070000_mvp_001_s11_notification_events",
+        "migration_set_sha256": "d78d13eeec7b5771d1effd7e8c8182552b39354f27765fe0d37c70fc95b990a5",
+        "catalog_overall_sha256": "cd2684ad21e5a8e7c2fd81758ee21f2345a19eb9a8539b0da118d7628f7203ce",
+        "checks": "7/7 PASS",
+        "result": "PASS"
+      },
+      {
+        "run": "3",
+        "date": "2026-11-20",
+        "migrations": 61,
+        "last_migration": "20261127070000_mvp_001_s11_notification_events",
+        "migration_set_sha256": "d78d13eeec7b5771d1effd7e8c8182552b39354f27765fe0d37c70fc95b990a5",
+        "catalog_overall_sha256": "cd2684ad21e5a8e7c2fd81758ee21f2345a19eb9a8539b0da118d7628f7203ce",
+        "checks": "7/7 PASS",
+        "result": "PASS"
+      },
+      {
+        "run": "4",
+        "commit": "e6d45c64662f6e80a718e81223f1f5b08fc6758f",
+        "started_at": "2026-11-22T17:10:56Z",
+        "migrations": 71,
+        "last_migration": "20261127170000_mvp_001_s11_workspace_reads",
+        "result": "PASS"
+      },
+      {
+        "run": "5 (at 5283fda)",
+        "commit": "5283fdab79ceaa182cab8a4365a9976853f4edfa",
+        "started_at": "2026-11-22T19:04:02Z",
+        "migrations": 72,
+        "last_migration": "20261127180000_mvp_001_s11_review_corrections",
+        "migration_set_sha256": "209ec267a110bd19b2306ae754e07f9148b9b80d656a9045abd2d0a2e73f10bd",
+        "dump": "custom format, 1,859,183 bytes, sha256 3ce53134ae476d2775ea3169a9388a24499c181dc3dedcfc4f6d9f2986d65610, 2,274 table-of-contents entries",
+        "catalog": "478 functions, 68 relations, 647 columns, 588 constraints, 192 indexes, 171 triggers, 47 row policies",
+        "rows": "68 tables, 51 synthetic rows",
+        "environment_record": "class development restored unchanged; the environment-record hazard check passes",
+        "checks": "7/7 PASS",
+        "result": "PASS"
+      },
+      {
+        "run": "6 (at d9d1151)",
+        "commit": "d9d115110b1049dd637e3a2c99ab45b58012cc78",
+        "started_at": "2026-11-23T00:07:05Z",
+        "migrations": 76,
+        "last_migration": "20261127220000_mvp_001_s11_offered_start_containment",
+        "migration_set_sha256": "dede44cbe2ae7ea6ff46b9370d1a190cf16807e0d9f2b96a31c56623d0d4389c",
+        "catalog_overall_sha256": "7264fe266200f7fa706218a3888e0723152608939cc46563e16fb5f834e2a154",
+        "dump": "custom format, 1,936,508 bytes, sha256 prefix a9411351bd0f, 2,378 table-of-contents entries",
+        "catalog": "501 functions, 70 relations, 672 columns, 606 constraints, 200 indexes, 176 triggers, 47 row policies",
+        "rows": "70 tables, 54 synthetic rows",
+        "postgresql": "16.15",
+        "pg_restore": "exit 0, no error lines",
+        "environment_record": "class development restored unchanged; the environment-record hazard check passes",
+        "hosted_only_steps": "Not performed (L6, HOLD)",
+        "checks": "7/7 PASS",
+        "result": "PASS",
+        "total_time": "4,904 ms",
+        "date_source": "Start instant recorded by the Builder"
+      },
+      {
+        "run": "7 (final, at 2a1b94f)",
+        "commit": "2a1b94f82c3377fd2544b2402ea8852c13d0b017",
+        "started_at": "2026-11-23T00:46:26Z",
+        "migrations": 76,
+        "last_migration": "20261127220000_mvp_001_s11_offered_start_containment",
+        "migration_set_sha256": "e652545f9f5c605a50bbc7a912db0bd69986992b411e8b270e4ca45d8256e9b9",
+        "catalog_overall_sha256": "3d16f951e7727621d075a5005134758c658638aa114afc34256350958657d6b6",
+        "dump": "custom format, 1,938,795 bytes, sha256 e8fce4bc29113e0da5add8da32d710e1cf461ba8b88c014d545229ea350d7a56, 2,378 table-of-contents entries",
+        "catalog": "501 functions, 70 relations, 672 columns, 606 constraints, 200 indexes, 176 triggers, 47 row policies",
+        "rows": "70 tables, 54 synthetic rows",
+        "postgresql": "16.15",
+        "pg_restore": "exit 0, no error lines",
+        "environment_record": "class development restored unchanged; the environment-record hazard check passes",
+        "hosted_only_steps": "Not performed (L6, HOLD)",
+        "checks": "7/7 PASS",
+        "result": "PASS",
+        "total_time": "5,516 ms",
+        "date_source": "Start instant recorded by the Builder"
+      }
+    ],
+    "date_source": "Runs 1 to 3: file dates (UTC) of the run report documents; runs 4 to 7: start instants; all recorded by the Builder (the reports stay outside the repository)"
+  },
+  "not_run": [
+    "Any L6 (hosted) verification",
+    "A real signed webhook delivery for any provider",
+    "A real media participant join",
+    "Email delivery-status reads",
+    "The real hosted payment page in a browser",
+    "The IMP section 40 security review"
+  ]
+}

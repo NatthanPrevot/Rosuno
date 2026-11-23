@@ -975,11 +975,14 @@ async function privilegeChecks() {
         assert.equal(functionExecutable("authenticated", signature), true);
         assert.equal(functionExecutable("anon", signature), false);
         assert.equal(functionExecutable("service_role", signature), false);
+        // MVP-001 S11 D8 (20261127160000) sets the house search_path on these
+        // definers (pg_catalog, pg_temp: pg_temp searched last, never first),
+        // the only admitted change.
         assert.equal(
           one(
             `select prosecdef::text || '|' || array_to_string(proconfig, ',') from pg_proc where oid = 'public.${signature}'::regprocedure;`,
           ),
-          "true|search_path=pg_catalog",
+          "true|search_path=pg_catalog, pg_temp",
           signature,
         );
       }
@@ -1027,15 +1030,32 @@ async function privilegeChecks() {
         // S2 operational-jobs migration (20261118010000).
         // MVP-001 S7 re-pin: and exactly the one code of the later registered
         // S7 payment-integrity migration (20261123010000).
+        // MVP-001 S11 re-pin: and exactly the five codes of the later
+        // registered S11 completion-integrity migration (20261127010000).
+        // MVP-001 S11 pass 2 re-pin: and exactly the four codes of the later
+        // registered S11 operations-integrity migration (20261127080000).
+        // MVP-001 S11 PS-A6 re-pin: and exactly the two codes of the later
+        // registered PS-A6 migrations (20261127190000, 20261127200000).
         [
+          "approve_break_glass",
           "authorize_jurisdiction_launch",
           "manage_attorney_verification",
+          "manage_client_accounts",
+          "manage_complaints",
+          "manage_compliance_reviews",
+          "manage_consultation_operations",
+          "manage_data_requests",
           "manage_financial_operations",
           "manage_intake_configuration",
           "manage_jurisdiction_configuration",
+          "manage_legal_holds",
           "manage_operational_jobs",
           "manage_policy_configuration",
           "manage_staff_capabilities",
+          "moderate_reviews",
+          "view_audit_events",
+          "view_operations",
+          "view_referral_operations",
         ].join(","),
       );
       for (const table of [

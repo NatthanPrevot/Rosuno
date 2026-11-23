@@ -348,7 +348,9 @@ const SIGN_IN_REQUIRED = Object.freeze({ status: "sign-in-required" } as const);
 const DENIED = Object.freeze({ status: "denied" } as const);
 const UNAVAILABLE = Object.freeze({ status: "unavailable" } as const);
 
-function readEntry(row: unknown): CalendarEntry | null {
+// One calendar row read strictly (MVP-001 S11 pass 2B: also read by the
+// attorney's week view).
+export function readCalendarEntry(row: unknown): CalendarEntry | null {
   const fields = readExact(row, CALENDAR_COLUMNS);
   if (fields === null) {
     return null;
@@ -553,7 +555,7 @@ export async function resolveAttorneySchedule(
     ) {
       return UNAVAILABLE;
     }
-    const calendar = calendarRows.map(readEntry);
+    const calendar = calendarRows.map(readCalendarEntry);
     const rules = ruleRows.map(readRule);
     const blackouts = blackoutRows.map((row) => readBlackout(row, now));
     const instant = readInstant(instantRows);

@@ -325,7 +325,15 @@ export default async function ProfessionalSetupPage() {
           <tbody>
             {view.licenses.map((license) => (
               <tr key={license.id}>
-                <td>{license.jurisdiction}</td>
+                <td>
+                  {license.jurisdiction}
+                  {license.waitlist ? (
+                    <>
+                      {" "}
+                      <Status tone="neutral">Waitlist</Status>
+                    </>
+                  ) : null}
+                </td>
                 <td>{license.licenseNumber}</td>
                 <td>
                   <Status tone={VERIFICATION[license.verification].tone}>
@@ -338,6 +346,12 @@ export default async function ProfessionalSetupPage() {
           </tbody>
         </Table>
       )}
+      {view.licenses.some((license) => license.waitlist) ? (
+        <Text size="small" tone="muted">
+          Waitlist: this jurisdiction is not open yet. A licence there gives no
+          marketplace visibility, referrals or consultations until it opens.
+        </Text>
+      ) : null}
       {view.licenses
         .filter((license) => license.editable)
         .map((license) => (

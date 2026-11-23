@@ -66,8 +66,10 @@ export const ACKNOWLEDGE_OUTCOMES = Object.freeze([
   "not_found",
 ] as const);
 
+// The recipient's own Request or Consultation page, or (MVP-001 S11,
+// correction D14: complaint_received) the recipient's own complaints page.
 const LINK_PATH =
-  /^\/(?:client|attorney)\/(?:requests|consultations)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  /^\/(?:client|attorney)\/(?:(?:requests|consultations)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|complaints)$/;
 
 export type CenterReads = {
   // notification_center()
@@ -137,6 +139,9 @@ function readEntry(row: unknown): CenterEntry | null {
     (state === "acknowledged" && !ack) ||
     !isTimestamp(createdAt) ||
     !(link === null || (typeof link === "string" && LINK_PATH.test(link))) ||
+    // Only a complaint_received Notification links to a complaints page.
+    (typeof link === "string" &&
+      link.endsWith("/complaints") !== (type === "complaint_received")) ||
     !(email === null || isOneOf(EMAIL_STATES, email))
   ) {
     return null;

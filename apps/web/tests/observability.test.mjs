@@ -378,35 +378,86 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // only), the communication adapter (a failed call, with the call name and
   // how it failed only) and the Resend webhook adapter (each refused or
   // recorded delivery, with a fixed outcome only; never a header, signature,
-  // body, identifier or address) write lines too.
+  // body, identifier or address) write lines too. MVP-001 S11: the attorney's
+  // reviews and reported problems pages, the client's consultation list,
+  // reviews and reported problems pages (a view unavailable, with the route
+  // and outcome only), the participants' and staff completion actions (an
+  // action not completed, with its fixed outcome only) and the completion
+  // adapter (a failed call, with the call name and how it failed only) write
+  // lines too. MVP-001 S11 pass 2: the staff attorney lifecycle and client
+  // account actions (an action not completed, with its fixed outcome only)
+  // and the operations adapter (a failed call, with the call name and how it
+  // failed only) write lines too. MVP-001 S11 pass 2B: the attorney's
+  // compliance, past consultations, dashboard, documents and messages pages
+  // and the client's messages, payments, privacy and settings pages (a view
+  // unavailable, with the route and outcome only) and the participant
+  // workspace adapter (a failed call, with the call name and how it failed
+  // only) write lines too. MVP-001 S11 correction pass (A7): the client's
+  // consultation actions (a cancellation not completed, with its fixed
+  // outcome only) and the attorney's week view (a view unavailable, with the
+  // route and outcome only) write lines too. MVP-001 S11 PS-A6: the client's
+  // data request actions and the staff break-glass and data request actions
+  // (an action not completed, with its fixed outcome only) and the privacy
+  // adapter (a failed call, with the call name and how it failed only) write
+  // lines too.
   assert.deepEqual(callers, [
+    "app/attorney/complaints/actions.ts",
+    "app/attorney/complaints/page.tsx",
+    "app/attorney/compliance/page.tsx",
     "app/attorney/consultations/[consultation]/page.tsx",
+    "app/attorney/consultations/history/page.tsx",
     "app/attorney/consultations/page.tsx",
+    "app/attorney/dashboard/page.tsx",
+    "app/attorney/documents/page.tsx",
     "app/attorney/earnings/page.tsx",
+    "app/attorney/messages/page.tsx",
     "app/attorney/notifications/page.tsx",
     "app/attorney/requests/[request]/page.tsx",
     "app/attorney/requests/page.tsx",
+    "app/attorney/reviews/page.tsx",
+    "app/attorney/schedule/week/page.tsx",
     "app/attorneys/[attorney]/page.tsx",
     "app/client/actions.ts",
+    "app/client/complaints/actions.ts",
+    "app/client/complaints/page.tsx",
     "app/client/consultations/[consultation]/page.tsx",
+    "app/client/consultations/actions.ts",
+    "app/client/consultations/page.tsx",
     "app/client/intakes/[intake]/page.tsx",
+    "app/client/messages/page.tsx",
     "app/client/notifications/page.tsx",
     "app/client/page.tsx",
     "app/client/payments/[payment]/page.tsx",
+    "app/client/payments/page.tsx",
+    "app/client/privacy/actions.ts",
+    "app/client/privacy/page.tsx",
     "app/client/requests/[request]/page.tsx",
     "app/client/requests/actions.ts",
     "app/client/requests/new/page.tsx",
+    "app/client/reviews/actions.ts",
+    "app/client/reviews/page.tsx",
+    "app/client/settings/page.tsx",
     "app/find-an-attorney/page.tsx",
     "app/find-an-attorney/select/actions.ts",
     "app/find-an-attorney/select/page.tsx",
     "app/sign-in/actions.ts",
     "app/staff/actions.ts",
+    "app/staff/attorneys/actions.ts",
+    "app/staff/break-glass/actions.ts",
+    "app/staff/clients/actions.ts",
+    "app/staff/complaints/actions.ts",
+    "app/staff/compliance/actions.ts",
+    "app/staff/consultations/actions.ts",
+    "app/staff/data-requests/actions.ts",
     "app/staff/finance/actions.ts",
     "app/staff/frame.tsx",
+    "app/staff/legal-holds/actions.ts",
+    "app/staff/reviews/actions.ts",
     "app/staff/verification/actions.ts",
     "src/infrastructure/client/client-intake-adapter.ts",
     "src/infrastructure/client/intake-suggestion-adapter.ts",
     "src/infrastructure/communications/communication-adapter.ts",
+    "src/infrastructure/consultations/completion-adapter.ts",
     "src/infrastructure/consultations/consultation-adapter.ts",
     "src/infrastructure/discovery/discovery-adapter.ts",
     "src/infrastructure/identity/authentication-abuse-control.ts",
@@ -417,6 +468,8 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "src/infrastructure/offers/consultation-offer-adapter.ts",
     "src/infrastructure/payments/payment-adapter.ts",
     "src/infrastructure/payments/stripe-webhook.ts",
+    // MVP-001 S11 PS-A6: the privacy and security actions adapter.
+    "src/infrastructure/privacy/privacy-adapter.ts",
     "src/infrastructure/requests/attorney-request-adapter.ts",
     "src/infrastructure/requests/consultation-request-adapter.ts",
     "src/infrastructure/resources/protected-resource-adapter.ts",
@@ -424,7 +477,11 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     // call name and how it failed only, and the sign-out step's fixed
     // outcome).
     "src/infrastructure/scheduling/attorney-schedule-adapter.ts",
+    // MVP-001 S11 pass 2: the staff operations adapter.
+    "src/infrastructure/staff/operations-adapter.ts",
     "src/infrastructure/staff/staff-configuration-adapter.ts",
+    // MVP-001 S11 pass 2B: the participant workspace adapter.
+    "src/infrastructure/workspaces/workspace-adapter.ts",
   ]);
   for (const file of callers) {
     const code = codeOf(read(file));

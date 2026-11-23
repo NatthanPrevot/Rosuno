@@ -1,7 +1,7 @@
 # Logging control
 
-Logging is an execution-control concern only. No runtime logger is implemented here.
+Logging is an execution-control concern. Since MVP-001 S1 (correction D-8) the application has a server-side structured logger: `apps/web/src/infrastructure/observability/log.ts` writes one JSON object per line (info to standard output, warn and error to standard error) holding a timestamp, a level, a fixed event code, the request's correlation identifier and allowlisted fields of narrow shape; every other key is never read, and a value of the wrong shape is dropped. `apps/web/src/infrastructure/observability/request-log.ts` logs route-level outcomes, and the proxy issues the correlation identifier. `apps/web/tests/observability.test.mjs` pins the logger and the list of modules allowed to call it. Logging never throws and never changes an outcome. No log sink, retention or alerting is configured by this repository; alert delivery from the `security.protection_unavailable` line depends on the hosted environment.
 
-Future logs must be structured, minimal, environment-scoped, and safe to retain. They may include event name, timestamp, severity, bounded work-item reference, release reference, environment, outcome, and a correlation identifier. They must not include secret values, authorization headers, private keys, credentials, raw provider payloads, or sensitive user data.
+Logs must be structured, minimal, environment-scoped, and safe to retain. They may include event name, timestamp, severity, bounded work-item reference, release reference, environment, outcome, and a correlation identifier. They must not include secret values, authorization headers, private keys, credentials, raw provider payloads, or sensitive user data.
 
 Failures must be explicit and actionable. A control failure records the failed control, safe evidence reference, environment, and next action without copying sensitive input into the log.

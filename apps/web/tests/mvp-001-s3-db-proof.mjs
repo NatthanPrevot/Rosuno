@@ -1988,17 +1988,24 @@ const V2_FUNCTIONS = Object.freeze([
   ["intake_expire_if_due(uuid)", null, "helper"],
   ["intake_expiry_sweep()", null, "helper-timeout"],
   ["client_request_intake_change(uuid, text)", "authenticated", "definer"],
+  // MVP-001 S11 D8 (20261127160000) sets the house search_path on these three
+  // replaced definers (pg_catalog, pg_temp: pg_temp searched last, never
+  // first), the only admitted change.
   [
     "client_save_intake_revision(uuid, integer, uuid, uuid, text, jsonb)",
     "authenticated",
-    "kept:search_path=pg_catalog",
+    "kept:search_path=pg_catalog, pg_temp",
   ],
   [
     "client_submit_intake(uuid, integer)",
     "authenticated",
-    "kept:search_path=pg_catalog",
+    "kept:search_path=pg_catalog, pg_temp",
   ],
-  ["client_close_intake(uuid)", "authenticated", "kept:search_path=pg_catalog"],
+  [
+    "client_close_intake(uuid)",
+    "authenticated",
+    "kept:search_path=pg_catalog, pg_temp",
+  ],
   [
     "resource_begin_voice_memo(uuid, text, bigint, text, integer)",
     "authenticated",

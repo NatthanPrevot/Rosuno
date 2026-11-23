@@ -68,15 +68,35 @@ const S2_MIGRATIONS = Object.freeze([
 ]);
 // MVP-001 S7 re-pin: the later registered S7 payment-integrity migration
 // (20261123010000) adds exactly manage_financial_operations.
+// MVP-001 S11 re-pin: the later registered S11 completion-integrity migration
+// (20261127010000) adds exactly manage_complaints, manage_compliance_reviews,
+// manage_consultation_operations, manage_legal_holds and moderate_reviews.
+// MVP-001 S11 pass 2 re-pin: the later registered S11 operations-integrity
+// migration (20261127080000) adds exactly manage_client_accounts,
+// view_audit_events, view_operations and view_referral_operations.
+// MVP-001 S11 PS-A6 re-pin: the later registered PS-A6 migrations
+// (20261127190000, 20261127200000) add exactly approve_break_glass and
+// manage_data_requests.
 const CAPABILITIES = Object.freeze([
+  "approve_break_glass",
   "authorize_jurisdiction_launch",
   "manage_attorney_verification",
+  "manage_client_accounts",
+  "manage_complaints",
+  "manage_compliance_reviews",
+  "manage_consultation_operations",
+  "manage_data_requests",
   "manage_financial_operations",
   "manage_intake_configuration",
   "manage_jurisdiction_configuration",
+  "manage_legal_holds",
   "manage_operational_jobs",
   "manage_policy_configuration",
   "manage_staff_capabilities",
+  "moderate_reviews",
+  "view_audit_events",
+  "view_operations",
+  "view_referral_operations",
 ]);
 const V1_KEY = "intake-questions-v1";
 const V1 = JSON.parse(

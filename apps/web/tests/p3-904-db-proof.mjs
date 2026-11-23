@@ -1753,7 +1753,10 @@ async function predicateChecks() {
         one(
           "select pg_get_function_identity_arguments('public.has_manage_attorney_verification_scope(uuid, boolean)'::regprocedure) || '|' || pg_get_function_result('public.has_manage_attorney_verification_scope(uuid, boolean)'::regprocedure) || '|' || prosecdef || '|' || provolatile::text || '|' || array_to_string(proconfig, ';') || '|' || pg_get_userbyid(proowner) from pg_proc where oid = 'public.has_manage_attorney_verification_scope(uuid, boolean)'::regprocedure;",
         ),
-        "required_jurisdiction uuid, allow_any_jurisdiction boolean|boolean|true|s|search_path=pg_catalog|postgres",
+        // MVP-001 S11 D8 (20261127160000) sets the house search_path on the
+        // predicate (pg_catalog, pg_temp: pg_temp searched last, never first),
+        // the only admitted change.
+        "required_jurisdiction uuid, allow_any_jurisdiction boolean|boolean|true|s|search_path=pg_catalog, pg_temp|postgres",
       );
       assert.equal(
         aclOf("has_manage_attorney_verification_scope(uuid, boolean)"),

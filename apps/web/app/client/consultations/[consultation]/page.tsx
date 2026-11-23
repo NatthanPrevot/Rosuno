@@ -28,8 +28,11 @@ import {
   type CommunicationView,
   type HistoryView,
 } from "../../../../src/application/consultation-communication.ts";
+import { cancellable } from "../../../../src/application/consultation-outcomes.ts";
 import { resolveClientConsultation } from "../../../../src/application/consultations.ts";
+import { resolveClientReviews } from "../../../../src/application/reviews.ts";
 import { CLIENT_COMMUNICATION_SOURCES } from "../../../../src/infrastructure/communications/communication-adapter.ts";
+import { CLIENT_REVIEW_SOURCES } from "../../../../src/infrastructure/consultations/completion-adapter.ts";
 import { CLIENT_CONSULTATION_SOURCES } from "../../../../src/infrastructure/consultations/consultation-adapter.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
 import {
@@ -86,7 +89,9 @@ import {
   Table,
   Text,
 } from "../../../../src/presentation/design-system.tsx";
+import { outcomeLabelOf } from "../../../../src/presentation/completion-labels.ts";
 import {
+  CancelPanel,
   DocumentControls,
   DocumentReplace,
   DocumentUpload,
@@ -337,6 +342,20 @@ function ConsultationFrame({
   );
 }
 
+// MVP-001 S11: whether the client may still review this completed
+// Consultation (the database lists it without a review); the database decides
+// again on submission.
+async function reviewable(consultationId: string): Promise<boolean> {
+  const reviews = await resolveClientReviews(CLIENT_REVIEW_SOURCES);
+  return (
+    reviews.status === "ready" &&
+    reviews.consultations.some(
+      (entry) =>
+        entry.consultationId === consultationId && entry.review === null,
+    )
+  );
+}
+
 const BACK = (
   <Cluster>
     <ButtonLink variant="tertiary" href="/client">
@@ -465,7 +484,11 @@ export default async function ClientConsultationPage({
           {record.outcomeCode === null ? null : (
             <tr>
               <th scope="row">How it ended</th>
-              <td>{COMPLETION_LABELS[record.outcomeCode] ?? "Ended"}</td>
+              <td>
+                {outcomeLabelOf(record.outcomeCode) ??
+                  COMPLETION_LABELS[record.outcomeCode] ??
+                  "Ended"}
+              </td>
             </tr>
           )}
           {record.mediaState === null ? null : (
@@ -477,6 +500,26 @@ export default async function ClientConsultationPage({
         </tbody>
       </Table>
       <JoinPanel consultationId={record.id} joinable={view.joinable} />
+      <CancelPanel
+        consultationId={record.id}
+        cancellable={cancellable(record.state)}
+      />
+      <Cluster>
+        {record.state === "completed" && (await reviewable(record.id)) ? (
+          <ButtonLink
+            variant="secondary"
+            href={`/client/reviews#review-${record.id}`}
+          >
+            Leave a review
+          </ButtonLink>
+        ) : null}
+        <ButtonLink
+          variant="tertiary"
+          href={`/client/complaints?consultation=${record.id}`}
+        >
+          Report a problem
+        </ButtonLink>
+      </Cluster>
       <Table id="client-consultation-attendance" caption="Attendance recorded">
         <tbody>
           <tr>

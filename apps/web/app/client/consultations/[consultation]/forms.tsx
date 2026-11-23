@@ -12,16 +12,29 @@
 // dropped connection) asks the server for a new short-lived token for the
 // same room. No timer in the browser decides anything.
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   INITIAL_COMMUNICATION_STATE,
   type CommunicationActionState,
 } from "../../../../src/application/consultation-communication.ts";
 import {
+  INITIAL_CANCEL_STATE,
+  type CancelActionState,
+} from "../../../../src/application/consultation-outcomes.ts";
+import {
   INITIAL_JOIN_STATE,
   type JoinActionState,
 } from "../../../../src/application/consultations.ts";
+import {
+  CANCEL_CONFIRM_LABEL,
+  CANCEL_CONFIRM_PROMPT,
+  CANCEL_KEEP_LABEL,
+  CANCEL_LABEL,
+  CANCEL_MESSAGES,
+  CANCEL_NOTE,
+  messageOf,
+} from "../../../../src/presentation/completion-labels.ts";
 import {
   communicationMessage,
   DOCUMENT_FIELD_HINT,
@@ -50,10 +63,12 @@ import {
   Cluster,
   MediaFrame,
   Stack,
+  Text,
   TextAreaField,
   TextField,
 } from "../../../../src/presentation/design-system.tsx";
 import {
+  cancelConsultationAction,
   joinConsultationAction,
   openDocumentAction,
   replaceDocumentAction,
@@ -299,6 +314,84 @@ export function DocumentControls({
           </form>
         ) : null}
       </Cluster>
+    </Stack>
+  );
+}
+
+// MVP-001 S11: the client cancels before the consultation starts. A hidden
+// field only names the Consultation; the server decides afresh whether it is
+// the client's own and whether it can still be cancelled, frees the booked
+// time, closes the room and tells the attorney. No money moves here.
+// Correction pass (A7): the first button only asks for confirmation; the
+// form is sent from the second step, which lasts until the next answer.
+export function CancelPanel({
+  consultationId,
+  cancellable,
+}: {
+  readonly consultationId: string;
+  // Whether the page reports the Consultation cancellable; the panel stays
+  // mounted after a cancellation refreshes the page, so the fixed outcome
+  // message stays in view.
+  readonly cancellable: boolean;
+}) {
+  const [state, action, pending] = useActionState<CancelActionState, FormData>(
+    cancelConsultationAction,
+    INITIAL_CANCEL_STATE,
+  );
+  // The answer the confirmation was asked after; a new answer ends it.
+  const [confirmingAt, setConfirmingAt] = useState<CancelActionState | null>(
+    null,
+  );
+  const message = messageOf(state, CANCEL_MESSAGES);
+  return (
+    <Stack gap="tight">
+      {message === null ? null : (
+        <Alert
+          tone={message.tone}
+          title={message.title}
+          role={message.tone === "error" ? "alert" : "status"}
+        >
+          {message.body}
+        </Alert>
+      )}
+      {!cancellable ? null : confirmingAt === state ? (
+        <form action={action}>
+          <Stack gap="tight">
+            <Text size="small" tone="muted">
+              {CANCEL_NOTE}
+            </Text>
+            <Text size="small">{CANCEL_CONFIRM_PROMPT}</Text>
+            <input type="hidden" name="consultation" value={consultationId} />
+            <Cluster>
+              <Button variant="secondary" type="submit" disabled={pending}>
+                {CANCEL_CONFIRM_LABEL}
+              </Button>
+              <Button
+                variant="tertiary"
+                disabled={pending}
+                onClick={() => setConfirmingAt(null)}
+              >
+                {CANCEL_KEEP_LABEL}
+              </Button>
+            </Cluster>
+          </Stack>
+        </form>
+      ) : (
+        <Stack gap="tight">
+          <Text size="small" tone="muted">
+            {CANCEL_NOTE}
+          </Text>
+          <Cluster>
+            <Button
+              variant="secondary"
+              disabled={pending}
+              onClick={() => setConfirmingAt(state)}
+            >
+              {CANCEL_LABEL}
+            </Button>
+          </Cluster>
+        </Stack>
+      )}
     </Stack>
   );
 }

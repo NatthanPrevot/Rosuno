@@ -19,11 +19,34 @@ import {
 import { createNotificationRecorder } from "../identity/registration-provisioning.ts";
 import {
   createResendEmailProvider,
+  readResendConfiguration,
+  readResendWebhookSecret,
   readSiteOrigin,
   RESEND_PROVIDER_CODE,
 } from "./resend-provider.ts";
 
 export { NOTIFICATION_JOB_TYPES };
+
+// MVP-001 S11 pass 2 (system health): whether the email provider's settings
+// (the sending key and sender, and the site origin of the email's one link)
+// have their declared shape now; never a value, and nothing is contacted.
+export function emailDeliveryConfigured(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return (
+    readResendConfiguration(environment) !== null &&
+    readSiteOrigin(environment) !== null
+  );
+}
+
+// MVP-001 S11 correction pass (A6; system health): whether the email
+// provider's webhook signing setting has its declared shape now (the
+// delivery report route answers unavailable without it); never a value.
+export function emailWebhookConfigured(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return readResendWebhookSecret(environment) !== null;
+}
 
 export const NOTIFICATION_JOB_HANDLERS = createNotificationJobHandlers(
   Object.freeze({

@@ -14,7 +14,12 @@
 // page; the server checks both. MVP-001 S8: review items about a Request or a
 // Consultation (eligibility and jurisdiction changes, PM rows 37-45) are
 // listed the same way; the payment link is offered only for an exception
-// whose canonical object is a payment transaction.
+// whose canonical object is a payment transaction. MVP-001 S11: the database
+// lists here only the financial family (the payment, ledger and provider
+// discrepancies and the cancellation, outcome and retained-funds reviews);
+// the compliance family is on the compliance review items page and the
+// operations family on the consultation operations page, each under its own
+// capability.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";

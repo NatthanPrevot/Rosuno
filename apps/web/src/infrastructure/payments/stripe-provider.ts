@@ -13,11 +13,15 @@
 // configuration reader; names only here):
 // - ROSUNO_STRIPE_SECRET_KEY: a Stripe test-mode secret or restricted key
 //   (sk_test_ or rk_test_). Live keys are excluded from S7 entirely and are
-//   refused in every environment class;
+//   refused in every environment class; MVP-001 S11 D1: in a production
+//   class the test-mode key is refused too, so payments are unavailable there
+//   until live mode is separately authorized;
 // - ROSUNO_AUTH_PUBLIC_ORIGIN: the site's trusted public origin (the same
 //   setting the confirmation route uses), for Checkout's return URLs;
+//   MVP-001 S11 D9: https outside development;
 // - ROSUNO_STRIPE_WEBHOOK_SECRET: the webhook endpoint's signing secret
-//   (whsec_), read only by the webhook route.
+//   (whsec_), read only by the webhook route; MVP-001 S11 D1: refused in a
+//   production class, so no test-mode event is recorded there.
 // Anything absent, malformed or a placeholder means payments are
 // unavailable: no fallback, mock or default exists.
 //
@@ -63,17 +67,32 @@ export const STRIPE_PROVIDER_CODE = "stripe";
 export const PAYMENT_METADATA_KEY = "rosuno_payment_transaction";
 export const REFUND_METADATA_KEY = "rosuno_refund_request";
 
+// MVP-001 S11 D1: no value matches in a production class. Test mode is
+// refused there and live mode is not authorized, so in production payments
+// report unavailable and the webhook route refuses every delivery (no
+// test-mode event is recorded) until live mode is separately authorized.
+const REFUSED_IN_CLASS = /(?!)/;
+
+// MVP-001 S11 D9: outside development the public origin must be https.
+const HTTPS_ORIGIN = /^https:\/\//;
+
 export const STRIPE_SECRET_SETTING: ProviderSetting = Object.freeze({
   name: "ROSUNO_STRIPE_SECRET_KEY",
   pattern: /^(?:sk|rk)_test_[A-Za-z0-9]{16,247}$/,
+  classPatterns: Object.freeze({ production: REFUSED_IN_CLASS }),
 });
 export const PUBLIC_ORIGIN_SETTING: ProviderSetting = Object.freeze({
   name: "ROSUNO_AUTH_PUBLIC_ORIGIN",
   pattern: /^https?:\/\/[a-z0-9.-]{1,253}(?::[0-9]{1,5})?$/,
+  classPatterns: Object.freeze({
+    staging: HTTPS_ORIGIN,
+    production: HTTPS_ORIGIN,
+  }),
 });
 export const STRIPE_WEBHOOK_SETTING: ProviderSetting = Object.freeze({
   name: "ROSUNO_STRIPE_WEBHOOK_SECRET",
   pattern: /^whsec_[A-Za-z0-9+/=]{16,128}$/,
+  classPatterns: Object.freeze({ production: REFUSED_IN_CLASS }),
 });
 
 // Whether a key is a test-mode key (the only kind S7 accepts).
