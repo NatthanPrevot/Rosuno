@@ -2759,6 +2759,60 @@
       "rollback_reference": "Before merge, close the PR. After merge, a forward-only PR restores the previous .replit, .replitignore and replit.md, and the owner unpublishes or deletes the new Replit app; no database or application change exists to undo.",
       "created_at": "2026-11-23T16:29:13Z",
       "updated_at": "2026-11-23T16:29:13Z"
+    },
+    {
+      "work_item_id": "WI-P2-923-HOSTED-REGISTRATION-INGRESS",
+      "title": "Hosted client registration: trusted ingress activation (P2-923 FEATURE)",
+      "objective": "Enable public client self-registration on the Replit Autoscale hosting by supplying the registration abuse control's client address from the evidenced trusted-ingress contract (DECISION C), with the implemented counter retention as live policy (DECISION R, R1), without changing quota SQL, limits, abuse controls, provisioning or Supabase Auth.",
+      "in_scope": [
+        "apps/web/src/infrastructure/identity/trusted-ingress.ts: the server-only DECISION C reader of X-Forwarded-For (fourth entry from the right behind 34.117.33.233 and 35.191.0.0/16, 4 to 20 entries), logging nothing and never throwing.",
+        "apps/web/app/sign-up/actions.ts: the abuse control's trustedClientAddress comes from the trusted ingress; nothing else changes.",
+        "Fence tests: client-registration.test.mjs test 35 and attorney-application.test.mjs test 22 amended with equal or stricter assertions; new trusted-ingress.test.mjs.",
+        "Records: this work item, its decision, and the hosted registration row of governance/readiness/outstanding-items.md."
+      ],
+      "out_of_scope": [
+        "Quota SQL, registration limits, the registration abuse control and its strict address parser, provisioning, Supabase Auth configuration, migrations, dependencies and every other route.",
+        "Replit deployment, Supabase mutations, provider changes, PR creation and merge, which need separate owner authorization.",
+        "Declaring registration operational before the P2-923 deployed proof passes."
+      ],
+      "status": "in_progress",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "decision_refs": ["DEC-20261123-P2-923-HOSTED-REGISTRATION-INGRESS"],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "The net diff against owner main is limited to the Packet copy, the two source files, the three test files and the three records files named in the Packet.",
+        "trustedClientAddressOf returns only the fourth entry from the right under the DECISION C conditions and null otherwise; forged left-hand entries never change the counted quota key; strict-parser refusals reach no quota call.",
+        "The sign-up action imports the trusted ingress, reads no header itself, and still refuses before any provider call when no address is established.",
+        "All validation commands pass, the registration abuse database proof passes, and the guard self-check prints ROSUNO-GUARD PASS.",
+        "Registration is declared operational only after the deployed proof (Packet section 6) passes at the Staging hostname."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "node apps/web/tests/registration-abuse-db-proof.mjs",
+        "bash .github/scripts/rosuno-guard.sh <owner main SHA> HEAD wi/P2-923-hosted-registration-ingress refs/rosuno/approved"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Before merge, close the PR. After merge, a forward-only PR restoring NO_TRUSTED_CLIENT_ADDRESS wiring in the sign-up action returns registration to default-deny immediately; no data change is involved. A hosting change requires re-attestation and deny-on-cutover (P2-007 section 5).",
+      "created_at": "2026-11-23T22:22:52Z",
+      "updated_at": "2026-11-23T22:22:52Z"
     }
   ]
 }

@@ -2324,7 +2324,7 @@ test("21. privileged credentials and modules never reach presentation: the page,
   }
 });
 
-test("22. D-04 and client registration stay as they were: P3-002 adds no account creation, signup path, or registration mechanism", async () => {
+test("22. P3-002 adds no account creation, signup path, or registration mechanism (client registration reaches D-04 only through the P2-923 trusted ingress)", async () => {
   for (const file of [
     "app/attorney/apply/page.tsx",
     "app/attorney/apply/actions.ts",
@@ -2338,9 +2338,18 @@ test("22. D-04 and client registration stay as they were: P3-002 adds no account
       file,
     );
   }
-  // The sign-up action is still default-deny with no trusted client address.
+  // The sign-up action takes its client address only from the server-only
+  // trusted ingress (P2-923, owner DECISION C), and reads no header itself.
   const signUp = codeOf(read("app/sign-up/actions.ts"));
-  assert.match(signUp, /trustedClientAddress: NO_TRUSTED_CLIENT_ADDRESS,/);
+  assert.equal(
+    signUp.match(/trustedClientAddress: await trustedClientAddress\(\),/g)
+      .length,
+    1,
+  );
+  assert.doesNotMatch(
+    signUp,
+    /next\/headers|headers\(\)|x-forwarded-for|x-real-ip|NO_TRUSTED_CLIENT_ADDRESS/,
+  );
   // The existing registration ports keep exactly their operations.
   const factory = recordingFactory();
   const provisioning = await createRegistrationProvisioning(
