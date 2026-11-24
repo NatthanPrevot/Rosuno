@@ -2813,6 +2813,56 @@
       "rollback_reference": "Before merge, close the PR. After merge, a forward-only PR restoring NO_TRUSTED_CLIENT_ADDRESS wiring in the sign-up action returns registration to default-deny immediately; no data change is involved. A hosting change requires re-attestation and deny-on-cutover (P2-007 section 5).",
       "created_at": "2026-11-23T22:22:52Z",
       "updated_at": "2026-11-23T22:22:52Z"
+    },
+    {
+      "work_item_id": "WI-P2-926-HOSTED-CONFIRM-LISTENER",
+      "title": "Hosted email confirmation behind Replit's listener (P2-926 FIX)",
+      "objective": "Restore hosted email confirmation: /auth/confirm refused every request on Rosuno-Staging because Replit's next start --hostname 0.0.0.0 reports request URLs as http://0.0.0.0:<port>, which the internal-listener check did not accept. Accept the unspecified bind address on the same terms as loopback, keeping the browser Origin and Sec-Fetch-Site checks and Supabase token verification unchanged.",
+      "in_scope": [
+        "apps/web/app/auth/confirm/route.ts: INTERNAL_LISTENER also accepts http://0.0.0.0 with an optional port; comment updated.",
+        "apps/web/tests/client-registration.test.mjs test 32a: http://0.0.0.0:3000 and http://0.0.0.0 join the accepted internal targets (with every internal-target assertion, including foreign, missing and null Origin refusals); new refused lookalikes https://0.0.0.0:3000, http://0.0.0.0.synthetic.invalid:3000 and http://0.0.0.1:3000; the unconfigured-origin check also covers http://0.0.0.0:3000.",
+        "Records: this work item and the hosted registration rows of governance/readiness/outstanding-items.md."
+      ],
+      "out_of_scope": [
+        "Every other route, forwarding-header handling, Supabase Auth settings, the Replit run command, migrations and dependencies.",
+        "The confirmation-email re-send and the QA account confirmations, which need separate owner authorization; PR creation, merge and republish."
+      ],
+      "status": "in_progress",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "decision_refs": [],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "The net diff against owner main is limited to the Packet copy, the route, test 32a's file and the two records files named in the Packet.",
+        "With the configured origin, a request whose URL origin is http://0.0.0.0 or http://0.0.0.0:<port> is treated as the internal listener: GET renders the confirmation form, and POST passes only with the browser's exact configured Origin and a same-origin Sec-Fetch-Site when present.",
+        "https://0.0.0.0:3000, http://0.0.0.0.synthetic.invalid:3000 and http://0.0.0.1:3000 stay refused, and an unconfigured origin stays unavailable on every listener.",
+        "A local next start --hostname 0.0.0.0 run with the configured origin answers GET /auth/confirm with 200."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "bash .github/scripts/rosuno-guard.sh <owner main SHA> HEAD wi/P2-926-hosted-confirm-listener refs/rosuno/approved"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Before merge, close the PR. After merge, a forward-only commit restoring the previous INTERNAL_LISTENER pattern; no data or migration is involved.",
+      "created_at": "2026-11-24T07:08:08Z",
+      "updated_at": "2026-11-24T07:08:08Z"
     }
   ]
 }
