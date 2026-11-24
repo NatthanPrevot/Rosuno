@@ -2817,10 +2817,10 @@
     {
       "work_item_id": "WI-P2-926-HOSTED-CONFIRM-LISTENER",
       "title": "Hosted email confirmation behind Replit's listener (P2-926 FIX)",
-      "objective": "Restore hosted email confirmation: /auth/confirm refused every request on Rosuno-Staging because Replit's next start --hostname 0.0.0.0 reports request URLs as http://0.0.0.0:<port>, which the internal-listener check did not accept. Accept the unspecified bind address on the same terms as loopback, keeping the browser Origin and Sec-Fetch-Site checks and Supabase token verification unchanged.",
+      "objective": "Restore hosted email confirmation: /auth/confirm refused every request on Rosuno-Staging because Replit's next start --hostname 0.0.0.0 reports request URLs as http://0.0.0.0:<port>, (https://0.0.0.0:<port> behind Replit's X-Forwarded-Proto: https), which the internal-listener check did not accept. Accept the unspecified bind address over HTTP or HTTPS on the same terms as loopback, keeping the browser Origin and Sec-Fetch-Site checks and Supabase token verification unchanged.",
       "in_scope": [
-        "apps/web/app/auth/confirm/route.ts: INTERNAL_LISTENER also accepts http://0.0.0.0 with an optional port; comment updated.",
-        "apps/web/tests/client-registration.test.mjs test 32a: http://0.0.0.0:3000 and http://0.0.0.0 join the accepted internal targets (with every internal-target assertion, including foreign, missing and null Origin refusals); new refused lookalikes https://0.0.0.0:3000, http://0.0.0.0.synthetic.invalid:3000 and http://0.0.0.1:3000; the unconfigured-origin check also covers http://0.0.0.0:3000.",
+        "apps/web/app/auth/confirm/route.ts: INTERNAL_LISTENER also accepts the unspecified bind address 0.0.0.0 over HTTP or HTTPS with an optional port (loopback names stay HTTP only); comment updated.",
+        "apps/web/tests/client-registration.test.mjs test 32a: http://0.0.0.0:3000, http://0.0.0.0, https://0.0.0.0:3000 and https://0.0.0.0 join the accepted internal targets (http://0.0.0.0:3000 moves from the lookalikes; every internal-target assertion applies, including foreign, missing and null Origin and cross-site and same-site Sec-Fetch-Site refusals); new refused lookalikes http://0.0.0.0.synthetic.invalid:3000, http://0.0.0.1:3000 and https://0.0.0.1:3000; the unconfigured-origin check also covers http://0.0.0.0:3000 and https://0.0.0.0:3000.",
         "Records: this work item and the hosted registration rows of governance/readiness/outstanding-items.md."
       ],
       "out_of_scope": [
@@ -2842,9 +2842,9 @@
       "dependencies": [],
       "acceptance_criteria": [
         "The net diff against owner main is limited to the Packet copy, the route, test 32a's file and the two records files named in the Packet.",
-        "With the configured origin, a request whose URL origin is http://0.0.0.0 or http://0.0.0.0:<port> is treated as the internal listener: GET renders the confirmation form, and POST passes only with the browser's exact configured Origin and a same-origin Sec-Fetch-Site when present.",
-        "https://0.0.0.0:3000, http://0.0.0.0.synthetic.invalid:3000 and http://0.0.0.1:3000 stay refused, and an unconfigured origin stays unavailable on every listener.",
-        "A local next start --hostname 0.0.0.0 run with the configured origin answers GET /auth/confirm with 200."
+        "With the configured origin, a request whose URL origin is http://0.0.0.0 or https://0.0.0.0, with or without a port, is treated as the internal listener: GET renders the confirmation form, and POST passes only with the browser's exact configured Origin and a same-origin Sec-Fetch-Site when present.",
+        "https://localhost:3000, http://0.0.0.0.synthetic.invalid:3000, http://0.0.0.1:3000 and https://0.0.0.1:3000 stay refused, and an unconfigured origin stays unavailable on every listener.",
+        "A local next start --hostname 0.0.0.0 run with the configured origin and Replit-style headers (X-Forwarded-Proto: https) answers GET /auth/confirm with 200, renders the confirm form for a token link, lets a POST with the configured Origin past the origin checks and refuses foreign, missing and cross-site POSTs."
       ],
       "validation_commands": [
         "pnpm install --frozen-lockfile",

@@ -2254,8 +2254,10 @@ test("32a. MVP-001 S1: behind a proxy, the internal listener target is accepted 
   // `next start` reports its own loopback listener as the request URL,
   // whatever public host the browser used. P2-926: bound to the unspecified
   // address (Replit's `next start --hostname 0.0.0.0`), it reports
-  // http://0.0.0.0:<port>, which is accepted on the same terms (formerly listed
-  // below as a lookalike; every internal-target assertion now applies to it).
+  // 0.0.0.0:<port> as the host, with the forwarded protocol's scheme (https
+  // behind Replit's edge). Those forms are accepted on the same terms
+  // (http://0.0.0.0:3000 was formerly listed below as a lookalike); every
+  // internal-target assertion applies to them.
   const internal = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -2263,6 +2265,8 @@ test("32a. MVP-001 S1: behind a proxy, the internal listener target is accepted 
     "http://localhost",
     "http://0.0.0.0:3000",
     "http://0.0.0.0",
+    "https://0.0.0.0:3000",
+    "https://0.0.0.0",
   ];
   // `http://00.0.0.0:3000` is not listed: Request normalizes it to
   // http://0.0.0.0:3000 before the route receives it.
@@ -2272,9 +2276,9 @@ test("32a. MVP-001 S1: behind a proxy, the internal listener target is accepted 
     "http://127.0.0.2:3000",
     "http://10.0.0.5:3000",
     "https://other.synthetic.invalid",
-    "https://0.0.0.0:3000",
     "http://0.0.0.0.synthetic.invalid:3000",
     "http://0.0.0.1:3000",
+    "https://0.0.0.1:3000",
   ];
   const post = (target, headers = {}) =>
     new Request(`${target}/auth/confirm`, {
@@ -2339,7 +2343,11 @@ test("32a. MVP-001 S1: behind a proxy, the internal listener target is accepted 
   });
   // An unconfigured origin is still unavailable, even on the listener.
   await withOrigin(undefined, async () => {
-    for (const listener of ["http://localhost:3000", "http://0.0.0.0:3000"]) {
+    for (const listener of [
+      "http://localhost:3000",
+      "http://0.0.0.0:3000",
+      "https://0.0.0.0:3000",
+    ]) {
       assert.equal(
         confirmRoute.GET(
           new Request(
