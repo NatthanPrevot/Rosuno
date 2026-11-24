@@ -2093,6 +2093,37 @@
         "Local production-mode evidence on the base tree: next start bound to an explicit host and port answers 200 with Content-Security-Policy, X-Frame-Options DENY, Referrer-Policy same-origin, X-Content-Type-Options nosniff and Strict-Transport-Security; an unconfigured POST /api/jobs/run answers 503 and GET answers 405."
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261123-P2-923-HOSTED-REGISTRATION-INGRESS",
+      "title": "Activate hosted client registration through the evidenced Replit trusted-ingress contract (P2-007 D-04)",
+      "status": "accepted",
+      "scope": "Client self-registration on the Replit Autoscale hosting under the owner-adopted P2-923 FEATURE Packet: the trusted-ingress contract (DECISION C) that supplies the registration abuse control's client address, and the live retention policy for registration counters (DECISION R, option R1). Quota SQL, limits, abuse controls, provisioning, Supabase Auth configuration and every other route are unchanged.",
+      "decision": "DECISION C: the registration client address comes only from X-Forwarded-For, as the fourth entry from the right, accepted only when the header holds 4 to 20 non-empty entries, the third from the right is exactly the Replit edge load balancer 34.117.33.233, the second from the right is an IPv4 address inside 35.191.0.0/16, and the entry is a canonical IPv4 or IPv6 literal accepted by the unchanged strict parser; anything else is no address and registration stays unavailable. No other header and never the TCP peer is a source; nothing configures the rule; an edge topology change fails closed until re-attested. DECISION R (R1): the implemented P2-007 D-02 retention is the live Staging policy: counters hold only HMAC digests and counts, expire at the aligned window end plus 24 hours, and each decision prunes at most 100 expired rows; key rotation is default-deny, then the swap 24 hours after the last accepted decision.",
+      "rationale": "P2-007 section 5 and D-04 keep registration default-denied until deployed evidence of ingress provenance, header overwrite and stripping, and spoof handling exists and a retention decision is made. The probe evidence shows the Replit edge appends exactly three entries after the connecting address and never overwrites client-supplied entries, so the fourth entry from the right is the only position a client cannot forge; the Staging hostname resolves to the same edge address. R1 needs no migration and stores no address or email.",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-923-HOSTED-REGISTRATION-INGRESS"],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-23T22:22:52Z",
+      "updated_at": "2026-11-23T22:22:52Z",
+      "supersedes": [],
+      "impact": "Adds one server-only module (apps/web/src/infrastructure/identity/trusted-ingress.ts) and changes the sign-up action to take its client address from it; amends two fence tests with equal or stricter assertions and adds the trusted-ingress tests. Registration remains unavailable on the host until the merged change is deployed and the P2-923 deployed proof (traffic, server-action provenance, logging redaction) passes. No migration, dependency, Supabase, provider or Replit change.",
+      "evidence": [
+        "Probe rosuno-ingress-probe (replId f125ee8a-91f6-4155-93c6-7e39ba7ab6f5), published 2026-11-23; deployed files verified equal to the supplied files through the Replit connector.",
+        "Builder vantage, 7 requests on 2026-11-23: X-Forwarded-For was always <client-supplied entries>, CLIENT, 34.117.33.233, 35.191.x.x, <internal hop>; forged single and double X-Forwarded-For values stayed on the left; Forwarded was dropped; X-Real-IP, True-Client-IP and CF-Connecting-IP passed through unchanged; the TCP peer was 127.0.0.1.",
+        "Owner vantage, iPhone Safari on a warehouse Wi-Fi network (IPv4), 2026-11-23: a plain request arrived as CLIENT, 34.117.33.233, 35.191.x.x, <internal hop>. Client addresses are recorded only as CLIENT.",
+        "The Staging hostname rosuno-staging.replit.app resolves to 34.117.33.233, the constant edge hop in every observed chain.",
+        "Not performed (not required by P2-007): a cellular-network request and an IPv6 client; an IPv6 client that the edge represents non-canonically fails closed and is never admitted wrongly.",
+        "Owner adoption: the P2-923 Packet was added on owner branch wi/P2-923-hosted-registration-ingress in 93edb53 (head 309f8c4), net diff against main d250a41e8ad09fdb1894a000be1cb9e35e9368f7 exactly docs/work-items/P2-923/PACKET.md, Git blob 556f01ba549c702021b37903aa636ed6bb4749e2; the owner approved DECISION C and DECISION R (R1) and granted implementation on 2026-11-23."
+      ],
+      "expiry": null
     }
   ]
 }

@@ -2427,11 +2427,13 @@ test("34. the route handler is web-standard, fixed-destination, and verifies a t
   );
 });
 
-// P2-007 (Revision 5): the action imports exactly the original registration
-// boundary, the server-only abuse-control adapter, and the privileged module
-// for its unchanged port builders and narrow quota capability. No request
-// transport such as next/headers is imported: no ingress contract is
-// verified, so nothing is read from the request as a client address.
+// P2-007 (Revision 5), P2-923: the action imports exactly the original
+// registration boundary, the server-only abuse-control adapter, the
+// privileged module for its unchanged port builders and narrow quota
+// capability, and (P2-923, owner DECISION C) the server-only trusted
+// ingress, the one source of a client address. The action itself still
+// imports no request transport such as next/headers and reads no header,
+// forwarding header, socket, or literal address.
 function assertRegistrationActionContract(source) {
   const code = codeOf(source);
   assert.match(source, /^"use server";\n/);
@@ -2439,23 +2441,27 @@ function assertRegistrationActionContract(source) {
     "../../src/application/client-registration.ts",
     "../../src/infrastructure/identity/registration-abuse-control.ts",
     "../../src/infrastructure/identity/registration-provisioning.ts",
+    "../../src/infrastructure/identity/trusted-ingress.ts",
   ]);
   assert.match(
     code,
-    /^import \{\n {2}registerClientAccount,\n {2}type RegistrationState,\n\} from "\.\.\/\.\.\/src\/application\/client-registration\.ts";\nimport \{\n {2}NO_TRUSTED_CLIENT_ADDRESS,\n {2}createRegistrationAbuseControl,\n\} from "\.\.\/\.\.\/src\/infrastructure\/identity\/registration-abuse-control\.ts";\nimport \{\n {2}createConfirmationDispatch,\n {2}createRegistrationProvisioning,\n {2}decideQuotaRpc,\n\} from "\.\.\/\.\.\/src\/infrastructure\/identity\/registration-provisioning\.ts";$/m,
+    /^import \{\n {2}registerClientAccount,\n {2}type RegistrationState,\n\} from "\.\.\/\.\.\/src\/application\/client-registration\.ts";\nimport \{ createRegistrationAbuseControl \} from "\.\.\/\.\.\/src\/infrastructure\/identity\/registration-abuse-control\.ts";\nimport \{\n {2}createConfirmationDispatch,\n {2}createRegistrationProvisioning,\n {2}decideQuotaRpc,\n\} from "\.\.\/\.\.\/src\/infrastructure\/identity\/registration-provisioning\.ts";\nimport \{ trustedClientAddress \} from "\.\.\/\.\.\/src\/infrastructure\/identity\/trusted-ingress\.ts";$/m,
   );
   assert.deepEqual(
     [...code.matchAll(/\bexport\b[^\n]*/g)].map((match) => match[0]),
     ["export async function register("],
   );
-  // A new abuse control is built inside each call, with no trusted client
-  // address and only the narrow quota capability; the other ports and the
-  // form pass through unchanged.
+  // A new abuse control is built inside each call, with the address the
+  // trusted ingress establishes for that request (or none) and only the
+  // narrow quota capability; the other ports and the form pass through
+  // unchanged.
   assert.match(
     code,
-    /\nexport async function register\(\n {2}_previous: RegistrationState,\n {2}formData: FormData,\n\): Promise<RegistrationState> \{\n {2}return registerClientAccount\(\n {4}\{\n {6}abuseControl: createRegistrationAbuseControl\(\{\n {8}trustedClientAddress: NO_TRUSTED_CLIENT_ADDRESS,\n {8}decideQuota: decideQuotaRpc,\n {6}\}\),\n {6}provisioning: \(\) => createRegistrationProvisioning\(\),\n {6}dispatch: \(\) => createConfirmationDispatch\(\),\n {4}\},\n {4}formData,\n {2}\);\n\}\n$/,
+    /\nexport async function register\(\n {2}_previous: RegistrationState,\n {2}formData: FormData,\n\): Promise<RegistrationState> \{\n {2}return registerClientAccount\(\n {4}\{\n {6}abuseControl: createRegistrationAbuseControl\(\{\n {8}trustedClientAddress: await trustedClientAddress\(\),\n {8}decideQuota: decideQuotaRpc,\n {6}\}\),\n {6}provisioning: \(\) => createRegistrationProvisioning\(\),\n {6}dispatch: \(\) => createConfirmationDispatch\(\),\n {4}\},\n {4}formData,\n {2}\);\n\}\n$/,
   );
   assert.equal(code.match(/\bcreateRegistrationAbuseControl\(/g).length, 1);
+  assert.equal(code.match(/\btrustedClientAddress\(/g).length, 1);
+  assert.equal(code.match(/\bawait\b/g).length, 1);
   assert.equal(code.match(/\b_previous\b/g).length, 1);
   assert.equal(code.match(/\bformData\b/g).length, 2);
   assert.doesNotMatch(
@@ -2468,14 +2474,21 @@ function assertRegistrationActionContract(source) {
     code,
     /forwarded|x-real-ip|connecting-ip|client-ip|remoteAddress|socket|\brequest\b|\bip\b|\d+\.\d+\.\d+\.\d+|::/i,
   );
+  // P2-923: no header API and no other address source, the default-deny
+  // constant included, appears in the action.
+  assert.doesNotMatch(
+    code,
+    /next\/headers|headers\(\)|trustedClientAddressOf|NO_TRUSTED_CLIENT_ADDRESS|NO_TRUSTED_ABUSE_CONTROL/,
+  );
 }
 
-test("35. the sign-up server action is POST-only, default-deny, and hands the form to the application boundary unread", async () => {
+test("35. the sign-up server action is POST-only, takes its client address only from the trusted ingress (none otherwise), and hands the form to the application boundary unread", async () => {
   const source = read("app/sign-up/actions.ts");
   assertRegistrationActionContract(source);
   // Representative forbidden variants fail the same contract.
   const wiring =
-    "abuseControl: createRegistrationAbuseControl({\n        trustedClientAddress: NO_TRUSTED_CLIENT_ADDRESS,\n        decideQuota: decideQuotaRpc,\n      }),";
+    "abuseControl: createRegistrationAbuseControl({\n        trustedClientAddress: await trustedClientAddress(),\n        decideQuota: decideQuotaRpc,\n      }),";
+  const address = "trustedClientAddress: await trustedClientAddress(),";
   assert.ok(source.includes(wiring));
   const forbidden = {
     "allow fallback": source.replace(
@@ -2492,19 +2505,47 @@ test("35. the sign-up server action is POST-only, default-deny, and hands the fo
         '"use server";\nimport { headers } from "next/headers";\n',
       )
       .replace(
-        "trustedClientAddress: NO_TRUSTED_CLIENT_ADDRESS,",
+        address,
         'trustedClientAddress: (await headers()).get("x-forwarded-for"),',
       ),
     "literal address": source.replace(
-      "trustedClientAddress: NO_TRUSTED_CLIENT_ADDRESS,",
+      address,
       'trustedClientAddress: "192.0.2.10",',
     ),
     "shared module-level control": source
       .replace(
         "// The previous state",
-        "const shared = createRegistrationAbuseControl({\n  trustedClientAddress: NO_TRUSTED_CLIENT_ADDRESS,\n  decideQuota: decideQuotaRpc,\n});\n\n// The previous state",
+        "const shared = createRegistrationAbuseControl({\n  trustedClientAddress: await trustedClientAddress(),\n  decideQuota: decideQuotaRpc,\n});\n\n// The previous state",
       )
       .replace(wiring, "abuseControl: shared,"),
+    // P2-923: every way around the trusted ingress fails the same contract.
+    "trusted ingress parser on a raw header": source
+      .replace(
+        '"use server";\n',
+        '"use server";\nimport { headers } from "next/headers";\n',
+      )
+      .replace(
+        address,
+        'trustedClientAddress: trustedClientAddressOf(\n          (await headers()).get("x-forwarded-for"),\n        ),',
+      ),
+    "another header as address": source.replace(
+      address,
+      'trustedClientAddress: (await import("next/headers")).headers().get("x-real-ip"),',
+    ),
+    "address from the form": source.replace(
+      address,
+      'trustedClientAddress: String(formData.get("client")),',
+    ),
+    "address cached at module level": source
+      .replace(
+        "// The previous state",
+        "const cached = await trustedClientAddress();\n\n// The previous state",
+      )
+      .replace(address, "trustedClientAddress: cached,"),
+    "ingress dropped for default-deny constant": source.replace(
+      address,
+      "trustedClientAddress: null,",
+    ),
     "form field read": source.replace(
       "    formData,\n  );",
       '    formData,\n  ).then((state) => (formData.get("email"), state));',
@@ -2525,8 +2566,9 @@ test("35. the sign-up server action is POST-only, default-deny, and hands the fo
     );
   }
   // With every runtime input bound and the quota configured, the action still
-  // refuses a valid form before any quota, Admin, or database request: no
-  // client address is trusted. All values are synthetic and restored.
+  // refuses a valid form before any quota, Admin, or database request when the
+  // trusted ingress establishes no address (here, outside any request). All
+  // values are synthetic and restored.
   const key = Buffer.alloc(32, 0x5a).toString("base64");
   const configured = {
     ...boundEnvironment(),
