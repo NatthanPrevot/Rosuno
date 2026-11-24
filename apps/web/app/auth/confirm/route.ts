@@ -85,9 +85,14 @@ function originOf(url: string): string | null {
 // URL's origin (MVP-001 S1 correction): behind a reverse proxy, `next start`
 // reports http://localhost:<port> whatever public host the browser used, and
 // forwarding headers are never authority here, so that form says nothing
-// about the public target. Only exact loopback names over plain HTTP qualify.
+// about the public target. P2-926: bound to the unspecified address (Replit's
+// `next start --hostname 0.0.0.0`), it reports 0.0.0.0:<port> as the host,
+// which likewise says nothing about the public target; its scheme follows the
+// forwarded protocol (https behind Replit's edge), which is never authority.
+// Only exact loopback names over plain HTTP, or the unspecified address over
+// HTTP or HTTPS, qualify.
 const INTERNAL_LISTENER =
-  /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]{1,5})?$/;
+  /^(?:http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])|https?:\/\/0\.0\.0\.0)(?::[0-9]{1,5})?$/;
 
 // Whether the request targets the configured origin as far as this server
 // can tell: the configured origin itself (a direct deployment), or the

@@ -2252,20 +2252,33 @@ test("32. POST requires the configured origin, a same-origin form, and exactly t
 test("32a. MVP-001 S1: behind a proxy, the internal listener target is accepted only with the browser's exact configured Origin from a same-origin form; lookalike targets stay refused", async () => {
   const valid = `token_hash=${LINK_HASH}&type=email`;
   // `next start` reports its own loopback listener as the request URL,
-  // whatever public host the browser used.
+  // whatever public host the browser used. P2-926: bound to the unspecified
+  // address (Replit's `next start --hostname 0.0.0.0`), it reports
+  // 0.0.0.0:<port> as the host, with the forwarded protocol's scheme (https
+  // behind Replit's edge). Those forms are accepted on the same terms
+  // (http://0.0.0.0:3000 was formerly listed below as a lookalike); every
+  // internal-target assertion applies to them.
   const internal = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://[::1]:3000",
     "http://localhost",
+    "http://0.0.0.0:3000",
+    "http://0.0.0.0",
+    "https://0.0.0.0:3000",
+    "https://0.0.0.0",
   ];
+  // `http://00.0.0.0:3000` is not listed: Request normalizes it to
+  // http://0.0.0.0:3000 before the route receives it.
   const lookalikes = [
     "https://localhost:3000",
     "http://localhost.synthetic.invalid:3000",
     "http://127.0.0.2:3000",
-    "http://0.0.0.0:3000",
     "http://10.0.0.5:3000",
     "https://other.synthetic.invalid",
+    "http://0.0.0.0.synthetic.invalid:3000",
+    "http://0.0.0.1:3000",
+    "https://0.0.0.1:3000",
   ];
   const post = (target, headers = {}) =>
     new Request(`${target}/auth/confirm`, {
@@ -2330,18 +2343,26 @@ test("32a. MVP-001 S1: behind a proxy, the internal listener target is accepted 
   });
   // An unconfigured origin is still unavailable, even on the listener.
   await withOrigin(undefined, async () => {
-    assert.equal(
-      confirmRoute.GET(
-        new Request(
-          `http://localhost:3000/auth/confirm?token_hash=${LINK_HASH}&type=email`,
-        ),
-      ).status,
-      503,
-    );
-    assert.equal(
-      (await confirmRoute.POST(post("http://localhost:3000"))).status,
-      503,
-    );
+    for (const listener of [
+      "http://localhost:3000",
+      "http://0.0.0.0:3000",
+      "https://0.0.0.0:3000",
+    ]) {
+      assert.equal(
+        confirmRoute.GET(
+          new Request(
+            `${listener}/auth/confirm?token_hash=${LINK_HASH}&type=email`,
+          ),
+        ).status,
+        503,
+        listener,
+      );
+      assert.equal(
+        (await confirmRoute.POST(post(listener))).status,
+        503,
+        listener,
+      );
+    }
   });
 });
 
