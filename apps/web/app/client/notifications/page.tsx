@@ -8,18 +8,28 @@
 // MVP-001 S11 correction D14, the client's own reported problems page) and
 // the delivery state of its email twin. Nothing about an address or a provider is
 // shown. An acknowledgement-required Notification offers the acknowledge
-// form; the database decides again on submission.
+// form; the database decides again on submission. DEV-001: the owner's UI/UX
+// design places the notification center in the client account's Settings,
+// Notifications, with the table's existing markup; the design's notification
+// preferences have no record yet and show its "Not available yet" state.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import type { ReactNode } from "react";
 
 import {
   resolveClientNotifications,
   type CenterEntry,
 } from "../../../src/application/notification-center.ts";
+import { getShellView } from "../../../src/application/shell.ts";
 import { CLIENT_CENTER_SOURCES } from "../../../src/infrastructure/communications/communication-adapter.ts";
+import { SUPABASE_SERVER_SESSION_SOURCE } from "../../../src/infrastructure/identity/server-session-source.ts";
 import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";
+import {
+  ClientAccount,
+  ClientGate,
+  ClientSettings,
+  NotAvailableYet,
+} from "../../../src/presentation/client-account.tsx";
 import {
   CENTER_INTRO,
   CENTER_TITLE,
@@ -32,52 +42,19 @@ import {
 import {
   Alert,
   ButtonLink,
-  Cluster,
-  Eyebrow,
-  Heading,
-  Page,
   Stack,
   Status,
-  Surface,
   Table,
   Text,
 } from "../../../src/presentation/design-system.tsx";
+import { SitePage } from "../../../src/presentation/site-chrome.tsx";
+import { signOut } from "../../sign-in/actions.ts";
 import { AcknowledgeForm } from "./forms.tsx";
 
 export const metadata: Metadata = {
   title: "Notifications",
   robots: { index: false, follow: false },
 };
-
-function CenterFrame({
-  title,
-  children,
-}: {
-  readonly title: string;
-  readonly children: ReactNode;
-}) {
-  return (
-    <Page density="client">
-      <Surface emphasis="raised" labelledBy="client-notifications-title">
-        <Stack>
-          <Eyebrow>Client workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="client-notifications-title">
-            {title}
-          </Heading>
-          {children}
-        </Stack>
-      </Surface>
-    </Page>
-  );
-}
-
-const BACK = (
-  <Cluster>
-    <ButtonLink variant="tertiary" href="/client">
-      Back to your workspace
-    </ButtonLink>
-  </Cluster>
-);
 
 function CenterTable({
   entries,
@@ -140,28 +117,31 @@ function CenterTable({
 export default async function ClientNotificationsPage() {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  const shell = await getShellView(SUPABASE_SERVER_SESSION_SOURCE);
   const view = await resolveClientNotifications(CLIENT_CENTER_SOURCES);
   if (view.status === "sign-in-required") {
     return (
-      <CenterFrame title="Sign in to continue">
-        <Text tone="muted">
-          Notifications are available only to signed-in client accounts.
-        </Text>
-        <Cluster>
-          <ButtonLink variant="primary" href="/sign-in">
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Sign in to continue">
+          <p className="sm muted">
+            Notifications are available only to signed-in client accounts.
+          </p>
+          <a className="btn btn-ink" href="/sign-in">
             Sign in
-          </ButtonLink>
-        </Cluster>
-      </CenterFrame>
+          </a>
+        </ClientGate>
+      </SitePage>
     );
   }
   if (view.status === "denied") {
     return (
-      <CenterFrame title="Notifications not available">
-        <Alert tone="warning" title="Not available" role="status">
-          This account does not have access to client notifications.
-        </Alert>
-      </CenterFrame>
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Notifications not available">
+          <Alert tone="warning" title="Not available" role="status">
+            This account does not have access to client notifications.
+          </Alert>
+        </ClientGate>
+      </SitePage>
     );
   }
   if (view.status !== "ready") {
@@ -170,20 +150,37 @@ export default async function ClientNotificationsPage() {
       outcome: view.status,
     });
     return (
-      <CenterFrame title="Notifications unavailable">
-        <Alert tone="error" title="Something went wrong" role="alert">
-          Your notifications could not be shown right now. Please try again
-          later.
-        </Alert>
-        {BACK}
-      </CenterFrame>
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Notifications unavailable">
+          <Alert tone="error" title="Something went wrong" role="alert">
+            Your notifications could not be shown right now. Please try again
+            later.
+          </Alert>
+          <a className="cx-link" href="/client">
+            Back to your account
+          </a>
+        </ClientGate>
+      </SitePage>
     );
   }
   return (
-    <CenterFrame title={CENTER_TITLE}>
-      <Text tone="muted">{CENTER_INTRO}</Text>
-      <CenterTable entries={view.entries} prefix="client" />
-      {BACK}
-    </CenterFrame>
+    <SitePage session={shell.session} signOut={signOut}>
+      <ClientAccount area="settings" heading="Settings">
+        <ClientSettings category="notifications" labelledBy="cx-set-h">
+          <div className="rz-cx-panel">
+            <h2 className="cx-ct2" id="cx-set-h">
+              {CENTER_TITLE}
+            </h2>
+            <Text tone="muted">{CENTER_INTRO}</Text>
+            <CenterTable entries={view.entries} prefix="client" />
+          </div>
+          <p className="cx-sgrp">Notification preferences</p>
+          <NotAvailableYet
+            reason="choosing which notifications you receive, and how, is not part of your account yet."
+            placeholder="[notification channels and wording — per communications policy]"
+          />
+        </ClientSettings>
+      </ClientAccount>
+    </SitePage>
   );
 }

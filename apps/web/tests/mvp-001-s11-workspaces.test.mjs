@@ -462,19 +462,18 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
     account,
     /<nav className="cx-nav" aria-label=\{CLIENT_ACCOUNT_NAVIGATION_LABEL\}>/,
   );
-  // DEV-001: the owner's UI/UX design moves the client pages onto the
-  // account frame screen group by screen group; each page renders exactly the
-  // frame named here, with its own path or area marked, and its path is a
-  // link of the navigation it shows.
+  // DEV-001: the owner's UI/UX design renders every client page of this pass
+  // in the account frame with its own area marked (the navigation of the
+  // design replaces the workspace navigation component on these pages).
   const CLIENT_FRAMES = {
     "app/client/payments/page.tsx":
       '<ClientAccount area="payments" heading="Payments">',
     "app/client/messages/page.tsx":
       '<ClientAccount area="consultations" heading="Your messages">',
     "app/client/settings/page.tsx":
-      '<ClientNavigation current="/client/settings" />',
+      '<ClientAccount area="profile" heading="My profile">',
     "app/client/privacy/page.tsx":
-      '<ClientNavigation current="/client/privacy" />',
+      '<ClientAccount area="settings" heading="Settings">',
     "app/client/settings/security/page.tsx":
       '<ClientAccount area="settings" heading="Settings">',
   };
@@ -501,41 +500,36 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
   for (const [file, frame] of Object.entries(CLIENT_FRAMES)) {
     const code = codeOf(read(file));
     assert.ok(code.includes(frame), file);
-    if (frame.startsWith("<ClientNavigation ")) {
-      assert.ok(
-        labels.CLIENT_NAVIGATION.some((link) => link.href === pathOf(file)),
-        file,
-      );
-    } else {
-      // The page's area is one of the navigation's, and the page is a link
-      // of the account navigation or the Settings categories (and then shows
-      // its own category marked), or (pages the design's navigation does not
-      // hold) is linked from both the overview and My consultations.
-      const area = /area="([a-z]+)"/.exec(frame)[1];
-      assert.ok(
-        accountNavigation.some((link) => link.area === area),
-        file,
-      );
-      const category = settingsNavigation.find(
-        (entry) => entry.href === pathOf(file),
-      )?.category;
-      if (category !== undefined) {
+    assert.doesNotMatch(code, /<ClientNavigation\b/, file);
+    // The page's area is one of the navigation's: the area of its own link
+    // when the account navigation holds the page; the Settings pages also
+    // mark their own category; a page the design's navigation does not hold
+    // is linked from both the overview and My consultations.
+    const area = /area="([a-z]+)"/.exec(frame)[1];
+    assert.ok(
+      accountNavigation.some((link) => link.area === area),
+      file,
+    );
+    const own = accountNavigation.find((link) => link.href === pathOf(file));
+    const category = settingsNavigation.find(
+      (entry) => entry.href === pathOf(file),
+    )?.category;
+    if (own !== undefined) {
+      assert.equal(own.area, area, file);
+    }
+    if (category !== undefined) {
+      assert.equal(area, "settings", file);
+      assert.ok(code.includes(`<ClientSettings category="${category}"`), file);
+    }
+    if (own === undefined && category === undefined) {
+      for (const page of [
+        "app/client/page.tsx",
+        "app/client/consultations/page.tsx",
+      ]) {
         assert.ok(
-          code.includes(`<ClientSettings category="${category}"`),
-          file,
+          codeOf(read(page)).includes(`href="${pathOf(file)}"`),
+          `${page}: ${file}`,
         );
-      } else if (
-        !accountNavigation.some((link) => link.href === pathOf(file))
-      ) {
-        for (const page of [
-          "app/client/page.tsx",
-          "app/client/consultations/page.tsx",
-        ]) {
-          assert.ok(
-            codeOf(read(page)).includes(`href="${pathOf(file)}"`),
-            `${page}: ${file}`,
-          );
-        }
       }
     }
   }

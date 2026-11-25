@@ -88,6 +88,16 @@
 .cx .rz-cx-panel > .rz-stack:empty {
   display: none;
 }
+/* A fixed sentence the page keeps as its text primitive, set as the design's row description. */
+.cx .cx-srow .rz-text {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--subtle);
+}
+.cx .rz-cx-none {
+  padding: 12px 0;
+}
 .cx .rz-cx-links {
   display: flex;
   flex-wrap: wrap;

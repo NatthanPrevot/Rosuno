@@ -13,34 +13,32 @@
 // deletion, export or restriction) with an optional description, sees their
 // own requests with their state and decision, and withdraws one before its
 // decision. The wording is neutral and fixed: no statement of rights,
-// entitlements, timelines or retention (Packet rule 11).
+// entitlements, timelines or retention (Packet rule 11). DEV-001: the
+// owner's UI/UX design places the page in the client account's Settings,
+// Privacy & data: the records the account holds, the data request form, the
+// privacy notice row and the client's own privacy requests.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import type { ReactNode } from "react";
 
 import { resolveClientDataRequests } from "../../../src/application/data-requests.ts";
 import {
   DATA_CATEGORIES,
   resolveClientAccount,
 } from "../../../src/application/participant-workspaces.ts";
+import { getShellView } from "../../../src/application/shell.ts";
+import { SUPABASE_SERVER_SESSION_SOURCE } from "../../../src/infrastructure/identity/server-session-source.ts";
 import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";
 import { CLIENT_DATA_REQUEST_SOURCES } from "../../../src/infrastructure/privacy/privacy-adapter.ts";
 import { CLIENT_WORKSPACE_SOURCES } from "../../../src/infrastructure/workspaces/workspace-adapter.ts";
-import { utcText } from "../../../src/presentation/completion-labels.ts";
 import {
-  Alert,
-  ButtonLink,
-  Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
-  Table,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
+  ClientAccount,
+  ClientGate,
+  ClientPill,
+  ClientSettings,
+  whenText,
+} from "../../../src/presentation/client-account.tsx";
+import { Alert, Text } from "../../../src/presentation/design-system.tsx";
 import {
   DATA_REQUEST_NOTE,
   OUTCOME_LABELS,
@@ -48,12 +46,13 @@ import {
   REQUEST_STATE_LABELS,
   REQUEST_TYPE_LABELS,
 } from "../../../src/presentation/privacy-labels.ts";
+import { SitePage } from "../../../src/presentation/site-chrome.tsx";
 import {
   DATA_CATEGORY_LABELS,
   DATA_INTRO,
   PRIVACY_NOT_AVAILABLE,
 } from "../../../src/presentation/workspace-labels.ts";
-import { ClientNavigation } from "../../../src/presentation/workspace-navigation.tsx";
+import { signOut } from "../../sign-in/actions.ts";
 import { DataRequestForm, WithdrawRequestForm } from "./forms.tsx";
 
 export const metadata: Metadata = {
@@ -61,51 +60,37 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function Frame({ children }: { readonly children: ReactNode }) {
-  return (
-    <Page density="client">
-      <Surface emphasis="raised" labelledBy="data-title">
-        <Stack>
-          <Eyebrow>Client workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="data-title">
-            Privacy and data
-          </Heading>
-          {children}
-          <ClientNavigation current="/client/privacy" />
-        </Stack>
-      </Surface>
-    </Page>
-  );
-}
-
 export default async function ClientDataPage() {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  const shell = await getShellView(SUPABASE_SERVER_SESSION_SOURCE);
   const [view, requests] = await Promise.all([
     resolveClientAccount(CLIENT_WORKSPACE_SOURCES),
     resolveClientDataRequests(CLIENT_DATA_REQUEST_SOURCES),
   ]);
   if (view.status === "sign-in-required") {
     return (
-      <Frame>
-        <Text tone="muted">
-          This page is available only to its signed-in client.
-        </Text>
-        <Cluster>
-          <ButtonLink variant="primary" href="/sign-in">
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Sign in to continue">
+          <p className="sm muted">
+            This page is available only to its signed-in client.
+          </p>
+          <a className="btn btn-ink" href="/sign-in">
             Sign in
-          </ButtonLink>
-        </Cluster>
-      </Frame>
+          </a>
+        </ClientGate>
+      </SitePage>
     );
   }
   if (view.status === "denied") {
     return (
-      <Frame>
-        <Alert tone="warning" title="Not available" role="status">
-          This account does not have a client workspace.
-        </Alert>
-      </Frame>
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Privacy & data">
+          <Alert tone="warning" title="Not available" role="status">
+            This account does not have a client workspace.
+          </Alert>
+        </ClientGate>
+      </SitePage>
     );
   }
   if (view.status !== "ready") {
@@ -114,77 +99,106 @@ export default async function ClientDataPage() {
       outcome: view.status,
     });
     return (
-      <Frame>
-        <Alert tone="error" title="Something went wrong" role="alert">
-          This page could not be shown right now. Please try again later.
-        </Alert>
-      </Frame>
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Privacy & data">
+          <Alert tone="error" title="Something went wrong" role="alert">
+            This page could not be shown right now. Please try again later.
+          </Alert>
+        </ClientGate>
+      </SitePage>
     );
   }
   return (
-    <Frame>
-      <Text tone="muted">{DATA_INTRO}</Text>
-      <Table id="client-data" caption="Records your account holds">
-        <thead>
-          <tr>
-            <th scope="col">Kind of record</th>
-            <th scope="col">Count</th>
-          </tr>
-        </thead>
-        <tbody>
-          {DATA_CATEGORIES.map((category) => (
-            <tr key={category}>
-              <th scope="row">{DATA_CATEGORY_LABELS[category]}</th>
-              <td>{view.account.counts[category]}</td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-      <Heading as="h2" size="md" id="data-requests-title">
-        Requests about your data
-      </Heading>
-      <Text tone="muted">{DATA_REQUEST_NOTE}</Text>
-      <DataRequestForm />
-      {requests.status !== "ready" ? (
-        <Alert tone="error" title="Something went wrong" role="alert">
-          Your requests could not be shown right now. Please try again later.
-        </Alert>
-      ) : requests.requests.length === 0 ? (
-        <Text>You have not made a request about your data.</Text>
-      ) : (
-        requests.requests.map((request) => (
-          <Surface key={request.id} labelledBy={`data-request-${request.id}`}>
-            <Stack gap="tight">
-              <Heading as="h3" size="sm" id={`data-request-${request.id}`}>
-                {`${REQUEST_TYPE_LABELS[request.type]}, submitted ${utcText(request.submittedAt)}`}
-              </Heading>
-              <Cluster>
-                <Status tone={REQUEST_STATE_LABELS[request.state].tone}>
-                  {REQUEST_STATE_LABELS[request.state].label}
-                </Status>
-                {request.outcome === null ? null : (
-                  <Status tone="neutral">
-                    {`${RECORDED_DECISION_LABEL}: ${OUTCOME_LABELS[request.outcome]}`}
-                  </Status>
-                )}
-              </Cluster>
-              {request.details === null ? null : (
-                <Text size="small">{`Your details: ${request.details}`}</Text>
-              )}
-              {request.decidedAt === null ? null : (
-                <Text size="small" tone="muted">
-                  {`Decided ${utcText(request.decidedAt)}`}
-                </Text>
-              )}
-              {request.state === "submitted" ||
-              request.state === "in_review" ? (
-                <WithdrawRequestForm request={request.id} />
-              ) : null}
-            </Stack>
-          </Surface>
-        ))
-      )}
-      <Text>{PRIVACY_NOT_AVAILABLE}</Text>
-    </Frame>
+    <SitePage session={shell.session} signOut={signOut}>
+      <ClientAccount area="settings" heading="Settings">
+        <ClientSettings category="privacy" labelledBy="cx-set-h">
+          <h2 className="cx-ct2" id="cx-set-h">
+            Privacy & data
+          </h2>
+          <div className="cx-rows l-mt8">
+            <div className="cx-srow">
+              <div>
+                <p className="cx-st">Records your account holds</p>
+                <p className="cx-sd">{DATA_INTRO}</p>
+              </div>
+            </div>
+            <div className="cx-rows" aria-label="Records your account holds">
+              {DATA_CATEGORIES.map((category) => (
+                <div className="cx-row" key={category}>
+                  <span className="cx-k">{DATA_CATEGORY_LABELS[category]}</span>
+                  <span className="cx-v">{view.account.counts[category]}</span>
+                </div>
+              ))}
+            </div>
+            <div className="cx-srow">
+              <div>
+                <p className="cx-st">Requests about your data</p>
+                <p className="cx-sd">{DATA_REQUEST_NOTE}</p>
+              </div>
+            </div>
+            <div className="cx-rc">
+              <DataRequestForm />
+            </div>
+            <div className="cx-srow">
+              <div>
+                <p className="cx-st">Privacy notice</p>
+                <Text>{PRIVACY_NOT_AVAILABLE}</Text>
+              </div>
+              <a className="btn btn-line btn-sm" href="/privacy">
+                Read
+              </a>
+            </div>
+          </div>
+          <section aria-labelledby="cx-priv-h">
+            <h3 className="cx-sgrp" id="cx-priv-h">
+              Your privacy requests
+            </h3>
+            {requests.status !== "ready" ? (
+              <Alert tone="error" title="Something went wrong" role="alert">
+                Your requests could not be shown right now. Please try again
+                later.
+              </Alert>
+            ) : requests.requests.length === 0 ? (
+              <p className="cx-sd rz-cx-none">
+                You have not made a request about your data.
+              </p>
+            ) : (
+              requests.requests.map((request) => (
+                <div className="cx-srow" key={request.id}>
+                  <div>
+                    <p className="cx-st">{REQUEST_TYPE_LABELS[request.type]}</p>
+                    <p className="cx-sd">
+                      {`Submitted ${whenText(request.submittedAt)}`}
+                    </p>
+                    {request.details === null ? null : (
+                      <p className="cx-sd">{`Your details: ${request.details}`}</p>
+                    )}
+                    {request.decidedAt === null ? null : (
+                      <p className="cx-sd">
+                        {`Decided ${whenText(request.decidedAt)}`}
+                      </p>
+                    )}
+                    {request.outcome === null ? null : (
+                      <p className="cx-sd">
+                        {`${RECORDED_DECISION_LABEL}: ${OUTCOME_LABELS[request.outcome]}`}
+                      </p>
+                    )}
+                  </div>
+                  <span className="row l-g8-fwrwrap-jcflex-end">
+                    <ClientPill tone={REQUEST_STATE_LABELS[request.state].tone}>
+                      {REQUEST_STATE_LABELS[request.state].label}
+                    </ClientPill>
+                    {request.state === "submitted" ||
+                    request.state === "in_review" ? (
+                      <WithdrawRequestForm request={request.id} />
+                    ) : null}
+                  </span>
+                </div>
+              ))
+            )}
+          </section>
+        </ClientSettings>
+      </ClientAccount>
+    </SitePage>
   );
 }
