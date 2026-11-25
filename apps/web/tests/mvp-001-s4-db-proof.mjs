@@ -79,7 +79,10 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
+import {
+  assertRegisteredLifecycle,
+  assertTailThenRegistered,
+} from "./migration-lifecycle.mjs";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54339;
@@ -423,7 +426,7 @@ function applyMigrations() {
   assert.deepEqual(files.slice(s3 + 1, s3 + 1 + S4_MIGRATIONS.length), [
     ...S4_MIGRATIONS,
   ]);
-  assert.deepEqual(files.slice(s3 + 1 + S4_MIGRATIONS.length), [
+  assertTailThenRegistered(files.slice(s3 + 1 + S4_MIGRATIONS.length), [
     "20261121010000_mvp_001_s5_referral_integrity.sql",
     "20261121020000_mvp_001_s5_discovery.sql",
     "20261121030000_mvp_001_s5_referral.sql",
@@ -479,7 +482,7 @@ function applyMigrations() {
     // MVP-001 S11: the offered-start correction (registered and checked by
     // the S6 proof).
     "20261127220000_mvp_001_s11_offered_start_containment.sql",
-  ]);
+  ], S4_MIGRATIONS.at(-1));
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),

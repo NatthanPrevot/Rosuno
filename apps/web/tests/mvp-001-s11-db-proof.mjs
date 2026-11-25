@@ -72,7 +72,10 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
+import {
+  assertRegisteredLifecycle,
+  assertTailThenRegistered,
+} from "./migration-lifecycle.mjs";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54347;
@@ -487,14 +490,14 @@ function applyMigrations() {
   // in a consistent lifecycle state.
   const s10 = files.indexOf(S10_LAST);
   assert.ok(s10 >= 0, "the last S10 migration is present");
-  assert.deepEqual(files.slice(s10 + 1), [
+  assertTailThenRegistered(files.slice(s10 + 1), [
     ...S11_MIGRATIONS,
     ...S11_OPERATIONS_MIGRATIONS,
     ...S11_SURFACES_MIGRATIONS,
     ...S11_CORRECTIONS_MIGRATIONS,
     ...S11_PS_A6_MIGRATIONS,
     ...S11_OFFERED_START_MIGRATIONS,
-  ]);
+  ], S11_MIGRATIONS.at(-1));
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),

@@ -99,3 +99,57 @@ export function assertRegisteredLifecycle(row) {
   }
   return "applied_to_staging";
 }
+
+// DEV-001 (reviewed design P2-924 D4): the tail after a proof's own
+// migrations. A proof that pinned the exact list of later migrations calls
+//   assertTailThenRegistered(files.slice(n + 1), [...KNOWN], OWN_LAST);
+// where OWN_LAST is the proof's own last migration (the anchor when KNOWN is
+// empty). KNOWN stays pinned literally. Every migration after it must be
+// exactly the migrations registered after it in the migration register, in
+// register order, with contiguous sequence numbers and the canonical artifact
+// path, each in a valid lifecycle state (assertRegisteredLifecycle). An
+// unregistered, reordered, renamed or missing file still fails; a later
+// migration needs its register entry instead of edits to every proof.
+
+const MIGRATION_REGISTER = "governance/migrations/reviewed-migrations.json";
+
+export function assertTailThenRegistered(tail, known, ownLast) {
+  assert.ok(
+    Array.isArray(tail) && Array.isArray(known),
+    "tail and known are lists",
+  );
+  assert.deepEqual(
+    tail.slice(0, known.length),
+    [...known],
+    "the known tail is unchanged",
+  );
+  const anchorFile = known.length > 0 ? known[known.length - 1] : ownLast;
+  assert.equal(typeof anchorFile, "string", "an anchor migration is named");
+  const anchor = anchorFile.replace(/\.sql$/, "");
+  const rows = JSON.parse(
+    fs.readFileSync(path.join(REPOSITORY_ROOT, MIGRATION_REGISTER), "utf8"),
+  ).migrations;
+  assert.ok(Array.isArray(rows), `${MIGRATION_REGISTER} lists migrations`);
+  const ordered = [...rows].sort((a, b) => a.sequence - b.sequence);
+  const at = ordered.findIndex((row) => row.migration_id === anchor);
+  assert.ok(at >= 0, `${anchor} is registered`);
+  const later = ordered.slice(at + 1);
+  assert.deepEqual(
+    tail.slice(known.length),
+    later.map((row) => path.basename(row.artifact_path)),
+    "every later migration is exactly the register's later migrations, in order",
+  );
+  later.forEach((row, index) => {
+    assert.equal(
+      row.sequence,
+      ordered[at].sequence + 1 + index,
+      `${row.migration_id} sequence is contiguous`,
+    );
+    assert.equal(
+      row.artifact_path,
+      `supabase/migrations/${row.migration_id}.sql`,
+      `${row.migration_id} path`,
+    );
+    assertRegisteredLifecycle(row);
+  });
+}

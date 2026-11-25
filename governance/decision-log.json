@@ -2153,6 +2153,39 @@
         "The owner reported on 2026-11-25 that capability E and DEV-001 were activated and independently verified; the Builder did not perform or observe that verification. Builder reconciliation on 2026-11-25 with the guard from owner main 89a391c: grant/DEV-001 heads with an empty diff, an ordinary UI file and a new forward migration printed ROSUNO-GUARD PASS route=grant; a CLAUDE.md edit, a non-owner PR author and an unknown grant were refused."
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261125-DEV-001-ENGINEERING-PROGRAM",
+      "title": "DEV-001 engineering program under the standing grant, and its first migration (non-production development regulatory mode and audited first-staff bootstrap)",
+      "status": "accepted",
+      "scope": "The owner's DEV-001 engineering program on the standing-grant route and the traceability of every DEV-001 migration. First migration: 20261128010000_p2_924_development_regulatory_mode_and_staff_bootstrap, the reviewed P2-924 revision 3.1 design. No production, Staging-application, release or provider effect.",
+      "decision": "On 2026-11-25 the owner activated capability E and grant DEV-001 on the owner branch rosuno-grants (effects code, schema and dependencies; until 2036-11-25T05:28:22Z) and directed the Builder to continue the hosted MVP roadmap under it, P2-924 first and then P2-925. This entry is the single program decision every DEV-001 migration references. The first migration implements the reviewed P2-924 design: owner DECISION M14: A (2026-11-24), the smallest compliant development- and Staging-only regulatory mode through a reviewed forward-only migration; the owner accepted revision 3 as the adoption candidate on 2026-11-24 and selected the OWNER-AUTH approach (both bootstrap grants name the real authorizing user, D5); revision 3.1 corrected two statements of its section 5 at the owner's direction, with the migration and proof unchanged. The migration adds two functions only: activate_development_regulatory_mode and bootstrap_staff_administrators, executable by the database owner alone, security invoker with a pinned search_path, reading the environment only through deployment_environment_identity(), refusing every recorded class other than development or staging and writing an append-only audit event for each effect. It activates no approved Regulatory Mode (M14 and M15 stay open), is applied nowhere, and its Staging application and use need separate owner authorization.",
+      "rationale": "The standing-grant route removes per-change Packets, work items and decisions, but P0 migration traceability still needs an owner work item and decision that reference each new migration; one program work item and one decision cover all of them. The M14 design was already reviewed and accepted, so it is implemented byte-for-byte rather than redesigned, and the hosted Staging tests need both a temporally valid development mode and an audited way to create the first staff administrators.",
+      "authority_refs": [
+        "GOVERNANCE-MODERNIZATION-V1.1",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-DEV-001-ENGINEERING-PROGRAM"],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-25T06:19:41Z",
+      "updated_at": "2026-11-25T06:19:41Z",
+      "supersedes": [],
+      "impact": "Adds migration 20261128010000 (two functions, no relation, column or policy) with register row 77 unapplied, its disposable-database proof, the assertTailThenRegistered helper and its use in eleven slice proofs, this decision, the DEV-001 program work item and readiness facts. No Staging, production, provider, release or control-path change.",
+      "evidence": [
+        "Owner activation: commit e18b6c7e59684e0d80980c197755846fef840076 on owner branch rosuno-grants, .github/rosuno-grants/activation.json (capability E, control_commit 89a391c0b5e7c78e657f1488d666518d1de77781) and .github/rosuno-grants/DEV-001.json (status active, effects code, schema and dependencies, issued 2026-11-25T05:28:22Z, expires 2036-11-25T05:28:22Z); read by the Builder from the owner repository on 2026-11-25.",
+        "Owner direction in the Builder session, 2026-11-25: continue canonical development under DEV-001 from the last verified checkpoint, owner main 1aa7d9eede7d74bf3d8e034fbdca76123b14e90e.",
+        "Owner DECISION M14: A in the Builder session, 2026-11-24; owner acceptance of P2-924 revision 3 (Git blob 22b2be1522ed8647b632d13e0b95d540740ee8ee) as the adoption candidate and selection of OWNER-AUTH, 2026-11-24T05:55:15Z; revision 3.1 (Git blob d7eba042a2945ce973be69471c254901c9dcef1c) verified against its blob and SHA-256 by primary oversight as reported by the owner.",
+        "Migration SHA-256 6971040c3b19565b5a26ebfaa0cc5c4e655a62fa1fda3fae7fa707bfe6d2c1ea; proof apps/web/tests/p2-924-db-proof.mjs SHA-256 d12ce8acd85b3f603e502b92e9c6b4ecae61ef40f8202ddef5ff42fd441586d4, which pins the migration bytes."
+      ],
+      "expiry": null
     }
   ]
 }

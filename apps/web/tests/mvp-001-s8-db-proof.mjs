@@ -67,7 +67,10 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
+import {
+  assertRegisteredLifecycle,
+  assertTailThenRegistered,
+} from "./migration-lifecycle.mjs";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54344;
@@ -508,7 +511,7 @@ function applyMigrations() {
   // and checked by the S10 proof).
   const s7 = files.indexOf(S7_LAST);
   assert.ok(s7 >= 0, "the S7 payment engine migration is present");
-  assert.deepEqual(files.slice(s7 + 1), [
+  assertTailThenRegistered(files.slice(s7 + 1), [
     ...S8_MIGRATIONS,
     ...S9_MIGRATIONS,
     ...S10_MIGRATIONS,
@@ -518,7 +521,7 @@ function applyMigrations() {
     ...S11_CORRECTIONS_MIGRATIONS,
     ...S11_PS_A6_MIGRATIONS,
     ...S11_OFFERED_START_MIGRATIONS,
-  ]);
+  ], S8_MIGRATIONS.at(-1));
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),

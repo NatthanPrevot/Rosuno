@@ -2920,6 +2920,68 @@
       "rollback_reference": "Before merge, leave the PR unmerged or correct it forward. After merge the route stays inactive until activation; the owner can revoke an activation or grant by a commit on, or deletion of, the owner rosuno-grants branch, and the Packet route remains available. Controls are corrected forward through a protected PR; no data or migration is involved.",
       "created_at": "2026-11-25T03:03:07Z",
       "updated_at": "2026-11-25T05:43:59Z"
+    },
+    {
+      "work_item_id": "WI-P2-DEV-001-ENGINEERING-PROGRAM",
+      "title": "DEV-001 engineering program: hosted MVP completion under the owner's standing grant",
+      "objective": "Complete the hosted Rosuno MVP under owner grant DEV-001 (effects code, schema and dependencies): backend and application improvements, support for the UI/UX integration, forward-only schema development and defect corrections, without production changes, persistent database application or unresolved regulatory decisions. This is the one program work item that P0 migration traceability requires for every DEV-001 migration.",
+      "in_scope": [
+        "Ordinary engineering on grant/DEV-001/<slug> branches cut from current owner main, within the grant's effects and outside the control paths of docs/process/p2-927-standing-grant-route.md.",
+        "Forward-only migrations with unapplied register rows; this work item and DEC-20261125-DEV-001-ENGINEERING-PROGRAM cover every DEV-001 migration.",
+        "First migration 20261128010000_p2_924_development_regulatory_mode_and_staff_bootstrap: the reviewed P2-924 revision 3.1 design (non-production development regulatory mode and audited first-staff bootstrap), with its disposable-database proof apps/web/tests/p2-924-db-proof.mjs.",
+        "The D4 proof-tail helper assertTailThenRegistered in apps/web/tests/migration-lifecycle.mjs and its use in the eleven slice proofs that pinned the later-migration list.",
+        "Fact records allowed under a grant: this work item, its decision, unapplied register rows and readiness items."
+      ],
+      "out_of_scope": [
+        "Applying any migration to Staging or any other persistent database, deployments, releases and production operations: separate owner authorization.",
+        "Use of the new functions on Staging and G3 Phase B: separate owner authorization.",
+        "Control paths (CI, guard, validators, tools/p0/**, Builder and tool configuration, docs/process/**, Packets, package-manager settings, Supabase configuration and seeds, governance authority): the Packet route.",
+        "New dependency names, scripts or top-level areas under the P0-001-registered allowlists: a TYPE: PROCESS change.",
+        "Unresolved regulatory, legal, payment, eligibility or policy decisions; activation of an approved Regulatory Mode (M14) and the production decision (M15)."
+      ],
+      "status": "in_progress",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": [
+        "GOVERNANCE-MODERNIZATION-V1.1",
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED"
+      ],
+      "decision_refs": ["DEC-20261125-DEV-001-ENGINEERING-PROGRAM"],
+      "dependencies": ["WI-P2-927-GOVERNANCE-MODERNIZATION-CONTROL"],
+      "acceptance_criteria": [
+        "Each DEV-001 PR receives ROSUNO-GUARD PASS route=grant from the trusted workflow and designated human approval of its exact head before the owner merges.",
+        "Every DEV-001 migration is forward-only, sorts after main, is registered unapplied with this work item and decision, and passes its disposable-database proof.",
+        "First migration: apps/web/tests/p2-924-db-proof.mjs passes on disposable PostgreSQL 16, every existing disposable-database proof passes with assertTailThenRegistered, and both functions refuse production (environment_not_permitted) and write nothing."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "node apps/web/tests/p2-924-db-proof.mjs",
+        "node apps/web/tests/<each>-db-proof.mjs",
+        "EXPECTED_REPO=NatthanPrevot/Rosuno EXPECTED_BASE=main BUILDER_FORK=RosunoBackup/Rosuno OWNER_LOGIN=NatthanPrevot ROSUNO_PR_AUTHOR=NatthanPrevot ROSUNO_HEAD_REPO=RosunoBackup/Rosuno bash .github/scripts/rosuno-guard.sh <current owner main SHA> HEAD grant/DEV-001/<slug> refs/rosuno/grants"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [
+        "20261128010000_p2_924_development_regulatory_mode_and_staff_bootstrap"
+      ],
+      "rollback_reference": "Forward-only: a defect is corrected by a further DEV-001 change, a migration by a separately authorized forward corrective migration. The owner revokes the program by setting DEV-001 or the activation to revoked on rosuno-grants.",
+      "created_at": "2026-11-25T06:19:41Z",
+      "updated_at": "2026-11-25T06:19:41Z"
     }
   ]
 }
