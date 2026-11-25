@@ -2124,6 +2124,32 @@
         "Owner adoption: the P2-923 Packet was added on owner branch wi/P2-923-hosted-registration-ingress in 93edb53 (head 309f8c4), net diff against main d250a41e8ad09fdb1894a000be1cb9e35e9368f7 exactly docs/work-items/P2-923/PACKET.md, Git blob 556f01ba549c702021b37903aa636ed6bb4749e2; the owner approved DECISION C and DECISION R (R1) and granted implementation on 2026-11-23."
       ],
       "expiry": null
+    },
+    {
+      "decision_id": "DEC-20261124-P2-927-GOVERNANCE-MODERNIZATION-CONDITIONAL-ADOPTION",
+      "title": "Conditionally adopt the Governance Modernization package v1.1 and implement the standing-grant control (P2-927 CONTROL program)",
+      "status": "accepted",
+      "scope": "The owner's conditional adoption of the privately held Governance Modernization Adoption Package v1.1 (registered here by SHA-256 only) and the one bounded CONTROL program P2-927 that implements its transition under the existing protected route. S1: the rosuno-guard v5 standing-grant route (owner-controlled activation and DEV grant records on the owner repository), its trusted workflow wiring, Builder instructions, PR template and procedure. No product, schema, provider, business-policy, Staging, production or OLD effect.",
+      "decision": "The owner adopted the exact package bytes conditionally on 2026-11-24 and authorized P2-927. Adoption grants no permission by itself: every successor capability (E ordinary engineering, P delegated publication and PR creation, M mechanical merge, S Staging release, O production operations) stays inactive until the owner records its activation with evidence, and predecessor authority, prior Decision Log entries, historical evidence, migrations and the current protected route remain in force until then. Guard v5 adds a standing-grant route that is refused unless the owner's records on the owner branch rosuno-grants name this registered digest, a control commit on main, capability E and a valid DEV grant; the Packet route is unchanged. P0-001-LOCKED stays an external, unavailable reference: its registered controls (dependency and script allowlists, neutral paths, package-manager side-channel checks) are unchanged.",
+      "rationale": "The Packet requires the smallest sufficient transition to one broad owner grant without weakening actual safeguards. Reusing an owner-repository branch as the authorization source keeps the existing trust assumption (only the owner writes to the owner repository) and needs no new credential; reading grants only from that owner ref means no PR can grant or widen its own scope. Controls whose dependence on P0-001 is not established are retained and reported as exact residual restrictions rather than changed.",
+      "authority_refs": ["GOVERNANCE-MODERNIZATION-V1.1"],
+      "work_item_refs": ["WI-P2-927-GOVERNANCE-MODERNIZATION-CONTROL"],
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "created_at": "2026-11-25T03:03:07Z",
+      "updated_at": "2026-11-25T03:35:07Z",
+      "supersedes": [],
+      "impact": "Changes .github/scripts/rosuno-guard.sh (v5), .github/workflows/rosuno-guard.yml, CLAUDE.md, the PR template and the neutral-path admission of one exact procedure path (docs/process/p2-927-standing-grant-route.md); adds tools/p0/tests/p2-927-standing-grant.test.mjs; registers the package digest, this decision and the CONTROL work item. The trust binding, CODEOWNERS, .claude settings, every other P0 validator, historical evidence, migrations and the release and migration registers are unchanged. Effective only after protected merge and a separate owner activation; no live GitHub setting or environment is changed.",
+      "evidence": [
+        "Owner adoption: the P2-927 Packet was added on owner branch wi/P2-927-governance-modernization-control in d0801548564bd1feb2f09f0fd40bb9e9c8627ef9 (parent 5a9423e2f3c558b925e9d3d8c29ffed9418e0239), Git blob 3a12b08cf6bfecd2f4cb292b89b598c728efa7fb; the owner granted implementation of S1 on 2026-11-25.",
+        "Adopted package SHA-256 6cd443caf7ad3a343a80530dff51b9396cdff40c440cba4065319151fed8333b, verified against the owner-supplied file; its contents are not stored in this repository.",
+        "Read-only reconciliation at owner main 5a9423e2f3c558b925e9d3d8c29ffed9418e0239: guard b1bf60fdc01d4210b954a6a2ff910ecf00e4f9a0, trusted workflow 7a86b2f62e6657ef21597e528119a313f5edce24, trust binding d6a16c8db64a95f47916323f90ef06f294190457, CLAUDE.md 789a64254fad19e6b428d40c63b4b3fdd6a40bb6, authority references f37c90db294a69caca4017c07a79af9f3d93dd06 and the 58-entry decision log 1c6eec5dc770684eb65e26cf1124f8b3cdee8796; the owner repository has no rosuno-grants branch.",
+        "Not obtained: GitHub branch-protection and ruleset administrative evidence for the owner and fork repositories, and the P0-001 source text. No capability has been activated."
+      ],
+      "expiry": null
     }
   ]
 }

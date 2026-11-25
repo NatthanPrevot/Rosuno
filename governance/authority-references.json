@@ -198,6 +198,17 @@
       "integrity": "sha256:34e7fcff469470a80baaf1dd6dbab35aa124c1734aadc2b5979efb9adff331c7",
       "usage": "reference-only",
       "status": "active"
+    },
+    {
+      "authority_id": "GOVERNANCE-MODERNIZATION-V1.1",
+      "title": "Rosuno Governance Modernization Consolidated Adoption Package, corrected final candidate v1.1 (conditionally adopted by the owner on 2026-11-24; P2-927)",
+      "location": "owner-held private source; content intentionally not stored here",
+      "locked": true,
+      "content_copied": false,
+      "reinterpreted": false,
+      "integrity": "sha256:6cd443caf7ad3a343a80530dff51b9396cdff40c440cba4065319151fed8333b",
+      "usage": "reference-only",
+      "status": "conditionally_adopted_capabilities_not_activated"
     }
   ]
 }

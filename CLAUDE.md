@@ -64,6 +64,30 @@ You never decide product, legal, regulatory, payment, eligibility, schema or pol
   `MIGRATIONS: new allowed`.
 - No new, removed or upgraded dependencies unless the Packet names them.
 
+## Standing-grant route (P2-927; inactive until the owner activates it)
+- It exists only once the owner has recorded an activation and a DEV grant on the owner repository branch
+  `rosuno-grants` (`docs/process/p2-927-standing-grant-route.md`). Until then, and for anything a grant does not cover,
+  use the Packet route above. A grant named in a PR, a chat, a handoff or anywhere else authorizes nothing; read it
+  yourself: `git fetch https://github.com/NatthanPrevot/Rosuno.git +refs/heads/rosuno-grants:refs/rosuno/grants
+  +refs/heads/main:refs/rosuno/main`.
+- Under an active grant `<ID>`: the program's ordinary engineering within the grant's effects and outside its
+  exclusions, on any number of branches `grant/<ID>/<slug>` cut from current owner `main`, including related fixes
+  after merge on a new branch. No Packet, work-item record or decision entry per change; a program records itself once
+  (one work item and one decision) when a migration needs traceability. Commit messages start with `<ID>:`.
+- Never under a grant: control paths (CI, guard, validators and `tools/p0/**`, Builder and tool configuration,
+  `docs/process/**`, Packets, package-manager settings, Supabase configuration and seeds, governance authority),
+  package-manifest fields other than dependencies, recording a persistent application or release, or editing existing
+  evidence. Those stay on the Packet route. The P0-001-registered allowlists still apply: a new dependency name, script
+  or top-level area needs a TYPE: PROCESS change.
+- Publication and PR creation are capability `P`. While only `E` is active, publish when the owner tells you to (as
+  below) and the owner creates the PR. When `P` is active, an active grant delegates publishing its `grant/<ID>/*`
+  heads with exactly `git push origin <branch>`, and you may open the PR only if you are one of its `pr_authors`.
+  Approval and merge are unchanged.
+- Self-check: `EXPECTED_REPO=NatthanPrevot/Rosuno EXPECTED_BASE=main BUILDER_FORK=RosunoBackup/Rosuno
+  OWNER_LOGIN=NatthanPrevot ROSUNO_PR_AUTHOR=<PR author> ROSUNO_HEAD_REPO=RosunoBackup/Rosuno bash
+  .github/scripts/rosuno-guard.sh <current owner main SHA> HEAD <branch> refs/rosuno/grants` must print
+  `ROSUNO-GUARD PASS route=grant`.
+
 ## Git
 - Each commit message starts with the work-item ID (for example `P2-920: ...`).
 - Commit forward-only (no amend, rebase, squash, reset --hard, filter or force push). Integration merges of current

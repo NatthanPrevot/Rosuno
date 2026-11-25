@@ -248,3 +248,16 @@ implemented behaviour.
   consistently with its own input checks).
 - A step-up hint on the privacy page for dual-role Users at aal1.
 - Pass 2B items such as client display-name editing.
+
+## 14. Governance modernization (P2-927 S1)
+
+The standing-grant route of rosuno-guard v5 is implemented and inactive (`docs/process/p2-927-standing-grant-route.md`).
+These items stay open; none blocks work under the current Packet route.
+
+| Item                                                                 | Why open                                                                                                                                              | Who decides | What closes it                                                                                                                           |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Capability E activation                                              | Adoption activates nothing; the owner records activation with evidence                                                                                | Owner       | After the P2-927 S1 merge: the owner branch `rosuno-grants` with `activation.json` (`control_commit` = the merge) and a DEV grant record |
+| Capability P (delegated publication and PR creation)                 | Branch protection, rulesets, review identity, stale approvals, bypass and merge rights and owner-repository write access lack administrative evidence | Owner       | Owner-side settings evidence; then `P` in the activation, the login in `ROSUNO_PR_AUTHORS` and in the grant's `pr_authors`               |
+| P0-001 source                                                        | `P0-001-LOCKED` is unavailable; its registered controls stay in force                                                                                 | Owner       | Recovery and disposition of the source; until then a new dependency name, script or top-level area needs a TYPE: PROCESS change          |
+| Merge automation (M), Staging release (S), production operations (O) | Not provided by S1; manual owner merge and current Staging procedures remain                                                                          | Owner       | S2 (Staging release preparation) and later owner activation                                                                              |
+| Revocation does not re-run checks                                    | A green `rosuno-guard` status stays until the PR is re-checked                                                                                        | Owner       | Re-run the guard by manual dispatch after revoking, or do not merge                                                                      |
