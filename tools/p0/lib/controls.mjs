@@ -8356,6 +8356,9 @@ export function validateNeutralPaths(
     // exact paths; the guard keeps both PROCESS-only and owner-merged.
     ".mcp.json",
     "AGENTS.md",
+    // P2-927: the standing-grant route procedure, admitted as one exact
+    // PROCESS path (no directory, suffix or case variant).
+    "docs/process/p2-927-standing-grant-route.md",
   ]);
   const allowedP1Files = new Set([
     "supabase/migrations/20260828192126_p0_restrict_rls_auto_enable_execution.sql",

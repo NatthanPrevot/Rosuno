@@ -1,6 +1,7 @@
-## Work item
+## Authorization
 
-- Work item: `P?-???` (Packet `docs/work-items/<ID>/PACKET.md`)
+- Route: Packet `docs/work-items/<ID>/PACKET.md` on `wi/<ID>[-slug]`, or standing grant `<ID>` on `grant/<ID>/<slug>`
+  (only once the owner has activated the route)
 - What changed and why:
 
 ## Tests
@@ -21,9 +22,10 @@ pnpm run dependency:check
 
 ## Security / integrity
 
-<!-- Required for every PR (IMP §1; DL-ENG-2 G2). One line is enough when there is no security impact. For
-authentication, authorization/RLS, migrations, payments, regulatory/eligibility, storage or physical-model work:
-threats considered, tests proving the boundary, residual risks. -->
+<!-- One line is enough when there is no security impact. For authentication, authorization/RLS, protected
+disclosure, payments, regulatory/eligibility, destructive or data-transforming migrations, storage, release or guard
+trust: threats considered, tests proving the boundary, residual risks, and any independent assessment actually
+performed. -->
 
 ## Environment and data impact
 
@@ -34,4 +36,5 @@ threats considered, tests proving the boundary, residual risks. -->
 ## Review
 
 - Designated human approval of the exact head is required before merge. The owner merges.
-- Independent review: `not requested` / `requested — <who, result>` (optional, owner's choice).
+- Independent review: `not requested` / `requested — <who, result>` (optional, owner's choice; a material trust or
+  security change needs an independent assessment before the affected activation).

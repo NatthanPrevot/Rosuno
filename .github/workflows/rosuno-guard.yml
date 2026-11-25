@@ -1,5 +1,5 @@
 name: rosuno-guard
-# Trusted merge-boundary check (P2-919, guard v3; UOM v1.7.10 §28 / C1 rev5.11 §C1.3).
+# Trusted merge-boundary check (P2-919 guard v3; P2-927 guard v5; UOM v2.0 / C1 rev6.0 §C1.3).
 # - workflow_run: GitHub runs THIS file from the owner repository's DEFAULT branch after "P0 control
 #   foundation" completes for a pull request (any conclusion), with the owner repository's token. The PR head
 #   is fetched as Git data only and is never checked out or executed. No pull_request_target is used.
@@ -7,9 +7,14 @@ name: rosuno-guard
 #   an owner Packet revision. Dispatch it from `main`.
 # - Trust binding (rosuno-guard-trust.sh, unchanged): owner repository, base `main`, PR created by an allowed
 #   author, head from the authorized Builder fork, exactly one allowed-author open PR per head SHA. Owner-origin
-#   heads are refused. Edit the four values below ONLY via a TYPE: PROCESS work item.
+#   heads are refused. Edit the five values below ONLY via a TYPE: PROCESS work item.
 # - Allowed PR authors = the owner plus the logins in the owner-controlled repository variable ROSUNO_PR_AUTHORS
 #   (comma/space separated; unset = owner only). Setting it is how the owner delegates PR creation (UOM §60).
+# - P2-927: the head branch selects the owner ref the guard reads. wi/<ID>[-slug] (Packet route): the owner branch of
+#   the same name. grant/<ID>/<slug> (standing-grant route): the owner grant-record branch ROSUNO_GRANTS_BRANCH, whose
+#   activation and grant records only the owner can write; without it the route is refused. Either way it is fetched as
+#   data into refs/rosuno/approved. On the grant route the guard also requires the PR author to be one of the grant's PR
+#   authors, and an author other than the owner needs the owner-activated capability P.
 # The result is commit status "rosuno-guard" on the exact PR head SHA; branch protection requires it.
 # - T9-004: the status is published ONLY with a token of the dedicated owner-controlled GitHub App, and the required
 #   check is pinned to that App. A same-named check or status from GitHub Actions (any PR-defined workflow) cannot
@@ -42,6 +47,7 @@ jobs:
       EXPECTED_BASE: main
       BUILDER_FORK: RosunoBackup/Rosuno
       OWNER_LOGIN: NatthanPrevot
+      ROSUNO_GRANTS_BRANCH: rosuno-grants
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -81,6 +87,8 @@ jobs:
           HEAD_SHA="$(jq -r '.head.sha' "$RUNNER_TEMP/pr.json")"
           HEAD_REF="$(jq -r '.head.ref' "$RUNNER_TEMP/pr.json")"
           AUTHOR="$(jq -r '.user.login' "$RUNNER_TEMP/pr.json")"
+          HEAD_REPO="$(jq -r '.head.repo.full_name // ""' "$RUNNER_TEMP/pr.json")"
+          [[ "$HEAD_REPO" =~ ^[A-Za-z0-9-]{1,39}/[A-Za-z0-9._-]{1,100}$ ]] || HEAD_REPO=""
           [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::PR head SHA malformed"; exit 1; }
           [[ "$AUTHOR" =~ ^[A-Za-z0-9-]{1,39}$ ]] && [[ " $allowed " == *" $(printf '%s' "$AUTHOR" | tr '[:upper:]' '[:lower:]') "* ]] \
             || { echo "::error::PR author is not an allowed author"; exit 1; }
@@ -90,7 +98,7 @@ jobs:
           fi
           jq -n --slurpfile pr "$RUNNER_TEMP/pr.json" --slurpfile repo "$RUNNER_TEMP/repo.json" \
             '{pull_request: $pr[0], repository: $repo[0]}' > "$RUNNER_TEMP/event.json"
-          { echo "SKIP=false"; echo "PR=$PR"; echo "HEAD_SHA=$HEAD_SHA"; echo "PR_AUTHOR=$AUTHOR"; } >> "$GITHUB_OUTPUT"
+          { echo "SKIP=false"; echo "PR=$PR"; echo "HEAD_SHA=$HEAD_SHA"; echo "PR_AUTHOR=$AUTHOR"; echo "HEAD_REPO=$HEAD_REPO"; } >> "$GITHUB_OUTPUT"
           printf 'HEAD_REF<<EOF_REF\n%s\nEOF_REF\n' "$HEAD_REF" >> "$GITHUB_OUTPUT"
       - name: Status token of the dedicated rosuno-guard GitHub App (the only identity the required check accepts)
         id: app
@@ -127,7 +135,7 @@ jobs:
           set -euo pipefail
           bash .github/scripts/rosuno-guard-trust.sh "$RUNNER_TEMP/event.json" "$RUNNER_TEMP/open-prs.txt" | tee "$RUNNER_TEMP/trust.txt"
           grep -qx 'MODE=builder' "$RUNNER_TEMP/trust.txt" || { echo "::error::only PRs from the authorized Builder fork are checked; owner-origin heads are refused"; exit 1; }
-      - name: Fetch current main, the PR head and the owner-approved Packet branch as data
+      - name: Fetch current main, the PR head and the owner approval branch (Packet or grant records) as data
         id: fetch
         if: steps.trust.outcome == 'success'
         shell: bash
@@ -137,11 +145,17 @@ jobs:
           HEAD_REF: ${{ steps.pr.outputs.HEAD_REF }}
         run: |
           set -euo pipefail
-          [[ "$HEAD_REF" =~ ^wi/[A-Z][A-Z0-9]*-[0-9]{3}(-[a-z0-9-]+)?$ ]] || { echo "::error::head branch is not wi/<ID>[-slug]"; exit 1; }
+          if [[ "$HEAD_REF" =~ ^wi/[A-Z][A-Z0-9]*-[0-9]{3}(-[a-z0-9-]+)?$ ]]; then
+            OWNER_BRANCH="$HEAD_REF"; MISSING="branch $HEAD_REF (Packet not adopted by the owner)"
+          elif [[ "$HEAD_REF" =~ ^grant/[A-Z][A-Z0-9]*-[0-9]{3}/[a-z0-9][a-z0-9-]{0,62}$ ]]; then
+            OWNER_BRANCH="$ROSUNO_GRANTS_BRANCH"; MISSING="grant-record branch $ROSUNO_GRANTS_BRANCH (standing-grant route not activated)"
+          else
+            echo "::error::head branch is neither wi/<ID>[-slug] nor grant/<ID>/<slug>"; exit 1
+          fi
           git fetch --no-tags https://github.com/"$REPO".git "+refs/heads/main:refs/rosuno/main" "+refs/pull/${PR}/head:refs/rosuno/pr-head"
           test "$(git rev-parse refs/rosuno/pr-head)" = "$HEAD_SHA"
-          git fetch --no-tags https://github.com/"$REPO".git "+refs/heads/${HEAD_REF}:refs/rosuno/approved" \
-            || { echo "::error::owner repository has no branch $HEAD_REF (Packet not adopted by the owner)"; exit 1; }
+          git fetch --no-tags https://github.com/"$REPO".git "+refs/heads/${OWNER_BRANCH}:refs/rosuno/approved" \
+            || { echo "::error::owner repository has no $MISSING"; exit 1; }
           echo "BASE=$(git rev-parse refs/rosuno/main)" >> "$GITHUB_OUTPUT"
       - name: rosuno-guard (script from the default branch)
         id: guard
@@ -150,6 +164,8 @@ jobs:
           BASE: ${{ steps.fetch.outputs.BASE }}
           HEAD_SHA: ${{ steps.pr.outputs.HEAD_SHA }}
           HEAD_REF: ${{ steps.pr.outputs.HEAD_REF }}
+          ROSUNO_PR_AUTHOR: ${{ steps.pr.outputs.PR_AUTHOR }}
+          ROSUNO_HEAD_REPO: ${{ steps.pr.outputs.HEAD_REPO }}
         run: bash .github/scripts/rosuno-guard.sh "$BASE" "$HEAD_SHA" "$HEAD_REF" refs/rosuno/approved
       - name: Re-read the PR head before reporting
         id: now
