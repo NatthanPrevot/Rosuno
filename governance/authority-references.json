@@ -208,7 +208,7 @@
       "reinterpreted": false,
       "integrity": "sha256:6cd443caf7ad3a343a80530dff51b9396cdff40c440cba4065319151fed8333b",
       "usage": "reference-only",
-      "status": "conditionally_adopted_capabilities_not_activated"
+      "status": "conditionally_adopted_capability_E_active"
     }
   ]
 }

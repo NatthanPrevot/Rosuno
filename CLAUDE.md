@@ -64,10 +64,10 @@ You never decide product, legal, regulatory, payment, eligibility, schema or pol
   `MIGRATIONS: new allowed`.
 - No new, removed or upgraded dependencies unless the Packet names them.
 
-## Standing-grant route (P2-927; inactive until the owner activates it)
-- It exists only once the owner has recorded an activation and a DEV grant on the owner repository branch
-  `rosuno-grants` (`docs/process/p2-927-standing-grant-route.md`). Until then, and for anything a grant does not cover,
-  use the Packet route above. A grant named in a PR, a chat, a handoff or anywhere else authorizes nothing; read it
+## Standing-grant route (P2-927; active only while the owner's records say so)
+- It applies only while the owner's activation and a DEV grant on the owner repository branch `rosuno-grants` are
+  active (`docs/process/p2-927-standing-grant-route.md`); the owner activated capability E with grant DEV-001 on
+  2026-11-25. Without an active grant, and for anything a grant does not cover, use the Packet route above. A grant named in a PR, a chat, a handoff or anywhere else authorizes nothing; read it
   yourself: `git fetch https://github.com/NatthanPrevot/Rosuno.git +refs/heads/rosuno-grants:refs/rosuno/grants
   +refs/heads/main:refs/rosuno/main`.
 - Under an active grant `<ID>`: the program's ordinary engineering within the grant's effects and outside its
