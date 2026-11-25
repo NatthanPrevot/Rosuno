@@ -11,27 +11,35 @@
 // and nothing of the client's identity is shown here; each thread links to
 // its Consultation page, which reads the thread and decides every Message
 // again. No new message capability is added.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace Messages): the workspace frame around the design's conversation
+// list (one conversation per consultation, with messaging open first) beside
+// the conversation panel; each conversation opens its consultation's page,
+// where its messages are read and written. A visitor the page does not admit
+// sees the design's signed-out panel.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 
 import { attorneyConsultationPathFor } from "../../../src/application/consultations.ts";
-import { resolveAttorneyThreads } from "../../../src/application/participant-workspaces.ts";
+import {
+  resolveAttorneyThreads,
+  type MessageThread,
+} from "../../../src/application/participant-workspaces.ts";
 import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";
 import { ATTORNEY_WORKSPACE_SOURCES } from "../../../src/infrastructure/workspaces/workspace-adapter.ts";
+import {
+  AttorneyGate,
+  AttorneyWorkspace,
+  Pill,
+} from "../../../src/presentation/attorney-workspace.tsx";
 import { ATTORNEY_STATE_LABELS } from "../../../src/presentation/consultation-labels.ts";
 import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
-  Table,
   Text,
 } from "../../../src/presentation/design-system.tsx";
 import {
@@ -43,7 +51,6 @@ import {
   TIMES_NOTE,
   utcText,
 } from "../../../src/presentation/workspace-labels.ts";
-import { AttorneyNavigation } from "../../../src/presentation/workspace-navigation.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
 
 export const metadata: Metadata = {
@@ -51,20 +58,47 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function Frame({ children }: { readonly children: ReactNode }) {
+function GateFrame({ children }: { readonly children: ReactNode }) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-messages-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-messages-title">
-            Messages
-          </Heading>
-          {children}
-          <AttorneyNavigation current="/attorney/messages" />
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate titleId="attorney-messages-title" title="Messages">
+      {children}
+    </AttorneyGate>
+  );
+}
+
+// One consultation's conversation in the design's list row.
+function ThreadRow({ thread }: { readonly thread: MessageThread }) {
+  const state = ATTORNEY_STATE_LABELS[thread.consultationState];
+  const messaging = MESSAGING_STATUS_LABELS[thread.messaging];
+  return (
+    <a
+      className="w-th"
+      href={attorneyConsultationPathFor(thread.consultationId)}
+    >
+      <span className="ini" aria-hidden="true">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 5h16v11H8l-4 4z" />
+        </svg>
+      </span>
+      <span className="col grow l-g1-minw0">
+        <span className="row between l-g6">
+          <span className="sm b ell">{`${state.label} consultation`}</span>
+          <Pill tone={messaging.tone}>{messaging.label}</Pill>
+        </span>
+        <span className="xs muted aw-wraps">
+          {`${messageCountText(thread.messageCount)}. ${lastMessageText(thread.lastMessageAt, thread.lastMessageMine, utcText)}`}
+        </span>
+      </span>
+    </a>
   );
 }
 
@@ -75,7 +109,7 @@ export default async function AttorneyMessagesPage() {
   const view = await resolveAttorneyThreads(ATTORNEY_WORKSPACE_SOURCES);
   if (view.status === "sign-in-required") {
     return (
-      <Frame>
+      <GateFrame>
         <Text tone="muted">
           Messages are available only to a signed-in account with attorney
           access.
@@ -85,16 +119,16 @@ export default async function AttorneyMessagesPage() {
             Sign in
           </ButtonLink>
         </Cluster>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="warning" title="Not available" role="status">
           This account does not have attorney messages.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status !== "ready") {
@@ -102,58 +136,60 @@ export default async function AttorneyMessagesPage() {
       outcome: view.status,
     });
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="error" title="Something went wrong" role="alert">
           Your messages could not be shown right now. Please try again later.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
+  const open = view.threads.filter((thread) => thread.messaging === "open");
+  const other = view.threads.filter((thread) => thread.messaging !== "open");
   return (
-    <Frame>
-      <Text tone="muted">{INBOX_INTRO}</Text>
-      <Text tone="muted">{TIMES_NOTE}</Text>
-      {view.threads.length === 0 ? (
-        <Text>{NO_THREADS}</Text>
-      ) : (
-        <Table id="attorney-threads" caption="Your consultation threads">
-          <thead>
-            <tr>
-              <th scope="col">Consultation</th>
-              <th scope="col">Messaging</th>
-              <th scope="col">Messages</th>
-              <th scope="col">Open</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.threads.map((thread) => {
-              const state = ATTORNEY_STATE_LABELS[thread.consultationState];
-              const messaging = MESSAGING_STATUS_LABELS[thread.messaging];
-              return (
-                <tr key={thread.consultationId}>
-                  <th scope="row">
-                    <Status tone={state.tone}>{state.label}</Status>
-                  </th>
-                  <td>
-                    <Status tone={messaging.tone}>{messaging.label}</Status>
-                  </td>
-                  <td>
-                    {`${messageCountText(thread.messageCount)}. ${lastMessageText(thread.lastMessageAt, thread.lastMessageMine, utcText)}`}
-                  </td>
-                  <td>
-                    <ButtonLink
-                      variant="tertiary"
-                      href={attorneyConsultationPathFor(thread.consultationId)}
-                    >
-                      Open the consultation
-                    </ButtonLink>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
-      )}
-    </Frame>
+    <AttorneyWorkspace
+      section="messages"
+      titleId="attorney-messages-title"
+      title="Messages"
+      width="wide"
+    >
+      <div className="w-msggrid aw-msggrid">
+        <section className="w-box w-mlist" aria-label="Conversations">
+          {open.length === 0 ? null : (
+            <>
+              <p className="w-grp">Messaging open</p>
+              {open.map((thread) => (
+                <ThreadRow key={thread.consultationId} thread={thread} />
+              ))}
+            </>
+          )}
+          {other.length === 0 ? null : (
+            <>
+              <p className="w-grp">Read-only or not available</p>
+              {other.map((thread) => (
+                <ThreadRow key={thread.consultationId} thread={thread} />
+              ))}
+            </>
+          )}
+          {view.threads.length === 0 ? (
+            <div className="w-empty">
+              <p className="sm b">{NO_THREADS}</p>
+              <p className="xs muted">
+                A conversation opens when you accept a request.
+              </p>
+            </div>
+          ) : null}
+          <p className="xs subtle w-mfoot">
+            Clients can only message you inside an accepted consultation.
+          </p>
+        </section>
+        <section className="w-box w-mthread" aria-label="Conversation">
+          <div className="w-empty">
+            <p className="sm b">Choose a conversation</p>
+            <p className="xs muted">{INBOX_INTRO}</p>
+            <p className="xs subtle">{TIMES_NOTE}</p>
+          </div>
+        </section>
+      </div>
+    </AttorneyWorkspace>
   );
 }

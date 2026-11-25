@@ -621,10 +621,18 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
   }
   const ATTORNEY_FRAMES = {
     "app/attorney/dashboard/page.tsx": { section: "dashboard" },
-    "app/attorney/consultations/history/page.tsx": { legacy: true },
+    "app/attorney/consultations/history/page.tsx": {
+      section: "consultations",
+      label: "Consultation pages",
+      pages: "CONSULTATION_PAGES",
+    },
     "app/attorney/schedule/week/page.tsx": { section: "calendar" },
-    "app/attorney/messages/page.tsx": { legacy: true },
-    "app/attorney/documents/page.tsx": { legacy: true },
+    "app/attorney/messages/page.tsx": { section: "messages" },
+    "app/attorney/documents/page.tsx": {
+      section: "consultations",
+      label: "Consultation pages",
+      pages: "CONSULTATION_PAGES",
+    },
     "app/attorney/compliance/page.tsx": { legacy: true },
   };
   assert.deepEqual(

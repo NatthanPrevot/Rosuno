@@ -11,6 +11,13 @@
 // newest first. No storage path, link or content is shown here, and nothing
 // changes: each document links to its Consultation page, where downloading
 // and sharing are decided again. No new document capability is added.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace Consultations, documents): the workspace frame around the
+// design's document rows (type, size, version, when and by whom it was
+// added, its sharing, and the link to its consultation), with the section's
+// switch. A visitor the page does not admit sees the design's signed-out
+// panel.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -21,16 +28,15 @@ import { resolveAttorneyDocuments } from "../../../src/application/participant-w
 import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";
 import { ATTORNEY_WORKSPACE_SOURCES } from "../../../src/infrastructure/workspaces/workspace-adapter.ts";
 import {
+  AttorneyGate,
+  AttorneyWorkspace,
+  CONSULTATION_PAGES,
+  Pill,
+} from "../../../src/presentation/attorney-workspace.tsx";
+import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
-  Table,
   Text,
 } from "../../../src/presentation/design-system.tsx";
 import {
@@ -44,7 +50,6 @@ import {
   uploaderLabel,
   utcText,
 } from "../../../src/presentation/workspace-labels.ts";
-import { AttorneyNavigation } from "../../../src/presentation/workspace-navigation.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
 
 export const metadata: Metadata = {
@@ -52,20 +57,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function Frame({ children }: { readonly children: ReactNode }) {
+function GateFrame({ children }: { readonly children: ReactNode }) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-documents-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-documents-title">
-            Documents
-          </Heading>
-          {children}
-          <AttorneyNavigation current="/attorney/documents" />
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate titleId="attorney-documents-title" title="Documents">
+      {children}
+    </AttorneyGate>
   );
 }
 
@@ -76,7 +72,7 @@ export default async function AttorneyDocumentsPage() {
   const view = await resolveAttorneyDocuments(ATTORNEY_WORKSPACE_SOURCES);
   if (view.status === "sign-in-required") {
     return (
-      <Frame>
+      <GateFrame>
         <Text tone="muted">
           Documents are available only to a signed-in account with attorney
           access.
@@ -86,16 +82,16 @@ export default async function AttorneyDocumentsPage() {
             Sign in
           </ButtonLink>
         </Cluster>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="warning" title="Not available" role="status">
           This account does not have attorney documents.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status !== "ready") {
@@ -104,63 +100,74 @@ export default async function AttorneyDocumentsPage() {
       outcome: view.status,
     });
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="error" title="Something went wrong" role="alert">
           Your documents could not be shown right now. Please try again later.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   return (
-    <Frame>
-      <Text tone="muted">{DOCUMENTS_INTRO}</Text>
-      <Text tone="muted">{TIMES_NOTE}</Text>
+    <AttorneyWorkspace
+      section="consultations"
+      titleId="attorney-documents-title"
+      title="Documents"
+      width="medium"
+      pages={{
+        label: "Consultation pages",
+        links: CONSULTATION_PAGES,
+        current: "/attorney/documents",
+      }}
+    >
+      <p className="xs subtle aw-lead">{`${DOCUMENTS_INTRO} ${TIMES_NOTE}`}</p>
       {view.documents.length === 0 ? (
-        <Text>{NO_ATTORNEY_DOCUMENTS}</Text>
+        <div className="w-box w-empty">
+          <p className="sm b">{NO_ATTORNEY_DOCUMENTS}</p>
+        </div>
       ) : (
-        <Table id="attorney-documents" caption="Your documents">
-          <thead>
-            <tr>
-              <th scope="col">Document</th>
-              <th scope="col">Added</th>
-              <th scope="col">Uploaded by</th>
-              <th scope="col">Sharing</th>
-              <th scope="col">Consultation</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.documents.map((document) => (
-              <tr key={document.documentId}>
-                <th scope="row">
-                  {`${DOCUMENT_TYPE_LABELS[document.mimeType]}, ${byteSizeText(document.byteSize)}, ${document.versionLabel}`}
-                </th>
-                <td>{utcText(document.createdAt)}</td>
-                <td>{uploaderLabel(document.uploadedBy, document.mine)}</td>
-                <td>
-                  <Status
-                    tone={document.sharing === "active" ? "success" : "neutral"}
+        <section className="w-box w-crs" aria-label="Your documents">
+          {view.documents.map((document) => (
+            <div className="w-cr" key={document.documentId}>
+              <div className="w-crh aw-static">
+                <span className="ini" aria-hidden="true">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   >
-                    {sharingLabel(document.sharing, document.mine)}
-                  </Status>
-                </td>
-                <td>
-                  <ButtonLink
-                    variant="tertiary"
-                    href={attorneyConsultationPathFor(document.consultationId)}
-                  >
-                    Open the consultation
-                  </ButtonLink>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+                    <path d="M6 3h8l4 4v14H6zM14 3v4h4" />
+                  </svg>
+                </span>
+                <span className="col grow l-g1-minw0">
+                  <span className="sm b ell">
+                    {`${DOCUMENT_TYPE_LABELS[document.mimeType]}, ${byteSizeText(document.byteSize)}, ${document.versionLabel}`}
+                  </span>
+                  <span className="xs muted ell">
+                    {`Added ${utcText(document.createdAt)} · ${uploaderLabel(document.uploadedBy, document.mine)}`}
+                  </span>
+                </span>
+                <Pill
+                  tone={document.sharing === "active" ? "success" : "neutral"}
+                >
+                  {sharingLabel(document.sharing, document.mine)}
+                </Pill>
+                <a
+                  className="link sm"
+                  href={attorneyConsultationPathFor(document.consultationId)}
+                >
+                  Open the consultation
+                </a>
+              </div>
+            </div>
+          ))}
+        </section>
       )}
-      {view.more ? (
-        <Text size="small" tone="muted">
-          {MORE_DOCUMENTS_NOTE}
-        </Text>
-      ) : null}
-    </Frame>
+      {view.more ? <p className="xs subtle">{MORE_DOCUMENTS_NOTE}</p> : null}
+    </AttorneyWorkspace>
   );
 }

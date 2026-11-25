@@ -10,6 +10,12 @@
 // requests, upcoming and active Consultations stay on their existing pages.
 // Each links to its own page, where the database decides everything again.
 // Nothing of the client's identity is shown.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace Consultations, past): the workspace frame around the design's
+// consultation rows in their groups (each opens the consultation's own
+// page), with the section's switch. A visitor the page does not admit sees
+// the design's signed-out panel.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -19,6 +25,13 @@ import { attorneyConsultationPathFor } from "../../../../src/application/consult
 import { resolveAttorneyHistory } from "../../../../src/application/participant-workspaces.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
 import { ATTORNEY_WORKSPACE_SOURCES } from "../../../../src/infrastructure/workspaces/workspace-adapter.ts";
+import {
+  AttorneyGate,
+  AttorneyWorkspace,
+  CONSULTATION_PAGES,
+  Pill,
+  RowChevron,
+} from "../../../../src/presentation/attorney-workspace.tsx";
 import { outcomeLabelOf } from "../../../../src/presentation/completion-labels.ts";
 import {
   ATTORNEY_STATE_LABELS,
@@ -29,12 +42,6 @@ import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
   Text,
 } from "../../../../src/presentation/design-system.tsx";
 import {
@@ -43,7 +50,6 @@ import {
   TIMES_NOTE,
   utcText,
 } from "../../../../src/presentation/workspace-labels.ts";
-import { AttorneyNavigation } from "../../../../src/presentation/workspace-navigation.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
 
 export const metadata: Metadata = {
@@ -63,20 +69,11 @@ const GROUPS = Object.freeze([
   },
 ] as const);
 
-function Frame({ children }: { readonly children: ReactNode }) {
+function GateFrame({ children }: { readonly children: ReactNode }) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-history-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-history-title">
-            Past consultations
-          </Heading>
-          {children}
-          <AttorneyNavigation current="/attorney/consultations/history" />
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate titleId="attorney-history-title" title="Past consultations">
+      {children}
+    </AttorneyGate>
   );
 }
 
@@ -87,7 +84,7 @@ export default async function AttorneyHistoryPage() {
   const view = await resolveAttorneyHistory(ATTORNEY_WORKSPACE_SOURCES);
   if (view.status === "sign-in-required") {
     return (
-      <Frame>
+      <GateFrame>
         <Text tone="muted">
           Past consultations are available only to their signed-in attorney.
         </Text>
@@ -96,16 +93,16 @@ export default async function AttorneyHistoryPage() {
             Sign in
           </ButtonLink>
         </Cluster>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="warning" title="Not available" role="status">
           This account does not have attorney consultations.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status !== "ready") {
@@ -114,70 +111,98 @@ export default async function AttorneyHistoryPage() {
       outcome: view.status,
     });
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="error" title="Something went wrong" role="alert">
           Your past consultations could not be shown right now. Please try again
           later.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   return (
-    <Frame>
-      <Text tone="muted">{HISTORY_INTRO}</Text>
-      <Text tone="muted">{TIMES_NOTE}</Text>
-      {view.entries.length === 0 ? <Text>{NO_HISTORY}</Text> : null}
-      {GROUPS.map((group) => {
-        const entries = view.entries.filter((entry) =>
-          (group.states as readonly string[]).includes(entry.state),
-        );
-        return (
-          <Stack key={group.key} gap="tight">
-            <Heading as="h2" size="md" id={`history-${group.key}`}>
-              {group.title}
-            </Heading>
-            {entries.length === 0 ? (
-              <Text tone="muted">None.</Text>
-            ) : (
-              entries.map((entry) => {
-                const state = ATTORNEY_STATE_LABELS[entry.state];
-                const outcome = outcomeLabelOf(entry.outcomeCode);
-                return (
-                  <Surface key={entry.id} labelledBy={`history-${entry.id}`}>
-                    <Stack gap="tight">
-                      <Heading as="h3" size="sm" id={`history-${entry.id}`}>
-                        {modalityText(entry.modality)}
-                      </Heading>
-                      <Cluster>
-                        <Status tone={state.tone}>{state.label}</Status>
-                      </Cluster>
-                      <Text size="small">
-                        {entry.bookingStart !== null
-                          ? utcText(entry.bookingStart)
-                          : PATH_LABELS[entry.path]}
-                      </Text>
-                      {entry.endedAt === null ? null : (
-                        <Text size="small">{`Ended ${utcText(entry.endedAt)}`}</Text>
-                      )}
-                      {outcome === null ? null : (
-                        <Text size="small">{outcome}</Text>
-                      )}
-                      <Cluster>
-                        <ButtonLink
-                          variant="tertiary"
+    <AttorneyWorkspace
+      section="consultations"
+      titleId="attorney-history-title"
+      title="Past consultations"
+      width="medium"
+      pages={{
+        label: "Consultation pages",
+        links: CONSULTATION_PAGES,
+        current: "/attorney/consultations/history",
+      }}
+    >
+      <p className="xs subtle aw-lead">{`${HISTORY_INTRO} ${TIMES_NOTE}`}</p>
+      {view.entries.length === 0 ? (
+        <div className="w-box w-empty">
+          <p className="sm b">{NO_HISTORY}</p>
+        </div>
+      ) : null}
+      <div className="w-clist">
+        {GROUPS.map((group) => {
+          const entries = view.entries.filter((entry) =>
+            (group.states as readonly string[]).includes(entry.state),
+          );
+          return (
+            <section
+              className="w-cgrp"
+              key={group.key}
+              aria-labelledby={`history-${group.key}`}
+            >
+              <h2 className="w-gh" id={`history-${group.key}`}>
+                {group.title}
+              </h2>
+              {entries.length === 0 ? (
+                <div className="w-box aw-none-box">
+                  <p className="xs subtle">None.</p>
+                </div>
+              ) : (
+                <div className="w-box w-crs">
+                  {entries.map((entry) => {
+                    const state = ATTORNEY_STATE_LABELS[entry.state];
+                    const outcome = outcomeLabelOf(entry.outcomeCode);
+                    return (
+                      <div
+                        className={
+                          entry.state === "cancelled" ? "w-cr cxl" : "w-cr"
+                        }
+                        key={entry.id}
+                      >
+                        <a
+                          className="w-crh"
                           href={attorneyConsultationPathFor(entry.id)}
+                          aria-labelledby={`history-${entry.id}`}
                         >
-                          Open the consultation
-                        </ButtonLink>
-                      </Cluster>
-                    </Stack>
-                  </Surface>
-                );
-              })
-            )}
-          </Stack>
-        );
-      })}
-    </Frame>
+                          <span className="col grow l-g1-minw0">
+                            <span
+                              className="sm b ell"
+                              id={`history-${entry.id}`}
+                            >
+                              {modalityText(entry.modality)}
+                            </span>
+                            <span className="xs muted ell">
+                              {entry.bookingStart !== null
+                                ? utcText(entry.bookingStart)
+                                : PATH_LABELS[entry.path]}
+                            </span>
+                            {entry.endedAt === null ? null : (
+                              <span className="xs muted ell">{`Ended ${utcText(entry.endedAt)}`}</span>
+                            )}
+                            {outcome === null ? null : (
+                              <span className="xs ell">{outcome}</span>
+                            )}
+                          </span>
+                          <Pill tone={state.tone}>{state.label}</Pill>
+                          <RowChevron />
+                        </a>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </AttorneyWorkspace>
   );
 }

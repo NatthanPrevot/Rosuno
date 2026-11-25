@@ -9,6 +9,13 @@
 // (ready as soon as the server reports the window open: the browser never
 // decides it), each linking to its own page. Nothing of the client's identity
 // is shown.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace Consultations): the workspace frame around the design's
+// consultation rows grouped by their UTC day (each opens the
+// consultation's own page), with the section's switch to past consultations
+// and documents. A visitor the page does not admit sees the design's
+// signed-out panel.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -18,9 +25,20 @@ import {
   attorneyConsultationPathFor,
   displayStateOf,
   resolveAttorneyConsultations,
+  type ConsultationEntry,
 } from "../../../src/application/consultations.ts";
 import { ATTORNEY_CONSULTATION_SOURCES } from "../../../src/infrastructure/consultations/consultation-adapter.ts";
 import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";
+import {
+  AttorneyGate,
+  AttorneyWorkspace,
+  clockText,
+  CONSULTATION_PAGES,
+  dayText,
+  Pill,
+  RowChevron,
+  TIMES_IN_UTC,
+} from "../../../src/presentation/attorney-workspace.tsx";
 import {
   ATTORNEY_STATE_LABELS,
   durationText,
@@ -34,13 +52,6 @@ import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
-  Table,
   Text,
 } from "../../../src/presentation/design-system.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
@@ -50,7 +61,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function ListFrame({
+function GateFrame({
   title,
   children,
 }: {
@@ -58,17 +69,9 @@ function ListFrame({
   readonly children: ReactNode;
 }) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-consultations-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-consultations-title">
-            {title}
-          </Heading>
-          {children}
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate titleId="attorney-consultations-title" title={title}>
+      {children}
+    </AttorneyGate>
   );
 }
 
@@ -80,6 +83,23 @@ const BACK = (
   </Cluster>
 );
 
+// The UTC day a consultation belongs to, or "Now" for one without a booked
+// time; consecutive entries of one day share a group, in the list's order.
+function groupsOf(entries: readonly ConsultationEntry[]) {
+  const groups: { label: string; entries: ConsultationEntry[] }[] = [];
+  for (const entry of entries) {
+    const label =
+      entry.bookingStart === null ? "Now" : dayText(entry.bookingStart);
+    const last = groups[groups.length - 1];
+    if (last !== undefined && last.label === label) {
+      last.entries.push(entry);
+    } else {
+      groups.push({ label, entries: [entry] });
+    }
+  }
+  return groups;
+}
+
 export default async function AttorneyConsultationsPage() {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
@@ -89,7 +109,7 @@ export default async function AttorneyConsultationsPage() {
   );
   if (view.status === "sign-in-required") {
     return (
-      <ListFrame title="Sign in to continue">
+      <GateFrame title="Sign in to continue">
         <Text tone="muted">
           Consultations are available only to a signed-in account with attorney
           access.
@@ -99,16 +119,16 @@ export default async function AttorneyConsultationsPage() {
             Sign in
           </ButtonLink>
         </Cluster>
-      </ListFrame>
+      </GateFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <ListFrame title="Consultations not available">
+      <GateFrame title="Consultations not available">
         <Alert tone="warning" title="No consultations access" role="status">
           This account does not have access to attorney consultations.
         </Alert>
-      </ListFrame>
+      </GateFrame>
     );
   }
   if (view.status !== "ready") {
@@ -117,67 +137,84 @@ export default async function AttorneyConsultationsPage() {
       outcome: view.status,
     });
     return (
-      <ListFrame title="Consultations unavailable">
+      <GateFrame title="Consultations unavailable">
         <Alert tone="error" title="Something went wrong" role="alert">
           Your consultations could not be shown right now. Please try again
           later.
         </Alert>
         {BACK}
-      </ListFrame>
+      </GateFrame>
     );
   }
   return (
-    <ListFrame title="Consultations">
-      <Text tone="muted">{LIST_INTRO}</Text>
+    <AttorneyWorkspace
+      section="consultations"
+      titleId="attorney-consultations-title"
+      title="Consultations"
+      width="medium"
+      pages={{
+        label: "Consultation pages",
+        links: CONSULTATION_PAGES,
+        current: "/attorney/consultations",
+      }}
+    >
+      <p className="xs subtle aw-lead">{`${LIST_INTRO} ${TIMES_IN_UTC}.`}</p>
       {view.entries.length === 0 ? (
-        <Text>{NO_CONSULTATIONS}</Text>
+        <div className="w-box w-empty">
+          <p className="sm b">{NO_CONSULTATIONS}</p>
+        </div>
       ) : (
-        <Table id="attorney-consultations" caption="Your consultations">
-          <thead>
-            <tr>
-              <th scope="col">Status</th>
-              <th scope="col">Consultation</th>
-              <th scope="col">How soon</th>
-              <th scope="col">Time</th>
-              <th scope="col">Open</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.entries.map((entry) => {
-              const state = ATTORNEY_STATE_LABELS[displayStateOf(entry)];
-              return (
-                <tr key={entry.id}>
-                  <td>
-                    <Status tone={state.tone}>{state.label}</Status>
-                  </td>
-                  <td>
-                    {entry.durationMinutes === null
-                      ? modalityText(entry.modality)
-                      : `${modalityText(entry.modality)}, ${durationText(entry.durationMinutes)}`}
-                  </td>
-                  <td>{PATH_LABELS[entry.path]}</td>
-                  <td>
-                    {entry.bookingStart === null
-                      ? entry.startedAt === null
-                        ? "Not started"
-                        : utcText(entry.startedAt)
-                      : utcText(entry.bookingStart)}
-                  </td>
-                  <td>
-                    <ButtonLink
-                      variant="secondary"
-                      href={attorneyConsultationPathFor(entry.id)}
-                    >
-                      Open
-                    </ButtonLink>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
+        <div className="w-clist">
+          {groupsOf(view.entries).map((group, index) => (
+            <section
+              className="w-cgrp"
+              key={`${group.label}-${index}`}
+              aria-label={group.label}
+            >
+              <h2 className="w-gh">{group.label}</h2>
+              <div className="w-box w-crs">
+                {group.entries.map((entry) => {
+                  const state = ATTORNEY_STATE_LABELS[displayStateOf(entry)];
+                  return (
+                    <div className="w-cr" key={entry.id}>
+                      <a
+                        className="w-crh"
+                        href={attorneyConsultationPathFor(entry.id)}
+                      >
+                        <span className="w-crt num">
+                          <b>
+                            {entry.bookingStart === null
+                              ? entry.startedAt === null
+                                ? "Not started"
+                                : utcText(entry.startedAt)
+                              : clockText(entry.bookingStart)}
+                          </b>
+                          <span className="xs muted">
+                            {entry.durationMinutes === null
+                              ? ""
+                              : durationText(entry.durationMinutes)}
+                          </span>
+                        </span>
+                        <span className="col grow l-g1-minw0">
+                          <span className="sm b ell">
+                            {modalityText(entry.modality)}
+                          </span>
+                          <span className="xs muted ell">
+                            {PATH_LABELS[entry.path]}
+                          </span>
+                        </span>
+                        <Pill tone={state.tone}>{state.label}</Pill>
+                        <RowChevron />
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
       )}
       {BACK}
-    </ListFrame>
+    </AttorneyWorkspace>
   );
 }
