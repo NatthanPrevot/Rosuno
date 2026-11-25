@@ -4550,19 +4550,36 @@ test("38. registration navigation is fixed first-party links on the sign-in and 
     [...signIn.matchAll(/\bhref="([^"]*)"/g)].map((match) => match[1]),
     ["/forgot-password", "/"],
   );
-  // MVP-001 D-1: account creation is refused by design until a client
-  // address can be trusted, so the home page offers no account-creation
-  // call to action at all. It keeps only the fixed confirmation-resume link.
+  // P2-923 (DECISION C) activated hosted self-registration, so the site
+  // chrome's visitor header offers sign-up beside sign-in (DEV-001, the
+  // owner's UI/UX design). The fixed confirmation-resume link and the help
+  // and privacy entry points are fixed first-party links of the site chrome,
+  // which the home page renders.
   const home = codeOf(read("app/page.tsx"));
-  assert.doesNotMatch(home, /\/sign-up|Create an account/);
-  // MVP-001 S3 part 2: beside it, exactly the fixed help and privacy entry
-  // points, and nothing else in that cluster.
+  const chrome = codeOf(read("src/presentation/site-chrome.tsx"));
   assert.match(
     home,
-    /<Cluster>\n\s+<ButtonLink variant="tertiary" href="\/auth\/confirm">\n\s+Finish account confirmation\n\s+<\/ButtonLink>\n\s+<ButtonLink variant="tertiary" href="\/help">\n\s+Help\n\s+<\/ButtonLink>\n\s+<ButtonLink variant="tertiary" href="\/privacy">\n\s+Privacy\n\s+<\/ButtonLink>\n\s+<\/Cluster>/,
+    /<SitePage session=\{view\.session\} signOut=\{signOut\}>/,
   );
-  // Links only: the home page still has just the one sign-out form.
-  assert.equal(home.match(/<form\b/g).length, 1);
+  assert.equal(chrome.match(/href="\/sign-up"/g).length, 1);
+  assert.equal(chrome.match(/href="\/sign-in"/g).length, 1);
+  assert.equal(
+    chrome.match(
+      /\{ href: "\/auth\/confirm", label: "Finish account confirmation" \}/g,
+    ).length,
+    1,
+  );
+  assert.equal(
+    chrome.match(/\{ href: "\/help", label: "Help & FAQ" \}/g).length,
+    1,
+  );
+  assert.equal(
+    chrome.match(/\{ href: "\/privacy", label: "Privacy" \}/g).length,
+    1,
+  );
+  // Links only on the home page; the chrome's one form is the sign-out action.
+  assert.doesNotMatch(home, /<form\b/);
+  assert.equal(chrome.match(/<form\b/g).length, 1);
   // The sign-up route is a page and its action, and nothing else.
   assert.deepEqual(filesIn("app/sign-up/"), [
     "app/sign-up/actions.ts",

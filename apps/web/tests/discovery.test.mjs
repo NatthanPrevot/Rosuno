@@ -1105,9 +1105,29 @@ test("S5-13. the public navigation is the fixed list of public pages, linked as 
     "react",
     "./design-system.tsx",
   ]);
+  // DEV-001: the home page renders the site chrome of the owner's design,
+  // whose primary navigation is fixed first-party links.
   assert.match(
     codeOf(read("app/page.tsx")),
-    /<Page density="public">\n {6}<PublicNavigation \/>/,
+    /<SitePage session=\{view\.session\} signOut=\{signOut\}>/,
+  );
+  assert.deepEqual(
+    [
+      ...codeOf(read("src/presentation/site-chrome.tsx"))
+        .slice(
+          0,
+          codeOf(read("src/presentation/site-chrome.tsx")).indexOf(
+            "SITE_FOOTER",
+          ),
+        )
+        .matchAll(/\{ href: "([^"]+)", label: "([^"]+)" \}/g),
+    ].map((m) => [m[1], m[2]]),
+    [
+      ["/find-an-attorney", "Find an attorney"],
+      ["/#legal-issues", "Legal matters"],
+      ["/how-it-works", "How it works"],
+      ["/help", "Help"],
+    ],
   );
 });
 

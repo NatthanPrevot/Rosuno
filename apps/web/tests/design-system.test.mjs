@@ -31,6 +31,7 @@ const partials = Object.freeze([
   "staff.css",
   "layout.css",
   "site.css",
+  "product.css",
 ]);
 const stylePaths = Object.freeze([
   globalPath,

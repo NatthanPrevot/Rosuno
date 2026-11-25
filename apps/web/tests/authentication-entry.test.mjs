@@ -1297,10 +1297,17 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
     "app/sign-in/actions.ts",
     "app/sign-in/page.tsx",
   ]);
+  // DEV-001: the home page renders the site chrome, whose one form is the
+  // sign-out action; the page passes the action and holds no form itself.
   const home = read("app/page.tsx");
-  assert.equal(home.match(/<form\b[^>]*>/g)?.length, 1);
-  assert.match(home, /<form action=\{signOut\}>/);
-  assert.doesNotMatch(home, /\bmethod=|href="[^"]*sign-?out/i);
+  const chrome = read("src/presentation/site-chrome.tsx");
+  assert.equal(codeOf(home).match(/<form\b/g), null);
+  assert.match(home, /signOut=\{signOut\}/);
+  assert.equal(chrome.match(/<form\b[^>]*>/g)?.length, 1);
+  assert.match(chrome, /<form action=\{signOut\}>/);
+  for (const source of [home, chrome]) {
+    assert.doesNotMatch(source, /\bmethod="post"|href="[^"]*sign-?out/i);
+  }
   // The home page reads session state only through the trusted source.
   assert.match(
     home,

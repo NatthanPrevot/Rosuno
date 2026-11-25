@@ -452,3 +452,18 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Public site frame and header (the design's public header, with its line always shown). */
+.rz.rz-site {
+  min-height: 100vh;
+  background: var(--page);
+}
+.rz .rz-site-header {
+  position: relative;
+  z-index: 40;
+  background: var(--page);
+  border-bottom: 1px solid var(--line);
+}
+.rz .rz-site-header form {
+  display: inline-flex;
+}

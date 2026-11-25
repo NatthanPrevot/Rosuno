@@ -143,12 +143,20 @@ test("PE-1. the privacy and help pages are fixed public server pages that read a
 });
 
 test("PE-2. the entry points are reachable from the home page and the client workspace as fixed first-party links", () => {
+  // DEV-001: the home page renders the site chrome, whose footer holds the
+  // fixed help and privacy entry points once each.
   const home = codeOf(read("app/page.tsx"));
+  const chrome = codeOf(read("src/presentation/site-chrome.tsx"));
+  const footer = chrome.slice(chrome.indexOf("SITE_FOOTER"));
+  assert.match(
+    home,
+    /<SitePage session=\{view\.session\} signOut=\{signOut\}>/,
+  );
+  assert.equal(footer.match(/href: "\/help"/g).length, 1);
+  assert.equal(footer.match(/href: "\/privacy"/g).length, 1);
   const workspace = codeOf(read("app/client/page.tsx"));
-  for (const code of [home, workspace]) {
-    assert.equal(code.match(/href="\/help"/g).length, 1);
-    assert.equal(code.match(/href="\/privacy"/g).length, 1);
-  }
+  assert.equal(workspace.match(/href="\/help"/g).length, 1);
+  assert.equal(workspace.match(/href="\/privacy"/g).length, 1);
 });
 
 test("PE-3. client suggestion wording: places only ever 'may be relevant', a category only as one that may fit, no banned recommendation claim, and nothing changes until the client saves", () => {
@@ -210,18 +218,33 @@ test("PE-3. client suggestion wording: places only ever 'may be relevant', a cat
   }
   assert.equal(suggestionMessage({ status: "idle" }), null);
   // Packet rule 11: no unapproved legal text (no disclaimer wording).
-  assert.doesNotMatch(AI_SUGGESTION_NOTE, /legal advice|disclaim|liab|warrant/i);
+  assert.doesNotMatch(
+    AI_SUGGESTION_NOTE,
+    /legal advice|disclaim|liab|warrant/i,
+  );
   assert.match(AI_SUGGESTION_NOTE, /never choose an attorney/);
-  assert.match(AI_SUGGESTION_NOTE, /Nothing changes in your answers unless you save them/);
+  assert.match(
+    AI_SUGGESTION_NOTE,
+    /Nothing changes in your answers unless you save them/,
+  );
   assert.match(PREFILL_NOTE, /saved only when you save/);
   assert.match(
     suggestionMessage({ status: "ai-unavailable" }).body,
     /complete and submit your Intake on your own/,
   );
-  assert.match(routingText({ kind: "category", name: "Family" }), /your own choice, not a legal classification/);
-  assert.match(routingText({ kind: "not_sure" }), /We have not chosen one for you/);
+  assert.match(
+    routingText({ kind: "category", name: "Family" }),
+    /your own choice, not a legal classification/,
+  );
+  assert.match(
+    routingText({ kind: "not_sure" }),
+    /We have not chosen one for you/,
+  );
   assert.match(CHANGE_NOTE, /not available yet/);
-  assert.match(outcomeMessage({ status: "change-not-configured" }).title, /Not available yet/);
+  assert.match(
+    outcomeMessage({ status: "change-not-configured" }).title,
+    /Not available yet/,
+  );
 });
 
 test("PE-4. the client suggestion section is offered only on a draft with saved content, decision forms only for an undecided suggestion, and change forms only after submission or expiry", () => {
