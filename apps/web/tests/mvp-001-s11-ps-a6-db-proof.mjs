@@ -75,6 +75,12 @@ const PORT = 54351;
 const DB = "rosuno_s11_ps_a6_proof";
 const PROD_DB = "rosuno_s11_ps_a6_proof_production";
 const BASE_DB = "rosuno_s11_ps_a6_proof_base";
+// DEV-001: the PS-A6 DDL inventory (MIG-2) compares BASE_DB with a database
+// migrated exactly through the known tail (PS-A6 and the offered-start
+// correction), so a later registered migration's own objects never enter the
+// PS-A6 inventory; every behavioural check still runs on DB, which holds
+// every migration.
+const INVENTORY_DB = "rosuno_s11_ps_a6_proof_inventory";
 const PRODUCTION_REF = "syntheticpsasixproof";
 const REPOSITORY_ROOT = path.resolve(
   path.dirname(decodeURIComponent(new URL(import.meta.url).pathname)),
@@ -497,9 +503,17 @@ function applyMigrations() {
   sql(fixtureFor(DB), "postgres");
   sql(fixtureFor(PROD_DB), "postgres");
   sql(fixtureFor(BASE_DB), "postgres");
+  sql(fixtureFor(INVENTORY_DB), "postgres");
   report.migrations.notices = applyMigrationsTo(DB, files);
   applyMigrationsTo(PROD_DB, files);
   applyMigrationsTo(BASE_DB, files.slice(0, last + 1));
+  applyMigrationsTo(
+    INVENTORY_DB,
+    files.slice(
+      0,
+      last + 1 + PS_A6_MIGRATIONS.length + S11_OFFERED_START_MIGRATIONS.length,
+    ),
+  );
   report.migrations.applied = files.length;
   report.migrations.ps_a6 = [...PS_A6_MIGRATIONS];
   report.migrations.registration = registration;
@@ -2102,7 +2116,7 @@ async function migrationChecks() {
       const deltas = Object.fromEntries(
         Object.keys(LISTINGS).map((name) => [
           name,
-          listingDelta(name, BASE_DB, DB),
+          listingDelta(name, BASE_DB, INVENTORY_DB),
         ]),
       );
       assert.deepEqual(deltas.relations, {

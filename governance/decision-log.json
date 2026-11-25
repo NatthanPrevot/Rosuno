@@ -2178,7 +2178,7 @@
       "created_at": "2026-11-25T06:19:41Z",
       "updated_at": "2026-11-25T06:19:41Z",
       "supersedes": [],
-      "impact": "Adds migration 20261128010000 (two functions, no relation, column or policy) with register row 77 unapplied, its disposable-database proof, the assertTailThenRegistered helper and its use in eleven slice proofs, this decision, the DEV-001 program work item and readiness facts. No Staging, production, provider, release or control-path change.",
+      "impact": "Adds migration 20261128010000 (two functions, no relation, column or policy) with register row 77 unapplied, its disposable-database proof, the assertTailThenRegistered helper and its use in eleven slice proofs, the S11 PS-A6 inventory comparison bounded to its known tail, this decision, the DEV-001 program work item and readiness facts. No Staging, production, provider, release or control-path change.",
       "evidence": [
         "Owner activation: commit e18b6c7e59684e0d80980c197755846fef840076 on owner branch rosuno-grants, .github/rosuno-grants/activation.json (capability E, control_commit 89a391c0b5e7c78e657f1488d666518d1de77781) and .github/rosuno-grants/DEV-001.json (status active, effects code, schema and dependencies, issued 2026-11-25T05:28:22Z, expires 2036-11-25T05:28:22Z); read by the Builder from the owner repository on 2026-11-25.",
         "Owner direction in the Builder session, 2026-11-25: continue canonical development under DEV-001 from the last verified checkpoint, owner main 1aa7d9eede7d74bf3d8e034fbdca76123b14e90e.",

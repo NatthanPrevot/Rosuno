@@ -2929,7 +2929,7 @@
         "Ordinary engineering on grant/DEV-001/<slug> branches cut from current owner main, within the grant's effects and outside the control paths of docs/process/p2-927-standing-grant-route.md.",
         "Forward-only migrations with unapplied register rows; this work item and DEC-20261125-DEV-001-ENGINEERING-PROGRAM cover every DEV-001 migration.",
         "First migration 20261128010000_p2_924_development_regulatory_mode_and_staff_bootstrap: the reviewed P2-924 revision 3.1 design (non-production development regulatory mode and audited first-staff bootstrap), with its disposable-database proof apps/web/tests/p2-924-db-proof.mjs.",
-        "The D4 proof-tail helper assertTailThenRegistered in apps/web/tests/migration-lifecycle.mjs and its use in the eleven slice proofs that pinned the later-migration list.",
+        "The D4 proof-tail helper assertTailThenRegistered in apps/web/tests/migration-lifecycle.mjs and its use in the eleven slice proofs that pinned the later-migration list; the S11 PS-A6 proof's DDL inventory compared through its known tail only, so a later migration's own objects stay out of the PS-A6 inventory.",
         "Fact records allowed under a grant: this work item, its decision, unapplied register rows and readiness items."
       ],
       "out_of_scope": [
