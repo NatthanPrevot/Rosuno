@@ -5,7 +5,14 @@
 // directory answer and the fixed first-party links built from it. No figure
 // the directory does not answer (rating, review count, price) is shown, and
 // no portrait is shown until consented images exist: the card shows the
-// attorney's initials in the portrait area instead.
+// attorney's initials in the portrait area instead. The availability wording
+// is the directory's own (discovery labels).
+
+import {
+  AVAILABLE_NOW,
+  NO_AVAILABILITY_SHOWN,
+  SCHEDULED_AVAILABILITY,
+} from "./discovery-labels.ts";
 
 export type AttorneyCardEntry = {
   readonly attorneyId: string;
@@ -72,12 +79,12 @@ export function AttorneyCard({
         {entry.availableNow ? (
           <span className="status now">
             <span className="dot" />
-            Available now
+            {AVAILABLE_NOW}
           </span>
         ) : entry.scheduledAvailability ? (
           <span className="status">
             <CalendarIcon />
-            Open times to book
+            {SCHEDULED_AVAILABILITY}
           </span>
         ) : (
           <span className="status l-cmuted">
@@ -94,7 +101,7 @@ export function AttorneyCard({
               <circle cx="12" cy="12" r="8" />
               <path d="M8 12h8" />
             </svg>
-            Not available right now
+            {NO_AVAILABILITY_SHOWN}
           </span>
         )}
       </a>

@@ -953,6 +953,7 @@ test("S5-11. banned claims: no S5 label, message, navigation entry, content stat
     "app/find-an-attorney/select/forms.tsx",
     "app/attorneys/[attorney]/page.tsx",
     "src/presentation/public-site.tsx",
+    "src/presentation/attorney-card.tsx",
     "src/presentation/discovery-labels.ts",
     "src/application/discovery.ts",
     ...Object.keys(PUBLIC_CONTENT_TOPICS).map((t) => `app/${t}/page.tsx`),

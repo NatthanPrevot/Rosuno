@@ -473,3 +473,23 @@
   gap: 16px;
   margin-top: 16px;
 }
+
+/* Section bottom spacing and filter-bar selects (native selects in the design's filter bar). */
+.rz .rz-section-end {
+  padding-bottom: 96px;
+}
+.rz .rz-fbar {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rz .rz-fsel {
+  width: auto;
+  height: 36px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.rz .rz-pager {
+  justify-content: center;
+  gap: 8px;
+}
