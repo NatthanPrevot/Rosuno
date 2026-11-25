@@ -95,6 +95,10 @@
   line-height: 1.5;
   color: var(--subtle);
 }
+/* A row header of the design that opens nothing here (its details are shown below it). */
+.cx .rz-cx-static {
+  cursor: default !important;
+}
 .cx .rz-cx-none {
   padding: 12px 0;
 }
