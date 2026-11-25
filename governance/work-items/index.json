@@ -2863,6 +2863,61 @@
       "rollback_reference": "Before merge, close the PR. After merge, a forward-only commit restoring the previous INTERNAL_LISTENER pattern; no data or migration is involved.",
       "created_at": "2026-11-24T07:08:08Z",
       "updated_at": "2026-11-24T07:08:08Z"
+    },
+    {
+      "work_item_id": "WI-P2-927-GOVERNANCE-MODERNIZATION-CONTROL",
+      "title": "Governance modernization CONTROL program: standing-grant route and compatible controls (P2-927)",
+      "objective": "Implement the smallest sufficient control transition to one broad, owner-controlled development grant (S1) and, separately, guarded Staging release preparation (S2), without weakening security, privacy, financial, environment or historical safeguards, owner decision rights, required checks or designated human approval.",
+      "in_scope": [
+        "S1: rosuno-guard v5 standing-grant route (owner activation and DEV grant records read only from the owner branch rosuno-grants), with the Packet route unchanged.",
+        "S1: trusted workflow wiring (owner-ref selection by branch shape; PR author and head repository passed to the guard); the trust binding is unchanged.",
+        "S1: CLAUDE.md, the PR template, the standing-grant procedure docs/process/p2-927-standing-grant-route.md and its exact neutral-path admission.",
+        "S1: disposable-repository positive and negative proofs in tools/p0/tests/p2-927-standing-grant.test.mjs.",
+        "Records: the package digest reference, this work item, its decision and the readiness outstanding items."
+      ],
+      "out_of_scope": [
+        "Activation of any capability, GitHub settings, repository variables, branch protection, the owner rosuno-grants branch, PR creation and merge: owner actions.",
+        "Product features, migrations, schema, providers, business policy, data, Staging or production effects, OLD, Phase B, P2-924, P2-925 and UI work.",
+        "P0-001-registered controls (dependency and script allowlists, neutral paths, package-manager side channels), .github/CODEOWNERS, .claude settings, the inactive P2-905 machinery and historical evidence.",
+        "S2 guarded Staging release tooling, a later slice under the same Packet."
+      ],
+      "status": "in_progress",
+      "owner": "NatthanPrevot",
+      "reviewer": {
+        "identity": "Rosuno",
+        "status": "pending"
+      },
+      "priority": "P2",
+      "authority_refs": ["GOVERNANCE-MODERNIZATION-V1.1"],
+      "decision_refs": [
+        "DEC-20261124-P2-927-GOVERNANCE-MODERNIZATION-CONDITIONAL-ADOPTION"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "The net diff against owner main is inside the P2-927 ALLOWED_SCOPE and outside its FORBIDDEN_SCOPE.",
+        "Under a broad DEV grant, ordinary UI, API, additive and restructured schema, dependency, feature-removal, independent-branch and post-merge-correction changes pass, and every listed unauthorized case fails closed.",
+        "The Packet route of guard v5 is byte-identical to guard v4 on the differential scenarios, and every existing required check passes.",
+        "No capability is active after merge until the owner records activation on the owner repository.",
+        "The guard self-check prints ROSUNO-GUARD PASS with the trusted current-main guard and with the candidate guard."
+      ],
+      "validation_commands": [
+        "pnpm install --frozen-lockfile",
+        "pnpm run format:check",
+        "pnpm run typecheck",
+        "pnpm run build",
+        "pnpm run p0:validate",
+        "pnpm run p0:test",
+        "pnpm run secrets:check",
+        "pnpm run dependency:check",
+        "node --test tools/p0/tests/p2-927-standing-grant.test.mjs",
+        "bash .github/scripts/rosuno-guard.sh <owner main SHA> HEAD wi/P2-927-governance-modernization-control refs/rosuno/approved"
+      ],
+      "environment": "none",
+      "release_refs": [],
+      "migration_refs": [],
+      "rollback_reference": "Before merge, leave the PR unmerged or correct it forward. After merge the route stays inactive until activation; the owner can revoke an activation or grant by a commit on, or deletion of, the owner rosuno-grants branch, and the Packet route remains available. Controls are corrected forward through a protected PR; no data or migration is involved.",
+      "created_at": "2026-11-25T03:03:07Z",
+      "updated_at": "2026-11-25T03:35:07Z"
     }
   ]
 }
