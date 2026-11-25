@@ -1327,6 +1327,7 @@ test("10. the sign-in page is an accessible design-system form that shows only f
     "../../src/application/form-operation.ts",
     "../../src/application/sign-in-continuation.ts",
     "../../src/presentation/design-system.tsx",
+    "../../src/presentation/auth-frame.tsx",
     "../../src/presentation/form-entries.ts",
     "./actions.ts",
   ]);
@@ -1426,7 +1427,12 @@ test("10. the sign-in page is an accessible design-system form that shows only f
   const used = [
     ...new Set([...code.matchAll(/<([A-Z]\w*)/g)].map((match) => match[1])),
   ].sort();
-  assert.deepEqual(used, imported);
+  // DEV-001: the owner's UI/UX design frames the page in the shared auth
+  // frame (public header, account card, plain statements); every other
+  // component still comes from the design system, and the frame wraps
+  // the page exactly once.
+  assert.deepEqual(used, [...imported, "AuthFrame"].sort());
+  assert.equal(code.match(/<AuthFrame>/g)?.length, 1);
   // MVP-001 S5: besides the form, the one native element is the hidden
   // continuation field pinned above.
   assert.deepEqual(
@@ -1438,9 +1444,11 @@ test("10. the sign-in page is an accessible design-system form that shows only f
     code,
     /className|\bstyle=|#[0-9a-f]{3,8}\b|rgb\(|hsl\(|\.css|<style\b|https?:/i,
   );
+  // DEV-001: the shared auth frame is the public site frame, so the page
+  // names no density of its own.
   assert.deepEqual(
     [...code.matchAll(/\bdensity="([^"]+)"/g)].map((match) => match[1]),
-    ["public"],
+    [],
   );
   // The copy holds no record, placeholder, or certification claim.
   assert.doesNotMatch(

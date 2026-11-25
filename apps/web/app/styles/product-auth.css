@@ -1,1 +1,16 @@
 /* Canonical auth additions to the owner's design system (values from its tokens). Only auth screens add rules here. */
+
+/* Auth frame (src/presentation/auth-frame.tsx): the design's card padding and
+   heading scale for the page's account card, and the statement list, which
+   the design draws as plain rows. */
+.rz .rz-auth .rz-surface.panel {
+  padding: 36px 36px 30px;
+}
+.rz .rz-auth .rz-surface.panel h1 {
+  font-size: 28px;
+}
+.rz .rz-auth__points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}

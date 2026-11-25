@@ -2636,6 +2636,7 @@ test("36. the sign-up page is an accessible design-system form with show and hid
     "../../src/application/client-registration.ts",
     "../../src/application/form-operation.ts",
     "../../src/presentation/design-system.tsx",
+    "../../src/presentation/auth-frame.tsx",
     "../../src/presentation/form-entries.ts",
     "./actions.ts",
   ]);
@@ -2723,7 +2724,12 @@ test("36. the sign-up page is an accessible design-system form with show and hid
   const used = [
     ...new Set([...code.matchAll(/<([A-Z]\w*)/g)].map((match) => match[1])),
   ].sort();
-  assert.deepEqual(used, imported);
+  // DEV-001: the owner's UI/UX design frames the page in the shared auth
+  // frame (public header, account card, plain statements); every other
+  // component still comes from the design system, and the frame wraps
+  // the page exactly once.
+  assert.deepEqual(used, [...imported, "AuthFrame"].sort());
+  assert.equal(code.match(/<AuthFrame>/g)?.length, 1);
   assert.deepEqual(
     [...new Set([...code.matchAll(/<([a-z]\w*)/g)].map((match) => match[1]))],
     ["form"],
@@ -2732,9 +2738,11 @@ test("36. the sign-up page is an accessible design-system form with show and hid
     code,
     /className|\bstyle=|#[0-9a-f]{3,8}\b|rgb\(|hsl\(|\.css|<style\b|https?:/i,
   );
+  // DEV-001: the shared auth frame is the public site frame, so the page
+  // names no density of its own.
   assert.deepEqual(
     [...code.matchAll(/\bdensity="([^"]+)"/g)].map((match) => match[1]),
-    ["public"],
+    [],
   );
   assert.deepEqual(
     [...code.matchAll(/\bhref="([^"]+)"/g)].map((match) => match[1]),

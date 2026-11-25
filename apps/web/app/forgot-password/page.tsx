@@ -11,12 +11,12 @@ import {
   Cluster,
   Eyebrow,
   Heading,
-  Page,
   Stack,
   Surface,
   Text,
   TextField,
 } from "../../src/presentation/design-system.tsx";
+import { AuthFrame } from "../../src/presentation/auth-frame.tsx";
 import { keepEntries } from "../../src/presentation/form-entries.ts";
 import { requestRecovery } from "./actions.ts";
 
@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
   const fieldErrors: FieldErrors =
     state.status === "invalid" ? state.fieldErrors : {};
   return (
-    <Page density="public">
+    <AuthFrame>
       <Surface emphasis="raised" labelledBy="forgot-password-title">
         <Stack>
           <Eyebrow>Rosuno</Eyebrow>
@@ -96,6 +96,6 @@ export default function ForgotPasswordPage() {
           </form>
         </Stack>
       </Surface>
-    </Page>
+    </AuthFrame>
   );
 }

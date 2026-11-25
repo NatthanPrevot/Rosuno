@@ -2245,6 +2245,7 @@ test("29. the recovery page renders only: the code goes only into its own hidden
     "../../src/application/account-recovery.ts",
     "../../src/application/form-operation.ts",
     "../../src/presentation/design-system.tsx",
+    "../../src/presentation/auth-frame.tsx",
     "./actions.ts",
   ]);
   assert.match(source, /^import \{ use, useActionState \} from "react";$/m);
@@ -2298,7 +2299,12 @@ test("29. the recovery page renders only: the code goes only into its own hidden
       [...code.matchAll(/(?<![\w$])<([A-Z]\w*)/g)].map((match) => match[1]),
     ),
   ].sort();
-  assert.deepEqual(used, imported);
+  // DEV-001: the owner's UI/UX design frames the page in the shared auth
+  // frame (public header, account card, plain statements); every other
+  // component still comes from the design system, and the frame wraps
+  // the page exactly once.
+  assert.deepEqual(used, [...imported, "AuthFrame"].sort());
+  assert.equal(code.match(/<AuthFrame>/g)?.length, 1);
   assert.deepEqual(
     [
       ...new Set(
@@ -2383,6 +2389,7 @@ test("30. the request page is an accessible design-system form whose copy never 
     "../../src/application/account-recovery.ts",
     "../../src/application/form-operation.ts",
     "../../src/presentation/design-system.tsx",
+    "../../src/presentation/auth-frame.tsx",
     "../../src/presentation/form-entries.ts",
     "./actions.ts",
   ]);
@@ -2448,7 +2455,12 @@ test("30. the request page is an accessible design-system form whose copy never 
   const used = [
     ...new Set([...code.matchAll(/<([A-Z]\w*)/g)].map((match) => match[1])),
   ].sort();
-  assert.deepEqual(used, imported);
+  // DEV-001: the owner's UI/UX design frames the page in the shared auth
+  // frame (public header, account card, plain statements); every other
+  // component still comes from the design system, and the frame wraps
+  // the page exactly once.
+  assert.deepEqual(used, [...imported, "AuthFrame"].sort());
+  assert.equal(code.match(/<AuthFrame>/g)?.length, 1);
   assert.deepEqual(
     [...new Set([...code.matchAll(/<([a-z]\w*)/g)].map((match) => match[1]))],
     ["form"],
