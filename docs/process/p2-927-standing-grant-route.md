@@ -1,8 +1,9 @@
 # Standing-grant route (P2-927)
 
-Status: implemented by rosuno-guard v5 (P2-927 S1). **Inactive** until the owner records an activation on the owner
-repository. Merging P2-927 activates nothing. The Packet route (`wi/<ID>[-slug]` with an owner-adopted Packet) stays
-available and unchanged.
+Status: implemented by rosuno-guard v5 (P2-927 S1, merged in `89a391c`). Only the owner records below decide whether
+the route is active. On 2026-11-25 owner commit `e18b6c7` activated capability E with grant DEV-001; merging P2-927
+itself activated nothing. The Packet route (`wi/<ID>[-slug]` with an owner-adopted Packet) stays available and
+unchanged.
 
 The route lets one owner grant cover a whole engineering program (many branches and PRs, related fixes before and after
 merge) without a Packet, file inventory, work-item record or decision entry per change. Required checks, the trusted

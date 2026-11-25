@@ -2140,14 +2140,17 @@
         "status": "pending"
       },
       "created_at": "2026-11-25T03:03:07Z",
-      "updated_at": "2026-11-25T03:35:07Z",
+      "updated_at": "2026-11-25T05:43:59Z",
       "supersedes": [],
       "impact": "Changes .github/scripts/rosuno-guard.sh (v5), .github/workflows/rosuno-guard.yml, CLAUDE.md, the PR template and the neutral-path admission of one exact procedure path (docs/process/p2-927-standing-grant-route.md); adds tools/p0/tests/p2-927-standing-grant.test.mjs; registers the package digest, this decision and the CONTROL work item. The trust binding, CODEOWNERS, .claude settings, every other P0 validator, historical evidence, migrations and the release and migration registers are unchanged. Effective only after protected merge and a separate owner activation; no live GitHub setting or environment is changed.",
       "evidence": [
         "Owner adoption: the P2-927 Packet was added on owner branch wi/P2-927-governance-modernization-control in d0801548564bd1feb2f09f0fd40bb9e9c8627ef9 (parent 5a9423e2f3c558b925e9d3d8c29ffed9418e0239), Git blob 3a12b08cf6bfecd2f4cb292b89b598c728efa7fb; the owner granted implementation of S1 on 2026-11-25.",
         "Adopted package SHA-256 6cd443caf7ad3a343a80530dff51b9396cdff40c440cba4065319151fed8333b, verified against the owner-supplied file; its contents are not stored in this repository.",
         "Read-only reconciliation at owner main 5a9423e2f3c558b925e9d3d8c29ffed9418e0239: guard b1bf60fdc01d4210b954a6a2ff910ecf00e4f9a0, trusted workflow 7a86b2f62e6657ef21597e528119a313f5edce24, trust binding d6a16c8db64a95f47916323f90ef06f294190457, CLAUDE.md 789a64254fad19e6b428d40c63b4b3fdd6a40bb6, authority references f37c90db294a69caca4017c07a79af9f3d93dd06 and the 58-entry decision log 1c6eec5dc770684eb65e26cf1124f8b3cdee8796; the owner repository has no rosuno-grants branch.",
-        "Not obtained: GitHub branch-protection and ruleset administrative evidence for the owner and fork repositories, and the P0-001 source text. No capability has been activated."
+        "Not obtained: GitHub branch-protection and ruleset administrative evidence for the owner and fork repositories, and the P0-001 source text. No capability has been activated.",
+        "S1 merge: PR #111 merged through merge commit 89a391c0b5e7c78e657f1488d666518d1de77781 (2026-11-24T20:27:20-08:00) with ordered parents 5a9423e2f3c558b925e9d3d8c29ffed9418e0239 then 3a9d78294d7b0dde4ed54b079cfa6f7d521507df; its tree 51b38e2a77b919b0525c3d96cde2825a9a239bf2 equals the validated S1 head tree.",
+        "Activation: owner commit e18b6c7e59684e0d80980c197755846fef840076 created owner branch rosuno-grants with .github/rosuno-grants/activation.json (capabilities E only, control_commit 89a391c0b5e7c78e657f1488d666518d1de77781, activated_at 2026-11-25T05:28:22Z, status active) and grant DEV-001 (profile DEV; effects code, schema and dependencies; no exclusions; PR author NatthanPrevot; issued 2026-11-25T05:28:22Z, expires 2036-11-25T05:28:22Z). Capabilities P, M, S and O are not active.",
+        "The owner reported on 2026-11-25 that capability E and DEV-001 were activated and independently verified; the Builder did not perform or observe that verification. Builder reconciliation on 2026-11-25 with the guard from owner main 89a391c: grant/DEV-001 heads with an empty diff, an ordinary UI file and a new forward migration printed ROSUNO-GUARD PASS route=grant; a CLAUDE.md edit, a non-owner PR author and an unknown grant were refused."
       ],
       "expiry": null
     }

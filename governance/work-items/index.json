@@ -2879,7 +2879,7 @@
         "Activation of any capability, GitHub settings, repository variables, branch protection, the owner rosuno-grants branch, PR creation and merge: owner actions.",
         "Product features, migrations, schema, providers, business policy, data, Staging or production effects, OLD, Phase B, P2-924, P2-925 and UI work.",
         "P0-001-registered controls (dependency and script allowlists, neutral paths, package-manager side channels), .github/CODEOWNERS, .claude settings, the inactive P2-905 machinery and historical evidence.",
-        "S2 guarded Staging release tooling, a later slice under the same Packet."
+        "S2 guarded Staging release tooling, a later slice under the same Packet; the owner deferred it on 2026-11-25 until independently required for authorized operations."
       ],
       "status": "in_progress",
       "owner": "NatthanPrevot",
@@ -2898,7 +2898,9 @@
         "Under a broad DEV grant, ordinary UI, API, additive and restructured schema, dependency, feature-removal, independent-branch and post-merge-correction changes pass, and every listed unauthorized case fails closed.",
         "The Packet route of guard v5 is byte-identical to guard v4 on the differential scenarios, and every existing required check passes.",
         "No capability is active after merge until the owner records activation on the owner repository.",
-        "The guard self-check prints ROSUNO-GUARD PASS with the trusted current-main guard and with the candidate guard."
+        "The guard self-check prints ROSUNO-GUARD PASS with the trusted current-main guard and with the candidate guard.",
+        "S1 closed: PR #111 merged through merge commit 89a391c0b5e7c78e657f1488d666518d1de77781 with ordered parents 5a9423e2f3c558b925e9d3d8c29ffed9418e0239 then 3a9d78294d7b0dde4ed54b079cfa6f7d521507df, merge tree equal to the validated S1 head tree 51b38e2a77b919b0525c3d96cde2825a9a239bf2.",
+        "Owner activation commit e18b6c7e59684e0d80980c197755846fef840076 on owner branch rosuno-grants activated capability E (control_commit 89a391c0b5e7c78e657f1488d666518d1de77781) and grant DEV-001 until 2036-11-25T05:28:22Z; the guard from owner main passed grant/DEV-001 heads and refused control-path, non-owner-author and unknown-grant probes."
       ],
       "validation_commands": [
         "pnpm install --frozen-lockfile",
@@ -2917,7 +2919,7 @@
       "migration_refs": [],
       "rollback_reference": "Before merge, leave the PR unmerged or correct it forward. After merge the route stays inactive until activation; the owner can revoke an activation or grant by a commit on, or deletion of, the owner rosuno-grants branch, and the Packet route remains available. Controls are corrected forward through a protected PR; no data or migration is involved.",
       "created_at": "2026-11-25T03:03:07Z",
-      "updated_at": "2026-11-25T03:35:07Z"
+      "updated_at": "2026-11-25T05:43:59Z"
     }
   ]
 }

@@ -1703,7 +1703,7 @@ describe("P2-927 records: adoption registered once, by digest, nothing activated
     readFileSync(path.join(ROOT, "governance/work-items/index.json"), "utf8"),
   ).work_items;
 
-  test("the adopted package is registered by exact digest only, reference-only and not activated", () => {
+  test("the adopted package is registered by exact digest only, reference-only, with only capability E recorded as active", () => {
     const entries = authority.filter(
       (entry) => entry.authority_id === "GOVERNANCE-MODERNIZATION-V1.1",
     );
@@ -1714,8 +1714,9 @@ describe("P2-927 records: adoption registered once, by digest, nothing activated
     assert.equal(entry.content_copied, false);
     assert.equal(entry.reinterpreted, false);
     assert.equal(entry.usage, "reference-only");
-    assert.match(entry.status, /^conditionally_adopted/);
-    assert.match(entry.status, /not_activated$/);
+    // The owner activated capability E only (owner record e18b6c7, 2026-11-25);
+    // a later activation or revocation is a records change on the PROCESS route.
+    assert.equal(entry.status, "conditionally_adopted_capability_E_active");
   });
 
   test("PRESERVED: prior references and all 58 prior decisions are unchanged; P0-001 stays external", () => {
