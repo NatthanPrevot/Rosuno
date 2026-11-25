@@ -8,3 +8,7 @@
 @import "./layout.css";
 @import "./site.css";
 @import "./product.css";
+@import "./product-client.css";
+@import "./product-attorney.css";
+@import "./product-staff.css";
+@import "./product-auth.css";
