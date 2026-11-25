@@ -32,6 +32,11 @@
 // a new Request; Rosuno names no other attorney). An accepted Request whose
 // payment flow authorizes at the attorney's acceptance shows the
 // authorization step (configuration decides).
+//
+// DEV-001: the owner's UI/UX design, the request status: the state, the
+// decision, the payment step and the withdrawal in the main panel, the
+// request's facts and price in the side panel. Every read, form and action
+// is unchanged.
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -44,22 +49,16 @@ import {
   resolveConsultationRequest,
   resolveRequestDecision,
 } from "../../../../src/application/consultation-request.ts";
+import {
+  getShellView,
+  type ShellView,
+} from "../../../../src/application/shell.ts";
+import { SUPABASE_SERVER_SESSION_SOURCE } from "../../../../src/infrastructure/identity/server-session-source.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
 import { CLIENT_PAYMENT_SOURCES } from "../../../../src/infrastructure/payments/payment-adapter.ts";
 import { REQUEST_SOURCES } from "../../../../src/infrastructure/requests/consultation-request-adapter.ts";
-import {
-  Alert,
-  ButtonLink,
-  Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
-  Table,
-  Text,
-} from "../../../../src/presentation/design-system.tsx";
+import { ClientPill } from "../../../../src/presentation/client-account.tsx";
+import { Alert, Text } from "../../../../src/presentation/design-system.tsx";
 import {
   CONSULTATION_STATE_TEXT,
   COULD_NOT_PROCEED_LABEL,
@@ -85,6 +84,8 @@ import {
   PAYMENT_STATUS_NOTE,
   PAYMENT_STEP_TEXT,
 } from "../../../../src/presentation/payment-labels.ts";
+import { SitePage } from "../../../../src/presentation/site-chrome.tsx";
+import { signOut } from "../../../sign-in/actions.ts";
 import { AuthorizePaymentForm, WithdrawRequestForm } from "./forms.tsx";
 
 export const metadata: Metadata = {
@@ -92,35 +93,78 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// The page outside the request itself (sign-in, refusal, unavailable): the
+// heading and one panel.
 function RequestFrame({
+  session,
   title,
   children,
 }: {
+  readonly session: ShellView["session"];
   readonly title: string;
   readonly children: ReactNode;
 }) {
   return (
-    <Page density="client">
-      <Surface emphasis="raised" labelledBy="request-title">
-        <Stack>
-          <Eyebrow>Client workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="request-title">
-            {title}
-          </Heading>
+    <SitePage session={session} signOut={signOut}>
+      <div className="wrap m4-rq l-pt32-pb88-mw1200">
+        <h1 className="h2 l-fs38">{title}</h1>
+        <section className="panel l-p24-26 l-mt20 rz-rq-panel">
           {children}
-        </Stack>
-      </Surface>
-    </Page>
+        </section>
+      </div>
+    </SitePage>
+  );
+}
+
+// The design's request status: the main panel beside the request's facts.
+function StatusLayout({
+  session,
+  aside,
+  children,
+}: {
+  readonly session: ShellView["session"];
+  readonly aside: ReactNode;
+  readonly children: ReactNode;
+}) {
+  return (
+    <SitePage session={session} signOut={signOut}>
+      <div className="wrap m4-rq l-pt32-pb88-mw1200">
+        {BACK}
+        <div className="m4-g2 l-dgrid-colsmm0-1fr-360-g28-aistart-mt8">
+          <section
+            className="panel l-p34-36-30 rz-rq-panel"
+            aria-labelledby="request-title"
+          >
+            {children}
+          </section>
+          {aside}
+        </div>
+      </div>
+    </SitePage>
   );
 }
 
 const BACK = (
-  <Cluster>
-    <ButtonLink variant="tertiary" href="/client">
-      Back to your workspace
-    </ButtonLink>
-  </Cluster>
+  <a className="link sm" href="/client">
+    ← Back to your account
+  </a>
 );
+
+// One fact of the design's side panel and decision rows.
+function Row({
+  label,
+  children,
+}: {
+  readonly label: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div className="row between l-g14">
+      <span className="sm muted">{label}</span>
+      <span className="sm l-fw500-taright">{children}</span>
+    </div>
+  );
+}
 
 export default async function RequestPage({
   params,
@@ -129,6 +173,7 @@ export default async function RequestPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  const shell = await getShellView(SUPABASE_SERVER_SESSION_SOURCE);
   const { request } = await params;
   const view = await resolveConsultationRequest(REQUEST_SOURCES, request);
   if (view.status === "not-found") {
@@ -136,19 +181,17 @@ export default async function RequestPage({
   }
   if (view.status === "sign-in-required") {
     return (
-      <RequestFrame title="Sign in to continue">
+      <RequestFrame session={shell.session} title="Sign in to continue">
         <Text>Sign in to your client account to see your request.</Text>
-        <Cluster>
-          <ButtonLink variant="primary" href="/sign-in">
-            Sign in
-          </ButtonLink>
-        </Cluster>
+        <a className="btn btn-ink rz-rq-start" href="/sign-in">
+          Sign in
+        </a>
       </RequestFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <RequestFrame title="Request unavailable">
+      <RequestFrame session={shell.session} title="Request unavailable">
         <Alert tone="error" title="Not available for this account" role="alert">
           Requests are available to signed-in client accounts.
         </Alert>
@@ -161,7 +204,7 @@ export default async function RequestPage({
       outcome: view.status,
     });
     return (
-      <RequestFrame title="Request unavailable">
+      <RequestFrame session={shell.session} title="Request unavailable">
         <Alert tone="error" title="Something went wrong" role="alert">
           Your request could not be shown right now. Please try again later.
         </Alert>
@@ -196,150 +239,123 @@ export default async function RequestPage({
   }
   const payment = paymentView.status === "ready" ? paymentView.payment : null;
   const latest = payment?.latest ?? null;
-  return (
-    <RequestFrame title="Your request">
-      <Cluster>
-        <Status tone={state.tone}>{state.label}</Status>
-      </Cluster>
-      {view.displayState === "expired" ? <Text>{EXPIRED_NOTE}</Text> : null}
-      <Table id="request-details" caption="Request details">
-        <tbody>
-          <tr>
-            <th scope="row">Attorney</th>
-            <td>{record.attorneyName ?? "Not shown"}</td>
-          </tr>
-          <tr>
-            <th scope="row">How soon</th>
-            <td>{REQUEST_PATH_LABELS[record.path]}</td>
-          </tr>
-          <tr>
-            <th scope="row">Option</th>
-            <td>
-              {record.durationMinutes === null
-                ? modalityText(record.modality)
-                : `${modalityText(record.modality)}, ${durationText(record.durationMinutes)}`}
-            </td>
-          </tr>
-          {record.slotStart === null || record.slotEnd === null ? null : (
-            <tr>
-              <th scope="row">Time</th>
-              <td>{`${utcText(record.slotStart)} to ${utcText(record.slotEnd)}`}</td>
-            </tr>
-          )}
-          <tr>
-            <th scope="row">Requested</th>
-            <td>{utcText(record.createdAt)}</td>
-          </tr>
-          {record.responseDeadline === null ? null : (
-            <tr>
-              <th scope="row">Response deadline</th>
-              <td>{utcText(record.responseDeadline)}</td>
-            </tr>
-          )}
-          {record.quoteValidUntil === null ? null : (
-            <tr>
-              <th scope="row">Price held until</th>
-              <td>{utcText(record.quoteValidUntil)}</td>
-            </tr>
-          )}
-        </tbody>
-      </Table>
+  const aside = (
+    <aside className="panel l-p22-24" aria-labelledby="request-attorney">
+      <p className="lbl-sm">Request</p>
+      <div className="stack l-g2 l-mt14">
+        <span className="h4 l-fs16" id="request-attorney">
+          {record.attorneyName ?? "Attorney not shown"}
+        </span>
+        <span className="xs subtle">{REQUEST_PATH_LABELS[record.path]}</span>
+      </div>
+      <div className="stack l-g10-mt16-pt14-bt1-solid-line">
+        <Row label="Option">
+          {record.durationMinutes === null
+            ? modalityText(record.modality)
+            : `${modalityText(record.modality)}, ${durationText(record.durationMinutes)}`}
+        </Row>
+        {record.slotStart === null || record.slotEnd === null ? null : (
+          <Row label="Time">{`${utcText(record.slotStart)} to ${utcText(record.slotEnd)}`}</Row>
+        )}
+        <Row label="Requested">{utcText(record.createdAt)}</Row>
+        {record.responseDeadline === null ? null : (
+          <Row label="Response deadline">
+            {utcText(record.responseDeadline)}
+          </Row>
+        )}
+        {record.quoteValidUntil === null ? null : (
+          <Row label="Price held until">{utcText(record.quoteValidUntil)}</Row>
+        )}
+      </div>
       {amounts === null ? null : (
-        <Table id="request-quote" caption="The price of this request">
-          <tbody>
-            <tr>
-              <th scope="row">Attorney&apos;s price</th>
-              <td>{moneyText(amounts.listedPriceMinor, amounts.currency)}</td>
-            </tr>
-            <tr>
-              <th scope="row">Client fee</th>
-              <td>{moneyText(amounts.clientFeeMinor, amounts.currency)}</td>
-            </tr>
-            <tr>
-              <th scope="row">Other required fees</th>
-              <td>{moneyText(amounts.otherFeeMinor, amounts.currency)}</td>
-            </tr>
-            <tr>
-              <th scope="row">Total</th>
-              <td>{moneyText(amounts.totalMinor, amounts.currency)}</td>
-            </tr>
-          </tbody>
-        </Table>
+        <div
+          className="stack l-g10-mt16-pt14-bt1-solid-line"
+          aria-label="The price of this request"
+        >
+          <Row label="Attorney's price">
+            {moneyText(amounts.listedPriceMinor, amounts.currency)}
+          </Row>
+          <Row label="Client fee">
+            {moneyText(amounts.clientFeeMinor, amounts.currency)}
+          </Row>
+          <Row label="Other required fees">
+            {moneyText(amounts.otherFeeMinor, amounts.currency)}
+          </Row>
+          <Row label="Total">
+            {moneyText(amounts.totalMinor, amounts.currency)}
+          </Row>
+        </div>
       )}
+      <p className="xs subtle l-mt14">{SERVER_TIME_NOTE}</p>
+    </aside>
+  );
+  return (
+    <StatusLayout session={shell.session} aside={aside}>
+      <div className="row l-g8">
+        <ClientPill tone={state.tone}>{state.label}</ClientPill>
+      </div>
+      <h1 className="h2 l-fs34-mt16-mw640" id="request-title">
+        Your request
+      </h1>
+      {view.displayState === "expired" ? <Text>{EXPIRED_NOTE}</Text> : null}
       {decision !== null && decision.state === "accepted" ? (
-        <Stack gap="tight">
-          <Heading as="h2" size="md">
-            Consultation
-          </Heading>
+        <div className="stack l-g10">
+          <h2 className="h4">Consultation</h2>
           {decision.consultationState === null ? (
             <Text>{DECISION_CONSULTATION_PENDING}</Text>
           ) : (
             <>
               <Text>{DECISION_ACCEPTED}</Text>
-              <Table id="request-consultation" caption="Your consultation">
-                <tbody>
-                  <tr>
-                    <th scope="row">Status</th>
-                    <td>
-                      {CONSULTATION_STATE_TEXT[decision.consultationState]}
-                    </td>
-                  </tr>
-                  {decision.bookingStart === null ||
-                  decision.bookingEnd === null ? null : (
-                    <tr>
-                      <th scope="row">Time</th>
-                      <td>{`${utcText(decision.bookingStart)} to ${utcText(decision.bookingEnd)}`}</td>
-                    </tr>
-                  )}
-                </tbody>
-              </Table>
+              <Row label="Status">
+                {CONSULTATION_STATE_TEXT[decision.consultationState]}
+              </Row>
+              {decision.bookingStart === null ||
+              decision.bookingEnd === null ? null : (
+                <Row label="Time">{`${utcText(decision.bookingStart)} to ${utcText(decision.bookingEnd)}`}</Row>
+              )}
               {decision.consultationId === null ? null : (
-                <Cluster>
-                  <ButtonLink
-                    variant="primary"
+                <div className="row l-g10-mt24-fwrwrap">
+                  <a
+                    className="btn btn-ink"
                     href={clientConsultationPathFor(decision.consultationId)}
                   >
                     Go to your consultation
-                  </ButtonLink>
-                </Cluster>
+                  </a>
+                </div>
               )}
             </>
           )}
-        </Stack>
+        </div>
       ) : null}
       {decision !== null &&
       (decision.endedReason === "declined" ||
         decision.endedReason === "could_not_proceed") ? (
-        <Stack gap="tight">
+        <div className="stack l-g10">
           <Text>
             {decision.endedReason === "declined"
               ? DECISION_DECLINED
               : DECISION_COULD_NOT_PROCEED}
           </Text>
-          <Cluster>
-            <ButtonLink
-              variant="secondary"
+          <div className="row l-g10-fwrwrap">
+            <a
+              className="btn btn-line"
               href={`/client/intakes/${decision.intakeId}`}
             >
               {SELECT_AGAIN_LABEL}
-            </ButtonLink>
-          </Cluster>
-        </Stack>
+            </a>
+          </div>
+        </div>
       ) : null}
       {record.message === null ? null : (
-        <Stack gap="tight">
-          <Heading as="h2" size="md">
-            {YOUR_MESSAGE}
-          </Heading>
+        <div className="stack l-g4">
+          <h2 className="h4">{YOUR_MESSAGE}</h2>
           {record.message.split("\n").map((line, index) => (
             <Text key={index}>{line === "" ? "\u00a0" : line}</Text>
           ))}
-        </Stack>
+        </div>
       )}
-      <Stack gap="tight">
-        <Heading as="h2" size="md">
-          Payment
-        </Heading>
+      <div className="stack l-g10 l-pt12-bt1-solid-line">
+        <h2 className="h4">Payment</h2>
         {payment === null ? (
           <Alert tone="error" title="Payment status unavailable" role="alert">
             The payment status could not be shown right now. Please try again
@@ -349,38 +365,25 @@ export default async function RequestPage({
           <>
             <Text>{PAYMENT_STEP_TEXT[payment.step]}</Text>
             {latest === null ? null : (
-              <Table id="request-payment" caption="Latest payment">
-                <tbody>
-                  <tr>
-                    <th scope="row">Status</th>
-                    <td>
-                      <Status tone={PAYMENT_STATE_LABELS[latest.state].tone}>
-                        {PAYMENT_STATE_LABELS[latest.state].label}
-                      </Status>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Started</th>
-                    <td>{utcText(latest.createdAt)}</td>
-                  </tr>
-                  {latest.authorizedAt === null ? null : (
-                    <tr>
-                      <th scope="row">Authorized</th>
-                      <td>{utcText(latest.authorizedAt)}</td>
-                    </tr>
-                  )}
-                </tbody>
-              </Table>
-            )}
-            {latest === null ? null : (
-              <Cluster>
-                <ButtonLink
-                  variant="secondary"
-                  href={`/client/payments/${latest.id}`}
-                >
-                  View payment receipt
-                </ButtonLink>
-              </Cluster>
+              <div className="stack l-g10" aria-label="Latest payment">
+                <Row label="Status">
+                  <ClientPill tone={PAYMENT_STATE_LABELS[latest.state].tone}>
+                    {PAYMENT_STATE_LABELS[latest.state].label}
+                  </ClientPill>
+                </Row>
+                <Row label="Started">{utcText(latest.createdAt)}</Row>
+                {latest.authorizedAt === null ? null : (
+                  <Row label="Authorized">{utcText(latest.authorizedAt)}</Row>
+                )}
+                <div className="row l-g10-fwrwrap">
+                  <a
+                    className="btn btn-line btn-sm"
+                    href={`/client/payments/${latest.id}`}
+                  >
+                    View payment receipt
+                  </a>
+                </div>
+              </div>
             )}
             {payment.payable ? (
               <AuthorizePaymentForm
@@ -392,13 +395,11 @@ export default async function RequestPage({
                 }
               />
             ) : null}
-            <Text tone="muted">{PAYMENT_STATUS_NOTE}</Text>
+            <p className="xs subtle">{PAYMENT_STATUS_NOTE}</p>
           </>
         )}
-      </Stack>
-      <Text tone="muted">{SERVER_TIME_NOTE}</Text>
+      </div>
       {view.withdrawable ? <WithdrawRequestForm requestId={record.id} /> : null}
-      {BACK}
-    </RequestFrame>
+    </StatusLayout>
   );
 }

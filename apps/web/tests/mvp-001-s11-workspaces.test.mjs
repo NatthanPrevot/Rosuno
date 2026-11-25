@@ -468,7 +468,7 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
   // link of the navigation it shows.
   const CLIENT_FRAMES = {
     "app/client/payments/page.tsx":
-      '<ClientNavigation current="/client/payments" />',
+      '<ClientAccount area="payments" heading="Payments">',
     "app/client/messages/page.tsx":
       '<ClientAccount area="consultations" heading="Your messages">',
     "app/client/settings/page.tsx":
