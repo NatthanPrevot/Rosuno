@@ -1101,9 +1101,10 @@ test("S5-13. the public navigation is the fixed list of public pages, linked as 
       ["/disclosures", "Disclosures"],
     ],
   );
+  // DEV-001: the public frames render the site chrome of the owner's design.
   assert.deepEqual(importsOf(read("src/presentation/public-site.tsx")), [
     "react",
-    "./design-system.tsx",
+    "./site-chrome.tsx",
   ]);
   // DEV-001: the home page renders the site chrome of the owner's design,
   // whose primary navigation is fixed first-party links.

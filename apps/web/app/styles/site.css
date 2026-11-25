@@ -467,3 +467,9 @@
 .rz .rz-site-header form {
   display: inline-flex;
 }
+
+/* Public page frame body */
+.rz .rz-frame__body {
+  gap: 16px;
+  margin-top: 16px;
+}

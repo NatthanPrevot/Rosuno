@@ -190,7 +190,7 @@ export function SiteFooter() {
           <a className="xs subtle link l-fw400" href="/disclosures">
             Legal and regulatory disclosures{" "}
             <span className="ph">
-              [shown for the active jurisdiction, per policy]
+              [jurisdiction disclosures — counsel’s text]
             </span>
           </a>
         </div>
