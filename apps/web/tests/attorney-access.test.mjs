@@ -1355,8 +1355,9 @@ const STATUS_ICONS = {
   warning: "M12 4.5 2.75 20h18.5L12 4.5Z M12 10v4.5 M12 17.25v.01",
   neutral: "M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z",
 };
+const STATUS_PILLS = { success: "ok", warning: "pending", neutral: "muted" };
 function statusOf(tone, text) {
-  return `<span class="rs-status" data-tone="${tone}" data-emphasis="subtle"><svg class="rs-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${STATUS_ICONS[tone]}"></path></svg><span>${text}</span></span>`;
+  return `<span class="pill ${STATUS_PILLS[tone]} rz-status" data-tone="${tone}" data-emphasis="subtle"><svg class="rz-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${STATUS_ICONS[tone]}"></path></svg><span>${text}</span></span>`;
 }
 
 // Nothing private, internal, or credential-like reaches the page.
@@ -1407,7 +1408,7 @@ function assertNoAdvertisedCapability(html, name) {
 // wording the workspace route admits, and only on its refusal page; every
 // other state still advertises nothing.
 const APPLICATION_ENTRY_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/apply">Attorney application</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/apply">Attorney application</a>';
 const REFUSAL_TITLE = "Attorney workspace not available";
 
 // MVP-001 S4: the one fixed link the granted page offers to the attorney's
@@ -1415,50 +1416,50 @@ const REFUSAL_TITLE = "Attorney workspace not available";
 // only scheduling wording the workspace route admits, and only on its granted
 // page; every other state still advertises no scheduling.
 const SCHEDULE_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/schedule">Schedule</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/schedule">Schedule</a>';
 // MVP-001 S6 PS-A3: the one fixed link the granted page offers to the
 // attorney's offers (which decides its own access), in exactly this form,
 // right after the schedule link; every other state advertises neither.
 const OFFERS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/offers">Offers</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/offers">Offers</a>';
 // MVP-001 S7: the one fixed link the granted page offers to the attorney's
 // ledger-derived earnings (which decides its own access), in exactly this
 // form, right after the offers link. It is the only earnings wording the
 // workspace route admits, and only on its granted page; every other state
 // advertises none of the three.
 const EARNINGS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/earnings">Earnings</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/earnings">Earnings</a>';
 // MVP-001 S8: the one fixed link the granted page offers to the attorney's
 // request queue (which decides its own access), in exactly this form, right
 // after the earnings link; every other state advertises none of the four.
 const REQUESTS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/requests">Requests</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/requests">Requests</a>';
 // MVP-001 S9: the one fixed link the granted page offers to the attorney's
 // consultations (which decides its own access), in exactly this form, right
 // after the requests link. It is the only consultation wording the workspace
 // route admits, and only on its granted page; every other state advertises
 // none of the five.
 const CONSULTATIONS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/consultations">Consultations</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/consultations">Consultations</a>';
 // MVP-001 S10: the one fixed link the granted page offers to the attorney's
 // notification center (which decides its own access), in exactly this form,
 // right after the consultations link; every other state advertises none of
 // the six.
 const NOTIFICATIONS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/notifications">Notifications</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/notifications">Notifications</a>';
 // MVP-001 S11: the two fixed links the granted page offers to the
 // attorney's published reviews and reported problems (each decides its own
 // access), in exactly this form, right after the consultations link.
 const REVIEWS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/reviews">Reviews</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/reviews">Reviews</a>';
 const COMPLAINTS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/complaints">Report a problem</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/complaints">Report a problem</a>';
 // MVP-001 S11 pass 2B: the one fixed link the granted page offers to the
 // attorney's dashboard (which decides its own access), in exactly this form,
 // right after the professional setup and before the schedule link; every
 // other state advertises none.
 const DASHBOARD_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/dashboard">Dashboard</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/dashboard">Dashboard</a>';
 const GRANTED_TITLE = "Restricted attorney workspace";
 
 function assertFrame(html, title, name) {
@@ -1525,13 +1526,13 @@ function assertFrame(html, title, name) {
 function assertFrameOf(html, title, name) {
   assert.match(
     html,
-    /^<div class="rs-page" data-density="attorney"><section class="rs-surface" data-tone="light" data-emphasis="raised" aria-labelledby="attorney-workspace-title">/,
+    /^<div class="rz rz-page" data-density="attorney"><div class="app-scroll"><div class="wrap rz-page__column"><section class="rz-surface panel" data-tone="light" data-emphasis="raised" aria-labelledby="attorney-workspace-title">/,
     name,
   );
   assert.equal(html.match(/<h1\b/g).length, 1, name);
   assert.ok(
     html.includes(
-      `<h1 class="rs-heading" data-size="lg" id="attorney-workspace-title">${title}</h1>`,
+      `<h1 class="h2" id="attorney-workspace-title">${title}</h1>`,
     ),
     name,
   );

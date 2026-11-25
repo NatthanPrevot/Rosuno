@@ -1039,7 +1039,7 @@ test("SR-10. the job view is listed for its capability holders, shows escalated 
   ]);
   assert.ok(
     view.html.includes(
-      'aria-current="page" class="rs-button" data-variant="primary" href="/staff/jobs"',
+      'aria-current="page" class="btn btn-ink" data-variant="primary" href="/staff/jobs"',
     ),
   );
 });

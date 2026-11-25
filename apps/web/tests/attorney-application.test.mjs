@@ -2744,13 +2744,13 @@ function assertNoAdvertisedCapability(html, name) {
 function assertFrame(html, title, name) {
   assert.match(
     html,
-    /^<div class="rs-page" data-density="attorney"><section class="rs-surface" data-tone="light" data-emphasis="raised" aria-labelledby="attorney-application-title">/,
+    /^<div class="rz rz-page" data-density="attorney"><div class="app-scroll"><div class="wrap rz-page__column"><section class="rz-surface panel" data-tone="light" data-emphasis="raised" aria-labelledby="attorney-application-title">/,
     name,
   );
   assert.equal(html.match(/<h1\b/g).length, 1, name);
   assert.ok(
     html.includes(
-      `<h1 class="rs-heading" data-size="lg" id="attorney-application-title">${title}</h1>`,
+      `<h1 class="h2" id="attorney-application-title">${title}</h1>`,
     ),
     name,
   );
@@ -2792,7 +2792,7 @@ test("25. a signed-in account that can start sees one accessible form posting on
   assert.equal(html.match(/<button\b/g).length, 1);
   assert.ok(
     html.includes(
-      '<button class="rs-button" data-variant="primary" type="submit">Start attorney application</button>',
+      '<button class="btn btn-ink" data-variant="primary" type="submit">Start attorney application</button>',
     ),
   );
   assert.ok(textOf(html).includes(MEANING));
