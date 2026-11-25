@@ -552,3 +552,93 @@
   border-bottom: 0;
   padding-bottom: 0;
 }
+
+/* ---------- Availability & pricing ---------- */
+.aw .aw-avgrid {
+  align-items: start;
+}
+.aw .aw-avgrid > .w-avmain {
+  overflow: visible;
+}
+.aw .aw-aved {
+  position: sticky;
+  top: 0;
+}
+.aw .aw-aved > .w-ch {
+  margin-bottom: 0;
+}
+.aw .w-wr.aw-wr {
+  grid-template-columns: 108px minmax(0, 1fr);
+}
+.aw span.w-chip {
+  display: inline-flex;
+  align-items: center;
+}
+.aw .aw-form {
+  max-width: 560px;
+}
+.aw .rz-disclosure .aw-form {
+  padding-top: 4px;
+}
+.aw .w-dl:empty {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .aw .w-avgrid.aw-avgrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .aw .aw-aved {
+    position: static;
+  }
+}
+
+/* ---------- Calendar (agenda) ---------- */
+.aw .aw-weekbar {
+  margin-bottom: 0;
+}
+.aw .aw-calbox {
+  overflow: visible;
+}
+.aw .aw-calbox .w-ag {
+  overflow: visible;
+}
+.aw .aw-agnone {
+  padding: 4px 8px;
+}
+.aw .w-tlb.sem-open {
+  background: var(--open-line);
+}
+.aw .w-agr > .pill {
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .aw .w-agr {
+    grid-template-columns: 4px minmax(0, 1fr);
+  }
+  .aw .w-agr > .num {
+    grid-column: 1 / -1;
+  }
+  .aw .w-agr > .pill {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* ---------- Offerings & fees ---------- */
+.aw .w-offer.aw-offer {
+  grid-template-columns: minmax(0, 1fr);
+}
+.aw .aw-offer > .aw-card:first-child {
+  grid-row: auto;
+}
+.aw .aw-durs {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+.aw .w-dur > .pill {
+  align-self: flex-start;
+  height: auto;
+  min-height: 24px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  white-space: normal;
+}

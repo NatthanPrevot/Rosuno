@@ -12,6 +12,12 @@
 // schedule is changed on the existing schedule page. Nothing of a client, a
 // request or an Intake is shown. A view unavailable is logged with the route
 // and outcome only.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace Calendar, agenda view): the workspace frame around the design's
+// seven-day agenda (each UTC day with its entries and their meaning in
+// words) and its legend; the week links are the existing ones. A visitor the
+// page does not admit sees the design's signed-out panel.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -21,16 +27,15 @@ import { resolveScheduleWeek } from "../../../../src/application/participant-wor
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
 import { ATTORNEY_SCHEDULE_SOURCES } from "../../../../src/infrastructure/scheduling/attorney-schedule-adapter.ts";
 import {
+  AttorneyGate,
+  AttorneyWorkspace,
+  dayText,
+  TIMES_IN_UTC,
+} from "../../../../src/presentation/attorney-workspace.tsx";
+import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
-  Table,
   Text,
 } from "../../../../src/presentation/design-system.tsx";
 import {
@@ -42,7 +47,6 @@ import {
   NO_ENTRIES,
   WEEK_INTRO,
 } from "../../../../src/presentation/workspace-labels.ts";
-import { AttorneyNavigation } from "../../../../src/presentation/workspace-navigation.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
 
 export const metadata: Metadata = {
@@ -50,27 +54,19 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const ENTRY_TONES = Object.freeze({
-  window: "success",
-  blackout: "neutral",
-  hold: "information",
-  booking: "warning",
+// The design's calendar semantics for each entry kind.
+const ENTRY_BARS = Object.freeze({
+  window: "w-tlb sem-open",
+  blackout: "w-tlb sem-off",
+  hold: "w-tlb sem-hold",
+  booking: "w-tlb sem-conf",
 } as const);
 
-function Frame({ children }: { readonly children: ReactNode }) {
+function GateFrame({ children }: { readonly children: ReactNode }) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-week-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-week-title">
-            Week view
-          </Heading>
-          {children}
-          <AttorneyNavigation current="/attorney/schedule/week" />
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate titleId="attorney-week-title" title="Week view">
+      {children}
+    </AttorneyGate>
   );
 }
 
@@ -90,7 +86,7 @@ export default async function AttorneyWeekPage({
   const view = await resolveScheduleWeek(ATTORNEY_SCHEDULE_SOURCES, week);
   if (view.status === "sign-in-required") {
     return (
-      <Frame>
+      <GateFrame>
         <Text tone="muted">
           The week view is available only to a signed-in account with attorney
           access.
@@ -100,16 +96,16 @@ export default async function AttorneyWeekPage({
             Sign in
           </ButtonLink>
         </Cluster>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="warning" title="Not available" role="status">
           This account does not have an attorney schedule.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status !== "ready") {
@@ -118,77 +114,118 @@ export default async function AttorneyWeekPage({
       outcome: view.status,
     });
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="error" title="Something went wrong" role="alert">
           The week view could not be shown right now. Please try again later.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   return (
-    <Frame>
-      <Text tone="muted">{WEEK_INTRO}</Text>
-      <Cluster>
-        {view.previous === null ? null : (
-          <ButtonLink variant="secondary" href={weekHref(view.previous)}>
-            Previous week
-          </ButtonLink>
-        )}
-        {view.start === view.today ? null : (
-          <ButtonLink variant="secondary" href={weekHref(view.today)}>
-            This week
-          </ButtonLink>
-        )}
-        {view.next === null ? null : (
-          <ButtonLink variant="secondary" href={weekHref(view.next)}>
-            Next week
-          </ButtonLink>
-        )}
-      </Cluster>
-      <Table id="attorney-week" caption={`Seven days from ${view.start} (UTC)`}>
-        <thead>
-          <tr>
-            <th scope="col">Day (UTC)</th>
-            <th scope="col">Calendar</th>
-          </tr>
-        </thead>
-        <tbody>
+    <AttorneyWorkspace
+      section="calendar"
+      titleId="attorney-week-title"
+      title="Calendar"
+      width="wide"
+    >
+      <p className="xs subtle aw-lead">{WEEK_INTRO}</p>
+      <div className="w-ph aw-weekbar">
+        <h2 className="w-h2 w-crange" id="attorney-week-range">
+          {`Seven days from ${view.start} (UTC)`}
+        </h2>
+        <span className="grow"></span>
+        <Cluster>
+          {view.previous === null ? null : (
+            <ButtonLink variant="secondary" href={weekHref(view.previous)}>
+              Previous week
+            </ButtonLink>
+          )}
+          {view.start === view.today ? null : (
+            <ButtonLink variant="secondary" href={weekHref(view.today)}>
+              This week
+            </ButtonLink>
+          )}
+          {view.next === null ? null : (
+            <ButtonLink variant="secondary" href={weekHref(view.next)}>
+              Next week
+            </ButtonLink>
+          )}
+        </Cluster>
+      </div>
+      <section
+        className="w-box w-calbox aw-calbox"
+        aria-labelledby="attorney-week-range"
+      >
+        <div className="w-ag">
           {view.days.map((day) => (
-            <tr key={day.date}>
-              <th scope="row">{day.date}</th>
-              <td>
-                {day.entries.length === 0 ? (
-                  <Text size="small" tone="muted">
-                    {NO_ENTRIES}
-                  </Text>
-                ) : (
-                  <Stack gap="tight">
-                    {day.entries.map((entry) => (
-                      <Cluster
-                        key={`${entry.kind}-${entry.id}-${entry.startsAt}`}
-                      >
-                        <Status tone={ENTRY_TONES[entry.kind]}>
-                          {ENTRY_LABELS[entry.kind]}
-                        </Status>
-                        <Text size="small">
-                          {entry.timezone === null
-                            ? `${formatUtc(entry.startsAt)} to ${formatUtc(entry.endsAt)}`
-                            : `${formatInZone(entry.startsAt, entry.timezone)} to ${formatInZone(entry.endsAt, entry.timezone)}`}
-                        </Text>
-                      </Cluster>
-                    ))}
-                  </Stack>
-                )}
-              </td>
-            </tr>
+            <section
+              className={day.date === view.today ? "w-agd today" : "w-agd"}
+              key={day.date}
+              aria-label={day.date}
+            >
+              <div className="w-agh">
+                <span className="sm b">{dayText(`${day.date}T00:00:00Z`)}</span>
+                {day.date === view.today ? (
+                  <span className="tag">Today</span>
+                ) : null}
+                <span className="grow"></span>
+                <span className="xs subtle">{day.date}</span>
+              </div>
+              {day.entries.length === 0 ? (
+                <p className="xs subtle aw-agnone">{NO_ENTRIES}</p>
+              ) : (
+                day.entries.map((entry) => (
+                  <div
+                    className="w-agr"
+                    key={`${entry.kind}-${entry.id}-${entry.startsAt}`}
+                  >
+                    <span className="xs num muted">{`${formatUtc(entry.startsAt).slice(11, 16)}–${formatUtc(entry.endsAt).slice(11, 16)} UTC`}</span>
+                    <i
+                      className={ENTRY_BARS[entry.kind]}
+                      aria-hidden="true"
+                    ></i>
+                    <span className="col grow l-g0-minw0">
+                      <span className="sm b ell">
+                        {ENTRY_LABELS[entry.kind]}
+                      </span>
+                      <span className="xs muted ell">
+                        {entry.timezone === null
+                          ? `${formatUtc(entry.startsAt)} to ${formatUtc(entry.endsAt)}`
+                          : `${formatInZone(entry.startsAt, entry.timezone)} to ${formatInZone(entry.endsAt, entry.timezone)}`}
+                      </span>
+                    </span>
+                  </div>
+                ))
+              )}
+            </section>
           ))}
-        </tbody>
-      </Table>
+        </div>
+        <div className="w-legend" aria-label="Legend">
+          <span>
+            <i className="lg sem-conf" aria-hidden="true"></i>
+            {ENTRY_LABELS.booking}
+          </span>
+          <span>
+            <i className="lg sem-hold" aria-hidden="true"></i>
+            {ENTRY_LABELS.hold}
+          </span>
+          <span>
+            <i className="lg sem-off" aria-hidden="true"></i>
+            {ENTRY_LABELS.blackout}
+          </span>
+          <span>
+            <i className="lg w-lgopen" aria-hidden="true"></i>
+            {ENTRY_LABELS.window}
+          </span>
+          <span className="grow"></span>
+          <span className="subtle">{TIMES_IN_UTC}</span>
+        </div>
+      </section>
       <Cluster>
         <ButtonLink variant="secondary" href="/attorney/schedule">
           Change your schedule
         </ButtonLink>
       </Cluster>
-    </Frame>
+    </AttorneyWorkspace>
   );
 }

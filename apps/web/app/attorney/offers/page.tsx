@@ -10,6 +10,13 @@
 // withdrawn history, with every instant in UTC. The page reads no route
 // parameter, query, header, or cookie of its own. Nothing of a client, a
 // request or an Intake is shown, and nothing suggests a price.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace Availability & pricing, Offerings & fees): the workspace frame
+// around the design's consultation lengths and fees (one card per current
+// offer, with the existing withdrawal form), the existing price form and
+// the earlier prices. A visitor the page does not admit sees the design's
+// signed-out panel.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -18,15 +25,16 @@ import type { ReactNode } from "react";
 import { resolveAttorneyOffers } from "../../../src/application/consultation-offers.ts";
 import { OFFER_SOURCES } from "../../../src/infrastructure/offers/consultation-offer-adapter.ts";
 import {
+  AttorneyGate,
+  AttorneyWorkspace,
+  AVAILABILITY_PAGES,
+  Card,
+  Pill,
+} from "../../../src/presentation/attorney-workspace.tsx";
+import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
   Table,
   Text,
 } from "../../../src/presentation/design-system.tsx";
@@ -49,7 +57,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function OffersFrame({
+function GateFrame({
   title,
   children,
 }: {
@@ -57,17 +65,9 @@ function OffersFrame({
   readonly children: ReactNode;
 }) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-offers-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-offers-title">
-            {title}
-          </Heading>
-          {children}
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate titleId="attorney-offers-title" title={title}>
+      {children}
+    </AttorneyGate>
   );
 }
 
@@ -86,7 +86,7 @@ export default async function AttorneyOffersPage() {
   const view = await resolveAttorneyOffers(OFFER_SOURCES);
   if (view.status === "sign-in-required") {
     return (
-      <OffersFrame title="Sign in to continue">
+      <GateFrame title="Sign in to continue">
         <Text tone="muted">
           Offers are available only to a signed-in account with attorney access.
         </Text>
@@ -95,12 +95,12 @@ export default async function AttorneyOffersPage() {
             Sign in
           </ButtonLink>
         </Cluster>
-      </OffersFrame>
+      </GateFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <OffersFrame title="Offers not available">
+      <GateFrame title="Offers not available">
         <Alert tone="warning" title="No offers access" role="status">
           This account does not have access to attorney offers.
         </Alert>
@@ -109,12 +109,12 @@ export default async function AttorneyOffersPage() {
             Return to the home page
           </ButtonLink>
         </Cluster>
-      </OffersFrame>
+      </GateFrame>
     );
   }
   if (view.status !== "ready") {
     return (
-      <OffersFrame title="Offers unavailable">
+      <GateFrame title="Offers unavailable">
         <Alert
           tone="error"
           title="Your offers could not be opened"
@@ -123,112 +123,109 @@ export default async function AttorneyOffersPage() {
           Your offers could not be read right now. Please try again later.
         </Alert>
         {WORKSPACE}
-      </OffersFrame>
+      </GateFrame>
     );
   }
   const { options } = view;
   return (
-    <OffersFrame title="Offers">
-      <Text tone="muted">{OFFERS_INTRO}</Text>
-      <Stack>
-        <Heading as="h2" size="md" id="current-offers-title">
-          Current offers
-        </Heading>
-        {view.current.length === 0 ? (
-          <Text tone="muted">You do not offer any consultation yet.</Text>
-        ) : (
-          <Table id="attorney-current-offers" caption="Your current offers">
-            <thead>
-              <tr>
-                <th scope="col">Consultation</th>
-                <th scope="col">Price</th>
-                <th scope="col">Status</th>
-                <th scope="col">Change</th>
-              </tr>
-            </thead>
-            <tbody>
+    <AttorneyWorkspace
+      section="availability"
+      titleId="attorney-offers-title"
+      title="Availability & pricing"
+      description="When clients can request you, and what you charge"
+      width="medium"
+      pages={{
+        label: "Availability sections",
+        links: AVAILABILITY_PAGES,
+        current: "/attorney/offers",
+      }}
+    >
+      <p className="xs subtle aw-lead">{OFFERS_INTRO}</p>
+      <div className="w-offer aw-offer">
+        <Card id="current-offers-title" title="Consultation lengths & fees">
+          {view.current.length === 0 ? (
+            <Text tone="muted">You do not offer any consultation yet.</Text>
+          ) : (
+            <div className="w-durs aw-durs">
               {view.current.map((offer) => (
-                <tr key={offer.id}>
-                  <th scope="row">
+                <div
+                  className={offer.permitted ? "w-dur on" : "w-dur"}
+                  key={offer.id}
+                >
+                  <span className="b">
                     {`${modalityText(offer.modality)}, ${durationText(offer.durationMinutes)}`}
-                  </th>
-                  <td>{moneyText(offer.listedPriceMinor, offer.currency)}</td>
-                  <td>
-                    {offer.permitted ? (
-                      <Status tone="success">Offered</Status>
-                    ) : (
-                      <Status tone="neutral">{NOT_OFFERED_NOW}</Status>
-                    )}
-                  </td>
-                  <td>
-                    <WithdrawOfferForm offerId={offer.id} />
-                  </td>
-                </tr>
+                  </span>
+                  <span className="w-big num">
+                    {moneyText(offer.listedPriceMinor, offer.currency)}
+                  </span>
+                  {offer.permitted ? (
+                    <Pill tone="success">Offered</Pill>
+                  ) : (
+                    <Pill tone="neutral">{NOT_OFFERED_NOW}</Pill>
+                  )}
+                  <WithdrawOfferForm offerId={offer.id} />
+                </div>
               ))}
-            </tbody>
-          </Table>
-        )}
-      </Stack>
-      <Stack>
-        <Heading as="h2" size="md" id="set-offer-title">
-          Set a price
-        </Heading>
-        {options === null ? (
-          <Text tone="muted">{OFFERS_NOT_APPROVED}</Text>
-        ) : !options.configured ? (
-          <Alert tone="information" title="Not configured yet" role="status">
-            {OFFERS_NOT_CONFIGURED}
-          </Alert>
-        ) : options.currencies.length === 0 ? (
-          <Alert tone="information" title="No currency yet" role="status">
-            {NO_CURRENCY}
-          </Alert>
-        ) : (
-          <>
-            <Text tone="muted">
-              Setting a price for a consultation you already offer in the same
-              currency replaces its price for new requests.
-            </Text>
-            <SetOfferForm
-              modalities={options.modalities}
-              durations={options.durations}
-              currencies={options.currencies}
-            />
-          </>
-        )}
-      </Stack>
-      <Stack>
-        <Heading as="h2" size="md" id="offer-history-title">
-          Earlier prices
-        </Heading>
-        {view.history.length === 0 ? (
-          <Text tone="muted">No earlier prices.</Text>
-        ) : (
-          <Table id="attorney-offer-history" caption="Your earlier prices">
-            <thead>
-              <tr>
-                <th scope="col">Consultation</th>
-                <th scope="col">Price</th>
-                <th scope="col">From</th>
-                <th scope="col">Until</th>
-              </tr>
-            </thead>
-            <tbody>
-              {view.history.map((offer) => (
-                <tr key={offer.id}>
-                  <th scope="row">
-                    {`${modalityText(offer.modality)}, ${durationText(offer.durationMinutes)}`}
-                  </th>
-                  <td>{moneyText(offer.listedPriceMinor, offer.currency)}</td>
-                  <td>{utcText(offer.createdAt)}</td>
-                  <td>{utcText(offer.withdrawnAt ?? offer.createdAt)}</td>
+            </div>
+          )}
+        </Card>
+        <Card id="set-offer-title" title="Set a price">
+          {options === null ? (
+            <Text tone="muted">{OFFERS_NOT_APPROVED}</Text>
+          ) : !options.configured ? (
+            <Alert tone="information" title="Not configured yet" role="status">
+              {OFFERS_NOT_CONFIGURED}
+            </Alert>
+          ) : options.currencies.length === 0 ? (
+            <Alert tone="information" title="No currency yet" role="status">
+              {NO_CURRENCY}
+            </Alert>
+          ) : (
+            <>
+              <Text tone="muted">
+                Setting a price for a consultation you already offer in the same
+                currency replaces its price for new requests.
+              </Text>
+              <div className="aw-form">
+                <SetOfferForm
+                  modalities={options.modalities}
+                  durations={options.durations}
+                  currencies={options.currencies}
+                />
+              </div>
+            </>
+          )}
+        </Card>
+        <Card id="offer-history-title" title="Earlier prices">
+          {view.history.length === 0 ? (
+            <Text tone="muted">No earlier prices.</Text>
+          ) : (
+            <Table id="attorney-offer-history" caption="Your earlier prices">
+              <thead>
+                <tr>
+                  <th scope="col">Consultation</th>
+                  <th scope="col">Price</th>
+                  <th scope="col">From</th>
+                  <th scope="col">Until</th>
                 </tr>
-              ))}
-            </tbody>
-          </Table>
-        )}
-      </Stack>
+              </thead>
+              <tbody>
+                {view.history.map((offer) => (
+                  <tr key={offer.id}>
+                    <th scope="row">
+                      {`${modalityText(offer.modality)}, ${durationText(offer.durationMinutes)}`}
+                    </th>
+                    <td>{moneyText(offer.listedPriceMinor, offer.currency)}</td>
+                    <td>{utcText(offer.createdAt)}</td>
+                    <td>{utcText(offer.withdrawnAt ?? offer.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card>
+      </div>
       {WORKSPACE}
-    </OffersFrame>
+    </AttorneyWorkspace>
   );
 }

@@ -622,7 +622,7 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
   const ATTORNEY_FRAMES = {
     "app/attorney/dashboard/page.tsx": { section: "dashboard" },
     "app/attorney/consultations/history/page.tsx": { legacy: true },
-    "app/attorney/schedule/week/page.tsx": { legacy: true },
+    "app/attorney/schedule/week/page.tsx": { section: "calendar" },
     "app/attorney/messages/page.tsx": { legacy: true },
     "app/attorney/documents/page.tsx": { legacy: true },
     "app/attorney/compliance/page.tsx": { legacy: true },
