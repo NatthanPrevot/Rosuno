@@ -280,17 +280,23 @@ test("5. correlation ids are fresh version 4 UUIDs, and the proxy always replace
   const proxy = codeOf(read("proxy.ts"));
   assert.deepEqual(importsOf(read("proxy.ts")), [
     "next/server",
+    // The reviewed Staging access gate design (P2-925, DEV-001).
+    "./src/infrastructure/environment/staging-access-gate.ts",
     "./src/infrastructure/identity/supabase-server.ts",
     "./src/infrastructure/observability/log.ts",
   ]);
   // A fresh id is set on the forwarded request before anything else reads
-  // it, and the same id is returned on the response. Nothing reads the
-  // browser's own value.
+  // it, and the same id is returned on the response, a gate refusal
+  // included. Nothing reads the browser's own value. Updated for the
+  // reviewed Staging access gate design (P2-925, DEV-001): the gate runs
+  // after the id is set and before the session refresh.
   assert.ok(
     proxy.includes(
-      "  const correlationId = newCorrelationId();\n  request.headers.set(CORRELATION_HEADER, correlationId);\n  const response = await refreshSupabaseSession(request);\n  response.headers.set(CORRELATION_HEADER, correlationId);\n  return response;\n",
+      '  const correlationId = newCorrelationId();\n  request.headers.set(CORRELATION_HEADER, correlationId);\n  const access = await stagingAccessGate(request);\n  const response =\n    access.kind === "refused"\n      ? access.response\n      : await refreshSupabaseSession(request);\n  if (access.kind !== "ungated") {\n    markGatedResponse(response);\n  }\n  response.headers.set(CORRELATION_HEADER, correlationId);\n  return response;\n',
     ),
   );
+  assert.equal(proxy.match(/newCorrelationId\(\)/g).length, 1);
+  assert.equal(proxy.match(/CORRELATION_HEADER, correlationId/g).length, 2);
   assert.doesNotMatch(proxy, /headers\.get\(|console\.|\blog\(/);
 });
 
