@@ -16,6 +16,12 @@
 // form is offered and the database decides again on submission. The attorney
 // starts and ends the consultation; the client cannot. Nothing of the attorney's contact details
 // is shown.
+//
+// DEV-001: the owner's UI/UX design, the client account's consultation: the
+// account navigation, the consultation's card (its time, length, type and
+// state), the room panel, the cancellation, review and report actions, the
+// design's "More details" and attendance facts, and the Messages and
+// documents sections with their existing markup.
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -31,10 +37,24 @@ import {
 import { cancellable } from "../../../../src/application/consultation-outcomes.ts";
 import { resolveClientConsultation } from "../../../../src/application/consultations.ts";
 import { resolveClientReviews } from "../../../../src/application/reviews.ts";
+import {
+  getShellView,
+  type ShellView,
+} from "../../../../src/application/shell.ts";
 import { CLIENT_COMMUNICATION_SOURCES } from "../../../../src/infrastructure/communications/communication-adapter.ts";
 import { CLIENT_REVIEW_SOURCES } from "../../../../src/infrastructure/consultations/completion-adapter.ts";
 import { CLIENT_CONSULTATION_SOURCES } from "../../../../src/infrastructure/consultations/consultation-adapter.ts";
+import { SUPABASE_SERVER_SESSION_SOURCE } from "../../../../src/infrastructure/identity/server-session-source.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
+import {
+  ClientAccount,
+  ClientGate,
+  ClientPill,
+  ConsultationTile,
+  ModalityIcon,
+  TIMES_IN_UTC,
+  whenText,
+} from "../../../../src/presentation/client-account.tsx";
 import {
   CLIENT_STATE_LABELS,
   CLIENT_WAITING_NOTE,
@@ -80,16 +100,14 @@ import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
   Heading,
-  Page,
   Stack,
-  Status,
-  Surface,
   Table,
   Text,
 } from "../../../../src/presentation/design-system.tsx";
 import { outcomeLabelOf } from "../../../../src/presentation/completion-labels.ts";
+import { SitePage } from "../../../../src/presentation/site-chrome.tsx";
+import { signOut } from "../../../sign-in/actions.ts";
 import {
   CancelPanel,
   DocumentControls,
@@ -320,25 +338,40 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// DEV-001: the account frame for this consultation, with the way back to the
+// list.
 function ConsultationFrame({
-  title,
+  session,
   children,
 }: {
-  readonly title: string;
+  readonly session: ShellView["session"];
   readonly children: ReactNode;
 }) {
   return (
-    <Page density="client">
-      <Surface emphasis="raised" labelledBy="consultation-title">
-        <Stack>
-          <Eyebrow>Client workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="consultation-title">
-            {title}
-          </Heading>
-          {children}
-        </Stack>
-      </Surface>
-    </Page>
+    <SitePage session={session} signOut={signOut}>
+      <ClientAccount area="consultations" heading="Your consultation">
+        <a className="link sm" href="/client/consultations">
+          ← All consultations
+        </a>
+        {children}
+      </ClientAccount>
+    </SitePage>
+  );
+}
+
+// One fact of the design's "More details" and attendance lists.
+function Fact({
+  term,
+  children,
+}: {
+  readonly term: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div>
+      <dt>{term}</dt>
+      <dd>{children}</dd>
+    </div>
   );
 }
 
@@ -356,14 +389,6 @@ async function reviewable(consultationId: string): Promise<boolean> {
   );
 }
 
-const BACK = (
-  <Cluster>
-    <ButtonLink variant="tertiary" href="/client">
-      Back to your workspace
-    </ButtonLink>
-  </Cluster>
-);
-
 export default async function ClientConsultationPage({
   params,
   searchParams,
@@ -376,6 +401,7 @@ export default async function ClientConsultationPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  const shell = await getShellView(SUPABASE_SERVER_SESSION_SOURCE);
   const { consultation } = await params;
   const { history } = await searchParams;
   const historyId = typeof history === "string" ? history : null;
@@ -388,25 +414,27 @@ export default async function ClientConsultationPage({
   }
   if (view.status === "sign-in-required") {
     return (
-      <ConsultationFrame title="Sign in to continue">
-        <Text tone="muted">
-          Your consultation is available only to its signed-in client.
-        </Text>
-        <Cluster>
-          <ButtonLink variant="primary" href="/sign-in">
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Sign in to continue">
+          <p className="sm muted">
+            Your consultation is available only to its signed-in client.
+          </p>
+          <a className="btn btn-ink" href="/sign-in">
             Sign in
-          </ButtonLink>
-        </Cluster>
-      </ConsultationFrame>
+          </a>
+        </ClientGate>
+      </SitePage>
     );
   }
   if (view.status === "denied") {
     return (
-      <ConsultationFrame title="Consultation not available">
-        <Alert tone="warning" title="Not available" role="status">
-          This account does not have access to this consultation.
-        </Alert>
-      </ConsultationFrame>
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Consultation not available">
+          <Alert tone="warning" title="Not available" role="status">
+            This account does not have access to this consultation.
+          </Alert>
+        </ClientGate>
+      </SitePage>
     );
   }
   if (view.status !== "ready") {
@@ -415,13 +443,17 @@ export default async function ClientConsultationPage({
       outcome: view.status,
     });
     return (
-      <ConsultationFrame title="Consultation unavailable">
-        <Alert tone="error" title="Something went wrong" role="alert">
-          This consultation could not be shown right now. Please try again
-          later.
-        </Alert>
-        {BACK}
-      </ConsultationFrame>
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Consultation unavailable">
+          <Alert tone="error" title="Something went wrong" role="alert">
+            This consultation could not be shown right now. Please try again
+            later.
+          </Alert>
+          <a className="link sm" href="/client/consultations">
+            ← All consultations
+          </a>
+        </ClientGate>
+      </SitePage>
     );
   }
   const record = view.consultation;
@@ -433,136 +465,138 @@ export default async function ClientConsultationPage({
     "technical_failure",
   ].includes(record.state);
   return (
-    <ConsultationFrame title="Your consultation">
-      <Cluster>
-        <Status tone={state.tone}>{state.label}</Status>
-      </Cluster>
-      <Text tone="muted">{WORKSPACE_NOTE}</Text>
-      {ended ? <Text>{ENDED_NOTE}</Text> : null}
-      {view.waiting ? <Text>{CLIENT_WAITING_NOTE}</Text> : null}
-      {!ended && !view.joinable && !view.waiting ? (
-        <Text>{view.windowPassed ? WINDOW_PASSED_NOTE : NOT_OPEN_NOTE}</Text>
-      ) : null}
-      <Table id="client-consultation-details" caption="Consultation details">
-        <tbody>
-          <tr>
-            <th scope="row">Consultation</th>
-            <td>
-              {record.durationMinutes === null
-                ? modalityText(record.modality)
-                : `${modalityText(record.modality)}, ${durationText(record.durationMinutes)}`}
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">How soon</th>
-            <td>{PATH_LABELS[record.path]}</td>
-          </tr>
+    <ConsultationFrame session={shell.session}>
+      <section
+        className="cx-card l-mt12-p22-24 rz-cx-panel"
+        aria-labelledby="consultation-when"
+      >
+        <div className="row between l-g12-fwrwrap-aiflex-start">
+          <div className="row l-g14">
+            <ConsultationTile modality={record.modality} />
+            <div className="stack l-g2-minw0">
+              <h2 className="h4" id="consultation-when">
+                {record.bookingStart === null
+                  ? PATH_LABELS[record.path]
+                  : whenText(record.bookingStart)}
+              </h2>
+              <p className="xs subtle cux-ty l-dflex">
+                {record.durationMinutes === null
+                  ? null
+                  : `${durationText(record.durationMinutes)} · `}
+                <ModalityIcon modality={record.modality} />
+                <span>{modalityText(record.modality)}</span>
+              </p>
+            </div>
+          </div>
+          <ClientPill tone={state.tone}>{state.label}</ClientPill>
+        </div>
+        <div className="stack l-g4">
+          {ended ? <p className="sm">{ENDED_NOTE}</p> : null}
+          {view.waiting ? <p className="sm">{CLIENT_WAITING_NOTE}</p> : null}
+          {!ended && !view.joinable && !view.waiting ? (
+            <p className="sm">
+              {view.windowPassed ? WINDOW_PASSED_NOTE : NOT_OPEN_NOTE}
+            </p>
+          ) : null}
+          <p className="xs subtle">{WORKSPACE_NOTE}</p>
+        </div>
+        <JoinPanel consultationId={record.id} joinable={view.joinable} />
+        <CancelPanel
+          consultationId={record.id}
+          cancellable={cancellable(record.state)}
+        />
+        <div className="row rz-cluster">
+          {record.state === "completed" && (await reviewable(record.id)) ? (
+            <a
+              className="btn btn-line btn-sm"
+              href={`/client/reviews#review-${record.id}`}
+            >
+              Leave a review
+            </a>
+          ) : null}
+          <a
+            className="btn btn-line btn-sm"
+            href={`/client/complaints?consultation=${record.id}`}
+          >
+            Report a problem
+          </a>
+        </div>
+      </section>
+      <section
+        className="cx-card l-mt12-p18-22"
+        aria-labelledby="consultation-more"
+      >
+        <div className="row between l-g12-aibaseline-fwrwrap">
+          <h2 className="cx-dl" id="consultation-more">
+            More details
+          </h2>
+          <span className="xs subtle">{TIMES_IN_UTC}</span>
+        </div>
+        <dl className="cux-more l-mt10">
+          <Fact term="How soon">{PATH_LABELS[record.path]}</Fact>
           {record.bookingStart === null || record.bookingEnd === null ? null : (
-            <tr>
-              <th scope="row">Time</th>
-              <td>{`${utcText(record.bookingStart)} to ${utcText(record.bookingEnd)}`}</td>
-            </tr>
+            <Fact term="Time">{`${whenText(record.bookingStart)} to ${whenText(record.bookingEnd)}`}</Fact>
           )}
           {record.opensAt === null || record.closesAt === null ? null : (
-            <tr>
-              <th scope="row">Room open</th>
-              <td>{`${utcText(record.opensAt)} to ${utcText(record.closesAt)}`}</td>
-            </tr>
+            <Fact term="Room open">{`${whenText(record.opensAt)} to ${whenText(record.closesAt)}`}</Fact>
           )}
           {record.startedAt === null ? null : (
-            <tr>
-              <th scope="row">Started</th>
-              <td>{utcText(record.startedAt)}</td>
-            </tr>
+            <Fact term="Started">{whenText(record.startedAt)}</Fact>
           )}
           {record.endedAt === null ? null : (
-            <tr>
-              <th scope="row">Ended</th>
-              <td>{utcText(record.endedAt)}</td>
-            </tr>
+            <Fact term="Ended">{whenText(record.endedAt)}</Fact>
           )}
           {record.outcomeCode === null ? null : (
-            <tr>
-              <th scope="row">How it ended</th>
-              <td>
-                {outcomeLabelOf(record.outcomeCode) ??
-                  COMPLETION_LABELS[record.outcomeCode] ??
-                  "Ended"}
-              </td>
-            </tr>
+            <Fact term="How it ended">
+              {outcomeLabelOf(record.outcomeCode) ??
+                COMPLETION_LABELS[record.outcomeCode] ??
+                "Ended"}
+            </Fact>
           )}
           {record.mediaState === null ? null : (
-            <tr>
-              <th scope="row">Consultation room</th>
-              <td>{MEDIA_STATE_LABELS[record.mediaState]}</td>
-            </tr>
+            <Fact term="Consultation room">
+              {MEDIA_STATE_LABELS[record.mediaState]}
+            </Fact>
           )}
-        </tbody>
-      </Table>
-      <JoinPanel consultationId={record.id} joinable={view.joinable} />
-      <CancelPanel
-        consultationId={record.id}
-        cancellable={cancellable(record.state)}
-      />
-      <Cluster>
-        {record.state === "completed" && (await reviewable(record.id)) ? (
-          <ButtonLink
-            variant="secondary"
-            href={`/client/reviews#review-${record.id}`}
-          >
-            Leave a review
-          </ButtonLink>
-        ) : null}
-        <ButtonLink
-          variant="tertiary"
-          href={`/client/complaints?consultation=${record.id}`}
-        >
-          Report a problem
-        </ButtonLink>
-      </Cluster>
-      <Table id="client-consultation-attendance" caption="Attendance recorded">
-        <tbody>
-          <tr>
-            <th scope="row">You joined</th>
-            <td>
-              {record.clientJoinedAt === null
-                ? "Not yet"
-                : utcText(record.clientJoinedAt)}
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">The attorney joined</th>
-            <td>
-              {record.attorneyJoinedAt === null
-                ? "Not yet"
-                : utcText(record.attorneyJoinedAt)}
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">Reconnections</th>
-            <td>{String(record.reconnections)}</td>
-          </tr>
-        </tbody>
-      </Table>
-      <Text tone="muted">{EVIDENCE_NOTE}</Text>
-      <CommunicationSection
-        view={await resolveClientCommunication(
-          CLIENT_COMMUNICATION_SOURCES,
-          record.id,
-        )}
-        consultationId={record.id}
-        prefix="client"
-        history={
-          historyId === null
-            ? null
-            : await resolveClientDocumentHistory(
-                CLIENT_COMMUNICATION_SOURCES,
-                record.id,
-                historyId,
-              )
-        }
-      />
-      {BACK}
+        </dl>
+        <h3 className="cx-dl l-mt16">Attendance recorded</h3>
+        <dl className="cux-more l-mt10">
+          <Fact term="You joined">
+            {record.clientJoinedAt === null
+              ? "Not yet"
+              : whenText(record.clientJoinedAt)}
+          </Fact>
+          <Fact term="The attorney joined">
+            {record.attorneyJoinedAt === null
+              ? "Not yet"
+              : whenText(record.attorneyJoinedAt)}
+          </Fact>
+          <Fact term="Reconnections">{String(record.reconnections)}</Fact>
+        </dl>
+        <p className="xs subtle l-mt10">{EVIDENCE_NOTE}</p>
+      </section>
+      <section
+        className="cx-card cx-pad rz-cx-panel l-mt12"
+        aria-label="Messages and documents"
+      >
+        <CommunicationSection
+          view={await resolveClientCommunication(
+            CLIENT_COMMUNICATION_SOURCES,
+            record.id,
+          )}
+          consultationId={record.id}
+          prefix="client"
+          history={
+            historyId === null
+              ? null
+              : await resolveClientDocumentHistory(
+                  CLIENT_COMMUNICATION_SOURCES,
+                  record.id,
+                  historyId,
+                )
+          }
+        />
+      </section>
     </ConsultationFrame>
   );
 }

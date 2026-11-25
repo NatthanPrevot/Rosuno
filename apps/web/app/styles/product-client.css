@@ -84,6 +84,10 @@
 .cx .cx-card + .rz-cx-panel {
   margin-top: 16px;
 }
+/* A panel's slot that holds nothing at the moment (a form's message slot before any answer) takes no room. */
+.cx .rz-cx-panel > .rz-stack:empty {
+  display: none;
+}
 .cx .rz-cx-links {
   display: flex;
   flex-wrap: wrap;

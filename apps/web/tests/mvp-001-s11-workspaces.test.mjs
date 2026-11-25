@@ -417,75 +417,6 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
       assert.ok(link.label.length > 0 && link.label.length <= 40);
     }
   }
-  // DEV-001: the owner's UI/UX design moves the client pages onto the
-  // account frame screen group by screen group; each page renders exactly the
-  // frame named here, with its own path or area marked, and its path is a
-  // link of the navigation it shows.
-  const CLIENT_FRAMES = {
-    "app/client/payments/page.tsx":
-      '<ClientNavigation current="/client/payments" />',
-    "app/client/messages/page.tsx":
-      '<ClientNavigation current="/client/messages" />',
-    "app/client/settings/page.tsx":
-      '<ClientNavigation current="/client/settings" />',
-    "app/client/privacy/page.tsx":
-      '<ClientNavigation current="/client/privacy" />',
-    "app/client/settings/security/page.tsx":
-      '<ClientAccount area="settings" heading="Settings">',
-  };
-  const settingsNavigation = [
-    ...codeOf(read("src/presentation/client-account.tsx"))
-      .slice(
-        codeOf(read("src/presentation/client-account.tsx")).indexOf(
-          "export const CLIENT_SETTINGS_NAVIGATION",
-        ),
-      )
-      .replace(/\s+/g, " ")
-      .matchAll(
-        /\{ category: "([a-z]+)", href: "([^"]+)", label: "[^"]+",? \}/g,
-      ),
-  ].map(([, category, href]) => ({ category, href }));
-  assert.deepEqual(
-    settingsNavigation.map((entry) => entry.category),
-    ["security", "notifications", "privacy"],
-  );
-  assert.deepEqual(
-    Object.keys(CLIENT_FRAMES).sort(),
-    Object.keys(CLIENT_PAGES).sort(),
-  );
-  for (const [file, frame] of Object.entries(CLIENT_FRAMES)) {
-    const code = codeOf(read(file));
-    assert.ok(code.includes(frame), file);
-    if (frame.startsWith("<ClientNavigation ")) {
-      assert.ok(
-        labels.CLIENT_NAVIGATION.some((link) => link.href === pathOf(file)),
-        file,
-      );
-    } else {
-      const area = /area="([a-z]+)"/.exec(frame)[1];
-      assert.ok(
-        settingsNavigation.some((entry) => entry.href === pathOf(file)),
-        file,
-      );
-      assert.ok(
-        exists("/client/settings/security") &&
-          code.includes(`<ClientSettings category="security"`),
-        file,
-      );
-      assert.equal(area, "settings", file);
-    }
-  }
-  for (const file of Object.keys(ATTORNEY_PAGES)) {
-    const code = codeOf(read(file));
-    assert.ok(
-      code.includes(`<AttorneyNavigation current="${pathOf(file)}" />`),
-      file,
-    );
-    assert.ok(
-      labels.ATTORNEY_NAVIGATION.some((link) => link.href === pathOf(file)),
-      file,
-    );
-  }
   // DEV-001: the owner's UI/UX design gives the client account one
   // navigation (fixed first-party links, each to a client page that exists,
   // its own area marked), which the account frame renders on the home and on
@@ -531,6 +462,94 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
     account,
     /<nav className="cx-nav" aria-label=\{CLIENT_ACCOUNT_NAVIGATION_LABEL\}>/,
   );
+  // DEV-001: the owner's UI/UX design moves the client pages onto the
+  // account frame screen group by screen group; each page renders exactly the
+  // frame named here, with its own path or area marked, and its path is a
+  // link of the navigation it shows.
+  const CLIENT_FRAMES = {
+    "app/client/payments/page.tsx":
+      '<ClientNavigation current="/client/payments" />',
+    "app/client/messages/page.tsx":
+      '<ClientAccount area="consultations" heading="Your messages">',
+    "app/client/settings/page.tsx":
+      '<ClientNavigation current="/client/settings" />',
+    "app/client/privacy/page.tsx":
+      '<ClientNavigation current="/client/privacy" />',
+    "app/client/settings/security/page.tsx":
+      '<ClientAccount area="settings" heading="Settings">',
+  };
+  const settingsNavigation = [
+    ...codeOf(read("src/presentation/client-account.tsx"))
+      .slice(
+        codeOf(read("src/presentation/client-account.tsx")).indexOf(
+          "export const CLIENT_SETTINGS_NAVIGATION",
+        ),
+      )
+      .replace(/\s+/g, " ")
+      .matchAll(
+        /\{ category: "([a-z]+)", href: "([^"]+)", label: "[^"]+",? \}/g,
+      ),
+  ].map(([, category, href]) => ({ category, href }));
+  assert.deepEqual(
+    settingsNavigation.map((entry) => entry.category),
+    ["security", "notifications", "privacy"],
+  );
+  assert.deepEqual(
+    Object.keys(CLIENT_FRAMES).sort(),
+    Object.keys(CLIENT_PAGES).sort(),
+  );
+  for (const [file, frame] of Object.entries(CLIENT_FRAMES)) {
+    const code = codeOf(read(file));
+    assert.ok(code.includes(frame), file);
+    if (frame.startsWith("<ClientNavigation ")) {
+      assert.ok(
+        labels.CLIENT_NAVIGATION.some((link) => link.href === pathOf(file)),
+        file,
+      );
+    } else {
+      // The page's area is one of the navigation's, and the page is a link
+      // of the account navigation or the Settings categories (and then shows
+      // its own category marked), or (pages the design's navigation does not
+      // hold) is linked from both the overview and My consultations.
+      const area = /area="([a-z]+)"/.exec(frame)[1];
+      assert.ok(
+        accountNavigation.some((link) => link.area === area),
+        file,
+      );
+      const category = settingsNavigation.find(
+        (entry) => entry.href === pathOf(file),
+      )?.category;
+      if (category !== undefined) {
+        assert.ok(
+          code.includes(`<ClientSettings category="${category}"`),
+          file,
+        );
+      } else if (
+        !accountNavigation.some((link) => link.href === pathOf(file))
+      ) {
+        for (const page of [
+          "app/client/page.tsx",
+          "app/client/consultations/page.tsx",
+        ]) {
+          assert.ok(
+            codeOf(read(page)).includes(`href="${pathOf(file)}"`),
+            `${page}: ${file}`,
+          );
+        }
+      }
+    }
+  }
+  for (const file of Object.keys(ATTORNEY_PAGES)) {
+    const code = codeOf(read(file));
+    assert.ok(
+      code.includes(`<AttorneyNavigation current="${pathOf(file)}" />`),
+      file,
+    );
+    assert.ok(
+      labels.ATTORNEY_NAVIGATION.some((link) => link.href === pathOf(file)),
+      file,
+    );
+  }
   const chrome = codeOf(read("src/presentation/site-chrome.tsx"));
   const primary = [
     ...chrome
