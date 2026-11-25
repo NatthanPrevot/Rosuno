@@ -399,7 +399,9 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // data request actions and the staff break-glass and data request actions
   // (an action not completed, with its fixed outcome only) and the privacy
   // adapter (a failed call, with the call name and how it failed only) write
-  // lines too.
+  // lines too. DEV-001: the owner's UI/UX design's Legal matters and Account
+  // security pages (a view unavailable, with the route and outcome only)
+  // write lines too.
   assert.deepEqual(callers, [
     "app/attorney/complaints/actions.ts",
     "app/attorney/complaints/page.tsx",
@@ -424,6 +426,7 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/client/consultations/actions.ts",
     "app/client/consultations/page.tsx",
     "app/client/intakes/[intake]/page.tsx",
+    "app/client/intakes/page.tsx",
     "app/client/messages/page.tsx",
     "app/client/notifications/page.tsx",
     "app/client/page.tsx",
@@ -437,6 +440,7 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/client/reviews/actions.ts",
     "app/client/reviews/page.tsx",
     "app/client/settings/page.tsx",
+    "app/client/settings/security/page.tsx",
     "app/find-an-attorney/page.tsx",
     "app/find-an-attorney/select/actions.ts",
     "app/find-an-attorney/select/page.tsx",

@@ -174,9 +174,20 @@ test("PE-2. the entry points are reachable from the home page and the client wor
   );
   assert.equal(footer.match(/href: "\/help"/g).length, 1);
   assert.equal(footer.match(/href: "\/privacy"/g).length, 1);
+  // DEV-001: the owner's UI/UX design renders the client workspace inside the
+  // same site chrome, so its help and privacy entry points are the chrome's
+  // own fixed links (the header's Help and the footer's two, pinned above),
+  // and the workspace adds no second copy of either.
   const workspace = codeOf(read("app/client/page.tsx"));
-  assert.equal(workspace.match(/href="\/help"/g).length, 1);
-  assert.equal(workspace.match(/href="\/privacy"/g).length, 1);
+  assert.equal(
+    workspace.match(
+      /<SitePage session=\{shell\.session\} signOut=\{signOut\}>/g,
+    ).length,
+    4,
+  );
+  assert.match(chrome, /\{ href: "\/help", label: "Help" \}/);
+  assert.equal(workspace.match(/href="\/help"/g), null);
+  assert.equal(workspace.match(/href="\/privacy"/g), null);
 });
 
 test("PE-3. client suggestion wording: places only ever 'may be relevant', a category only as one that may fit, no banned recommendation claim, and nothing changes until the client saves", () => {

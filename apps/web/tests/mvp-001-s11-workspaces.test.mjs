@@ -98,6 +98,10 @@ const CLIENT_PAGES = Object.freeze({
     "resolveClientAccount(CLIENT_WORKSPACE_SOURCES)",
   "app/client/privacy/page.tsx":
     "resolveClientAccount(CLIENT_WORKSPACE_SOURCES)",
+  // DEV-001: the owner's UI/UX design's Account security page reads the same
+  // account overview, held to the same contract.
+  "app/client/settings/security/page.tsx":
+    "resolveClientAccount(CLIENT_WORKSPACE_SOURCES)",
 });
 const ATTORNEY_PAGES = Object.freeze({
   "app/attorney/dashboard/page.tsx":
@@ -301,7 +305,24 @@ test("S11C-1 (MBS section 18.6) the new pages are server pages rendered per requ
       // MVP-001 S11 PS-A6 section 3: the privacy and data page also renders
       // the data request forms of its own client module (the one admitted
       // sibling import).
-      if (file === "app/client/privacy/page.tsx" && specifier === "./forms.tsx") {
+      if (
+        file === "app/client/privacy/page.tsx" &&
+        specifier === "./forms.tsx"
+      ) {
+        continue;
+      }
+      // DEV-001: the owner's UI/UX design renders the client pages inside the
+      // site chrome, which offers the existing sign-out server action; a page
+      // imports exactly that action and hands it only to the chrome (it still
+      // renders no form and offers no action of its own, checked above).
+      if (/^(?:\.\.\/)+sign-in\/actions\.ts$/.test(specifier)) {
+        assert.ok(
+          source.includes(`\nimport { signOut } from "${specifier}";\n`),
+          `${file}: ${specifier}`,
+        );
+        const handed = code.match(/signOut=\{signOut\}/g)?.length ?? 0;
+        assert.ok(handed > 0, file);
+        assert.equal(code.match(/\bsignOut\b/g).length, 1 + 2 * handed, file);
         continue;
       }
       assert.match(
@@ -396,16 +417,63 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
       assert.ok(link.label.length > 0 && link.label.length <= 40);
     }
   }
-  for (const file of Object.keys(CLIENT_PAGES)) {
+  // DEV-001: the owner's UI/UX design moves the client pages onto the
+  // account frame screen group by screen group; each page renders exactly the
+  // frame named here, with its own path or area marked, and its path is a
+  // link of the navigation it shows.
+  const CLIENT_FRAMES = {
+    "app/client/payments/page.tsx":
+      '<ClientNavigation current="/client/payments" />',
+    "app/client/messages/page.tsx":
+      '<ClientNavigation current="/client/messages" />',
+    "app/client/settings/page.tsx":
+      '<ClientNavigation current="/client/settings" />',
+    "app/client/privacy/page.tsx":
+      '<ClientNavigation current="/client/privacy" />',
+    "app/client/settings/security/page.tsx":
+      '<ClientAccount area="settings" heading="Settings">',
+  };
+  const settingsNavigation = [
+    ...codeOf(read("src/presentation/client-account.tsx"))
+      .slice(
+        codeOf(read("src/presentation/client-account.tsx")).indexOf(
+          "export const CLIENT_SETTINGS_NAVIGATION",
+        ),
+      )
+      .replace(/\s+/g, " ")
+      .matchAll(
+        /\{ category: "([a-z]+)", href: "([^"]+)", label: "[^"]+",? \}/g,
+      ),
+  ].map(([, category, href]) => ({ category, href }));
+  assert.deepEqual(
+    settingsNavigation.map((entry) => entry.category),
+    ["security", "notifications", "privacy"],
+  );
+  assert.deepEqual(
+    Object.keys(CLIENT_FRAMES).sort(),
+    Object.keys(CLIENT_PAGES).sort(),
+  );
+  for (const [file, frame] of Object.entries(CLIENT_FRAMES)) {
     const code = codeOf(read(file));
-    assert.ok(
-      code.includes(`<ClientNavigation current="${pathOf(file)}" />`),
-      file,
-    );
-    assert.ok(
-      labels.CLIENT_NAVIGATION.some((link) => link.href === pathOf(file)),
-      file,
-    );
+    assert.ok(code.includes(frame), file);
+    if (frame.startsWith("<ClientNavigation ")) {
+      assert.ok(
+        labels.CLIENT_NAVIGATION.some((link) => link.href === pathOf(file)),
+        file,
+      );
+    } else {
+      const area = /area="([a-z]+)"/.exec(frame)[1];
+      assert.ok(
+        settingsNavigation.some((entry) => entry.href === pathOf(file)),
+        file,
+      );
+      assert.ok(
+        exists("/client/settings/security") &&
+          code.includes(`<ClientSettings category="security"`),
+        file,
+      );
+      assert.equal(area, "settings", file);
+    }
   }
   for (const file of Object.keys(ATTORNEY_PAGES)) {
     const code = codeOf(read(file));
@@ -418,10 +486,72 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
       file,
     );
   }
-  const home = codeOf(read("app/client/page.tsx"));
-  const homeLinks = new Set(
-    [...home.matchAll(/href="([^"]*)"/g)].map((m) => m[1]),
+  // DEV-001: the owner's UI/UX design gives the client account one
+  // navigation (fixed first-party links, each to a client page that exists,
+  // its own area marked), which the account frame renders on the home and on
+  // every account page, inside the site chrome. The home reaches every client
+  // area of the set from that navigation, the chrome's primary links (Find an
+  // attorney, Help) or its own page-local links.
+  const account = codeOf(read("src/presentation/client-account.tsx"));
+  const accountNavigation = [
+    ...account
+      .slice(
+        account.indexOf("export const CLIENT_ACCOUNT_NAVIGATION:"),
+        account.indexOf("export const CLIENT_ACCOUNT_NAVIGATION_LABEL"),
+      )
+      .replace(/\s+/g, " ")
+      .matchAll(/\{ area: "([a-z]+)", href: "([^"]+)", label: "([^"]+)",? \}/g),
+  ].map(([, area, href, label]) => ({ area, href, label }));
+  assert.deepEqual(
+    accountNavigation.map((link) => link.area),
+    [
+      "overview",
+      "consultations",
+      "matters",
+      "payments",
+      "profile",
+      "settings",
+      "help",
+    ],
   );
+  assert.equal(
+    new Set(accountNavigation.map((link) => link.href)).size,
+    accountNavigation.length,
+  );
+  for (const link of accountNavigation) {
+    assert.match(link.href, /^\/client(?:\/[a-z-/]*)?$/, link.href);
+    assert.ok(exists(link.href), link.href);
+    assert.ok(link.label.length > 0 && link.label.length <= 40);
+  }
+  assert.match(
+    account,
+    /aria-current=\{link\.area === area \? "page" : undefined\}/,
+  );
+  assert.match(
+    account,
+    /<nav className="cx-nav" aria-label=\{CLIENT_ACCOUNT_NAVIGATION_LABEL\}>/,
+  );
+  const chrome = codeOf(read("src/presentation/site-chrome.tsx"));
+  const primary = [
+    ...chrome
+      .slice(
+        chrome.indexOf("export const SITE_NAVIGATION"),
+        chrome.indexOf("export const SITE_FOOTER"),
+      )
+      .matchAll(/href: "([^"]+)"/g),
+  ].map((m) => m[1]);
+  const home = codeOf(read("app/client/page.tsx"));
+  assert.ok(
+    home.includes('<ClientAccount area="overview" heading="Overview">'),
+  );
+  assert.ok(
+    home.includes("<SitePage session={shell.session} signOut={signOut}>"),
+  );
+  const homeLinks = new Set([
+    ...[...home.matchAll(/href="([^"]*)"/g)].map((m) => m[1]),
+    ...accountNavigation.map((link) => link.href),
+    ...primary,
+  ]);
   for (const link of labels.CLIENT_NAVIGATION) {
     if (link.href !== "/client") {
       assert.ok(homeLinks.has(link.href), link.href);

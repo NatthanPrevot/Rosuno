@@ -1,1 +1,104 @@
 /* Canonical client additions to the owner's design system (values from its tokens). Only client screens add rules here. */
+
+/* The account frame for a visitor the page does not admit: the heading and one card, without the navigation. */
+.cx .cx-shell.rz-cx-solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+.cx .rz-cx-solo .cx-main {
+  max-width: 720px;
+}
+.cx .rz-cx-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+.cx .rz-cx-gate > .rz-alert {
+  align-self: stretch;
+}
+
+/* The tile where the design shows a portrait: no consented image exists, so it carries the consultation glyph. */
+.cx .rz-cx-tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 52px;
+  border-radius: 10px;
+  background: var(--paper-2);
+  color: var(--subtle);
+}
+.cx .rz-cx-tile[data-size="next"] {
+  width: 112px;
+  height: 128px;
+  border-radius: 14px;
+}
+.cx .rz-cx-tile[data-size="next"] .cux-ico {
+  width: 28px;
+  height: 28px;
+}
+
+/* Rows that open their own page: the design's expand control points to the page instead of opening in place. */
+.cx .rz-cx-row:hover .cx-rn,
+.cx .rz-cx-row:hover .rz-cx-rt {
+  text-decoration: underline;
+}
+.cx .rz-cx-row:hover .cx-expb {
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line-3);
+}
+
+/* The segmented switch of the design, as links to the page's own filtered view. */
+.cx .cx-seg a {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.cx .cx-seg a:hover {
+  color: var(--ink);
+}
+.cx .cx-seg a.on {
+  background: var(--page);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow:
+    0 1px 2px rgba(15, 16, 19, 0.08),
+    0 0 0 0.5px rgba(15, 16, 19, 0.06);
+}
+
+/* A card that holds the page's existing primitives (tables, forms, alerts) inside the account. */
+.cx .rz-cx-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cx .rz-cx-panel + .rz-cx-panel,
+.cx .rz-cx-panel + .cx-card,
+.cx .cx-card + .rz-cx-panel {
+  margin-top: 16px;
+}
+.cx .rz-cx-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 18px;
+}
+
+@media (max-width: 700px) {
+  .cx .rz-cx-tile[data-size="next"] {
+    width: 56px;
+    height: 64px;
+    border-radius: 12px;
+  }
+  .cx .rz-cx-tile[data-size="next"] .cux-ico {
+    width: 20px;
+    height: 20px;
+  }
+}
