@@ -1,0 +1,23 @@
+{
+  "schema": "rosuno-grant/v1",
+  "grant_id": "DEV-001",
+  "profile": "DEV",
+  "status": "active",
+  "repository": "NatthanPrevot/Rosuno",
+  "base": "main",
+  "source_repository": "RosunoBackup/Rosuno",
+  "owner_login": "NatthanPrevot",
+  "pr_authors": [
+    "NatthanPrevot"
+  ],
+  "purpose": "Broad Rosuno engineering, including UI/UX integration, backend improvements, forward-only schema development and defect corrections. No production changes, persistent database application or unresolved regulatory decisions. Existing protected PR, CI, human review and environment boundaries remain mandatory.",
+  "decision_ref": "Owner instruction in Rosuno New Build oversight chat, 2026-11-24 PST: Capability E active indefinitely unless explicitly revoked; initial DEV-001 grant valid for 10 years, revocable at owner discretion. Preserve all substantive safeguards and existing guard implementation.",
+  "effects": [
+    "code",
+    "schema",
+    "dependencies"
+  ],
+  "exclusions": [],
+  "issued_at": "2026-11-25T05:28:22Z",
+  "expires_at": "2036-11-25T05:28:22Z"
+}

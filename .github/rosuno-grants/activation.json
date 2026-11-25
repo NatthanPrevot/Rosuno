@@ -1,0 +1,13 @@
+{
+  "schema": "rosuno-activation/v1",
+  "repository": "NatthanPrevot/Rosuno",
+  "owner_login": "NatthanPrevot",
+  "adopted_package_sha256": "6cd443caf7ad3a343a80530dff51b9396cdff40c440cba4065319151fed8333b",
+  "control_commit": "89a391c0b5e7c78e657f1488d666518d1de77781",
+  "decision_ref": "Owner instruction in Rosuno New Build oversight chat, 2026-11-24 PST: Capability E active indefinitely unless explicitly revoked; initial DEV-001 grant valid for 10 years, revocable at owner discretion. Preserve all substantive safeguards and existing guard implementation.",
+  "capabilities": [
+    "E"
+  ],
+  "status": "active",
+  "activated_at": "2026-11-25T05:28:22Z"
+}
