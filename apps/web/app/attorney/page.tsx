@@ -21,6 +21,11 @@
 // and unavailable requests each see one fixed message and no profile data;
 // every refusal also offers the same fixed link to the attorney application
 // entry (P3-002), which decides afresh on its own.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace): the admitted attorney sees the entry inside the workspace frame;
+// every other state renders the design's signed-out panel, which shows no
+// workspace navigation.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -33,15 +38,15 @@ import {
 import { ATTORNEY_PRINCIPAL_SOURCE } from "../../src/infrastructure/identity/attorney-principal-source.ts";
 import { SUPABASE_SERVER_SESSION_SOURCE } from "../../src/infrastructure/identity/server-session-source.ts";
 import {
+  AttorneyGate,
+  AttorneyWorkspace,
+  Card,
+} from "../../src/presentation/attorney-workspace.tsx";
+import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
   Status,
-  Surface,
   Table,
   Text,
 } from "../../src/presentation/design-system.tsx";
@@ -59,24 +64,19 @@ const STAGE_LABELS: Readonly<Record<AttorneyWorkspaceStage, string>> = {
   approved: "Approved (record stage only)",
 };
 
-type WorkspaceFrameProps = {
+// DEV-001: the owner's UI/UX design. A visitor the page does not admit sees
+// the design's signed-out panel, which holds no workspace navigation.
+function GateFrame({
+  title,
+  children,
+}: {
   readonly title: string;
   readonly children: ReactNode;
-};
-
-function WorkspaceFrame({ title, children }: WorkspaceFrameProps) {
+}) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-workspace-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-workspace-title">
-            {title}
-          </Heading>
-          {children}
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate titleId="attorney-workspace-title" title={title}>
+      {children}
+    </AttorneyGate>
   );
 }
 
@@ -90,101 +90,110 @@ export default async function AttorneyWorkspacePage() {
   });
   if (access.status === "granted") {
     return (
-      <WorkspaceFrame title="Restricted attorney workspace">
-        <Text tone="muted">
-          Your signed-in account has an existing attorney profile that permits
-          entry to this restricted workspace. It shows access standing only and
-          changes nothing.
-        </Text>
-        <Table id="attorney-workspace-standing" caption="Access standing">
-          <thead>
-            <tr>
-              <th scope="col">Item</th>
-              <th scope="col">Current state</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row">Workspace access</th>
-              <td>
-                <Status tone="success">Restricted entry permitted</Status>
-              </td>
-            </tr>
-            <tr>
-              <th scope="row">User account</th>
-              <td>
-                <Status tone="success">Active</Status>
-              </td>
-            </tr>
-            <tr>
-              <th scope="row">Attorney profile lifecycle</th>
-              <td>
-                <Status tone="neutral">{STAGE_LABELS[access.stage]}</Status>
-              </td>
-            </tr>
-            <tr>
-              <th scope="row">Professional verification</th>
-              <td>
-                <Status tone="neutral">Shown in professional setup</Status>
-              </td>
-            </tr>
-            <tr>
-              <th scope="row">Current eligibility</th>
-              <td>
-                <Status tone="neutral">Shown in professional setup</Status>
-              </td>
-            </tr>
-          </tbody>
-        </Table>
-        <Alert tone="information" title="Access is not verification">
-          Entry to this workspace does not establish professional verification
-          or determine current eligibility. An attorney profile lifecycle stage,
-          approved included, is a record stage that establishes neither, and
-          this workspace makes no such decision. Your claims, their review, and
-          any recorded eligibility determination are shown separately in
-          professional setup.
-        </Alert>
-        <Cluster>
-          <ButtonLink variant="primary" href="/attorney/professional">
-            Professional setup
-          </ButtonLink>
-          <ButtonLink variant="secondary" href="/attorney/dashboard">
-            Dashboard
-          </ButtonLink>
-          <ButtonLink variant="secondary" href="/attorney/schedule">
-            Schedule
-          </ButtonLink>
-          <ButtonLink variant="secondary" href="/attorney/offers">
-            Offers
-          </ButtonLink>
-          <ButtonLink variant="secondary" href="/attorney/earnings">
-            Earnings
-          </ButtonLink>
-          <ButtonLink variant="secondary" href="/attorney/requests">
-            Requests
-          </ButtonLink>
-          <ButtonLink variant="secondary" href="/attorney/consultations">
-            Consultations
-          </ButtonLink>
-          <ButtonLink variant="secondary" href="/attorney/reviews">
-            Reviews
-          </ButtonLink>
-          <ButtonLink variant="secondary" href="/attorney/complaints">
-            Report a problem
-          </ButtonLink>
-          <ButtonLink variant="secondary" href="/attorney/notifications">
-            Notifications
-          </ButtonLink>
-          <ButtonLink variant="tertiary" href="/">
-            Return to the home page
-          </ButtonLink>
-        </Cluster>
-      </WorkspaceFrame>
+      <AttorneyWorkspace
+        section={null}
+        titleId="attorney-workspace-title"
+        title="Restricted attorney workspace"
+        width="medium"
+      >
+        <Card id="attorney-workspace-standing-title" title="Access standing">
+          <Text tone="muted">
+            Your signed-in account has an existing attorney profile that permits
+            entry to this restricted workspace. It shows access standing only
+            and changes nothing.
+          </Text>
+          <Table id="attorney-workspace-standing" caption="Access standing">
+            <thead>
+              <tr>
+                <th scope="col">Item</th>
+                <th scope="col">Current state</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Workspace access</th>
+                <td>
+                  <Status tone="success">Restricted entry permitted</Status>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">User account</th>
+                <td>
+                  <Status tone="success">Active</Status>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Attorney profile lifecycle</th>
+                <td>
+                  <Status tone="neutral">{STAGE_LABELS[access.stage]}</Status>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Professional verification</th>
+                <td>
+                  <Status tone="neutral">Shown in professional setup</Status>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Current eligibility</th>
+                <td>
+                  <Status tone="neutral">Shown in professional setup</Status>
+                </td>
+              </tr>
+            </tbody>
+          </Table>
+          <Alert tone="information" title="Access is not verification">
+            Entry to this workspace does not establish professional verification
+            or determine current eligibility. An attorney profile lifecycle
+            stage, approved included, is a record stage that establishes
+            neither, and this workspace makes no such decision. Your claims,
+            their review, and any recorded eligibility determination are shown
+            separately in professional setup.
+          </Alert>
+        </Card>
+        <Card id="attorney-workspace-pages-title" title="Your workspace">
+          <Cluster>
+            <ButtonLink variant="primary" href="/attorney/professional">
+              Professional setup
+            </ButtonLink>
+            <ButtonLink variant="secondary" href="/attorney/dashboard">
+              Dashboard
+            </ButtonLink>
+            <ButtonLink variant="secondary" href="/attorney/schedule">
+              Schedule
+            </ButtonLink>
+            <ButtonLink variant="secondary" href="/attorney/offers">
+              Offers
+            </ButtonLink>
+            <ButtonLink variant="secondary" href="/attorney/earnings">
+              Earnings
+            </ButtonLink>
+            <ButtonLink variant="secondary" href="/attorney/requests">
+              Requests
+            </ButtonLink>
+            <ButtonLink variant="secondary" href="/attorney/consultations">
+              Consultations
+            </ButtonLink>
+            <ButtonLink variant="secondary" href="/attorney/reviews">
+              Reviews
+            </ButtonLink>
+            <ButtonLink variant="secondary" href="/attorney/complaints">
+              Report a problem
+            </ButtonLink>
+            <ButtonLink variant="secondary" href="/attorney/notifications">
+              Notifications
+            </ButtonLink>
+            <ButtonLink variant="tertiary" href="/">
+              Return to the home page
+            </ButtonLink>
+          </Cluster>
+        </Card>
+      </AttorneyWorkspace>
     );
   }
   if (access.status === "sign-in-required") {
     return (
-      <WorkspaceFrame title="Sign in to continue">
+      <GateFrame title="Sign in to continue">
         <Text tone="muted">
           The attorney workspace is available only to a signed-in account with
           existing attorney access.
@@ -197,12 +206,12 @@ export default async function AttorneyWorkspacePage() {
             Return to the home page
           </ButtonLink>
         </Cluster>
-      </WorkspaceFrame>
+      </GateFrame>
     );
   }
   if (access.status === "denied") {
     return (
-      <WorkspaceFrame title="Attorney workspace not available">
+      <GateFrame title="Attorney workspace not available">
         <Alert tone="warning" title="No workspace access" role="status">
           This account does not have access to the attorney workspace. Any other
           access the account has is unchanged.
@@ -215,11 +224,11 @@ export default async function AttorneyWorkspacePage() {
             Return to the home page
           </ButtonLink>
         </Cluster>
-      </WorkspaceFrame>
+      </GateFrame>
     );
   }
   return (
-    <WorkspaceFrame title="Attorney workspace unavailable">
+    <GateFrame title="Attorney workspace unavailable">
       <Alert tone="error" title="Access could not be confirmed" role="alert">
         The attorney workspace could not be opened right now. Please try again
         later.
@@ -229,6 +238,6 @@ export default async function AttorneyWorkspacePage() {
           Return to the home page
         </ButtonLink>
       </Cluster>
-    </WorkspaceFrame>
+    </GateFrame>
   );
 }

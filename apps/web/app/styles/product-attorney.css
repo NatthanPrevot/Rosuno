@@ -1,1 +1,554 @@
 /* Canonical attorney additions to the owner's design system (values from its tokens). Only attorney screens add rules here. */
+
+/* The workspace frame fills the viewport: the product has no demo bar above it, so the design's chrome offset is
+   zero at every width, and the page body scrolls inside the frame as in the design. */
+.rzw.W.aw {
+  --chrome: 0px;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+:where(.aw) a {
+  color: inherit;
+  text-decoration: none;
+}
+/* The navigation groups keep the design's flat list (one column beside the page, one scrolling row on a phone). */
+.aw .aw-ngroup {
+  display: contents;
+}
+.aw .w-me {
+  flex-wrap: wrap;
+}
+.aw .w-talk > .sm.b {
+  display: block;
+}
+
+/* The design's page switch, as links to each page of the section. */
+.aw .seg a {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.aw .seg a:hover {
+  color: var(--ink);
+}
+.aw .seg a.on {
+  background: var(--page);
+  color: var(--ink);
+  box-shadow:
+    0 1px 2px rgba(15, 16, 19, 0.08),
+    0 0 0 0.5px rgba(15, 16, 19, 0.06);
+}
+.aw .w-segsm a {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+
+/* The page column holds the page's cards in one flow. */
+.aw .aw-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.aw .aw-page > .w-ph {
+  margin-bottom: 0;
+}
+.aw .aw-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.aw .aw-card > .w-ch {
+  margin-bottom: 2px;
+}
+.aw .aw-lead {
+  max-width: 760px;
+}
+
+/* The frame for a visitor the page does not admit: the signed-out panel's message and actions. */
+.aw .aw-gate__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+  width: 100%;
+}
+.aw .aw-gate__body > .rz-alert {
+  align-self: stretch;
+  text-align: left;
+}
+
+/* The countdown ring in thirteen steps: twelfths of the response window still to run. */
+.aw .w-ring[data-step="0"] {
+  --a: 0deg;
+}
+.aw .w-ring[data-step="1"] {
+  --a: 30deg;
+}
+.aw .w-ring[data-step="2"] {
+  --a: 60deg;
+}
+.aw .w-ring[data-step="3"] {
+  --a: 90deg;
+}
+.aw .w-ring[data-step="4"] {
+  --a: 120deg;
+}
+.aw .w-ring[data-step="5"] {
+  --a: 150deg;
+}
+.aw .w-ring[data-step="6"] {
+  --a: 180deg;
+}
+.aw .w-ring[data-step="7"] {
+  --a: 210deg;
+}
+.aw .w-ring[data-step="8"] {
+  --a: 240deg;
+}
+.aw .w-ring[data-step="9"] {
+  --a: 270deg;
+}
+.aw .w-ring[data-step="10"] {
+  --a: 300deg;
+}
+.aw .w-ring[data-step="11"] {
+  --a: 330deg;
+}
+.aw .w-ring[data-step="12"] {
+  --a: 360deg;
+}
+
+/* The design's gated state and its status words inside the workspace. */
+.aw .aw-gated {
+  margin: 0;
+}
+.aw .pill.pending {
+  background: var(--hold-bg);
+  color: var(--hold);
+}
+
+/* ---------- the shared primitives inside the workspace (their own rules are scoped to the public root) ---------- */
+.aw .rz-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.aw .rz-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.aw .rz-stack[data-gap="tight"] {
+  gap: 8px;
+}
+.aw .rz-stack[data-gap="loose"] {
+  gap: 24px;
+}
+.aw .rz-stack:empty {
+  display: none;
+}
+.aw .rz-cluster {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.aw .rz-columns {
+  display: grid;
+  gap: 16px;
+}
+.aw .rz-columns[data-columns="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.aw .rz-columns[data-columns="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.aw .rz-columns[data-columns="split"] {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+.aw .rz-rule {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 0;
+  width: 100%;
+}
+.aw .rz-text {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.aw .rz-text.lead {
+  font-size: 15px;
+}
+.aw .rz-text.sm {
+  font-size: 13px;
+}
+.aw .rz-text.xs {
+  font-size: 12px;
+}
+.aw .rz-text[data-tone="muted"] {
+  color: var(--muted);
+}
+.aw .rz-text[data-tone="accent"] {
+  color: var(--accent);
+}
+.aw .kicker {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.aw .h2 {
+  font-family: var(--f-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+.aw .h3 {
+  font-family: var(--f-display);
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.aw .h4 {
+  font-family: var(--f-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+/* A surface inside a card: the design's row with a hairline. */
+.aw .rz-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--page);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.aw .rz-surface.well {
+  background: var(--paper);
+  box-shadow: none;
+}
+
+/* Fields */
+.aw .fld {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.aw .fld > label,
+.aw .fld > .fl {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.aw .rz-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.aw .rz-errors .err {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.aw .rz-errors .rz-icon {
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+}
+.aw .rz-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.aw .rz-fieldset > legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.aw .rz-choice {
+  align-items: flex-start;
+}
+.aw .rz-choice > .stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.aw .rz-choice input {
+  margin-top: 2px;
+}
+.aw .selx {
+  appearance: none;
+  padding-right: 30px;
+  background-image: url("/icons/chevron-down.svg");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+.aw button.btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Disclosure */
+.aw .rz-disclosure {
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--page);
+}
+.aw .rz-disclosure__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.aw .rz-disclosure__summary::-webkit-details-marker {
+  display: none;
+}
+.aw .rz-disclosure[open] > .rz-disclosure__summary .rz-icon {
+  transform: rotate(180deg);
+}
+.aw .rz-disclosure__content {
+  padding: 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Tables: the design's list rows inside a card, scrolling sideways on narrow screens. */
+.aw .rz-table-region {
+  overflow-x: auto;
+  border-radius: 12px;
+  background: var(--page);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.aw .rz-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.aw .rz-table__caption {
+  text-align: left;
+  padding: 12px 14px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.aw .rz-table th {
+  text-align: left;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--subtle);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.aw .rz-table tbody th {
+  color: var(--ink);
+  font-weight: 600;
+  white-space: normal;
+}
+.aw .rz-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  color: var(--ink-2);
+}
+.aw .rz-table tbody th {
+  padding: 10px 14px;
+  vertical-align: top;
+}
+.aw .rz-table tbody tr:last-child td,
+.aw .rz-table tbody tr:last-child th {
+  border-bottom: 0;
+}
+.aw .rz-table [data-align="end"] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.aw .rz-table .btn {
+  white-space: nowrap;
+}
+
+/* Status pill icon */
+.aw .rz-status .rz-icon {
+  width: 12px;
+  height: 12px;
+}
+.aw .rz-status[data-emphasis="strong"] {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+/* Alerts in the design's note colours; the icon shape carries the meaning too. */
+.aw .rz-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.aw .rz-alert > .rz-icon {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+.aw .rz-alert__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.aw .rz-alert__title {
+  font-weight: 600;
+  color: var(--ink);
+}
+.aw .rz-alert[data-tone="success"] {
+  background: var(--live-bg);
+}
+.aw .rz-alert[data-tone="success"] > .rz-icon {
+  color: var(--live-ink);
+}
+.aw .rz-alert[data-tone="warning"] {
+  background: var(--hold-bg);
+}
+.aw .rz-alert[data-tone="warning"] > .rz-icon {
+  color: var(--hold);
+}
+.aw .rz-alert[data-tone="error"] {
+  background: var(--no-bg);
+}
+.aw .rz-alert[data-tone="error"] > .rz-icon {
+  color: var(--no);
+}
+.aw .rz-alert[data-tone="information"] {
+  background: var(--accent-2);
+}
+.aw .rz-alert[data-tone="information"] > .rz-icon {
+  color: var(--accent);
+}
+
+/* Media frame (the consultation room's provider frame) */
+.aw .rz-media {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.aw .rz-media__content {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--paper-2);
+  aspect-ratio: 16 / 9;
+}
+.aw .rz-media__content > iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+@media (max-width: 980px) {
+  .aw .rz-columns[data-columns="3"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .aw .rz-columns[data-columns="split"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .aw .rz-columns[data-columns] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .aw .w-side .w-me {
+    gap: 6px;
+  }
+}
+
+/* ---------- Overview ---------- */
+.aw .aw-next-time {
+  gap: 14px;
+  align-items: baseline;
+  margin-top: 6px;
+}
+.aw .aw-next-acts {
+  gap: 8px;
+  margin-top: 12px;
+}
+.aw .aw-next-note {
+  text-align: right;
+}
+.aw .aw-none {
+  padding: 8px 0;
+}
+.aw .w-feed .aw-feed-col {
+  gap: 4px;
+  align-items: flex-start;
+}
+.aw .w-feed .aw-feed-col .pill {
+  height: auto;
+  min-height: 22px;
+  white-space: normal;
+}
+.aw .w-feed li > .link {
+  flex: none;
+}
+
+/* ---------- Requests ---------- */
+.aw .aw-reqgrid {
+  align-items: start;
+}
+.aw .aw-rqnotes {
+  margin: 4px auto 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  gap: 10px;
+}
+.aw .aw-urgent {
+  color: var(--urgent);
+}
+.aw .aw-priv-note {
+  margin-top: 4px;
+}
+.aw .w-rdet .w-facts4:has(+ .w-facts4) {
+  border-bottom: 0;
+  padding-bottom: 0;
+}

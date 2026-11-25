@@ -104,8 +104,11 @@ const CLIENT_PAGES = Object.freeze({
     "resolveClientAccount(CLIENT_WORKSPACE_SOURCES)",
 });
 const ATTORNEY_PAGES = Object.freeze({
+  // DEV-001: the owner's UI/UX design's Overview hands the dashboard use case
+  // its own sources through a wrapper that keeps what each answered (pinned
+  // in S11C-1); the use case and its sources are unchanged.
   "app/attorney/dashboard/page.tsx":
-    "resolveAttorneyDashboard(DASHBOARD_SOURCES)",
+    "resolveAttorneyDashboard(keepingSources(kept))",
   "app/attorney/consultations/history/page.tsx":
     "resolveAttorneyHistory(ATTORNEY_WORKSPACE_SOURCES)",
   "app/attorney/schedule/week/page.tsx":
@@ -341,6 +344,26 @@ test("S11C-1 (MBS section 18.6) the new pages are server pages rendered per requ
     } else {
       assert.doesNotMatch(code, /requireSteppedUp/, file);
     }
+    // DEV-001: the Overview's wrapper hands the dashboard exactly its own
+    // production sources, keeping the queue, the Consultation list and the
+    // clock reading each source answered; every source still runs once, as
+    // the dashboard asks, and nothing else is read.
+    if (file === "app/attorney/dashboard/page.tsx") {
+      assert.ok(
+        code.includes(
+          "function keepingSources(kept: Kept): AttorneyDashboardSources {\n  return Object.freeze({\n    ...DASHBOARD_SOURCES,\n    consultations: async () =>\n      (kept.consultations = await DASHBOARD_SOURCES.consultations()),\n    requests: async () => (kept.queue = await DASHBOARD_SOURCES.requests()),\n    clock: () => (kept.now = DASHBOARD_SOURCES.clock()),\n  });\n}\n",
+        ),
+        file,
+      );
+      assert.equal(code.match(/keepingSources\(/g).length, 2, file);
+      assert.equal(code.match(/DASHBOARD_SOURCES\./g).length, 3, file);
+      assert.ok(
+        code.includes(
+          "  const kept: Kept = {};\n  const view = await resolveAttorneyDashboard(keepingSources(kept));\n",
+        ),
+        file,
+      );
+    }
     const queries = code.match(/\bsearchParams\b/g)?.length ?? 0;
     if (file === "app/client/payments/page.tsx") {
       assert.equal(queries, 3, file);
@@ -533,16 +556,112 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
       }
     }
   }
-  for (const file of Object.keys(ATTORNEY_PAGES)) {
+  // DEV-001: the owner's UI/UX design renders the attorney pages in the
+  // workspace frame, whose grouped section navigation (fixed first-party
+  // links, each to an attorney page that exists, the current section marked)
+  // replaces the workspace navigation component screen group by screen
+  // group. A page the section navigation does not hold itself is one page of
+  // its section's page switch, which marks the page and holds the section's
+  // own page.
+  const shell = codeOf(read("src/presentation/attorney-workspace.tsx"));
+  const sections = [
+    ...shell
+      .slice(
+        shell.indexOf("export const ATTORNEY_SECTIONS:"),
+        shell.indexOf("export const ATTORNEY_SECTIONS_LABEL"),
+      )
+      .replace(/\s+/g, " ")
+      .matchAll(
+        /\{ section: "([a-z]+)", href: "([^"]+)", label: "([^"]+)", group: "(Work|Practice|Account)",? \}/g,
+      ),
+  ].map(([, section, href, label, group]) => ({ section, href, label, group }));
+  assert.deepEqual(
+    sections.map((link) => `${link.group}/${link.section}`),
+    [
+      "Work/dashboard",
+      "Work/requests",
+      "Work/calendar",
+      "Work/consultations",
+      "Work/messages",
+      "Practice/availability",
+      "Practice/profile",
+      "Practice/earnings",
+      "Account/compliance",
+      "Account/settings",
+    ],
+  );
+  assert.equal(new Set(sections.map((link) => link.href)).size, 10);
+  for (const link of sections) {
+    assert.match(link.href, /^\/attorney\/[a-z-/]+$/, link.href);
+    assert.ok(exists(link.href), link.href);
+    assert.ok(link.label.length > 0 && link.label.length <= 40);
+  }
+  assert.match(
+    shell,
+    /aria-current=\{link\.section === section \? "page" : undefined\}/,
+  );
+  assert.match(
+    shell,
+    /<nav className="w-nav" aria-label=\{ATTORNEY_SECTIONS_LABEL\}>/,
+  );
+  const switches = Object.fromEntries(
+    [
+      ...shell.matchAll(
+        /export const ([A-Z_]+_PAGES): readonly AttorneyPageLink\[\] = Object\.freeze\(\[([\s\S]*?)\]\);/g,
+      ),
+    ].map(([, name, body]) => [
+      name,
+      [...body.matchAll(/href: "([^"]+)"/g)].map((m) => m[1]),
+    ]),
+  );
+  for (const hrefs of Object.values(switches)) {
+    for (const href of hrefs) {
+      assert.ok(exists(href), href);
+    }
+  }
+  const ATTORNEY_FRAMES = {
+    "app/attorney/dashboard/page.tsx": { section: "dashboard" },
+    "app/attorney/consultations/history/page.tsx": { legacy: true },
+    "app/attorney/schedule/week/page.tsx": { legacy: true },
+    "app/attorney/messages/page.tsx": { legacy: true },
+    "app/attorney/documents/page.tsx": { legacy: true },
+    "app/attorney/compliance/page.tsx": { legacy: true },
+  };
+  assert.deepEqual(
+    Object.keys(ATTORNEY_FRAMES).sort(),
+    Object.keys(ATTORNEY_PAGES).sort(),
+  );
+  for (const [file, frame] of Object.entries(ATTORNEY_FRAMES)) {
     const code = codeOf(read(file));
+    const flat = code.replace(/\s+/g, " ");
+    if (frame.legacy) {
+      assert.ok(
+        code.includes(`<AttorneyNavigation current="${pathOf(file)}" />`),
+        file,
+      );
+      assert.ok(
+        labels.ATTORNEY_NAVIGATION.some((link) => link.href === pathOf(file)),
+        file,
+      );
+      continue;
+    }
+    assert.doesNotMatch(code, /<AttorneyNavigation\b/, file);
     assert.ok(
-      code.includes(`<AttorneyNavigation current="${pathOf(file)}" />`),
+      flat.includes(`<AttorneyWorkspace section="${frame.section}"`),
       file,
     );
-    assert.ok(
-      labels.ATTORNEY_NAVIGATION.some((link) => link.href === pathOf(file)),
-      file,
-    );
+    const own = sections.find((link) => link.section === frame.section);
+    assert.ok(own !== undefined, file);
+    if (own.href !== pathOf(file)) {
+      assert.ok(
+        flat.includes(
+          `pages={{ label: "${frame.label}", links: ${frame.pages}, current: "${pathOf(file)}", }}`,
+        ),
+        file,
+      );
+      assert.ok(switches[frame.pages].includes(pathOf(file)), file);
+      assert.ok(switches[frame.pages].includes(own.href), file);
+    }
   }
   const chrome = codeOf(read("src/presentation/site-chrome.tsx"));
   const primary = [

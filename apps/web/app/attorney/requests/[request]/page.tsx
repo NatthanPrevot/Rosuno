@@ -18,6 +18,12 @@
 // accept and decline forms are offered; the database decides again, with
 // fresh evaluations, at the moment of the decision. Nothing of the client,
 // their message or their Intake is shown (Packet section 3: counsel gate).
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace request details): the workspace frame around the design's
+// request panel (status, the consultation asked for, the deadline or held
+// time, the facts, the counsel-gated client section and the decision). A
+// visitor the page does not admit sees the design's signed-out panel.
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -43,16 +49,16 @@ import {
   utcText,
 } from "../../../../src/presentation/attorney-request-labels.ts";
 import {
+  AttorneyGate,
+  AttorneyWorkspace,
+  Facts,
+  ModalityTile,
+  Pill,
+} from "../../../../src/presentation/attorney-workspace.tsx";
+import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
-  Table,
   Text,
 } from "../../../../src/presentation/design-system.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
@@ -63,7 +69,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function RequestFrame({
+function GateFrame({
   title,
   children,
 }: {
@@ -71,17 +77,9 @@ function RequestFrame({
   readonly children: ReactNode;
 }) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-request-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-request-title">
-            {title}
-          </Heading>
-          {children}
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate titleId="attorney-request-title" title={title}>
+      {children}
+    </AttorneyGate>
   );
 }
 
@@ -108,7 +106,7 @@ export default async function AttorneyRequestPage({
   }
   if (view.status === "sign-in-required") {
     return (
-      <RequestFrame title="Sign in to continue">
+      <GateFrame title="Sign in to continue">
         <Text tone="muted">
           Requests are available only to a signed-in account with attorney
           access.
@@ -118,16 +116,16 @@ export default async function AttorneyRequestPage({
             Sign in
           </ButtonLink>
         </Cluster>
-      </RequestFrame>
+      </GateFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <RequestFrame title="Request not available">
+      <GateFrame title="Request not available">
         <Alert tone="warning" title="No requests access" role="status">
           This account does not have access to attorney requests.
         </Alert>
-      </RequestFrame>
+      </GateFrame>
     );
   }
   if (view.status !== "ready") {
@@ -136,104 +134,149 @@ export default async function AttorneyRequestPage({
       outcome: view.status,
     });
     return (
-      <RequestFrame title="Request unavailable">
+      <GateFrame title="Request unavailable">
         <Alert tone="error" title="Something went wrong" role="alert">
           This request could not be shown right now. Please try again later.
         </Alert>
         {BACK}
-      </RequestFrame>
+      </GateFrame>
     );
   }
   const record = view.request;
   const state = ATTORNEY_REQUEST_STATE_LABELS[view.displayState];
+  const instant = record.path === "instant";
   return (
-    <RequestFrame title="Request">
-      <Cluster>
-        <Status tone={state.tone}>{state.label}</Status>
-      </Cluster>
-      <Text tone="muted">{DETAIL_NOTE}</Text>
-      {view.displayState === "expired" ? (
-        <Text>{EXPIRED_REQUEST_NOTE}</Text>
-      ) : null}
-      <Table id="attorney-request-details" caption="Request details">
-        <tbody>
-          <tr>
-            <th scope="row">Consultation</th>
-            <td>{`${modalityText(record.modality)}, ${durationText(record.durationMinutes)}`}</td>
-          </tr>
-          <tr>
-            <th scope="row">How soon</th>
-            <td>{ATTORNEY_REQUEST_PATH_LABELS[record.path]}</td>
-          </tr>
-          {record.slotStart === null || record.slotEnd === null ? null : (
-            <tr>
-              <th scope="row">Time</th>
-              <td>{`${utcText(record.slotStart)} to ${utcText(record.slotEnd)}`}</td>
-            </tr>
-          )}
-          <tr>
-            <th scope="row">Your price</th>
-            <td>{moneyText(record.listedPriceMinor, record.currency)}</td>
-          </tr>
-          <tr>
-            <th scope="row">Platform fee</th>
-            <td>{moneyText(record.platformFeeMinor, record.currency)}</td>
-          </tr>
-          <tr>
-            <th scope="row">Requested</th>
-            <td>{utcText(record.createdAt)}</td>
-          </tr>
-          {record.decideBy === null ? null : (
-            <tr>
-              <th scope="row">Decide by</th>
-              <td>{utcText(record.decideBy)}</td>
-            </tr>
-          )}
-          {record.decidedAt === null ? null : (
-            <tr>
-              <th scope="row">Decided</th>
-              <td>{utcText(record.decidedAt)}</td>
-            </tr>
-          )}
-        </tbody>
-      </Table>
-      {record.state === "accepted" ? (
-        record.consultationState === null ? (
-          <Text>{CONSULTATION_PENDING_NOTE}</Text>
-        ) : (
-          <Stack gap="tight">
-            <Text>{ACCEPTED_NOTE}</Text>
-            <Table id="attorney-request-consultation" caption="Consultation">
-              <tbody>
-                <tr>
-                  <th scope="row">Status</th>
-                  <td>{CONSULTATION_STATE_LABELS[record.consultationState]}</td>
-                </tr>
-                {record.bookingStart === null ||
-                record.bookingEnd === null ? null : (
-                  <tr>
-                    <th scope="row">Time</th>
-                    <td>{`${utcText(record.bookingStart)} to ${utcText(record.bookingEnd)}`}</td>
-                  </tr>
-                )}
-              </tbody>
-            </Table>
-            {record.consultationId === null ? null : (
-              <Cluster>
-                <ButtonLink
-                  variant="secondary"
-                  href={attorneyConsultationPathFor(record.consultationId)}
-                >
-                  Open the consultation
-                </ButtonLink>
-              </Cluster>
-            )}
-          </Stack>
-        )
-      ) : null}
-      <DecisionPanel requestId={record.id} decidable={view.decidable} />
-      <Text tone="muted">{DECIDE_BY_NOTE}</Text>
+    <AttorneyWorkspace
+      section="requests"
+      titleId="attorney-request-title"
+      title="Request"
+      width="medium"
+    >
       {BACK}
-    </RequestFrame>
+      <section className="w-box w-rdet" aria-label="Request details">
+        <div className="w-rqd">
+          <div className="row between l-g8">
+            <span className="row l-g6">
+              <Pill tone={state.tone}>{state.label}</Pill>
+              <span className={instant ? "kind urgent" : "kind scheduled"}>
+                {instant ? "Talk Now" : "Scheduled"}
+              </span>
+            </span>
+          </div>
+          <div className="row w-rqhead">
+            <ModalityTile modality={record.modality} urgent={instant} large />
+            <div className="col grow l-g1-minw0">
+              <h2 className="w-rqn">{`${modalityText(record.modality)}, ${durationText(record.durationMinutes)}`}</h2>
+              <p className="sm muted">
+                {ATTORNEY_REQUEST_PATH_LABELS[record.path]}
+              </p>
+            </div>
+          </div>
+          {view.decidable && record.decideBy !== null ? (
+            instant ? (
+              <div className="w-cd">
+                <div className="col grow l-g2">
+                  <span className="sm b aw-urgent">{`Respond by ${utcText(record.decideBy)}`}</span>
+                  <span className="xs muted">
+                    Rosuno’s server decides when this request expires.
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="w-hold">
+                <span className="col grow l-g1">
+                  <span className="sm b">{`Respond by ${utcText(record.decideBy)}`}</span>
+                  <span className="xs">Not booked until you accept.</span>
+                </span>
+              </div>
+            )
+          ) : null}
+          {view.displayState === "expired" ? (
+            <p className="w-note warn">{EXPIRED_REQUEST_NOTE}</p>
+          ) : null}
+          <Facts
+            items={[
+              [
+                "Consultation",
+                `${modalityText(record.modality)}, ${durationText(record.durationMinutes)}`,
+              ],
+              ["How soon", ATTORNEY_REQUEST_PATH_LABELS[record.path]],
+              [
+                "Your price",
+                moneyText(record.listedPriceMinor, record.currency),
+              ],
+              [
+                "Platform fee",
+                moneyText(record.platformFeeMinor, record.currency),
+              ],
+            ]}
+          />
+          <Facts
+            items={[
+              ...(record.slotStart === null || record.slotEnd === null
+                ? []
+                : ([
+                    [
+                      "Time",
+                      `${utcText(record.slotStart)} to ${utcText(record.slotEnd)}`,
+                    ],
+                  ] as const)),
+              ["Requested", utcText(record.createdAt)],
+              ...(record.decideBy === null
+                ? []
+                : ([["Decide by", utcText(record.decideBy)]] as const)),
+              ...(record.decidedAt === null
+                ? []
+                : ([["Decided", utcText(record.decidedAt)]] as const)),
+            ]}
+          />
+          <div className="w-priv">
+            <p className="lbl">From the client</p>
+            <p className="sm muted aw-priv-note">
+              {DETAIL_NOTE}{" "}
+              <span className="gate">Disclosure rule pending</span>
+            </p>
+          </div>
+          {record.state === "accepted" ? (
+            record.consultationState === null ? (
+              <p className="w-note info">{CONSULTATION_PENDING_NOTE}</p>
+            ) : (
+              <>
+                <p className="w-note info">{ACCEPTED_NOTE}</p>
+                <Facts
+                  items={[
+                    [
+                      "Status",
+                      CONSULTATION_STATE_LABELS[record.consultationState],
+                    ],
+                    ...(record.bookingStart === null ||
+                    record.bookingEnd === null
+                      ? []
+                      : ([
+                          [
+                            "Time",
+                            `${utcText(record.bookingStart)} to ${utcText(record.bookingEnd)}`,
+                          ],
+                        ] as const)),
+                  ]}
+                />
+                {record.consultationId === null ? null : (
+                  <div className="w-acts">
+                    <ButtonLink
+                      variant="secondary"
+                      href={attorneyConsultationPathFor(record.consultationId)}
+                    >
+                      Open the consultation
+                    </ButtonLink>
+                  </div>
+                )}
+              </>
+            )
+          ) : null}
+          <DecisionPanel requestId={record.id} decidable={view.decidable} />
+          <p className="xs subtle">{DECIDE_BY_NOTE}</p>
+        </div>
+      </section>
+    </AttorneyWorkspace>
   );
 }

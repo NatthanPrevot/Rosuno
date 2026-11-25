@@ -1092,6 +1092,9 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
     "../../src/application/attorney-access.ts",
     "../../src/infrastructure/identity/attorney-principal-source.ts",
     "../../src/infrastructure/identity/server-session-source.ts",
+    // DEV-001: the owner's UI/UX design's workspace frame (presentation only:
+    // fixed first-party links and the page's own content).
+    "../../src/presentation/attorney-workspace.tsx",
     "../../src/presentation/design-system.tsx",
     // MVP-001 S2: the step-up gate, and nothing else, is added.
     "../account/gate.ts",
@@ -1294,6 +1297,17 @@ async function buildPageHarness() {
       { "react/jsx-runtime": jsxRuntime },
     ),
   );
+  // DEV-001: the owner's UI/UX design's workspace frame, linked as written.
+  write(
+    "attorney-workspace.mjs",
+    relink(
+      transpile(
+        read("src/presentation/attorney-workspace.tsx"),
+        "attorney-workspace.tsx",
+      ),
+      { "react/jsx-runtime": jsxRuntime },
+    ),
+  );
   write(
     "page.mjs",
     relink(transpile(read("app/attorney/page.tsx"), "page.tsx"), {
@@ -1307,13 +1321,17 @@ async function buildPageHarness() {
         target("wiring.mjs"),
       "../../src/infrastructure/identity/server-session-source.ts":
         target("wiring.mjs"),
+      "../../src/presentation/attorney-workspace.tsx": target(
+        "attorney-workspace.mjs",
+      ),
       "../../src/presentation/design-system.tsx": target("design-system.mjs"),
       "../account/gate.ts": target("gate.mjs"),
     }),
   );
   const { wiring } = await import(target("wiring.mjs"));
   const page = await import(target("page.mjs"));
-  return { directory, wiring, page };
+  const shell = await import(target("attorney-workspace.mjs"));
+  return { directory, wiring, page, shell };
 }
 
 const harness = await buildPageHarness();
@@ -1523,20 +1541,99 @@ function assertFrame(html, title, name) {
   assertFrameOf(html, title, name);
 }
 
-function assertFrameOf(html, title, name) {
-  assert.match(
-    html,
-    /^<div class="rz rz-page" data-density="attorney"><div class="app-scroll"><div class="wrap rz-page__column"><section class="rz-surface panel" data-tone="light" data-emphasis="raised" aria-labelledby="attorney-workspace-title">/,
+// DEV-001: the owner's UI/UX design's workspace sidebar, which only the
+// granted page shows: fixed first-party links in this order (the brand to the
+// home page, the Talk Now card to the schedule, the grouped sections and the
+// account links), no section marked (the entry is not one of them), Instant
+// mode's state not shown (this page does not read it), and no form, field or
+// button. It is exactly the frame module's own sidebar.
+const SIDEBAR_HREFS = [
+  "/",
+  "/attorney/schedule",
+  "/attorney/dashboard",
+  "/attorney/requests",
+  "/attorney/schedule/week",
+  "/attorney/consultations",
+  "/attorney/messages",
+  "/attorney/schedule",
+  "/attorney/professional",
+  "/attorney/earnings",
+  "/attorney/compliance",
+  "/attorney/notifications",
+  "/account/security",
+  "/help",
+];
+const SIDEBAR_TEXT =
+  "rosuno for attorneys Talk Now Talk Now settings Automatically turns off when you sign out. Work Overview Requests Calendar Consultations Messages Practice Availability &amp; pricing Public profile Earnings Account Compliance &amp; readiness Settings &amp; help Account security Help";
+
+function sidebarOf(html) {
+  const start = html.indexOf('<aside class="w-side" aria-label="Workspace">');
+  const end = html.indexOf("</aside>");
+  assert.ok(start > 0 && end > start);
+  return html.slice(start, end + "</aside>".length);
+}
+
+function withoutSidebar(html, name) {
+  const sidebar = sidebarOf(html);
+  assert.equal(html.split("<aside").length, 2, name);
+  assert.deepEqual(hrefsOf(sidebar), SIDEBAR_HREFS, name);
+  assert.equal(textOf(sidebar), SIDEBAR_TEXT, name);
+  assert.doesNotMatch(
+    sidebar,
+    /<form|<input|<textarea|<select|<button|aria-current|w-tword/,
     name,
   );
+  const expected = renderToStaticMarkup(
+    harness.shell.AttorneyWorkspace({
+      section: null,
+      titleId: "attorney-workspace-title",
+      title: GRANTED_TITLE,
+      children: null,
+    }),
+  );
+  assert.equal(sidebar, sidebarOf(expected), name);
+  return html.replace(sidebar, "");
+}
+
+function assertFrameOf(html, title, name) {
+  if (title === GRANTED_TITLE) {
+    // The workspace frame: the sidebar (pinned above, then set aside), the
+    // page header with the one heading, and the page column.
+    assert.match(
+      html,
+      /^<div class="rzw W aw"><div class="w-app"><aside class="w-side" aria-label="Workspace">/,
+      name,
+    );
+    const page = withoutSidebar(html, name);
+    assert.ok(
+      page.startsWith(
+        `<div class="rzw W aw"><div class="w-app"><div class="w-main"><header class="w-top"><div class="col grow l-g0-minw0"><h1 class="w-h1" id="attorney-workspace-title">${title}</h1></div></header><div class="w-body"><div class="w-page"><div class="w-wrap w-wrap-m aw-page">`,
+      ),
+      name,
+    );
+    assert.equal(page.match(/<h1\b/g).length, 1, name);
+    assert.ok(textOf(page).startsWith(`${title} Access standing`), name);
+    assertNoPrivateData(html, name);
+    assertNoAdvertisedCapability(page, name);
+    return;
+  }
+  // Every other state: the design's signed-out panel, with no workspace
+  // navigation at all.
+  assert.match(
+    html,
+    /^<div class="rzw W aw"><div class="signedout"><div class="col l-aicenter-tacenter-mw420-g0 aw-gate"><span class="brand l-fs22"><span class="mark" aria-hidden="true"><\/span>rosuno<\/span><span class="xs subtle">for attorneys<\/span>/,
+    name,
+  );
+  assert.equal(html.includes("<aside"), false, name);
+  assert.equal(html.includes("<nav"), false, name);
   assert.equal(html.match(/<h1\b/g).length, 1, name);
   assert.ok(
     html.includes(
-      `<h1 class="h2" id="attorney-workspace-title">${title}</h1>`,
+      `<h1 class="disp l-fs26-mt26" id="attorney-workspace-title">${title}</h1>`,
     ),
     name,
   );
-  assert.ok(textOf(html).startsWith(`Attorney workspace ${title}`), name);
+  assert.ok(textOf(html).startsWith(`rosuno for attorneys ${title}`), name);
   assertNoPrivateData(html, name);
   assertNoAdvertisedCapability(html, name);
 }
@@ -1588,9 +1685,12 @@ test("14. the route renders a restricted entry for each admitted stage that keep
     );
     assert.equal(html.match(/data-tone="success"/g).length, 2, stage);
     assert.ok(text.includes("Access is not verification"), stage);
+    // DEV-001: the owner's UI/UX design's sidebar links come first (pinned
+    // in withoutSidebar), then the page's own links in their fixed order.
     assert.deepEqual(
       hrefsOf(html),
       [
+        ...SIDEBAR_HREFS,
         "/attorney/professional",
         "/attorney/dashboard",
         "/attorney/schedule",
