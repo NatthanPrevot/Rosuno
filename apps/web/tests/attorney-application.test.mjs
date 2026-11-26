@@ -2439,10 +2439,13 @@ test("23. the entry page is a server-rendered, parameter-free page with one expl
     code,
     /searchParams|\bparams\b|headers\(|cookies\(|redirect|notFound|next\/navigation|useActionState|useState|useEffect|dangerouslySetInnerHTML|process\.env|\bconsole\b|createSupabaseServerClient|\.from\(|getUser|getClaims|startAttorneyApplication|ATTORNEY_APPLICANT_PROVISIONING|localStorage|sessionStorage|window\.|document\.|\bfetch\s*\(/,
   );
+  // DEV-001: the owner's UI/UX design's breadcrumb adds exactly one fixed
+  // public destination, the For attorneys page, before the others.
   assert.deepEqual(
     [...new Set([...code.matchAll(/href="([^"]*)"/g)].map((m) => m[1]))],
-    ["/", "/attorney", "/sign-in"],
+    ["/for-attorneys", "/", "/attorney", "/sign-in"],
   );
+  assert.equal(code.match(/href="\/for-attorneys"/g).length, 1);
   assert.doesNotMatch(code, /href=\{/);
 });
 
@@ -2741,20 +2744,38 @@ function assertNoAdvertisedCapability(html, name) {
   );
 }
 
+// DEV-001: the owner's UI/UX design's application frame: the paper page,
+// the breadcrumb (its one link to the For attorneys page), the one heading,
+// then the step card, beside the design's steps only where the account may
+// hold an application.
+const BREADCRUMB =
+  '<nav class="crumbs" aria-label="Breadcrumb"><a href="/for-attorneys">For attorneys</a><span aria-hidden="true">/</span><span class="l-cink" aria-current="page">Apply</span></nav>';
+const STEPS_TEXT = {
+  "Start an attorney application":
+    "1 Start your application 2 Professional details 3 Review by Rosuno One application is kept per account. Step 1 of 3",
+  "Attorney application on record":
+    "✓ Start your application 2 Professional details 3 Review by Rosuno One application is kept per account. Step 1 of 3 · done",
+};
+
 function assertFrame(html, title, name) {
-  assert.match(
-    html,
-    /^<div class="rz rz-page" data-density="attorney"><div class="app-scroll"><div class="wrap rz-page__column"><section class="rz-surface panel" data-tone="light" data-emphasis="raised" aria-labelledby="attorney-application-title">/,
-    name,
-  );
-  assert.equal(html.match(/<h1\b/g).length, 1, name);
   assert.ok(
-    html.includes(
-      `<h1 class="h2" id="attorney-application-title">${title}</h1>`,
+    html.startsWith(
+      `<div class="rz l-bgpaper-minh100vh rz-apply"><div class="wrap ap-wrap l-pt32-pb88-mw1200">${BREADCRUMB}<div class="row between ap-title l-mt12-aiflex-end"><h1 class="h2 ap-h1 l-fs38" id="attorney-application-title">${title}</h1></div>`,
     ),
     name,
   );
-  assert.ok(textOf(html).startsWith(`Attorney application ${title}`), name);
+  assert.equal(html.match(/<h1\b/g).length, 1, name);
+  assert.equal(html.split(BREADCRUMB).length, 2, name);
+  const stepped = Object.hasOwn(STEPS_TEXT, title);
+  assert.equal(html.includes('aria-label="Application steps"'), stepped, name);
+  assert.ok(
+    textOf(html).startsWith(
+      stepped
+        ? `For attorneys / Apply ${title} ${STEPS_TEXT[title]} `
+        : `For attorneys / Apply ${title} `,
+    ),
+    name,
+  );
   assertNoPrivateData(html, name);
   assertNoAdvertisedCapability(html, name);
 }
@@ -2796,7 +2817,8 @@ test("25. a signed-in account that can start sees one accessible form posting on
     ),
   );
   assert.ok(textOf(html).includes(MEANING));
-  assert.deepEqual(hrefsOf(html), ["/"]);
+  // DEV-001: the breadcrumb's fixed link comes first (pinned in assertFrame).
+  assert.deepEqual(hrefsOf(html), ["/for-attorneys", "/"]);
   // Rendering the entry creates nothing.
   assert.equal(db.attorney_profiles.length, 0);
 });
@@ -2810,7 +2832,11 @@ test("26. on-record, anonymous, denied, and unavailable requests each render one
     });
     assertFrame(html, "Attorney application on record", state);
     assert.deepEqual(log, ["connection", "session", "account", "records"]);
-    assert.deepEqual(hrefsOf(html), ["/attorney", "/"], state);
+    assert.deepEqual(
+      hrefsOf(html),
+      ["/for-attorneys", "/attorney", "/"],
+      state,
+    );
     assert.match(html, /role="status"/);
     // The stage itself is shown only by the workspace.
     assert.doesNotMatch(textOf(html), /Under review|Approved|Applicant\b/);
@@ -2819,7 +2845,11 @@ test("26. on-record, anonymous, denied, and unavailable requests each render one
   const anonymous = await renderPage({ subject: null });
   assertFrame(anonymous.html, "Attorney application", "anonymous");
   assert.deepEqual(anonymous.log, ["connection", "session"]);
-  assert.deepEqual(hrefsOf(anonymous.html), ["/sign-in", "/"]);
+  assert.deepEqual(hrefsOf(anonymous.html), [
+    "/for-attorneys",
+    "/sign-in",
+    "/",
+  ]);
   assert.ok(textOf(anonymous.html).includes(MEANING));
   assert.equal(anonymous.html.includes("<form"), false);
   const denials = {
@@ -2849,7 +2879,7 @@ test("26. on-record, anonymous, denied, and unavailable requests each render one
   for (const [name, options] of Object.entries(denials)) {
     const { html } = await renderPage(options);
     assertFrame(html, "Attorney application not available", name);
-    assert.deepEqual(hrefsOf(html), ["/"], name);
+    assert.deepEqual(hrefsOf(html), ["/for-attorneys", "/"], name);
     assert.match(html, /role="status"/);
     deniedPages.add(html);
   }
@@ -2876,7 +2906,7 @@ test("26. on-record, anonymous, denied, and unavailable requests each render one
     const { html } = await renderPage(options);
     assertFrame(html, "Attorney application unavailable", name);
     assert.match(html, /role="alert"/, name);
-    assert.deepEqual(hrefsOf(html), ["/"], name);
+    assert.deepEqual(hrefsOf(html), ["/for-attorneys", "/"], name);
     unavailablePages.add(html);
   }
   assert.equal(unavailablePages.size, 1);

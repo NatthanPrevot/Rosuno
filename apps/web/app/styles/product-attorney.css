@@ -865,3 +865,44 @@
   font-weight: 500;
   white-space: normal;
 }
+
+/* ---------- The attorney application (public root): the design's step card and its phone rules ---------- */
+.rz .rz-ap-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.rz .rz-ap-sec > .kicker {
+  margin-bottom: -6px;
+}
+.rz .rz-ap-solo {
+  max-width: 760px;
+  margin-top: 24px;
+}
+.rz.rz-apply .ap-aside .vsteps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (max-width: 760px) {
+  .rz.rz-apply .ap-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .rz.rz-apply .ap-aside {
+    position: static !important;
+  }
+  .rz.rz-apply .ap-sec {
+    padding: 22px 18px !important;
+  }
+  .rz.rz-apply .ap-h1 {
+    font-size: 30px !important;
+  }
+  .rz.rz-apply .ap-wrap {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  .rz.rz-apply .ap-title {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
