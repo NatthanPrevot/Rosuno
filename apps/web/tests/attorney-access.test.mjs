@@ -1566,8 +1566,12 @@ const SIDEBAR_HREFS = [
 const SIDEBAR_TEXT =
   "rosuno for attorneys Talk Now Talk Now settings Automatically turns off when you sign out. Work Overview Requests Calendar Consultations Messages Practice Availability &amp; pricing Public profile Earnings Account Compliance &amp; readiness Settings &amp; help Account security Help";
 
+// DEV-001: website & appearance studio: the frame's elements carry their
+// data-rz ids (right after the class), which change nothing else.
 function sidebarOf(html) {
-  const start = html.indexOf('<aside class="w-side" aria-label="Workspace">');
+  const start = html.indexOf(
+    '<aside class="w-side" data-rz="attorney.sidebar" aria-label="Workspace">',
+  );
   const end = html.indexOf("</aside>");
   assert.ok(start > 0 && end > start);
   return html.slice(start, end + "</aside>".length);
@@ -1601,13 +1605,13 @@ function assertFrameOf(html, title, name) {
     // page header with the one heading, and the page column.
     assert.match(
       html,
-      /^<div class="rzw W aw"><div class="w-app"><aside class="w-side" aria-label="Workspace">/,
+      /^<div class="rzw W aw" data-rz="attorney.workspace"><div class="w-app"><aside class="w-side" data-rz="attorney.sidebar" aria-label="Workspace">/,
       name,
     );
     const page = withoutSidebar(html, name);
     assert.ok(
       page.startsWith(
-        `<div class="rzw W aw"><div class="w-app"><div class="w-main"><header class="w-top"><div class="col grow l-g0-minw0"><h1 class="w-h1" id="attorney-workspace-title">${title}</h1></div></header><div class="w-body"><div class="w-page"><div class="w-wrap w-wrap-m aw-page">`,
+        `<div class="rzw W aw" data-rz="attorney.workspace"><div class="w-app"><div class="w-main"><header class="w-top" data-rz="attorney.top"><div class="col grow l-g0-minw0"><h1 class="w-h1" data-rz="attorney.title" id="attorney-workspace-title">${title}</h1></div></header><div class="w-body"><div class="w-page"><div class="w-wrap w-wrap-m aw-page">`,
       ),
       name,
     );
@@ -1621,7 +1625,7 @@ function assertFrameOf(html, title, name) {
   // navigation at all.
   assert.match(
     html,
-    /^<div class="rzw W aw"><div class="signedout"><div class="col l-aicenter-tacenter-mw420-g0 aw-gate"><span class="brand l-fs22"><span class="mark" aria-hidden="true"><\/span>rosuno<\/span><span class="xs subtle">for attorneys<\/span>/,
+    /^<div class="rzw W aw" data-rz="attorney.workspace"><div class="signedout"><div class="col l-aicenter-tacenter-mw420-g0 aw-gate"><span class="brand l-fs22"><span class="mark" aria-hidden="true"><\/span>rosuno<\/span><span class="xs subtle">for attorneys<\/span>/,
     name,
   );
   assert.equal(html.includes("<aside"), false, name);

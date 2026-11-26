@@ -265,8 +265,11 @@
 }
 
 /* The design's staff layer resets every button's colour (.W.st button), which outranks the shared button colours and
-   would hide the text of a filled button; each button style keeps its own colour inside the staff root. */
-.W.st button.btn-ink,
+   would hide the text of a filled button; each button style keeps its own colour inside the staff root. The primary
+   button's text follows the appearance hook for text on ink (the owner's white unless a published theme sets it). */
+.W.st button.btn-ink {
+  color: var(--rz-on-ink, #fff);
+}
 .W.st button.btn-ok {
   color: #fff;
 }

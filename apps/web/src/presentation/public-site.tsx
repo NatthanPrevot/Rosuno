@@ -27,7 +27,11 @@ export const PUBLIC_NAVIGATION = Object.freeze([
 // The site-pages list, with the current page marked.
 export function PublicNavigation({ current }: { readonly current?: string }) {
   return (
-    <nav className="stack l-g2-possticky-t24" aria-label="Site pages">
+    <nav
+      className="stack l-g2-possticky-t24"
+      data-rz="content.pages-nav"
+      aria-label="Site pages"
+    >
       <span className="lbl-sm l-p0-10-8">Rosuno</span>
       {PUBLIC_NAVIGATION.map((entry) => (
         <a
@@ -56,7 +60,11 @@ export function PublicFrame({
   return (
     <SitePage session="anonymous">
       <div className="wrap l-pt40-pb96">
-        <section className="stack rz-frame" aria-labelledby={titleId}>
+        <section
+          className="stack rz-frame"
+          data-rz="content.frame"
+          aria-labelledby={titleId}
+        >
           <span className="kicker">Rosuno</span>
           <h1 className="h2 l-mt14" id={titleId}>
             {title}
@@ -88,7 +96,11 @@ export function PublicContentPage({
           <PublicNavigation current={current} />
           <article className="l-mw860" aria-labelledby="public-content-title">
             <span className="kicker">Rosuno</span>
-            <h1 className="h2 l-mt14" id="public-content-title">
+            <h1
+              className="h2 l-mt14"
+              data-rz="content.title"
+              id="public-content-title"
+            >
               {title}
             </h1>
             <p className="lead l-mt16">{statement}</p>

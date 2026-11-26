@@ -177,7 +177,20 @@ function contrast(foreground, background) {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
+// DEV-001: website & appearance studio: a hook token (--rz-*) is defined by
+// no repository stylesheet, only by a published appearance, so a wrapped
+// value computes its fallback; the fallback is the owner's literal.
 function resolve(value) {
+  const hook = /^var\((--rz-[a-z-]+), ([^()]+)\)$/.exec(value.trim());
+  if (hook) {
+    assert.ok(
+      !allRules.some((rule) =>
+        rule.declarations.some(([property]) => property === hook[1]),
+      ),
+      `${hook[1]} is defined by no repository stylesheet`,
+    );
+    return hook[2];
+  }
   const match = /^var\((--[\w-]+)\)$/.exec(value.trim());
   return match ? tokenValue(match[1]) : value;
 }
@@ -421,8 +434,11 @@ test("6. text, primary actions and status pills keep readable contrast", () => {
     "muted on paper",
   );
   const primary = Object.fromEntries(declarationsOf(".rz .btn-ink"));
+  // DEV-001: website & appearance studio: the text colour is the on-ink hook
+  // with the owner's white as its fallback.
+  assert.equal(primary.color, "var(--rz-on-ink, #fff)");
   assert.ok(
-    contrast(primary.color, resolve(primary.background)) >= 7,
+    contrast(resolve(primary.color), resolve(primary.background)) >= 7,
     "primary button",
   );
   for (const pill of ["pending", "ok", "no", "info"]) {

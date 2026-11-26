@@ -409,8 +409,14 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // security pages (a view unavailable, with the route and outcome only)
   // write lines too. DEV-001: website & appearance studio: the appearance
   // adapter (a failed call, with the call name and how it failed only; never
-  // a configuration, a page text or image bytes) writes lines too.
+  // a configuration, a page text or image bytes) writes lines too, and so do
+  // the published stylesheet and appearance image routes (the default sheet
+  // served or an image unavailable, with the fixed outcome only; never a
+  // configuration, a digest or bytes).
   assert.deepEqual(callers, [
+    // DEV-001: website & appearance studio: the two appearance routes.
+    "app/appearance/assets/[asset]/route.ts",
+    "app/appearance/theme.css/route.ts",
     "app/attorney/complaints/actions.ts",
     "app/attorney/complaints/page.tsx",
     "app/attorney/compliance/page.tsx",

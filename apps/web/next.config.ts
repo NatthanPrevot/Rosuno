@@ -76,6 +76,25 @@ const SECURITY_HEADERS = [
   TRANSPORT_SECURITY,
 ];
 
+// DEV-001 website and appearance studio: an appearance image
+// (/appearance/assets/<sha256>.<png|jpg|webp>) is served with a policy that
+// allows nothing at all and sandboxes the response, no framing, no sniffing
+// and same-origin resource loading only. It replaces the page set for
+// exactly the paths the image route answers (one segment under
+// /appearance/assets/); every other path, any deeper or empty one included,
+// keeps the full page set.
+const ASSET_HEADERS = [
+  {
+    key: "Content-Security-Policy",
+    value: "default-src 'none'; frame-ancestors 'none'; sandbox",
+  },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "same-origin" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  TRANSPORT_SECURITY,
+];
+
 const nextConfig: NextConfig = {
   // next dev writes AGENTS.md and CLAUDE.md into the app whenever it detects a
   // coding agent, and Replit's REPL_ID counts as one. Keep that generation off
@@ -86,8 +105,12 @@ const nextConfig: NextConfig = {
   distDir: "dist",
   async headers() {
     return [
-      { source: "/((?!auth/confirm$).*)", headers: SECURITY_HEADERS },
+      {
+        source: "/((?!auth/confirm$|appearance/assets/[^/]+$).*)",
+        headers: SECURITY_HEADERS,
+      },
       { source: "/auth/confirm", headers: [TRANSPORT_SECURITY] },
+      { source: "/appearance/assets/:asset", headers: ASSET_HEADERS },
     ];
   },
 };

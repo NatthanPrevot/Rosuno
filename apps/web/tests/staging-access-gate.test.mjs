@@ -1038,3 +1038,32 @@ test("G-13. source contract: digests are compared with timingSafeEqual, the gate
     /authori[sz]|cookie|\.entries\(|\.forEach\(/i,
   );
 });
+
+test("G-14. DEV-001: website & appearance studio: the published stylesheet and appearance images are gated exactly like pages, and the matcher is unchanged", async () => {
+  const matcher = /^\/((?!_next\/static\/).*)$/;
+  assert.ok(
+    codeOf(read("proxy.ts")).endsWith(
+      'export const config = {\n  matcher: ["/((?!_next/static/).*)"],\n};\n',
+    ),
+  );
+  const required = fixedDependencies(
+    identity("staging", REF),
+    settings({ configuredClass: "staging", gateValue: GATE_VALUE }),
+  );
+  for (const pathname of [
+    "/appearance/theme.css",
+    `/appearance/assets/${"a".repeat(64)}.png`,
+    `/appearance/assets/${"b".repeat(64)}.webp`,
+  ]) {
+    assert.equal(matcher.test(pathname), true, pathname);
+    assert.equal(isMachineRoute(pathname), false, pathname);
+    const refused = await stagingAccessGate(gatedRequest(pathname), required);
+    assert.equal(refused.kind, "refused", pathname);
+    assert.equal(refused.response.status, 401, pathname);
+    const request = gatedRequest(pathname, { authorization: ACCESS_HEADER });
+    assert.deepEqual(await stagingAccessGate(request, required), {
+      kind: "passed",
+    });
+    assert.equal(request.headers.has("authorization"), false, pathname);
+  }
+});

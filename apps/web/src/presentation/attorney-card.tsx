@@ -71,7 +71,11 @@ export function AttorneyCard({
 }: AttorneyCardProps) {
   const area = entry.practiceAreas[0] ?? null;
   return (
-    <article className="rz acard" aria-label={entry.displayName}>
+    <article
+      className="rz acard"
+      data-rz="directory.card"
+      aria-label={entry.displayName}
+    >
       <a className="portrait rz-portrait" href={profileHref} tabIndex={-1}>
         <span className="rz-portrait__initials" aria-hidden="true">
           {initialsOf(entry.displayName)}

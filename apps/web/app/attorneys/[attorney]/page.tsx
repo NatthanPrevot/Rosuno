@@ -87,7 +87,7 @@ export default async function AttorneyProfilePage({
     return (
       <SitePage session={shell.session} signOut={signOut}>
         <section className="wrap pg l-pt28 rz-section-end">
-          <h1 className="h2 l-fs40" id="profile-title">
+          <h1 className="h2 l-fs40" data-rz="profile.title" id="profile-title">
             Attorney profile
           </h1>
           <div className="l-mt24">
@@ -156,7 +156,11 @@ export default async function AttorneyProfilePage({
                     </span>
                   ) : null}
                 </div>
-                <h1 className="h2 l-fs32-mt12" id="profile-title">
+                <h1
+                  className="h2 l-fs32-mt12"
+                  data-rz="profile.title"
+                  id="profile-title"
+                >
                   {profile.displayName}
                 </h1>
                 {profile.practiceAreas.length === 0 ? null : (

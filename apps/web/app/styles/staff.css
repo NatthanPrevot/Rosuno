@@ -2316,7 +2316,7 @@
   color: var(--st-holdink);
 }
 .W.st .pm-do .btn-ink {
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 } /* .W.st button inherits colour; the primary review action keeps white text */
 @media (max-width: 700px) {
   .W.st .pm-dc {
@@ -2382,7 +2382,7 @@
   gap: 8px;
 }
 .W.st .p2-fb .btn-ink {
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .W.st .p2-fn {
   font-size: 12px;

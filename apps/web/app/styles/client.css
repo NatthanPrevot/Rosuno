@@ -485,7 +485,7 @@
 .cx .cx-chip.on {
   background: var(--ink);
   border-color: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .cx .cx-recs {
   margin-top: 16px;

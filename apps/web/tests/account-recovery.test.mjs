@@ -2523,6 +2523,10 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
   // too knows nothing of recovery and imports only its webhook adapter.
   // MVP-001 S10: and the Resend webhook route, admitted by its exact path; it
   // too knows nothing of recovery and imports only its webhook adapter.
+  // DEV-001: website & appearance studio: and the published stylesheet and
+  // appearance image routes, admitted by their exact paths; they too know
+  // nothing of recovery and import only the appearance adapter, the request
+  // logger and the appearance delivery module.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
     [
@@ -2530,6 +2534,8 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
       "app/api/media/daily/route.ts",
       "app/api/notifications/resend/route.ts",
       "app/api/payments/stripe/route.ts",
+      "app/appearance/assets/[asset]/route.ts",
+      "app/appearance/theme.css/route.ts",
       "app/auth/confirm/route.ts",
     ],
   );
@@ -2538,6 +2544,8 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
     "app/api/media/daily/route.ts",
     "app/api/notifications/resend/route.ts",
     "app/api/payments/stripe/route.ts",
+    "app/appearance/assets/[asset]/route.ts",
+    "app/appearance/theme.css/route.ts",
   ]) {
     assert.doesNotMatch(
       codeOf(read(route)),
@@ -2553,6 +2561,17 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
   ]);
   assert.deepEqual(importsOf(read("app/api/notifications/resend/route.ts")), [
     "../../../../src/infrastructure/notifications/resend-webhook.ts",
+  ]);
+  // DEV-001: website & appearance studio.
+  assert.deepEqual(importsOf(read("app/appearance/theme.css/route.ts")), [
+    "../../../src/infrastructure/appearance/appearance-adapter.ts",
+    "../../../src/infrastructure/observability/request-log.ts",
+    "../../../src/presentation/appearance/delivery.ts",
+  ]);
+  assert.deepEqual(importsOf(read("app/appearance/assets/[asset]/route.ts")), [
+    "../../../../src/infrastructure/appearance/appearance-adapter.ts",
+    "../../../../src/infrastructure/observability/request-log.ts",
+    "../../../../src/presentation/appearance/delivery.ts",
   ]);
   // The signup confirmation handler still verifies only signup links and
   // knows nothing of recovery.

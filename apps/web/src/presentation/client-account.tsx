@@ -152,9 +152,13 @@ type ClientAccountProps = {
 // column is a plain container.
 export function ClientAccount({ area, heading, children }: ClientAccountProps) {
   return (
-    <div className="rz cx">
+    <div className="rz cx" data-rz="client.account">
       <div className="cx-shell">
-        <nav className="cx-nav" aria-label={CLIENT_ACCOUNT_NAVIGATION_LABEL}>
+        <nav
+          className="cx-nav"
+          data-rz="client.nav"
+          aria-label={CLIENT_ACCOUNT_NAVIGATION_LABEL}
+        >
           {CLIENT_ACCOUNT_NAVIGATION.map((link) => (
             <a
               key={link.href}
@@ -169,7 +173,9 @@ export function ClientAccount({ area, heading, children }: ClientAccountProps) {
         </nav>
         <div className="cx-main">
           <div className="cx-head">
-            <h1 className="cx-h1">{heading}</h1>
+            <h1 className="cx-h1" data-rz="client.heading">
+              {heading}
+            </h1>
           </div>
           <div className="cx-body">{children}</div>
         </div>
@@ -220,11 +226,13 @@ type ClientGateProps = {
 // without the account navigation.
 export function ClientGate({ heading, children }: ClientGateProps) {
   return (
-    <div className="rz cx">
+    <div className="rz cx" data-rz="client.account">
       <div className="cx-shell rz-cx-solo">
         <div className="cx-main">
           <div className="cx-head">
-            <h1 className="cx-h1">{heading}</h1>
+            <h1 className="cx-h1" data-rz="client.heading">
+              {heading}
+            </h1>
           </div>
           <div className="cx-body">
             <section className="cx-card cx-pad rz-cx-gate">{children}</section>

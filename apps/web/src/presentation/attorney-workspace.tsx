@@ -230,10 +230,11 @@ function Sidebar({
   readonly waiting: number | null;
 }) {
   return (
-    <aside className="w-side" aria-label="Workspace">
+    <aside className="w-side" data-rz="attorney.sidebar" aria-label="Workspace">
       <div className="w-brand">
         <a
           className="brand"
+          data-rz="attorney.sidebar.brand"
           href="/"
           aria-label="Rosuno home — open the public site"
         >
@@ -259,7 +260,11 @@ function Sidebar({
           Automatically turns off when you sign out.
         </p>
       </section>
-      <nav className="w-nav" aria-label={ATTORNEY_SECTIONS_LABEL}>
+      <nav
+        className="w-nav"
+        data-rz="attorney.sidebar.nav"
+        aria-label={ATTORNEY_SECTIONS_LABEL}
+      >
         {GROUPS.map((group) => (
           <div className="aw-ngroup" key={group}>
             <p className="w-ng">{group}</p>
@@ -334,15 +339,15 @@ export function AttorneyWorkspace({
   children,
 }: AttorneyWorkspaceProps) {
   return (
-    <div className="rzw W aw">
+    <div className="rzw W aw" data-rz="attorney.workspace">
       <div className="w-app">
         <Sidebar section={section} talk={talk} waiting={waiting} />
         <div
           className={section === null ? "w-main" : `w-main w-tab-${section}`}
         >
-          <header className="w-top">
+          <header className="w-top" data-rz="attorney.top">
             <div className="col grow l-g0-minw0">
-              <h1 className="w-h1" id={titleId}>
+              <h1 className="w-h1" data-rz="attorney.title" id={titleId}>
                 {title}
               </h1>
               {description === undefined ? null : (
@@ -446,7 +451,7 @@ export function AttorneyGate({
   readonly children: ReactNode;
 }) {
   return (
-    <div className="rzw W aw">
+    <div className="rzw W aw" data-rz="attorney.workspace">
       <div className="signedout">
         <div className="col l-aicenter-tacenter-mw420-g0 aw-gate">
           <span className="brand l-fs22">
@@ -486,6 +491,7 @@ export function Card({
       className={
         place === undefined ? "w-card aw-card" : `w-card aw-card ${place}`
       }
+      data-rz="attorney.card"
       aria-labelledby={id}
     >
       <div className="w-ch">

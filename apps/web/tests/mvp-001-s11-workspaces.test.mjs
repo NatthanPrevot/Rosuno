@@ -575,9 +575,11 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
     account,
     /aria-current=\{link\.area === area \? "page" : undefined\}/,
   );
+  // DEV-001: website & appearance studio: the navigation also carries its
+  // data-rz id, right after its class.
   assert.match(
     account,
-    /<nav className="cx-nav" aria-label=\{CLIENT_ACCOUNT_NAVIGATION_LABEL\}>/,
+    /<nav\s+className="cx-nav"\s+data-rz="client\.nav"\s+aria-label=\{CLIENT_ACCOUNT_NAVIGATION_LABEL\}\s*>/,
   );
   // DEV-001: the owner's UI/UX design renders every client page of this pass
   // in the account frame with its own area marked (the navigation of the
@@ -693,9 +695,11 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
     shell,
     /aria-current=\{link\.section === section \? "page" : undefined\}/,
   );
+  // DEV-001: website & appearance studio: the navigation also carries its
+  // data-rz id, right after its class.
   assert.match(
     shell,
-    /<nav className="w-nav" aria-label=\{ATTORNEY_SECTIONS_LABEL\}>/,
+    /<nav\s+className="w-nav"\s+data-rz="attorney\.sidebar\.nav"\s+aria-label=\{ATTORNEY_SECTIONS_LABEL\}\s*>/,
   );
   const switches = Object.fromEntries(
     [

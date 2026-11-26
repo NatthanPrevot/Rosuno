@@ -74,7 +74,11 @@ function Heading() {
   return (
     <div className="row between l-mt14-aiflex-end-g32">
       <div className="stack l-g8">
-        <h1 className="h2 l-fs40" id="directory-title">
+        <h1
+          className="h2 l-fs40"
+          data-rz="directory.title"
+          id="directory-title"
+        >
           Find an attorney
         </h1>
         <p className="sm muted">{DIRECTORY_NOTE}</p>

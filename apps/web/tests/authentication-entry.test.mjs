@@ -1175,7 +1175,9 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
   // route, (MVP-001 S7) the Stripe webhook route, (MVP-001 S9) the Daily
   // webhook route and (MVP-001 S10) the Resend webhook route, each admitted by
   // its exact path and nothing broader, and the sign-out form is a POST server
-  // action on the home page.
+  // action on the home page. DEV-001: website & appearance studio: so are the
+  // published stylesheet and appearance image routes, each admitted by its
+  // exact path.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
     [
@@ -1183,9 +1185,41 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
       "app/api/media/daily/route.ts",
       "app/api/notifications/resend/route.ts",
       "app/api/payments/stripe/route.ts",
+      "app/appearance/assets/[asset]/route.ts",
+      "app/appearance/theme.css/route.ts",
       "app/auth/confirm/route.ts",
     ],
   );
+  // DEV-001: website & appearance studio: the two appearance routes have no
+  // sign-out or session capability: each imports only the appearance
+  // adapter, the request logger and the appearance delivery module, names no
+  // cookie, session or authentication call itself, never ends a session, and
+  // answers GET only.
+  for (const [route, depth] of [
+    ["app/appearance/theme.css/route.ts", "../../../"],
+    ["app/appearance/assets/[asset]/route.ts", "../../../../"],
+  ]) {
+    const appearanceSource = read(route);
+    assert.deepEqual(importsOf(appearanceSource), [
+      `${depth}src/infrastructure/appearance/appearance-adapter.ts`,
+      `${depth}src/infrastructure/observability/request-log.ts`,
+      `${depth}src/presentation/appearance/delivery.ts`,
+    ]);
+    assert.doesNotMatch(
+      codeOf(appearanceSource),
+      /sign-in\/actions|signOut|sign-?out|\.auth\.|cookies|getSession|getClaims|getUser|supabase-server|server-session-source|next\/headers|\bimport\s*\(/i,
+      route,
+    );
+    assert.deepEqual(
+      [
+        ...codeOf(appearanceSource).matchAll(
+          /^export (?:async function|function|const) (\w+)/gm,
+        ),
+      ].map((match) => match[1]),
+      ["dynamic", "GET"],
+      route,
+    );
+  }
   // MVP-001 S10: the Resend webhook route has no sign-out or session
   // capability either, exactly as the Daily and Stripe webhook routes: it
   // imports only its server-only webhook adapter, reads no cookie or session,

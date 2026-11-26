@@ -6,6 +6,11 @@
 // sign-out is the caller's server action. No marketing claim, status claim,
 // legal text or disclosure is written here: where the design shows one, the
 // design's own placeholder marks it until the approved text exists.
+//
+// DEV-001 website and appearance studio: the header, its logo and links, the
+// footer, its logo and its link columns carry data-rz ids, so the published
+// appearance can restyle them; their labels, links and the footer's pending
+// statements stay fixed (they are never text slots).
 
 import type { ReactNode } from "react";
 
@@ -88,13 +93,18 @@ type SiteHeaderProps = {
 
 export function SiteHeader({ session, signOut }: SiteHeaderProps) {
   return (
-    <header className="rz-site-header">
+    <header className="rz-site-header" data-rz="site.header">
       <div className="wrap nav">
-        <a className="brand" href="/" aria-label="Rosuno home">
+        <a
+          className="brand"
+          data-rz="site.header.brand"
+          href="/"
+          aria-label="Rosuno home"
+        >
           <BrandMark />
           rosuno
         </a>
-        <nav className="nlinks" aria-label="Primary">
+        <nav className="nlinks" data-rz="site.header.nav" aria-label="Primary">
           {SITE_NAVIGATION.map((entry) => (
             <a key={entry.href} href={entry.href}>
               {entry.label}
@@ -152,11 +162,11 @@ export function SiteHeader({ session, signOut }: SiteHeaderProps) {
 
 export function SiteFooter() {
   return (
-    <footer className="l-bt1-solid-line-p56-0-36-bgpage">
+    <footer className="l-bt1-solid-line-p56-0-36-bgpage" data-rz="site.footer">
       <div className="wrap">
         <div className="l-dgrid-cols4fr-2fr-2fr-2fr-2fr-g40">
           <div className="stack l-g14">
-            <a className="brand" href="/">
+            <a className="brand" data-rz="site.footer.brand" href="/">
               <BrandMark />
               rosuno
             </a>
@@ -169,6 +179,7 @@ export function SiteFooter() {
           {SITE_FOOTER.map((column) => (
             <nav
               className="stack l-g10-aiflex-start"
+              data-rz="site.footer.column"
               key={column.heading}
               aria-label={column.heading}
             >

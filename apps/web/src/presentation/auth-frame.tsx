@@ -55,12 +55,12 @@ type AuthFrameProps = {
 export function AuthFrame({ children }: AuthFrameProps) {
   return (
     <SitePage session="anonymous">
-      <main className="rz-auth l-bgpaper-minh820">
+      <main className="rz-auth l-bgpaper-minh820" data-rz="auth.frame">
         <div className="wrap l-pt56-pb80">
           <div className="l-dgrid-cols460-mm0-1fr-g56-aistart-f24738">
             {children}
             <aside className="stack l-g16-pt8" aria-label="How Rosuno works">
-              <p className="h2 l-fs36-mw460">
+              <p className="h2 l-fs36-mw460" data-rz="auth.aside.title">
                 Talk to an attorney, now or later.
               </p>
               <ul className="stack l-g14-mt10 rz-auth__points">

@@ -336,9 +336,13 @@ test("1. App Router shell route and boundary files exist", () => {
 test("2. root layout is shared by every route and renders its children", () => {
   const source = read("app/layout.tsx");
   assert.doesNotMatch(source, /^["']use client["']/m);
+  // DEV-001: website & appearance studio: the body also holds one constant
+  // same-origin stylesheet link, the published appearance (React places it
+  // in the head). It is a fixed literal: no expression, no data read, no
+  // other attribute.
   assert.match(
     source,
-    /<html lang="en">\s*<body>\s*<main>\{children\}<\/main>\s*<\/body>\s*<\/html>/,
+    /<html lang="en">\s*<body>\s*<link\s+rel="stylesheet"\s+href="\/appearance\/theme\.css"\s+precedence="rosuno-appearance"\s*\/>\s*<main>\{children\}<\/main>\s*<\/body>\s*<\/html>/,
   );
   assert.match(
     source,
@@ -354,8 +358,8 @@ test("2. root layout is shared by every route and renders its children", () => {
     functions: 1,
     returns: 1,
     arrows: 0,
-    tags: ["html", "body", "main"],
-    attributes: ["lang"],
+    tags: ["html", "body", "link", "main"],
+    attributes: ["lang", "rel", "href", "precedence"],
     expressions: ["children"],
     text: ["{}"],
   });
@@ -996,10 +1000,20 @@ test("12. presentation reaches application state only through application module
   assert.deepEqual(importsOf(page), [
     "next",
     "next/server",
+    // DEV-001: website & appearance studio: React's node type, the published
+    // appearance use case and its adapter, the schema's section resolver,
+    // the presentation registry (its validator and the Home section group)
+    // and the text slot component.
+    "react",
+    "../src/application/appearance.ts",
+    "../src/application/appearance-schema.ts",
     "../src/application/discovery.ts",
     "../src/application/shell.ts",
+    "../src/infrastructure/appearance/appearance-adapter.ts",
     "../src/infrastructure/discovery/discovery-adapter.ts",
     "../src/infrastructure/identity/server-session-source.ts",
+    "../src/presentation/appearance/registry.ts",
+    "../src/presentation/appearance/slot.tsx",
     "../src/presentation/attorney-card.tsx",
     "../src/presentation/site-chrome.tsx",
     "./home-finder.tsx",
@@ -1157,7 +1171,10 @@ test("14. generated Next.js state stays in ignored app-local locations", async (
   assert.equal(nextConfig.agentRules, false);
   assert.equal(nextConfig.distDir, "dist");
   assert.equal(typeof nextConfig.headers, "function");
-  assert.equal((await nextConfig.headers()).length, 2);
+  // DEV-001: website & appearance studio: one more fixed rule, the
+  // appearance image headers (pinned in full by
+  // tests/security-headers.test.mjs).
+  assert.equal((await nextConfig.headers()).length, 3);
   // Next.js copies every own key of the config, enumerable or not, and runs it
   // in its own process, so the file itself is exactly these three directives
   // and their fixed header values: nothing hidden or conditional on how it is
@@ -1169,10 +1186,13 @@ test("14. generated Next.js state stays in ignored app-local locations", async (
   // exactly one more: the CSP frame-src origin, taken only from the
   // server-side ROSUNO_DAILY_DOMAIN setting when it is a strict DNS label, and
   // none otherwise (every case pinned in tests/security-headers.test.mjs). No
-  // other environment value is read.
+  // other environment value is read. DEV-001: website & appearance studio:
+  // the fixed appearance image headers and their one rule, exactly the paths
+  // the image route answers, which the page rule then leaves out (every case
+  // pinned in tests/security-headers.test.mjs).
   assert.equal(
     codeOf(read("next.config.ts")),
-    'import type { NextConfig } from "next";\nconst SUPABASE_ORIGIN =\n  /^(?:https:\\/\\/[a-z]{20}\\.supabase\\.co|http:\\/\\/(?:127\\.0\\.0\\.1|localhost):54321)$/;\n\nfunction mediaSource(url: string | undefined): string {\n  const origin = typeof url === "string" ? url.replace(/\\/$/, "") : "";\n  return SUPABASE_ORIGIN.test(origin) ? origin : "\'none\'";\n}\nconst DAILY_DOMAIN_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;\n\nfunction frameSource(label: string | undefined): string {\n  return typeof label === "string" && DAILY_DOMAIN_LABEL.test(label)\n    ? `https://${label}.daily.co`\n    : "\'none\'";\n}\n\nconst CONTENT_SECURITY_POLICY = [\n  "default-src \'self\'",\n  "script-src \'self\' \'unsafe-inline\'",\n  "style-src \'self\'",\n  "img-src \'self\'",\n  "font-src \'self\'",\n  "connect-src \'self\'",\n  `media-src ${mediaSource(process.env.NEXT_PUBLIC_SUPABASE_URL)}`,\n  `frame-src ${frameSource(process.env.ROSUNO_DAILY_DOMAIN)}`,\n  "object-src \'none\'",\n  "base-uri \'none\'",\n  "form-action \'self\'",\n  "frame-ancestors \'none\'",\n].join("; ");\n\nconst TRANSPORT_SECURITY = {\n  key: "Strict-Transport-Security",\n  value: "max-age=31536000; includeSubDomains",\n};\n\nconst SECURITY_HEADERS = [\n  { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },\n  { key: "X-Frame-Options", value: "DENY" },\n  { key: "Referrer-Policy", value: "same-origin" },\n  { key: "X-Content-Type-Options", value: "nosniff" },\n  TRANSPORT_SECURITY,\n];\n\nconst nextConfig: NextConfig = {\n  agentRules: false,\n  distDir: "dist",\n  async headers() {\n    return [\n      { source: "/((?!auth/confirm$).*)", headers: SECURITY_HEADERS },\n      { source: "/auth/confirm", headers: [TRANSPORT_SECURITY] },\n    ];\n  },\n};\n\nexport default nextConfig;\n',
+    'import type { NextConfig } from "next";\nconst SUPABASE_ORIGIN =\n  /^(?:https:\\/\\/[a-z]{20}\\.supabase\\.co|http:\\/\\/(?:127\\.0\\.0\\.1|localhost):54321)$/;\n\nfunction mediaSource(url: string | undefined): string {\n  const origin = typeof url === "string" ? url.replace(/\\/$/, "") : "";\n  return SUPABASE_ORIGIN.test(origin) ? origin : "\'none\'";\n}\nconst DAILY_DOMAIN_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;\n\nfunction frameSource(label: string | undefined): string {\n  return typeof label === "string" && DAILY_DOMAIN_LABEL.test(label)\n    ? `https://${label}.daily.co`\n    : "\'none\'";\n}\n\nconst CONTENT_SECURITY_POLICY = [\n  "default-src \'self\'",\n  "script-src \'self\' \'unsafe-inline\'",\n  "style-src \'self\'",\n  "img-src \'self\'",\n  "font-src \'self\'",\n  "connect-src \'self\'",\n  `media-src ${mediaSource(process.env.NEXT_PUBLIC_SUPABASE_URL)}`,\n  `frame-src ${frameSource(process.env.ROSUNO_DAILY_DOMAIN)}`,\n  "object-src \'none\'",\n  "base-uri \'none\'",\n  "form-action \'self\'",\n  "frame-ancestors \'none\'",\n].join("; ");\n\nconst TRANSPORT_SECURITY = {\n  key: "Strict-Transport-Security",\n  value: "max-age=31536000; includeSubDomains",\n};\n\nconst SECURITY_HEADERS = [\n  { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },\n  { key: "X-Frame-Options", value: "DENY" },\n  { key: "Referrer-Policy", value: "same-origin" },\n  { key: "X-Content-Type-Options", value: "nosniff" },\n  TRANSPORT_SECURITY,\n];\nconst ASSET_HEADERS = [\n  {\n    key: "Content-Security-Policy",\n    value: "default-src \'none\'; frame-ancestors \'none\'; sandbox",\n  },\n  { key: "X-Frame-Options", value: "DENY" },\n  { key: "Referrer-Policy", value: "same-origin" },\n  { key: "X-Content-Type-Options", value: "nosniff" },\n  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },\n  TRANSPORT_SECURITY,\n];\n\nconst nextConfig: NextConfig = {\n  agentRules: false,\n  distDir: "dist",\n  async headers() {\n    return [\n      {\n        source: "/((?!auth/confirm$|appearance/assets/[^/]+$).*)",\n        headers: SECURITY_HEADERS,\n      },\n      { source: "/auth/confirm", headers: [TRANSPORT_SECURITY] },\n      { source: "/appearance/assets/:asset", headers: ASSET_HEADERS },\n    ];\n  },\n};\n\nexport default nextConfig;\n',
   );
   assert.deepEqual(read("next.config.ts").match(/process\.env\.\w+/g), [
     "process.env.NEXT_PUBLIC_SUPABASE_URL",

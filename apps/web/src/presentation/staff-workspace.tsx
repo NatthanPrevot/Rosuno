@@ -401,7 +401,11 @@ export function StaffSidebarNavigation({
 }) {
   const current = destinationOfPath(path);
   return (
-    <nav className="st-nav" aria-label={STAFF_SECTIONS_LABEL}>
+    <nav
+      className="st-nav"
+      data-rz="staff.sidebar.nav"
+      aria-label={STAFF_SECTIONS_LABEL}
+    >
       {staffNavigationOf(surfaces).map(({ group, destinations }) => (
         <div
           key={group.id}
@@ -482,12 +486,17 @@ export function StaffShell({
   readonly children: ReactNode;
 }) {
   return (
-    <div className="rzw W st">
+    <div className="rzw W st" data-rz="staff.workspace">
       <div className="st-app">
-        <aside className="st-side" aria-label="Staff workspace">
+        <aside
+          className="st-side"
+          data-rz="staff.sidebar"
+          aria-label="Staff workspace"
+        >
           <div className="w-brand st-brand">
             <a
               className="brand"
+              data-rz="staff.sidebar.brand"
               href="/"
               aria-label="Rosuno home — open the public site"
             >
@@ -557,9 +566,9 @@ export function StaffHeader({
   readonly aside?: ReactNode;
 }) {
   return (
-    <header className="w-top st-top">
+    <header className="w-top st-top" data-rz="staff.top">
       <div className="st-titles">
-        <h1 className="w-h1" id={titleId}>
+        <h1 className="w-h1" data-rz="staff.title" id={titleId}>
           {title}
         </h1>
         {subtitle === undefined ? null : <p className="st-sub">{subtitle}</p>}
@@ -609,6 +618,7 @@ export function Panel({
       className={
         place === undefined ? "w-card st-panel" : `w-card st-panel ${place}`
       }
+      data-rz="staff.panel"
       aria-labelledby={id}
     >
       <div className="st-ptop">

@@ -12,6 +12,14 @@
 // one other value is the server-side Daily domain label, for the CSP
 // frame-src origin; it is set or removed the same way, and removed for every
 // other case.
+//
+// DEV-001: website & appearance studio: an appearance image
+// (/appearance/assets/<sha256>.<png|jpg|webp>, exactly one path segment
+// under /appearance/assets/) gets its own fixed set instead of the page set:
+// a policy that allows nothing and sandboxes the response, no framing, no
+// sniffing, same-origin resource loading only, and transport security.
+// Every other path, a deeper or empty one under /appearance/assets/
+// included, keeps the full page set; no path is left without either.
 
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -74,9 +82,19 @@ const TRANSPORT = {
   key: "Strict-Transport-Security",
   value: "max-age=31536000; includeSubDomains",
 };
+// DEV-001: website & appearance studio: the appearance image set.
+const ASSET_POLICY = "default-src 'none'; frame-ancestors 'none'; sandbox";
+const ASSET_HEADERS = [
+  { key: "Content-Security-Policy", value: ASSET_POLICY },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "same-origin" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  TRANSPORT,
+];
 const EXPECTED_RULES = [
   {
-    source: "/((?!auth/confirm$).*)",
+    source: "/((?!auth/confirm$|appearance/assets/[^/]+$).*)",
     headers: [
       { key: "Content-Security-Policy", value: EXPECTED_POLICY },
       { key: "X-Frame-Options", value: "DENY" },
@@ -86,6 +104,7 @@ const EXPECTED_RULES = [
     ],
   },
   { source: "/auth/confirm", headers: [TRANSPORT] },
+  { source: "/appearance/assets/:asset", headers: ASSET_HEADERS },
 ];
 
 function directives(policy) {
@@ -208,6 +227,18 @@ test("3. every route gets the full set, and the confirmation handler gets only t
     "/auth/confirm/",
     "/auth/confirmation",
     "/auth/confirm/extra",
+    // DEV-001: website & appearance studio: the published stylesheet is a
+    // page-set response, and no path near the image route is left without
+    // a set.
+    "/appearance/theme.css",
+    "/appearance/theme.css?v=1",
+    "/appearance",
+    "/appearance/assets",
+    "/appearance/assets/",
+    `/appearance/assets/${"a".repeat(64)}.png/extra`,
+    "/appearance/assets/a/b",
+    "/appearance/assetsx",
+    `/x/appearance/assets/${"a".repeat(64)}.png`,
   ]) {
     assert.deepEqual(await headersFor(path), full, path);
   }
@@ -291,6 +322,7 @@ test("5. MVP-001 S3: media-src admits exactly the configured Supabase origin (a 
           ],
         },
         EXPECTED_RULES[1],
+        EXPECTED_RULES[2],
       ],
       url,
     );
@@ -351,6 +383,7 @@ test("6. MVP-001 S9: frame-src admits exactly https://<label>.daily.co for a con
           ],
         },
         EXPECTED_RULES[1],
+        EXPECTED_RULES[2],
       ],
       label,
     );
@@ -366,4 +399,40 @@ test("6. MVP-001 S9: frame-src admits exactly https://<label>.daily.co for a con
     const config = await configWith(undefined, label);
     assert.deepEqual(await config.headers(), EXPECTED_RULES, String(label));
   }
+});
+
+test("7. DEV-001: website & appearance studio: an appearance image gets exactly the fixed image set: nothing allowed, sandboxed, never framed, never sniffed, same-origin only", async () => {
+  const policy = directives(ASSET_POLICY);
+  assert.deepEqual(
+    [...policy.keys()],
+    ["default-src", "frame-ancestors", "sandbox"],
+  );
+  assert.deepEqual(policy.get("default-src"), ["'none'"]);
+  assert.deepEqual(policy.get("frame-ancestors"), ["'none'"]);
+  assert.deepEqual(policy.get("sandbox"), []);
+  const expected = new Map(
+    ASSET_HEADERS.map(({ key, value }) => [key.toLowerCase(), value]),
+  );
+  for (const path of [
+    `/appearance/assets/${"0".repeat(64)}.png`,
+    `/appearance/assets/${"a".repeat(64)}.jpg`,
+    `/appearance/assets/${"f".repeat(64)}.webp`,
+    // Any one segment: the route itself answers 404 to anything that is not
+    // a digest with an extension, still under the image set.
+    "/appearance/assets/unknown",
+    `/appearance/assets/${"a".repeat(64)}.svg`,
+  ]) {
+    const sent = await headersFor(path);
+    assert.deepEqual(sent, expected, path);
+    assert.equal(sent.get("x-frame-options"), "DENY", path);
+    assert.equal(sent.get("x-content-type-options"), "nosniff", path);
+    assert.equal(sent.get("cross-origin-resource-policy"), "same-origin");
+  }
+  // The image set is fixed: the configured media and frame origins never
+  // reach it.
+  const configured = await configWith(
+    "https://abcdefghijklmnopqrst.supabase.co",
+    "acme",
+  );
+  assert.deepEqual((await configured.headers())[2], EXPECTED_RULES[2]);
 });
