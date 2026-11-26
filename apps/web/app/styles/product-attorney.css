@@ -10,6 +10,13 @@
   flex-direction: column;
   overflow: hidden;
 }
+/* The shared theme shortens every workspace root on a phone by the prototype's 100 px demo bar; the product has none. */
+@media (max-width: 700px) {
+  .rzw.W.aw {
+    height: 100vh !important;
+    height: 100dvh !important;
+  }
+}
 :where(.aw) a {
   color: inherit;
   text-decoration: none;
@@ -74,7 +81,14 @@
   max-width: 760px;
 }
 
-/* The frame for a visitor the page does not admit: the signed-out panel's message and actions. */
+/* The frame for a visitor the page does not admit: the signed-out panel fills the frame and scrolls when its message
+   is taller than the screen; its message and actions. */
+.rzw.W.aw > .signedout {
+  height: 100%;
+  overflow-y: auto;
+  padding: 24px 16px;
+  place-items: safe center;
+}
 .aw .aw-gate__body {
   display: flex;
   flex-direction: column;
