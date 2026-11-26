@@ -346,6 +346,7 @@
   --rz-on-ink: initial;
   --rz-ink-hover: initial;
   --rz-surface-hover: initial;
+  position: relative;
   color: var(--ink);
   font-family: var(--f-body);
   min-width: 0;

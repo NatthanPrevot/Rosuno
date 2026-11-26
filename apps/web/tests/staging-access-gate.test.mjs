@@ -1054,6 +1054,11 @@ test("G-14. DEV-001: website & appearance studio: the published stylesheet and a
     "/appearance/theme.css",
     `/appearance/assets/${"a".repeat(64)}.png`,
     `/appearance/assets/${"b".repeat(64)}.webp`,
+    // DEV-001: website & appearance studio (G3): the studio preview's draft
+    // stylesheet and editor status, and the studio itself, gated alike.
+    "/appearance/draft.css",
+    "/appearance/editor",
+    "/staff/appearance",
   ]) {
     assert.equal(matcher.test(pathname), true, pathname);
     assert.equal(isMachineRoute(pathname), false, pathname);

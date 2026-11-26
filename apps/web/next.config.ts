@@ -95,6 +95,49 @@ const ASSET_HEADERS = [
   TRANSPORT_SECURITY,
 ];
 
+// DEV-001 website and appearance studio: the studio's live preview. D3
+// pending owner decision. Same-origin framing for the preview, and nothing
+// more, in two rules kept together in this one constant:
+// - the studio page itself (exactly /staff/appearance) may load frames of
+//   this origin only (frame-src 'self' instead of the page policy's frame
+//   source; the studio embeds no provider page); it stays unframeable;
+// - a page response to an address with ?rz-preview=1 may be framed by this
+//   origin only (frame-ancestors 'self' and X-Frame-Options SAMEORIGIN).
+// Every other directive is unchanged, every other response keeps
+// frame-src as configured, frame-ancestors 'none' and DENY, and nothing
+// under /appearance/ (the stylesheets, the editor status, the images) is
+// ever frameable. The preview loader blocks every activation inside the
+// frame. If the owner declines D3, remove this constant and its one spread
+// below: the studio then offers the preview in a new window instead.
+const PREVIEW_FRAMING_RULES = [
+  {
+    source: "/staff/appearance",
+    headers: [
+      {
+        key: "Content-Security-Policy",
+        value: CONTENT_SECURITY_POLICY.replace(
+          /frame-src [^;]+/,
+          "frame-src 'self'",
+        ),
+      },
+    ],
+  },
+  {
+    source: "/((?!auth/confirm$|appearance/).*)",
+    has: [{ type: "query" as const, key: "rz-preview", value: "1" }],
+    headers: [
+      {
+        key: "Content-Security-Policy",
+        value: CONTENT_SECURITY_POLICY.replace(
+          "frame-ancestors 'none'",
+          "frame-ancestors 'self'",
+        ),
+      },
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+    ],
+  },
+];
+
 const nextConfig: NextConfig = {
   // next dev writes AGENTS.md and CLAUDE.md into the app whenever it detects a
   // coding agent, and Replit's REPL_ID counts as one. Keep that generation off
@@ -111,6 +154,7 @@ const nextConfig: NextConfig = {
       },
       { source: "/auth/confirm", headers: [TRANSPORT_SECURITY] },
       { source: "/appearance/assets/:asset", headers: ASSET_HEADERS },
+      ...PREVIEW_FRAMING_RULES,
     ];
   },
 };

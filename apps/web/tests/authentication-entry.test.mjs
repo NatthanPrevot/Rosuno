@@ -1177,7 +1177,9 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
   // its exact path and nothing broader, and the sign-out form is a POST server
   // action on the home page. DEV-001: website & appearance studio: so are the
   // published stylesheet and appearance image routes, each admitted by its
-  // exact path.
+  // exact path. DEV-001: website & appearance studio: and the studio
+  // preview's draft stylesheet and editor status routes, each admitted by
+  // its exact path.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
     [
@@ -1186,10 +1188,40 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
       "app/api/notifications/resend/route.ts",
       "app/api/payments/stripe/route.ts",
       "app/appearance/assets/[asset]/route.ts",
+      "app/appearance/draft.css/route.ts",
+      "app/appearance/editor/route.ts",
       "app/appearance/theme.css/route.ts",
       "app/auth/confirm/route.ts",
     ],
   );
+  // DEV-001: website & appearance studio: the two preview routes have no
+  // sign-out or session capability either: each imports only the appearance
+  // adapter and the appearance delivery module, names no cookie, session or
+  // authentication call itself, never ends a session, and answers GET only.
+  for (const route of [
+    "app/appearance/draft.css/route.ts",
+    "app/appearance/editor/route.ts",
+  ]) {
+    const previewSource = read(route);
+    assert.deepEqual(importsOf(previewSource), [
+      "../../../src/infrastructure/appearance/appearance-adapter.ts",
+      "../../../src/presentation/appearance/delivery.ts",
+    ]);
+    assert.doesNotMatch(
+      codeOf(previewSource),
+      /sign-in\/actions|signOut|sign-?out|\.auth\.|cookies|getSession|getClaims|getUser|supabase-server|server-session-source|next\/headers|\bimport\s*\(/i,
+      route,
+    );
+    assert.deepEqual(
+      [
+        ...codeOf(previewSource).matchAll(
+          /^export (?:async function|function|const) (\w+)/gm,
+        ),
+      ].map((match) => match[1]),
+      ["dynamic", "GET"],
+      route,
+    );
+  }
   // DEV-001: website & appearance studio: the two appearance routes have no
   // sign-out or session capability: each imports only the appearance
   // adapter, the request logger and the appearance delivery module, names no

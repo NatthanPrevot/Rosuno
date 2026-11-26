@@ -127,33 +127,53 @@ export function PreviewFrame({
     return () => observer.disconnect();
   }, [device]);
 
-  // A new address or a reload closes the old channel.
+  // A new address or a reload closes the old channel and its attempts.
+  const attempts = useRef<{
+    timer: number | null;
+    ports: MessagePort[];
+  }>({ timer: null, ports: [] });
+  const stopAttempts = (keep: MessagePort | null) => {
+    if (attempts.current.timer !== null) {
+      window.clearInterval(attempts.current.timer);
+    }
+    for (const pending of attempts.current.ports) {
+      if (pending !== keep) {
+        pending.close();
+      }
+    }
+    attempts.current = { timer: null, ports: [] };
+  };
   useEffect(() => {
     setConnected("waiting");
     latest.current.onReady(null);
     const timer = window.setTimeout(() => {
       if (port.current === null) {
+        stopAttempts(null);
         setConnected("failed");
       }
     }, READY_TIMEOUT_MS);
     return () => {
       window.clearTimeout(timer);
+      stopAttempts(null);
       port.current?.close();
       port.current = null;
     };
   }, [address, reloadKey]);
 
+  // The handshake: the bridge loads after the page (it asks the server
+  // first), so the hello is posted again every 400 ms, each time with a
+  // fresh channel and this load's one nonce, until a ready answers on one of
+  // them; the bridge accepts only the first hello it sees.
   function handshake() {
     const target = frame.current?.contentWindow;
     if (target === null || target === undefined) {
       return;
     }
+    stopAttempts(null);
     port.current?.close();
     port.current = null;
     const nonce = newNonce();
-    const channel = new MessageChannel();
-    const own = channel.port1;
-    own.onmessage = (event: MessageEvent) => {
+    const listen = (own: MessagePort) => (event: MessageEvent) => {
       const message = readFrameMessage(event.data);
       if (message === null) {
         return;
@@ -164,6 +184,7 @@ export function PreviewFrame({
           return;
         }
         port.current = own;
+        stopAttempts(own);
         setConnected("ready");
         now.onReady(message);
         own.postMessage({ type: "rz:mode", mode: now.mode });
@@ -192,8 +213,21 @@ export function PreviewFrame({
           break;
       }
     };
-    // This origin only: never "*".
-    target.postMessage(helloOf(nonce), window.location.origin, [channel.port2]);
+    const attempt = () => {
+      if (port.current !== null) {
+        stopAttempts(port.current);
+        return;
+      }
+      const channel = new MessageChannel();
+      channel.port1.onmessage = listen(channel.port1);
+      attempts.current.ports.push(channel.port1);
+      // This origin only: never "*".
+      target.postMessage(helloOf(nonce), window.location.origin, [
+        channel.port2,
+      ]);
+    };
+    attempt();
+    attempts.current.timer = window.setInterval(attempt, 400);
   }
 
   useEffect(() => {

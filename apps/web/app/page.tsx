@@ -16,7 +16,9 @@
 // order. The hero comes first and the available-now and legal-issue sections
 // are always rendered, whatever a stored configuration says. Process and
 // legal statements, status names, the neutral-order statement and the search
-// form are never slots.
+// form are never slots. In the studio's preview mode (rz-preview=1) the
+// page renders the editor's saved draft instead, only for a holder of
+// manage_site_appearance (decided by the use case and the database).
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -612,19 +614,23 @@ function HomeHero({
 export default async function HomePage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly jurisdiction?: QueryValue }>;
+  readonly searchParams: Promise<{
+    readonly jurisdiction?: QueryValue;
+    readonly "rz-preview"?: QueryValue;
+  }>;
 }) {
   // Session state belongs to each request on the server; never prerender it.
   await connection();
   const view = await getShellView(SUPABASE_SERVER_SESSION_SOURCE);
-  const { jurisdiction } = await searchParams;
+  const { jurisdiction, "rz-preview": previewValue } = await searchParams;
   const directory = await homeDirectory(jurisdiction);
-  // The published appearance only; the studio's preview mode is not offered
-  // here yet.
+  // The published appearance; in the studio's preview mode (exactly
+  // rz-preview=1) a holder of manage_site_appearance sees the saved draft
+  // (the use case decides; anyone else still sees the published version).
   const { configuration } = await resolvePageAppearance(
     APPEARANCE_SOURCES,
     validateWithRegistry,
-    false,
+    previewValue === "1",
   );
   const sections: Readonly<Record<string, ReactNode>> = {
     "home.hero": (

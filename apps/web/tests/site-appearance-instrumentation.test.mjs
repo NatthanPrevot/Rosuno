@@ -154,7 +154,10 @@ test("SI-2 every data-rz, data-rz-slot and data-rz-section literal in the app is
   const known = new Map(
     APPEARANCE_REGISTRY.components.map((spec) => [spec.id, spec]),
   );
-  for (const file of sources) {
+  // DEV-001: website & appearance studio: the preview bridge names the
+  // attributes in exactly its constant lines below (checked after this loop).
+  const BRIDGE = "src/presentation/appearance/preview-bridge.ts";
+  for (const file of sources.filter((f) => f !== BRIDGE)) {
     const code = codeOf(read(file));
     assert.doesNotMatch(code, /data-rz(?:-slot|-section)?=\{/, file);
     assert.doesNotMatch(code, /["']data-rz/, file);
@@ -174,6 +177,40 @@ test("SI-2 every data-rz, data-rz-slot and data-rz-section literal in the app is
       assert.deepEqual(code.match(/.*data-rz.*/g), [
         '  return `:root [data-rz="${id}"][data-rz]${scope === "workspace" ? OUTSIDE_STUDIO : ""}`;',
       ]);
+      continue;
+    }
+    // DEV-001: website & appearance studio: the preview bridge reads the
+    // three instrumented attributes and sets only its own studio marks
+    // (selection, hover, the section order approximation), never an id.
+    if (file === BRIDGE) {
+      assert.deepEqual(code.match(/.*data-rz.*/g), [
+        'const ELEMENT = "data-rz";',
+        'const SLOT = "data-rz-slot";',
+        'const SECTION = "data-rz-section";',
+        'const SELECTED = "data-rz-studio-selected";',
+        'const HOVERED = "data-rz-studio-hovered";',
+        'const ORDERED = "data-rz-studio-order";',
+        'const PLACE = "data-rz-studio-place";',
+      ]);
+      assert.deepEqual(
+        [
+          ...code.matchAll(/\.(?:set|remove|toggle)Attribute\(\s*([A-Za-z]+)/g),
+        ].map((m) => m[1]),
+        [
+          "attribute",
+          "attribute",
+          "PLACE",
+          "ORDERED",
+          "ORDERED",
+          "PLACE",
+          "PLACE",
+        ],
+      );
+      assert.deepEqual(
+        [...code.matchAll(/\bmark\(([A-Z]+),/g)].map((m) => m[1]).sort(),
+        ["HOVERED", "HOVERED", "HOVERED", "SELECTED", "SELECTED"],
+      );
+      assert.doesNotMatch(code, /setAttributeNS|\.dataset\b/);
       continue;
     }
     assert.doesNotMatch(code, /data-rz=/, file);
@@ -394,20 +431,29 @@ test("SI-5 the Home section group: the hero fixed first, only the two-ways, how-
     );
     assert.match(map, new RegExp(`key="${id.replace(".", "\\.")}"`), id);
   }
-  // The published configuration only (the studio's preview arrives later),
-  // validated against the registry, read once after the session and the
-  // directory.
+  // DEV-001: website & appearance studio: the published configuration, or
+  // in the studio's preview mode (exactly rz-preview=1, read with the other
+  // query value) the editor's saved draft, as the use case decides for a
+  // holder of manage_site_appearance; validated against the registry, read
+  // once after the session and the directory.
   assert.equal(
     page.split(
-      "await resolvePageAppearance(\n    APPEARANCE_SOURCES,\n    validateWithRegistry,\n    false,\n  );",
+      'await resolvePageAppearance(\n    APPEARANCE_SOURCES,\n    validateWithRegistry,\n    previewValue === "1",\n  );',
     ).length,
     2,
   );
+  assert.equal(
+    page.split(
+      'const { jurisdiction, "rz-preview": previewValue } = await searchParams;',
+    ).length,
+    2,
+  );
+  assert.equal(page.match(/previewValue/g).length, 2);
   assert.ok(
     page.indexOf("await homeDirectory(jurisdiction)") <
       page.indexOf("await resolvePageAppearance("),
   );
-  assert.doesNotMatch(page, /rz-preview|searchParams\[/);
+  assert.doesNotMatch(page, /searchParams\[/);
 });
 
 test("SI-6 no stylesheet selects a data-rz attribute; the three hook tokens are defined by no stylesheet; the wrappers are exactly the listed ones, with the owner's values as fallbacks", () => {

@@ -2526,7 +2526,11 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
   // DEV-001: website & appearance studio: and the published stylesheet and
   // appearance image routes, admitted by their exact paths; they too know
   // nothing of recovery and import only the appearance adapter, the request
-  // logger and the appearance delivery module.
+  // logger and the appearance delivery module. DEV-001: website &
+  // appearance studio: and the studio preview's draft stylesheet and editor
+  // status routes, admitted by their exact paths; they too know nothing of
+  // recovery and import only the appearance adapter and the appearance
+  // delivery module.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
     [
@@ -2535,6 +2539,8 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
       "app/api/notifications/resend/route.ts",
       "app/api/payments/stripe/route.ts",
       "app/appearance/assets/[asset]/route.ts",
+      "app/appearance/draft.css/route.ts",
+      "app/appearance/editor/route.ts",
       "app/appearance/theme.css/route.ts",
       "app/auth/confirm/route.ts",
     ],
@@ -2545,6 +2551,8 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
     "app/api/notifications/resend/route.ts",
     "app/api/payments/stripe/route.ts",
     "app/appearance/assets/[asset]/route.ts",
+    "app/appearance/draft.css/route.ts",
+    "app/appearance/editor/route.ts",
     "app/appearance/theme.css/route.ts",
   ]) {
     assert.doesNotMatch(
@@ -2573,6 +2581,19 @@ test("32. recovery adds exactly two routes, no route handler, and leaves signup 
     "../../../../src/infrastructure/observability/request-log.ts",
     "../../../../src/presentation/appearance/delivery.ts",
   ]);
+  for (const route of [
+    "app/appearance/draft.css/route.ts",
+    "app/appearance/editor/route.ts",
+  ]) {
+    assert.deepEqual(
+      importsOf(read(route)),
+      [
+        "../../../src/infrastructure/appearance/appearance-adapter.ts",
+        "../../../src/presentation/appearance/delivery.ts",
+      ],
+      route,
+    );
+  }
   // The signup confirmation handler still verifies only signup links and
   // knows nothing of recovery.
   const confirmation = codeOf(read("app/auth/confirm/route.ts"));

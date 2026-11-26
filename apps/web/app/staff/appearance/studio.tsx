@@ -271,7 +271,20 @@ export function AppearanceStudio({ initial }: { readonly initial: Ready }) {
   const [busy, setBusy] = useState(false);
   const [serverIssues, setServerIssues] = useState<readonly Issue[]>([]);
   const inspector = useRef<HTMLElement>(null);
+  const versionsButton = useRef<HTMLButtonElement>(null);
   const importer = useRef<HTMLInputElement>(null);
+
+  // A dialog's own close (Escape, its close button) clears only itself.
+  const closeDialog = (
+    which:
+      Exclude<Dialog, null | { readonly restore: VersionSummary }> | "restore",
+  ) =>
+    setDialog((current) =>
+      current === which ||
+      (which === "restore" && typeof current === "object" && current !== null)
+        ? null
+        : current,
+    );
 
   const run = (task: () => Promise<void>) => {
     setBusy(true);
@@ -1111,6 +1124,7 @@ export function AppearanceStudio({ initial }: { readonly initial: Ready }) {
           <span className="grow"></span>
           <div className="rzs-tgroup">
             <button
+              ref={versionsButton}
               type="button"
               className="btn btn-line btn-sm"
               onClick={() => setDialog("versions")}
@@ -1154,7 +1168,7 @@ export function AppearanceStudio({ initial }: { readonly initial: Ready }) {
             <button
               type="button"
               className="btn btn-line btn-sm"
-              disabled={busy || editor.save === "saving" || viewing !== null}
+              disabled={editor.save === "saving" || viewing !== null}
               onClick={() => setDialog("reset")}
             >
               {RESET_LABELS.open}
@@ -1162,7 +1176,7 @@ export function AppearanceStudio({ initial }: { readonly initial: Ready }) {
             <button
               type="button"
               className="btn btn-ink btn-sm"
-              disabled={busy || viewing !== null}
+              disabled={viewing !== null}
               onClick={() => {
                 setServerIssues([]);
                 if (isDirty(editorRef.current)) {
@@ -1314,7 +1328,10 @@ export function AppearanceStudio({ initial }: { readonly initial: Ready }) {
                       REGISTRY.typeRoles.some((t) => t.id === role),
                   ),
                 });
-                if (selectionKey(selection) !== `component:${selected.id}`) {
+                if (
+                  selectionKey(selection) !== `component:${selected.id}` &&
+                  selectionKey(selection) !== `slot:${selected.id}`
+                ) {
                   setSelection({ kind: "component", id: selected.id });
                   setTab(0);
                 }
@@ -1394,7 +1411,7 @@ export function AppearanceStudio({ initial }: { readonly initial: Ready }) {
           window.requestAnimationFrame(() => inspector.current?.focus());
         }}
         onPublish={publish}
-        onClose={() => setDialog(null)}
+        onClose={() => closeDialog("publish")}
       />
       <ConfirmDialog
         open={dialog === "reset"}
@@ -1403,9 +1420,10 @@ export function AppearanceStudio({ initial }: { readonly initial: Ready }) {
         confirm={RESET_LABELS.confirm}
         busy={busy}
         onConfirm={reset}
-        onClose={() => setDialog(null)}
+        onClose={() => closeDialog("reset")}
       />
       <ConfirmDialog
+        returnTo={versionsButton}
         open={restoreTarget !== null}
         title={
           restoreTarget === null
@@ -1425,16 +1443,17 @@ export function AppearanceStudio({ initial }: { readonly initial: Ready }) {
             restore(restoreTarget);
           }
         }}
-        onClose={() => setDialog(null)}
+        onClose={() => closeDialog("restore")}
       />
       <ConfirmDialog
+        returnTo={versionsButton}
         open={dialog === "discard"}
         title={DISCARD_LABELS.title}
         body={DISCARD_LABELS.body}
         confirm={DISCARD_LABELS.confirm}
         busy={busy}
         onConfirm={discard}
-        onClose={() => setDialog(null)}
+        onClose={() => closeDialog("discard")}
       />
       <ConfirmDialog
         open={dialog === "keep"}
@@ -1443,7 +1462,7 @@ export function AppearanceStudio({ initial }: { readonly initial: Ready }) {
         confirm={CONFLICT_LABELS.keepConfirm}
         busy={busy}
         onConfirm={keepMine}
-        onClose={() => setDialog(null)}
+        onClose={() => closeDialog("keep")}
       />
       <VersionsDialog
         open={dialog === "versions"}
@@ -1455,7 +1474,7 @@ export function AppearanceStudio({ initial }: { readonly initial: Ready }) {
         onRestore={(version) => setDialog({ restore: version })}
         onDiscard={() => setDialog("discard")}
         onPage={(next) => run(() => refreshVersions(next))}
-        onClose={() => setDialog(null)}
+        onClose={() => closeDialog("versions")}
       />
       <AssetsDialog
         open={dialog === "assets"}
@@ -1467,7 +1486,7 @@ export function AppearanceStudio({ initial }: { readonly initial: Ready }) {
         onUseLogo={chooseLogo}
         onUseHero={chooseHero}
         onPage={(next) => run(() => refreshAssets(next))}
-        onClose={() => setDialog(null)}
+        onClose={() => closeDialog("assets")}
       />
     </div>
   );

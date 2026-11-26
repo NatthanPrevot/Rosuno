@@ -322,6 +322,7 @@ export function Layers({
             key={group.id}
             ref={ref(key)}
             role="treeitem"
+            aria-label={group.label}
             aria-expanded={open}
             tabIndex={current === key ? 0 : -1}
             className="rzs-tg"

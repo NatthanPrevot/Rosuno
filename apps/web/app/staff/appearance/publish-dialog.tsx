@@ -11,7 +11,14 @@
 // Publish only when nothing waits to be saved and nothing fails; the server
 // re-reads and re-validates the stored draft before it publishes anything.
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 import type { Issue } from "../../../src/application/appearance-schema.ts";
 import {
@@ -30,6 +37,7 @@ export function Modal({
   children,
   actions,
   wide = false,
+  returnTo,
 }: {
   readonly open: boolean;
   readonly title: string;
@@ -37,9 +45,16 @@ export function Modal({
   readonly children: ReactNode;
   readonly actions?: ReactNode;
   readonly wide?: boolean;
+  // Where focus goes when the control that opened the dialog is gone (it
+  // sat in a dialog that has closed since).
+  readonly returnTo?: RefObject<HTMLElement | null>;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<Element | null>(null);
+  // A close the studio asked for (another dialog opens, an action finished)
+  // only returns focus; a close the editor made (Escape, the close button)
+  // also tells the studio.
+  const closingByStudio = useRef(false);
   const id = useId();
   useEffect(() => {
     const element = dialog.current;
@@ -50,6 +65,7 @@ export function Modal({
       opener.current = document.activeElement;
       element.showModal();
     } else if (!open && element.open) {
+      closingByStudio.current = true;
       element.close();
     }
   }, [open]);
@@ -60,14 +76,24 @@ export function Modal({
     }
     const closed = () => {
       const back = opener.current;
-      if (back instanceof HTMLElement && back.isConnected) {
+      if (
+        back instanceof HTMLElement &&
+        back.isConnected &&
+        back !== document.body
+      ) {
         back.focus();
+      } else {
+        returnTo?.current?.focus();
+      }
+      if (closingByStudio.current) {
+        closingByStudio.current = false;
+        return;
       }
       onClose();
     };
     element.addEventListener("close", closed);
     return () => element.removeEventListener("close", closed);
-  }, [onClose]);
+  }, [onClose, returnTo]);
   return (
     <dialog
       ref={dialog}
@@ -108,7 +134,9 @@ export function ConfirmDialog({
   busy,
   onConfirm,
   onClose,
+  returnTo,
 }: {
+  readonly returnTo?: RefObject<HTMLElement | null>;
   readonly open: boolean;
   readonly title: string;
   readonly body: string;
@@ -123,6 +151,7 @@ export function ConfirmDialog({
       open={open}
       title={title}
       onClose={onClose}
+      returnTo={returnTo}
       actions={
         <>
           <button
@@ -184,6 +213,12 @@ export function PublishDialog({
 }) {
   const [label, setLabel] = useState("");
   const id = useId();
+  // Each opening starts with no version name.
+  useEffect(() => {
+    if (open) {
+      setLabel("");
+    }
+  }, [open]);
   const tooLong = [...label.trim()].length > 80;
   const disabled =
     busy || waiting || issues.length > 0 || !canPublish || tooLong;

@@ -1,9 +1,8 @@
 // Website and appearance studio: published delivery (DEV-001; studio
 // specification sections 5.3 and 5.5).
 //
-// Builds the answers of the two public appearance routes from injected
-// sources, so the routes stay one call each and the answers can be proved
-// without a server:
+// Builds the answers of the appearance routes from injected sources, so the
+// routes stay one call each and the answers can be proved without a server:
 // - the published stylesheet: the published version of the active theme,
 //   validated again here in publish mode against the registry and compiled;
 //   a constant URL revalidated on every page load (private, no-cache) with a
@@ -20,11 +19,16 @@
 //   and never cached, anything else not found. The fixed image type comes
 //   from a fixed table, never from the request or the row; next.config.ts
 //   adds the sandboxing, no-sniff and same-origin headers.
+// - the studio's preview (DEV-001 G3): the saved draft's stylesheet and the
+//   editor status, both for a holder of manage_site_appearance only (anyone
+//   else 403) and never stored.
 //
 // Nothing here logs, reads a cookie itself, or sees a credential.
 
 import {
   readAppearanceAsset,
+  resolveAppearanceEditor,
+  resolvePageAppearance,
   resolvePublishedAppearance,
   type AppearanceSources,
 } from "../../application/appearance.ts";
@@ -138,6 +142,68 @@ export async function themeStylesheet(
   } catch {
     return fallback("unavailable");
   }
+}
+
+// ---------------------------------------------------------------------------
+// The studio's preview (editors only)
+// ---------------------------------------------------------------------------
+
+const JSON_TYPE = "application/json";
+
+function forbidden(): Response {
+  return new Response(null, {
+    status: 403,
+    headers: { "cache-control": NO_STORE },
+  });
+}
+
+// The saved draft's stylesheet, for the preview of a holder of
+// manage_site_appearance only (everyone else: 403, empty): the draft
+// validated in draft mode (or, with no usable draft, the published version,
+// else nothing) and compiled. Never stored by anyone; any failure is the
+// empty default sheet.
+export async function draftStylesheet(
+  sources: AppearanceSources,
+): Promise<Response> {
+  try {
+    if (!(await resolveAppearanceEditor(sources))) {
+      return forbidden();
+    }
+    const page = await resolvePageAppearance(
+      sources,
+      validateWithRegistry,
+      true,
+    );
+    let css = "";
+    if (page.configuration !== null) {
+      try {
+        css = compileAppearanceCss(page.configuration, APPEARANCE_REGISTRY);
+      } catch {
+        css = "";
+      }
+    }
+    return stylesheet(css === "" ? DEFAULT_STYLESHEET : css, NO_STORE, null);
+  } catch {
+    return stylesheet(DEFAULT_STYLESHEET, NO_STORE, null);
+  }
+}
+
+// Whether the request's own session may use the preview bridge: {"editor":
+// true} (200) for a holder of manage_site_appearance, else {"editor":false}
+// (403). Never stored by anyone.
+export async function editorStatus(
+  sources: Pick<AppearanceSources, "staff">,
+): Promise<Response> {
+  let editor = false;
+  try {
+    editor = await resolveAppearanceEditor(sources);
+  } catch {
+    editor = false;
+  }
+  return new Response(JSON.stringify({ editor }), {
+    status: editor ? 200 : 403,
+    headers: { "content-type": JSON_TYPE, "cache-control": NO_STORE },
+  });
 }
 
 // ---------------------------------------------------------------------------

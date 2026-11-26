@@ -265,10 +265,13 @@ test("1. the design system is exactly its contracted files and entry chain", () 
     [...fontFiles, "public/icons/chevron-down.svg"].sort(),
   );
   // The layout loads the one global stylesheet, which loads the entry, which
-  // loads the layers in cascade order.
+  // loads the layers in cascade order. DEV-001: website & appearance studio:
+  // the layout also renders the preview loader (a client component that
+  // renders nothing and loads no stylesheet).
   assert.deepEqual(importsOf(read(layoutPath)), [
     "next",
     "react",
+    "../src/presentation/appearance/preview-loader.tsx",
     "./globals.css",
   ]);
   assert.deepEqual(
