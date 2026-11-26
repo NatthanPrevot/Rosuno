@@ -7,6 +7,11 @@
 // configuration capability; a launch authorization, a human decision, needs
 // the launch-authorization capability. Nothing here makes a jurisdiction
 // live: that is a lifecycle change the database decides.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, the Marketplace launch
+// record): the design's record panel with the required gates passed as its
+// key fact, the launch readiness, the gates and their evaluations, and the
+// launch authorizations, each with its unchanged forms.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -15,7 +20,6 @@ import { resolveLaunch } from "../../../../src/application/staff-configuration.t
 import { STAFF_CONFIGURATION_SOURCES } from "../../../../src/infrastructure/staff/staff-configuration-adapter.ts";
 import {
   Disclosure,
-  Heading,
   Status,
   Table,
   Text,
@@ -25,13 +29,14 @@ import {
   recordedStateLabel,
   utcDateTime,
 } from "../../../../src/presentation/staff-configuration-labels.ts";
-import { requireSteppedUp } from "../../../account/gate.ts";
 import {
-  BackLink,
-  BoundNotice,
-  refusalPage,
-  StaffFrame,
-} from "../../frame.tsx";
+  Block,
+  KeyFact,
+  KeyValues,
+  RecordPanel,
+} from "../../../../src/presentation/staff-workspace.tsx";
+import { requireSteppedUp } from "../../../account/gate.ts";
+import { BoundNotice, refusalPage } from "../../frame.tsx";
 import {
   DefineGateForm,
   EvaluationForm,
@@ -63,130 +68,128 @@ export default async function JurisdictionLaunchPage({
   }
   const j = view.jurisdiction;
   return (
-    <StaffFrame
-      eyebrow="Launch gates and authorization"
+    <RecordPanel
+      titleId="staff-configuration-title"
       title={`${j.name} (${j.code})`}
+      sub="Launch gates and authorization · times in UTC"
+      pill={{
+        tone: LIFECYCLE_LABELS[j.state].tone,
+        label: LIFECYCLE_LABELS[j.state].label,
+      }}
+      back={{ href: "/staff/launch", label: "Back to jurisdictions" }}
     >
-      <BackLink href="/staff/launch">Back to jurisdictions</BackLink>
-      <Table id="launch-summary" caption="Launch readiness">
-        <tbody>
-          <tr>
-            <th scope="row">Lifecycle</th>
-            <td>
-              <Status tone={LIFECYCLE_LABELS[j.state].tone}>
-                {LIFECYCLE_LABELS[j.state].label}
-              </Status>
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">Required gates passed (latest evaluation)</th>
-            <td>{`${view.requiredPassed} of ${view.requiredGates}`}</td>
-          </tr>
-          <tr>
-            <th scope="row">Active launch authorization</th>
-            <td>{view.hasActiveAuthorization ? "Yes" : "No"}</td>
-          </tr>
-        </tbody>
-      </Table>
-      <Heading as="h2" size="md">
-        Launch gates
-      </Heading>
-      <BoundNotice complete={view.gatesComplete} noun="launch gates" />
-      {view.gates.length === 0 ? (
-        <Text tone="muted">No launch gate is defined.</Text>
-      ) : (
-        view.gates.map((gate) => {
-          const latest = gate.evaluations[0];
-          const state =
-            latest === undefined ? null : recordedStateLabel(latest.status);
-          return (
-            <Disclosure
-              key={gate.id}
-              summary={`${gate.code} (${gate.required ? "required" : "not required"}): ${state === null ? "not evaluated" : state.label}`}
-            >
-              {gate.description === null ? null : (
-                <Text>{gate.description}</Text>
-              )}
-              {gate.evaluations.length === 0 ? (
-                <Text tone="muted">No evaluation is recorded.</Text>
-              ) : (
-                <Table
-                  id={`evaluations-${gate.id}`}
-                  caption="Recent evaluations, newest first"
-                >
-                  <thead>
-                    <tr>
-                      <th scope="col">Evaluated</th>
-                      <th scope="col">Result</th>
-                      <th scope="col">By</th>
-                      <th scope="col">Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {gate.evaluations.map((evaluation) => {
-                      const result = recordedStateLabel(evaluation.status);
-                      return (
-                        <tr key={evaluation.id}>
-                          <td>{utcDateTime(evaluation.evaluatedAt)}</td>
-                          <td>
-                            <Status tone={result.tone}>{result.label}</Status>
-                          </td>
-                          <td>{evaluation.by ?? "Not recorded"}</td>
-                          <td>{evaluation.reason ?? "Not recorded"}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </Table>
-              )}
-              {gate.evaluationsComplete ? null : (
-                <Text tone="muted">
-                  Older evaluations are kept but not shown here.
-                </Text>
-              )}
-              {view.canManageGates ? <EvaluationForm gate={gate.id} /> : null}
-            </Disclosure>
-          );
-        })
-      )}
-      {view.canManageGates ? (
-        <Disclosure summary="Define a launch gate">
-          <DefineGateForm jurisdiction={j.id} />
-        </Disclosure>
-      ) : null}
-      <Heading as="h2" size="md">
-        Launch authorizations
-      </Heading>
-      <BoundNotice
-        complete={view.authorizationsComplete}
-        noun="launch authorizations"
+      <KeyFact
+        label="Required gates passed (latest evaluation)"
+        value={`${view.requiredPassed} of ${view.requiredGates}`}
       />
-      {view.authorizations.length === 0 ? (
-        <Text tone="muted">No launch authorization is recorded.</Text>
-      ) : (
-        view.authorizations.map((authorization) => (
-          <Disclosure
-            key={authorization.id}
-            summary={`${utcDateTime(authorization.authorizedAt)} by ${authorization.by}: ${authorization.revokedAt === null ? "active" : `revoked ${utcDateTime(authorization.revokedAt)}`}`}
-          >
-            <Text>{authorization.reason}</Text>
-            {view.canAuthorize && authorization.revokedAt === null ? (
-              <RevokeLaunchForm authorization={authorization.id} />
-            ) : null}
+      <Block title="Launch readiness">
+        <KeyValues
+          items={[
+            ["Lifecycle", LIFECYCLE_LABELS[j.state].label],
+            [
+              "Active launch authorization",
+              view.hasActiveAuthorization ? "Yes" : "No",
+            ],
+          ]}
+        />
+      </Block>
+      <Block title="Launch gates">
+        <BoundNotice complete={view.gatesComplete} noun="launch gates" />
+        {view.gates.length === 0 ? (
+          <p className="st-emd">No launch gate is defined.</p>
+        ) : (
+          view.gates.map((gate) => {
+            const latest = gate.evaluations[0];
+            const state =
+              latest === undefined ? null : recordedStateLabel(latest.status);
+            return (
+              <Disclosure
+                key={gate.id}
+                summary={`${gate.code} (${gate.required ? "required" : "not required"}): ${state === null ? "not evaluated" : state.label}`}
+              >
+                {gate.description === null ? null : (
+                  <Text>{gate.description}</Text>
+                )}
+                {gate.evaluations.length === 0 ? (
+                  <Text tone="muted">No evaluation is recorded.</Text>
+                ) : (
+                  <Table
+                    id={`evaluations-${gate.id}`}
+                    caption="Recent evaluations, newest first"
+                  >
+                    <thead>
+                      <tr>
+                        <th scope="col">Evaluated</th>
+                        <th scope="col">Result</th>
+                        <th scope="col">By</th>
+                        <th scope="col">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gate.evaluations.map((evaluation) => {
+                        const result = recordedStateLabel(evaluation.status);
+                        return (
+                          <tr key={evaluation.id}>
+                            <td>{utcDateTime(evaluation.evaluatedAt)}</td>
+                            <td>
+                              <Status tone={result.tone}>{result.label}</Status>
+                            </td>
+                            <td>{evaluation.by ?? "Not recorded"}</td>
+                            <td>{evaluation.reason ?? "Not recorded"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </Table>
+                )}
+                {gate.evaluationsComplete ? null : (
+                  <Text tone="muted">
+                    Older evaluations are kept but not shown here.
+                  </Text>
+                )}
+                {view.canManageGates ? <EvaluationForm gate={gate.id} /> : null}
+              </Disclosure>
+            );
+          })
+        )}
+        {view.canManageGates ? (
+          <Disclosure summary="Define a launch gate">
+            <DefineGateForm jurisdiction={j.id} />
           </Disclosure>
-        ))
-      )}
-      {view.canAuthorize && !view.hasActiveAuthorization ? (
-        <Disclosure summary="Grant launch authorization">
-          <GrantLaunchForm jurisdiction={j.id} />
-        </Disclosure>
-      ) : null}
-      {view.canAuthorize ? null : (
-        <Text tone="muted">
-          Granting or revoking launch authorization needs the
-          launch-authorization capability for this jurisdiction.
-        </Text>
-      )}
-    </StaffFrame>
+        ) : null}
+      </Block>
+      <Block title="Launch authorizations">
+        <BoundNotice
+          complete={view.authorizationsComplete}
+          noun="launch authorizations"
+        />
+        {view.authorizations.length === 0 ? (
+          <p className="st-emd">No launch authorization is recorded.</p>
+        ) : (
+          view.authorizations.map((authorization) => (
+            <Disclosure
+              key={authorization.id}
+              summary={`${utcDateTime(authorization.authorizedAt)} by ${authorization.by}: ${authorization.revokedAt === null ? "active" : `revoked ${utcDateTime(authorization.revokedAt)}`}`}
+            >
+              <Text>{authorization.reason}</Text>
+              {view.canAuthorize && authorization.revokedAt === null ? (
+                <RevokeLaunchForm authorization={authorization.id} />
+              ) : null}
+            </Disclosure>
+          ))
+        )}
+        {view.canAuthorize && !view.hasActiveAuthorization ? (
+          <Disclosure summary="Grant launch authorization">
+            <GrantLaunchForm jurisdiction={j.id} />
+          </Disclosure>
+        ) : null}
+        {view.canAuthorize ? null : (
+          <p className="st-emd">
+            Granting or revoking launch authorization needs the
+            launch-authorization capability for this jurisdiction.
+          </p>
+        )}
+      </Block>
+    </RecordPanel>
   );
 }

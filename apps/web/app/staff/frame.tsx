@@ -28,15 +28,15 @@ import {
 
 export function StaffFrame({
   title,
-  description,
+  subtitle,
   lead,
   utc = false,
   children,
 }: {
   // The destination's name for the page (the design's page header) and its
-  // one-line description.
+  // one-line subtitle.
   readonly title: string;
-  readonly description?: string;
+  readonly subtitle?: string;
   // Plain context under the header (the design's lead).
   readonly lead?: ReactNode;
   // The page shows server instants, always in UTC.
@@ -50,7 +50,7 @@ export function StaffFrame({
       <StaffHeader
         titleId="staff-configuration-title"
         title={title}
-        description={description}
+        subtitle={subtitle}
         aside={utc ? TIMES_IN_UTC : undefined}
       />
       {lead === undefined ? null : <Lead>{lead}</Lead>}

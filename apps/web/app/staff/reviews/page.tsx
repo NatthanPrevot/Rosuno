@@ -63,7 +63,7 @@ export default async function ReviewModerationPage({
   return (
     <StaffFrame
       title="Support"
-      description="Client reviews: read, publish or reject submitted reviews."
+      subtitle="Client reviews: read, publish or reject submitted reviews."
       lead={
         <p>
           Reviews come from clients of completed consultations. Publish a review

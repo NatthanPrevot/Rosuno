@@ -50,7 +50,7 @@ export default async function StaffHomePage() {
   return (
     <StaffFrame
       title="Dashboard"
-      description="The staff tools your current grants open, by area."
+      subtitle="The staff tools your current grants open, by area."
     >
       {view.surfaces.length === 0 ? (
         <section className="w-card st-panel" role="status">

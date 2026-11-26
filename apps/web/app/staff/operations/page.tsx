@@ -140,7 +140,7 @@ export default async function OperationsDashboardPage() {
   return (
     <StaffFrame
       title="Dashboard"
-      description="Operations: counts from the database at the moment this page was loaded."
+      subtitle="Operations: counts from the database at the moment this page was loaded."
       lead={<p>{OPERATIONS_INTRO}</p>}
       utc
     >

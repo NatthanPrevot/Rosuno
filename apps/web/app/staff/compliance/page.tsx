@@ -153,7 +153,7 @@ export default async function ComplianceItemsPage({
   return (
     <StaffFrame
       title="Applications & verification"
-      description="Compliance: attorney records, review items and policy status changes."
+      subtitle="Compliance: attorney records, review items and policy status changes."
       lead={<p>{COMPLIANCE_INTRO}</p>}
       utc
     >
@@ -264,7 +264,7 @@ export default async function ComplianceItemsPage({
                     <PillCell label="Stage" tone={stage.tone}>
                       {stage.label}
                     </PillCell>
-                    <ActionCell label="Open">
+                    <ActionCell>
                       {workspace.attorneyPages ? (
                         <ButtonLink
                           variant="tertiary"

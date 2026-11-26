@@ -147,7 +147,7 @@ export default async function StaffVerificationQueuePage({
       <StaffHeader
         titleId={TITLE_ID}
         title="Applications & verification"
-        description="Attorney applications and professional records waiting for review."
+        subtitle="Attorney applications and professional records waiting for review."
       />
       <Lead>
         <p>{`Your current scope: ${view.scope.join(", ")}.`}</p>

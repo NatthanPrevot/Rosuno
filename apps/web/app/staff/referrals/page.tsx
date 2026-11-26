@@ -74,7 +74,7 @@ export default async function ReferralOperationsPage({
   return (
     <StaffFrame
       title="Bookings & consultations"
-      description="Referrals, their outcomes and the requests they led to."
+      subtitle="Referrals, their outcomes and the requests they led to."
       lead={<p>{REFERRAL_INTRO}</p>}
       utc
     >

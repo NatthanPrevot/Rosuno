@@ -90,7 +90,7 @@ export default async function StaffConsultationsPage({
   return (
     <StaffFrame
       title="Bookings & consultations"
-      description="Consultations waiting for an outcome, and the operations review items."
+      subtitle="Consultations waiting for an outcome, and the operations review items."
       lead={<p>{OPERATIONS_NOTE}</p>}
       utc
     >

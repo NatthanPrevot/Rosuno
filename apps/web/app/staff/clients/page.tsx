@@ -72,7 +72,7 @@ export default async function ClientAccountsPage({
   return (
     <StaffFrame
       title="Clients"
-      description="Client accounts and their requests."
+      subtitle="Client accounts and their requests."
       lead={<p>{CLIENTS_INTRO}</p>}
       utc
     >

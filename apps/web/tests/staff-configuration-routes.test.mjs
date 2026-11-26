@@ -1232,8 +1232,9 @@ test("SR-12. MVP-001 S3 part 2: the jurisdiction assessment review lists the Int
     view.text,
     /description|answer|voice|client_id|governing law is|best match|recommended/i,
   );
+  // DEV-001: the owner's UI/UX design: the group tabs only (the other staff
+  // tools are in the staff layout's navigation, SR-13).
   assert.deepEqual(view.hrefs, [
-    "/staff",
     "/staff/jurisdiction-review",
     "/staff/jurisdiction-review?group=unnamed",
   ]);
@@ -1258,7 +1259,7 @@ test("SR-12. MVP-001 S3 part 2: the jurisdiction assessment review lists the Int
     firstPage,
   );
   assert.ok(scopedView.text.includes("No assessment waits for your review."));
-  assert.deepEqual(scopedView.hrefs, ["/staff", "/staff/jurisdiction-review"]);
+  assert.deepEqual(scopedView.hrefs, ["/staff/jurisdiction-review"]);
   const refused = await render(
     "app/staff/jurisdiction-review/page.tsx",
     sources(w, plain),

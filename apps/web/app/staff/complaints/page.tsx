@@ -67,7 +67,7 @@ export default async function ComplaintQueuePage({
   return (
     <StaffFrame
       title="Support"
-      description="Reported problems: concerns clients and attorneys report about a consultation."
+      subtitle="Reported problems: concerns clients and attorneys report about a consultation."
       lead={
         <p>
           A reported problem is a restricted record. Opening one changes nothing

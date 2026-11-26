@@ -7,6 +7,11 @@
 // exist. Only the changes the version's current state allows are offered,
 // and only on a recorded environment that matches this deployment; the
 // database decides each change again.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, the Approvals record):
+// the design's record panel with the status pill, the version and its
+// parameters, the authority references, and the lifecycle, revision, end
+// and successor forms the state admits, all unchanged.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -16,10 +21,7 @@ import { STAFF_CONFIGURATION_SOURCES } from "../../../../src/infrastructure/staf
 import {
   Alert,
   Disclosure,
-  Heading,
   Status,
-  Table,
-  Text,
   TextAreaField,
 } from "../../../../src/presentation/design-system.tsx";
 import {
@@ -29,13 +31,13 @@ import {
   recordedStateLabel,
   utcDateTime,
 } from "../../../../src/presentation/staff-configuration-labels.ts";
-import { requireSteppedUp } from "../../../account/gate.ts";
 import {
-  BackLink,
-  BoundNotice,
-  refusalPage,
-  StaffFrame,
-} from "../../frame.tsx";
+  Block,
+  KeyValues,
+  RecordPanel,
+} from "../../../../src/presentation/staff-workspace.tsx";
+import { requireSteppedUp } from "../../../account/gate.ts";
+import { BoundNotice, refusalPage } from "../../frame.tsx";
 import {
   AuthorityReferenceForm,
   CreatePolicyForm,
@@ -67,155 +69,127 @@ export default async function PolicyVersionPage({
   const status = POLICY_STATUS_LABELS[v.status];
   const changes = view.canChange;
   return (
-    <StaffFrame eyebrow="Staff configuration" title={`${v.type}: ${v.label}`}>
-      <BackLink href="/staff/policies">Back to policy versions</BackLink>
+    <RecordPanel
+      titleId="staff-configuration-title"
+      title={`${v.type}: ${v.label}`}
+      sub="Policy version · times in UTC"
+      pill={
+        v.developmentOnly
+          ? { tone: "warning", label: "Development configuration" }
+          : { tone: status.tone, label: status.label }
+      }
+      back={{ href: "/staff/policies", label: "Back to policy versions" }}
+    >
       {v.developmentOnly ? (
-        <Alert tone="warning" title="Development configuration" role="status">
-          This version is development configuration: it is never approved, it is
-          selected only in development or staging databases, and it is fixed
-          except for a single end.
-        </Alert>
+        <Block>
+          <Alert tone="warning" title="Development configuration" role="status">
+            This version is development configuration: it is never approved, it
+            is selected only in development or staging databases, and it is
+            fixed except for a single end.
+          </Alert>
+        </Block>
       ) : null}
-      <Table id="policy-version" caption="Policy version">
-        <tbody>
-          <tr>
-            <th scope="row">Policy type</th>
-            <td>{v.type}</td>
-          </tr>
-          <tr>
-            <th scope="row">Scope</th>
-            <td>{v.jurisdiction}</td>
-          </tr>
-          <tr>
-            <th scope="row">Version label</th>
-            <td>{v.label}</td>
-          </tr>
-          <tr>
-            <th scope="row">Status</th>
-            <td>
-              {v.developmentOnly ? (
-                <Status tone="warning" emphasis="strong">
-                  Development configuration
-                </Status>
-              ) : (
-                <Status tone={status.tone}>{status.label}</Status>
-              )}
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">Effective</th>
-            <td>{periodLabel(v.effectiveFrom, v.effectiveUntil)}</td>
-          </tr>
-          <tr>
-            <th scope="row">Approved</th>
-            <td>
-              {v.approvedAt === null
+      <Block title="Policy version">
+        <KeyValues
+          items={[
+            ["Policy type", v.type],
+            ["Scope", v.jurisdiction],
+            ["Version label", v.label],
+            [
+              "Status",
+              v.developmentOnly ? "Development configuration" : status.label,
+            ],
+            ["Effective", periodLabel(v.effectiveFrom, v.effectiveUntil)],
+            [
+              "Approved",
+              v.approvedAt === null
                 ? "Not approved"
-                : `${utcDateTime(v.approvedAt)} by ${v.approvedBy ?? "staff"}`}
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">Supersedes</th>
-            <td>{v.supersedesId === null ? "None" : "An earlier version"}</td>
-          </tr>
-          <tr>
-            <th scope="row">Last changed</th>
-            <td>{utcDateTime(v.updatedAt)}</td>
-          </tr>
-        </tbody>
-      </Table>
-      <TextAreaField
-        id="policy-parameters"
-        label="Parameters"
-        rows={10}
-        readOnly
-        defaultValue={v.parametersText}
-      />
-      <Heading as="h2" size="md">
-        Authority references
-      </Heading>
-      <BoundNotice
-        complete={view.referencesComplete}
-        noun="authority references"
-      />
-      {view.references.length === 0 ? (
-        <Text tone="muted">No authority reference is recorded.</Text>
-      ) : (
-        view.references.map((reference) => {
-          const state = recordedStateLabel(reference.status);
-          const decisions = (["verified", "rejected"] as const).filter(
-            (decision) => decision !== reference.status,
-          );
-          return (
-            <Disclosure
-              key={reference.id}
-              summary={`${reference.authorityType}: ${reference.sourceTitle}`}
-            >
-              <Table
-                id={`reference-${reference.id}`}
-                caption="Authority reference"
+                : `${utcDateTime(v.approvedAt)} by ${v.approvedBy ?? "staff"}`,
+            ],
+            [
+              "Supersedes",
+              v.supersedesId === null ? "None" : "An earlier version",
+            ],
+            ["Last changed", utcDateTime(v.updatedAt)],
+          ]}
+        />
+        <TextAreaField
+          id="policy-parameters"
+          label="Parameters"
+          rows={10}
+          readOnly
+          defaultValue={v.parametersText}
+        />
+      </Block>
+      <Block title="Authority references">
+        <BoundNotice
+          complete={view.referencesComplete}
+          noun="authority references"
+        />
+        {view.references.length === 0 ? (
+          <p className="st-emd">No authority reference is recorded.</p>
+        ) : (
+          view.references.map((reference) => {
+            const state = recordedStateLabel(reference.status);
+            const decisions = (["verified", "rejected"] as const).filter(
+              (decision) => decision !== reference.status,
+            );
+            return (
+              <Disclosure
+                key={reference.id}
+                summary={`${reference.authorityType}: ${reference.sourceTitle}`}
               >
-                <tbody>
-                  <tr>
-                    <th scope="row">Citation</th>
-                    <td>{reference.citation}</td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Source address</th>
-                    <td>{reference.sourceUri ?? "Not recorded"}</td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Retrieved</th>
-                    <td>{utcDateTime(reference.retrievedAt)}</td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Verification</th>
-                    <td>
-                      <Status tone={state.tone}>{state.label}</Status>
-                      {reference.verifiedBy === null
-                        ? null
-                        : ` (by ${reference.verifiedBy})`}
-                    </td>
-                  </tr>
-                </tbody>
-              </Table>
-              {changes && view.draftFamily ? (
-                <DecideReferenceForm
-                  reference={reference.id}
-                  decisions={decisions}
+                <KeyValues
+                  items={[
+                    ["Citation", reference.citation],
+                    ["Source address", reference.sourceUri ?? "Not recorded"],
+                    ["Retrieved", utcDateTime(reference.retrievedAt)],
+                    [
+                      "Verification",
+                      <>
+                        <Status tone={state.tone}>{state.label}</Status>
+                        {reference.verifiedBy === null
+                          ? null
+                          : ` (by ${reference.verifiedBy})`}
+                      </>,
+                    ],
+                  ]}
                 />
-              ) : null}
+                {changes && view.draftFamily ? (
+                  <DecideReferenceForm
+                    reference={reference.id}
+                    decisions={decisions}
+                  />
+                ) : null}
+              </Disclosure>
+            );
+          })
+        )}
+        {changes ? null : (
+          <Alert tone="warning" title="Changes are refused here" role="status">
+            {`${ENVIRONMENT_LABELS[view.environment]}: policy changes are refused until the database environment is recorded and matches this deployment.`}
+          </Alert>
+        )}
+        {changes && view.draftFamily ? (
+          <>
+            <Disclosure summary="Add an authority reference">
+              <AuthorityReferenceForm version={v.id} />
             </Disclosure>
-          );
-        })
-      )}
-      {changes ? null : (
-        <Alert tone="warning" title="Changes are refused here" role="status">
-          {`${ENVIRONMENT_LABELS[view.environment]}: policy changes are refused until the database environment is recorded and matches this deployment.`}
-        </Alert>
-      )}
-      {changes && view.draftFamily ? (
-        <>
-          <Disclosure summary="Add an authority reference">
-            <AuthorityReferenceForm version={v.id} />
-          </Disclosure>
-          <Disclosure summary="Revise this draft">
-            <RevisePolicyForm
-              version={v.id}
-              expectedUpdatedAt={v.updatedAt}
-              label={v.label}
-              parametersText={v.parametersText}
-              effectiveFrom={v.effectiveFrom}
-              effectiveUntil={v.effectiveUntil}
-            />
-          </Disclosure>
-        </>
-      ) : null}
+            <Disclosure summary="Revise this draft">
+              <RevisePolicyForm
+                version={v.id}
+                expectedUpdatedAt={v.updatedAt}
+                label={v.label}
+                parametersText={v.parametersText}
+                effectiveFrom={v.effectiveFrom}
+                effectiveUntil={v.effectiveUntil}
+              />
+            </Disclosure>
+          </>
+        ) : null}
+      </Block>
       {changes && view.transitions.length > 0 ? (
-        <>
-          <Heading as="h2" size="md">
-            Lifecycle
-          </Heading>
+        <Block title="Lifecycle">
           {view.transitions.includes("approved") &&
           !view.hasVerifiedReference ? (
             <Alert tone="information">
@@ -231,22 +205,26 @@ export default async function PolicyVersionPage({
               target={target}
             />
           ))}
-        </>
+        </Block>
       ) : null}
-      {changes && view.canEnd ? (
-        <Disclosure summary="End this version">
-          <EndPolicyForm version={v.id} />
-        </Disclosure>
+      {(changes && view.canEnd) || (changes && view.canSucceed) ? (
+        <Block title="End or succeed">
+          {changes && view.canEnd ? (
+            <Disclosure summary="End this version">
+              <EndPolicyForm version={v.id} />
+            </Disclosure>
+          ) : null}
+          {changes && view.canSucceed ? (
+            <Disclosure summary="Draft a successor version">
+              <CreatePolicyForm
+                mode="successor"
+                supersedes={v.id}
+                parametersText={v.parametersText}
+              />
+            </Disclosure>
+          ) : null}
+        </Block>
       ) : null}
-      {changes && view.canSucceed ? (
-        <Disclosure summary="Draft a successor version">
-          <CreatePolicyForm
-            mode="successor"
-            supersedes={v.id}
-            parametersText={v.parametersText}
-          />
-        </Disclosure>
-      ) : null}
-    </StaffFrame>
+    </RecordPanel>
   );
 }

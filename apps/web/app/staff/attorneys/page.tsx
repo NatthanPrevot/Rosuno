@@ -88,7 +88,7 @@ export default async function AttorneysPage({
   return (
     <StaffFrame
       title="Attorneys"
-      description="Attorney profiles by stage, in your scope."
+      subtitle="Attorney profiles by stage, in your scope."
       lead={
         <p>
           Each status is separate. A profile stage does not verify credentials,

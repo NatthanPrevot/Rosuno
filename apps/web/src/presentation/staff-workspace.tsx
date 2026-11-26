@@ -543,17 +543,17 @@ export function StaffShell({
 
 export const TIMES_IN_UTC = "Times in UTC";
 
-// The design's page header: the title with its one-line description, and an
+// The design's page header: the title with its one-line subtitle, and an
 // optional note on the right (for example, that times are in UTC).
 export function StaffHeader({
   titleId,
   title,
-  description,
+  subtitle,
   aside,
 }: {
   readonly titleId: string;
   readonly title: ReactNode;
-  readonly description?: ReactNode;
+  readonly subtitle?: ReactNode;
   readonly aside?: ReactNode;
 }) {
   return (
@@ -562,9 +562,7 @@ export function StaffHeader({
         <h1 className="w-h1" id={titleId}>
           {title}
         </h1>
-        {description === undefined ? null : (
-          <p className="st-sub">{description}</p>
-        )}
+        {subtitle === undefined ? null : <p className="st-sub">{subtitle}</p>}
       </div>
       {aside === undefined ? null : (
         <>
@@ -852,16 +850,10 @@ export function PillCell({
 }
 
 // A cell holding a control (for example, a form the row offers), outside
-// any link.
-export function ActionCell({
-  label,
-  children,
-}: {
-  readonly label: string;
-  readonly children: ReactNode;
-}) {
+// any link; a stacked row shows the control without a heading.
+export function ActionCell({ children }: { readonly children: ReactNode }) {
   return (
-    <span className="st-cell st-cell-act" data-k={label}>
+    <span className="st-cell st-cell-act" data-k="">
       {children}
     </span>
   );

@@ -16,6 +16,11 @@
 // relevant" or "not confirmed", once, and never asserts governing law. The
 // two query values read, group and page, only choose the group and the
 // page; the server checks both.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Platform › Marketplace):
+// the design's group tabs above one card per Intake, each named jurisdiction
+// a bordered card with its source, basis, review state and the two decision
+// forms while it is reviewable, then the pager.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -26,15 +31,6 @@ import {
 } from "../../../src/application/staff-configuration.ts";
 import { STAFF_CONFIGURATION_SOURCES } from "../../../src/infrastructure/staff/staff-configuration-adapter.ts";
 import {
-  ButtonLink,
-  Cluster,
-  Heading,
-  Stack,
-  Status,
-  Table,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
-import {
   AMBIGUITY_LABELS,
   ASSESSMENT_SOURCE_LABELS,
   ASSESSMENT_STATUS_LABELS,
@@ -42,8 +38,14 @@ import {
   REVIEW_NOTE,
   utcDateTime,
 } from "../../../src/presentation/staff-configuration-labels.ts";
+import {
+  Empty,
+  KeyValues,
+  Pill,
+  TabLinks,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
+import { PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
 import { ReviewAssessmentForms } from "./forms.tsx";
 
 export const metadata: Metadata = {
@@ -82,97 +84,87 @@ export default async function JurisdictionReviewPage({
   }
   const current = REVIEW_GROUP_LINKS[view.group];
   return (
-    <StaffFrame eyebrow="Staff" title="Jurisdiction assessment review">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Text tone="muted">{REVIEW_NOTE}</Text>
-      <Cluster>
-        {REVIEW_GROUPS.filter(
+    <StaffFrame
+      title="Marketplace"
+      subtitle="Jurisdiction review: the jurisdictions submitted Intakes name, as suggestions."
+      lead={<p>{REVIEW_NOTE}</p>}
+      utc
+    >
+      <TabLinks
+        label="Intakes by group"
+        links={REVIEW_GROUPS.filter(
           (option) => option === "unreviewed" || view.global,
-        ).map((option) => (
-          <ButtonLink
-            key={option}
-            variant={option === view.group ? "primary" : "secondary"}
-            href={REVIEW_GROUP_LINKS[option].href}
-            aria-current={option === view.group ? "page" : undefined}
-          >
-            {REVIEW_GROUP_LINKS[option].title}
-          </ButtonLink>
-        ))}
-      </Cluster>
+        ).map((option) => ({
+          href: REVIEW_GROUP_LINKS[option].href,
+          label: REVIEW_GROUP_LINKS[option].title,
+        }))}
+        current={current.href}
+      />
       {view.intakes.length === 0 ? (
-        <Text>
-          {view.pager.page === 1
-            ? EMPTY_GROUP[view.group]
-            : "There are no Intakes on this page."}
-        </Text>
+        <section className="st-listbox" aria-label="Intakes">
+          <Empty
+            title={
+              view.pager.page === 1
+                ? EMPTY_GROUP[view.group]
+                : "There are no Intakes on this page."
+            }
+          />
+        </section>
       ) : null}
       {view.intakes.map((intake) => (
-        <Stack key={intake.intakeId}>
-          <Heading as="h2" size="sm">
-            {`Intake ${intake.intakeId}`}
-          </Heading>
-          <Cluster>
-            <Status tone={AMBIGUITY_LABELS[intake.ambiguity].tone}>
+        <section
+          key={intake.intakeId}
+          className="w-card st-panel"
+          aria-labelledby={`intake-${intake.intakeId}`}
+        >
+          <div className="st-ptop">
+            <h2 className="st-h2" id={`intake-${intake.intakeId}`}>
+              {`Intake ${intake.intakeId}`}
+            </h2>
+            <span className="grow"></span>
+            <Pill tone={AMBIGUITY_LABELS[intake.ambiguity].tone}>
               {AMBIGUITY_LABELS[intake.ambiguity].label}
-            </Status>
-            <Text tone="muted">
-              {`${intake.state === "active" ? "Active" : "Submitted"}; started ${utcDateTime(intake.createdAt)}`}
-            </Text>
-          </Cluster>
+            </Pill>
+          </div>
+          <p className="st-emd">
+            {`${intake.state === "active" ? "Active" : "Submitted"}; started ${utcDateTime(intake.createdAt)}`}
+          </p>
           {intake.assessments.length === 0 ? (
-            <Text tone="muted">
+            <p className="st-note">
               The client named no jurisdiction. Nothing is chosen for them, and
               there is nothing to review.
-            </Text>
+            </p>
           ) : (
-            <Table
-              id={`assessments-${intake.intakeId}`}
-              caption="Jurisdictions this Intake names, as suggestions"
-            >
-              <thead>
-                <tr>
-                  <th scope="col">Jurisdiction</th>
-                  <th scope="col">Source</th>
-                  <th scope="col">Basis</th>
-                  <th scope="col">Review</th>
-                  <th scope="col">Decision</th>
-                </tr>
-              </thead>
-              <tbody>
-                {intake.assessments.map((assessment) => (
-                  <tr key={assessment.id}>
-                    <td>{assessment.jurisdiction}</td>
-                    <td>{ASSESSMENT_SOURCE_LABELS[assessment.source]}</td>
-                    <td>{assessment.basis}</td>
-                    <td>
-                      <Stack gap="tight">
-                        <Status
-                          tone={
-                            ASSESSMENT_STATUS_LABELS[assessment.status].tone
-                          }
-                        >
-                          {ASSESSMENT_STATUS_LABELS[assessment.status].label}
-                        </Status>
-                        {assessment.reviewedAt === null ? null : (
-                          <Text size="small" tone="muted">
-                            {`By ${assessment.reviewedBy ?? "staff"} at ${utcDateTime(assessment.reviewedAt)}`}
-                          </Text>
-                        )}
-                      </Stack>
-                    </td>
-                    <td>
-                      {assessment.reviewable ? (
-                        <ReviewAssessmentForms assessment={assessment.id} />
-                      ) : (
-                        "None"
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
+            intake.assessments.map((assessment) => (
+              <div key={assessment.id} className="st-subcard">
+                <div className="st-ptop">
+                  <h3 className="st-h2s">{assessment.jurisdiction}</h3>
+                  <span className="grow"></span>
+                  <Pill tone={ASSESSMENT_STATUS_LABELS[assessment.status].tone}>
+                    {ASSESSMENT_STATUS_LABELS[assessment.status].label}
+                  </Pill>
+                </div>
+                <KeyValues
+                  items={[
+                    ["Source", ASSESSMENT_SOURCE_LABELS[assessment.source]],
+                    ["Basis", assessment.basis],
+                    ...(assessment.reviewedAt === null
+                      ? []
+                      : ([
+                          [
+                            "Review",
+                            `By ${assessment.reviewedBy ?? "staff"} at ${utcDateTime(assessment.reviewedAt)}`,
+                          ],
+                        ] as const)),
+                  ]}
+                />
+                {assessment.reviewable ? (
+                  <ReviewAssessmentForms assessment={assessment.id} />
+                ) : null}
+              </div>
+            ))
           )}
-        </Stack>
+        </section>
       ))}
       <PagerLinks
         pager={view.pager}
