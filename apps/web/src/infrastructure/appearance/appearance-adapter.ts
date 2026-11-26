@@ -20,7 +20,8 @@
 // The published read answers every caller alike, so one in-flight read is
 // shared and its rows are kept for five seconds in this process
 // (invalidatePublishedAppearance() drops them after a publication here); a
-// failed read is never kept.
+// failed read is never kept. It is bounded to 1.5 s (DEV-001 G3), so a slow
+// database never holds up a page.
 
 import {
   DISCARD_OUTCOMES,
@@ -74,6 +75,11 @@ const BASE64 =
 const MAX_BASE64 = Math.ceil(MAX_ASSET_BYTES / 3) * 4;
 // The published-read memo's lifetime.
 export const PUBLISHED_MEMO_MS = 5000;
+// DEV-001 G3: the published read (every Home render and the render-blocking
+// published stylesheet) never waits longer than this, whatever the call
+// deadline: a slower read answers unreadable, so Home renders the owner's
+// design for that request instead of waiting.
+export const PUBLISHED_READ_DEADLINE_MS = 1500;
 
 function ownField(value: unknown, key: string): unknown {
   if (value === null || typeof value !== "object") {
@@ -288,8 +294,10 @@ function callsOf(client: RequestClient, deadlineMs: number, now: () => number) {
     published: () =>
       memoized(
         () =>
-          observedRead("public_site_appearance", deadlineMs, () =>
-            client.rpc("public_site_appearance"),
+          observedRead(
+            "public_site_appearance",
+            Math.min(deadlineMs, PUBLISHED_READ_DEADLINE_MS),
+            () => client.rpc("public_site_appearance"),
           ),
         now,
       ),

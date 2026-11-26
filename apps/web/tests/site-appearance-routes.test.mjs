@@ -27,8 +27,11 @@ import { base64Of } from "../src/application/appearance-image.ts";
 import { compileAppearanceCss } from "../src/presentation/appearance/compiler.ts";
 import {
   appearanceAsset,
+  createThemeStylesheet,
   DEFAULT_ETAG,
   DEFAULT_STYLESHEET,
+  FAILURE_HOLD_MS,
+  PUBLISHED_READ_DEADLINE_MS,
   themeStylesheet,
 } from "../src/presentation/appearance/delivery.ts";
 import {
@@ -353,8 +356,14 @@ test("SR-6 any failure is the empty default sheet, never cached and without a ta
       },
     ],
   ];
+  // DEV-001: website & appearance studio (G3): each case asks its own
+  // answerer, which has compiled nothing yet (a failed read is otherwise
+  // answered with the last sheet compiled in the process, SR-11).
   for (const [outcome, answers] of cases) {
-    const answer = await themeStylesheet(request(), world(answers).sources);
+    const answer = await createThemeStylesheet()(
+      request(),
+      world(answers).sources,
+    );
     assert.equal(answer.outcome, outcome, JSON.stringify(answers.published));
     assert.equal(answer.response.status, 200);
     assert.deepEqual(headersOf(answer.response), {
@@ -363,7 +372,7 @@ test("SR-6 any failure is the empty default sheet, never cached and without a ta
     });
     assert.equal(await answer.response.text(), DEFAULT_STYLESHEET);
   }
-  const missing = await themeStylesheet(request(), {
+  const missing = await createThemeStylesheet()(request(), {
     reads: async () => null,
   });
   assert.equal(missing.outcome, "unavailable");
@@ -497,4 +506,153 @@ test("SR-10 an image not published: a library image only for a holder of manage_
       "cache-control": "private, no-store",
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// DEV-001: website & appearance studio (G3, the G2 carry-over): the published
+// read never holds up a page load.
+// ---------------------------------------------------------------------------
+
+test("SR-11 a failed or slow published read answers the last sheet compiled (with its tag, revalidated) or the empty default sheet, within the read's deadline", async () => {
+  assert.equal(PUBLISHED_READ_DEADLINE_MS, 1500);
+  assert.equal(FAILURE_HOLD_MS, 5000);
+  let clock = 1_000_000;
+  const now = () => clock;
+  const never = () => new Promise(() => undefined);
+  // Nothing compiled yet: a slow read is the default sheet, uncached, and
+  // answers within the deadline.
+  const cold = createThemeStylesheet({ deadlineMs: 30, now });
+  const started = Date.now();
+  const slow = await cold(request(), world({ published: never }).sources);
+  assert.ok(Date.now() - started < 1000);
+  assert.equal(slow.outcome, "unavailable");
+  assert.equal(await slow.response.text(), DEFAULT_STYLESHEET);
+  assert.equal(slow.response.headers.get("cache-control"), "private, no-store");
+  assert.equal(slow.response.headers.get("etag"), null);
+  // A sheet compiled once is the answer to a later failure, slow or failed,
+  // with its own tag and revalidation (304 for that tag).
+  for (const failing of [
+    never,
+    UNREADABLE,
+    () => Promise.reject(new Error("synthetic")),
+  ]) {
+    const answerer = createThemeStylesheet({ deadlineMs: 30, now });
+    const good = await answerer(
+      request(),
+      world({ published: rows([publishedRow(SPEC_EXAMPLE)]) }).sources,
+    );
+    const body = await good.response.text();
+    const etag = good.response.headers.get("etag");
+    assert.equal(body, compiled(SPEC_EXAMPLE));
+    const stale = await answerer(
+      request(),
+      world({ published: failing }).sources,
+    );
+    assert.equal(stale.outcome, "unavailable");
+    assert.equal(stale.response.status, 200);
+    assert.equal(await stale.response.text(), body);
+    assert.deepEqual(headersOf(stale.response), {
+      "cache-control": "private, no-cache",
+      "content-type": "text/css; charset=utf-8",
+      etag,
+    });
+    clock += FAILURE_HOLD_MS + 1;
+    const revalidated = await answerer(
+      request({ "if-none-match": etag }),
+      world({ published: failing }).sources,
+    );
+    assert.equal(revalidated.response.status, 304);
+    assert.equal(revalidated.response.headers.get("etag"), etag);
+    clock += FAILURE_HOLD_MS + 1;
+  }
+  // Nothing published, then a failure: the default sheet with its tag.
+  const empty = createThemeStylesheet({ deadlineMs: 30, now });
+  await empty(request(), world({ published: rows([]) }).sources);
+  const after = await empty(
+    request(),
+    world({ published: UNREADABLE }).sources,
+  );
+  assert.equal(await after.response.text(), DEFAULT_STYLESHEET);
+  assert.equal(after.response.headers.get("etag"), DEFAULT_ETAG);
+  // A stored version that no longer validates is not a failed read: the
+  // default sheet, uncached, even with a sheet compiled before.
+  const invalid = createThemeStylesheet({ deadlineMs: 30, now });
+  await invalid(
+    request(),
+    world({ published: rows([publishedRow(SPEC_EXAMPLE)]) }).sources,
+  );
+  const refused = await invalid(
+    request(),
+    world({
+      published: rows([
+        publishedRow({ schema: 1, components: { "home.form": {} } }),
+      ]),
+    }).sources,
+  );
+  assert.equal(refused.outcome, "invalid");
+  assert.equal(await refused.response.text(), DEFAULT_STYLESHEET);
+  assert.equal(
+    refused.response.headers.get("cache-control"),
+    "private, no-store",
+  );
+});
+
+test("SR-12 after a failed or slow read no new read starts for a few seconds: the held answer asks nothing and writes no log line; afterwards the database is asked again", async () => {
+  let clock = 5_000_000;
+  const now = () => clock;
+  const answerer = createThemeStylesheet({ deadlineMs: 30, now });
+  let calls = 0;
+  let answer = UNREADABLE;
+  const sources = {
+    reads: async () => ({
+      published: async () => {
+        calls += 1;
+        return answer;
+      },
+    }),
+  };
+  const failed = await answerer(request(), sources);
+  assert.equal(failed.outcome, "unavailable");
+  assert.equal(calls, 1);
+  for (const step of [0, 1000, FAILURE_HOLD_MS - 1]) {
+    clock = 5_000_000 + step;
+    const held = await answerer(request(), sources);
+    assert.equal(held.outcome, "held");
+    assert.equal(await held.response.text(), DEFAULT_STYLESHEET);
+    assert.equal(
+      held.response.headers.get("cache-control"),
+      "private, no-store",
+    );
+  }
+  assert.equal(calls, 1);
+  // Once the hold ends the read is tried again, and a good answer is served
+  // and kept.
+  answer = rows([publishedRow(SPEC_EXAMPLE)]);
+  clock = 5_000_000 + FAILURE_HOLD_MS + 1;
+  const back = await answerer(request(), sources);
+  assert.equal(calls, 2);
+  assert.equal(back.outcome, "published");
+  assert.equal(await back.response.text(), compiled(SPEC_EXAMPLE));
+  // A slow read holds too.
+  answer = new Promise(() => undefined);
+  const slow = await answerer(request(), sources);
+  assert.equal(slow.outcome, "unavailable");
+  assert.equal(calls, 3);
+  const held = await answerer(request(), sources);
+  assert.equal(held.outcome, "held");
+  assert.equal(calls, 3);
+  assert.equal(await held.response.text(), compiled(SPEC_EXAMPLE));
+  // The route logs a failed read, never a held answer (no line per page
+  // load during an outage).
+  const route = codeOf(read("app/appearance/theme.css/route.ts"));
+  assert.doesNotMatch(route, /held/);
+  assert.ok(route.includes('answer.outcome === "unavailable"'));
+  // The route uses the process-wide answerer.
+  assert.equal(typeof themeStylesheet, "function");
+  const delivery = codeOf(read("src/presentation/appearance/delivery.ts"));
+  assert.ok(
+    delivery.includes(
+      "export const themeStylesheet = createThemeStylesheet();",
+    ),
+  );
 });

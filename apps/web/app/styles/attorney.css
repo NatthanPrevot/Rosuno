@@ -1471,7 +1471,7 @@
 }
 .W .w-chd.today > b {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .W .w-chd.focus {
   background: #f7f8fe;
@@ -1710,7 +1710,7 @@
 }
 .W .w-mc.today .w-mcn {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .W .w-mci {
   font-size: 11px;
@@ -1994,7 +1994,7 @@
 .W .w-mb.me {
   align-self: flex-end;
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
   box-shadow: none;
 }
 .W .w-mb.me .subtle {

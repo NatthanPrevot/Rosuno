@@ -1874,11 +1874,11 @@
 }
 .cx .cx-chip2.on {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
   box-shadow: none;
 }
 .cx .cx-chip2.on svg {
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .cx .cx-chip2.sm2 {
   height: 36px;

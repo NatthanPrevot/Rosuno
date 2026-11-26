@@ -8,10 +8,12 @@
 //   a constant URL revalidated on every page load (private, no-cache) with a
 //   strong ETag naming the version and the stylesheet's digest, so a
 //   publication shows on the next page load without a redeploy. Nothing
-//   published answers the empty default sheet; any failure (the read
-//   unavailable, a stored version that no longer validates, a value the
-//   compiler refuses) answers the empty default sheet uncached, and the
-//   caller writes one log line with the fixed outcome only. The answer never
+//   published answers the empty default sheet. The read is bounded (1.5 s):
+//   a failed or slow read answers the last sheet compiled here, with its
+//   tag, or the empty default sheet uncached, and no new read starts for a
+//   few seconds; a stored version that no longer validates or a value the
+//   compiler refuses answers the empty default sheet uncached. The caller
+//   writes one log line with the fixed outcome only. The answer never
 //   depends on the query or on any request header but If-None-Match.
 // - an image: a 64-hex digest and an extension matching the stored type,
 //   the published one cached privately for a year (content-addressed and
@@ -43,8 +45,16 @@ const NO_STORE = "private, no-store";
 const IMMUTABLE = "private, max-age=31536000, immutable";
 
 // Why the published appearance was not applied (the caller logs it).
+// "held": a recent failure, so no read was started (the last good sheet or
+// the default was served without asking the database).
 export type StylesheetOutcome =
-  "published" | "not_modified" | "none" | "invalid" | "unavailable" | "unsafe";
+  | "published"
+  | "not_modified"
+  | "none"
+  | "invalid"
+  | "unavailable"
+  | "unsafe"
+  | "held";
 
 export type StylesheetAnswer = {
   readonly response: Response;
@@ -102,47 +112,126 @@ function revalidated(etag: string): Response {
   });
 }
 
-export async function themeStylesheet(
-  request: Request,
-  sources: Pick<AppearanceSources, "reads">,
-): Promise<StylesheetAnswer> {
-  try {
-    const published = await resolvePublishedAppearance(
-      sources,
-      validateWithRegistry,
+// The published read never holds up a page load (the stylesheet is render
+// blocking): it gets at most DEADLINE_MS; a read that fails or runs out of
+// time answers the last stylesheet compiled here (with its own tag, still
+// revalidated), else the empty default sheet uncached; and for HOLD_MS after
+// such a failure no new read is started, so a slow database is not asked by
+// every page load. A read that returns later still fills the adapter's
+// published-read memo for the next request.
+export const PUBLISHED_READ_DEADLINE_MS = 1500;
+export const FAILURE_HOLD_MS = 5000;
+
+type Compiled = { readonly body: string; readonly etag: string };
+
+export type ThemeStylesheetOptions = {
+  readonly deadlineMs?: number;
+  readonly holdMs?: number;
+  readonly now?: () => number;
+};
+
+const TIMED_OUT = Symbol("timed out");
+
+function within<T>(
+  promise: Promise<T>,
+  ms: number,
+): Promise<T | typeof TIMED_OUT> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(TIMED_OUT), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(TIMED_OUT);
+      },
     );
-    if (published.status !== "ready") {
-      return fallback("unavailable");
-    }
-    if (published.stored === "invalid") {
-      return fallback("invalid");
-    }
-    if (published.configuration === null || published.versionId === null) {
-      return notModified(request, DEFAULT_ETAG)
-        ? { response: revalidated(DEFAULT_ETAG), outcome: "not_modified" }
-        : {
-            response: stylesheet(DEFAULT_STYLESHEET, REVALIDATE, DEFAULT_ETAG),
-            outcome: "none",
-          };
-    }
-    let css: string;
-    try {
-      css = compileAppearanceCss(published.configuration, APPEARANCE_REGISTRY);
-    } catch {
-      return fallback("unsafe");
-    }
-    const body = css === "" ? DEFAULT_STYLESHEET : css;
-    const etag = `"rz-${published.versionId.slice(0, 8)}-${(await sha256Hex(body)).slice(0, 16)}"`;
-    return notModified(request, etag)
-      ? { response: revalidated(etag), outcome: "not_modified" }
-      : {
-          response: stylesheet(body, REVALIDATE, etag),
-          outcome: "published",
-        };
-  } catch {
-    return fallback("unavailable");
-  }
+  });
 }
+
+// One stylesheet answerer with its own last good sheet and failure hold
+// (the route uses the process-wide one below; tests make their own).
+export function createThemeStylesheet(options: ThemeStylesheetOptions = {}) {
+  const deadlineMs = options.deadlineMs ?? PUBLISHED_READ_DEADLINE_MS;
+  const holdMs = options.holdMs ?? FAILURE_HOLD_MS;
+  const now = options.now ?? Date.now;
+  let lastGood: Compiled | null = null;
+  let heldUntil = 0;
+
+  const answerOf = (request: Request, sheet: Compiled): Response =>
+    notModified(request, sheet.etag)
+      ? revalidated(sheet.etag)
+      : stylesheet(sheet.body, REVALIDATE, sheet.etag);
+
+  // The last good sheet (or the default) after a failed or slow read.
+  const degraded = (
+    request: Request,
+    outcome: StylesheetOutcome,
+  ): StylesheetAnswer =>
+    lastGood === null
+      ? fallback(outcome)
+      : { response: answerOf(request, lastGood), outcome };
+
+  return async function themeStylesheet(
+    request: Request,
+    sources: Pick<AppearanceSources, "reads">,
+  ): Promise<StylesheetAnswer> {
+    try {
+      if (now() < heldUntil) {
+        return degraded(request, "held");
+      }
+      const published = await within(
+        resolvePublishedAppearance(sources, validateWithRegistry),
+        deadlineMs,
+      );
+      if (published === TIMED_OUT || published.status !== "ready") {
+        heldUntil = now() + holdMs;
+        return degraded(request, "unavailable");
+      }
+      if (published.stored === "invalid") {
+        return fallback("invalid");
+      }
+      if (published.configuration === null || published.versionId === null) {
+        lastGood = { body: DEFAULT_STYLESHEET, etag: DEFAULT_ETAG };
+        return notModified(request, DEFAULT_ETAG)
+          ? { response: revalidated(DEFAULT_ETAG), outcome: "not_modified" }
+          : {
+              response: stylesheet(
+                DEFAULT_STYLESHEET,
+                REVALIDATE,
+                DEFAULT_ETAG,
+              ),
+              outcome: "none",
+            };
+      }
+      let css: string;
+      try {
+        css = compileAppearanceCss(
+          published.configuration,
+          APPEARANCE_REGISTRY,
+        );
+      } catch {
+        return fallback("unsafe");
+      }
+      const body = css === "" ? DEFAULT_STYLESHEET : css;
+      const etag = `"rz-${published.versionId.slice(0, 8)}-${(await sha256Hex(body)).slice(0, 16)}"`;
+      lastGood = { body, etag };
+      return notModified(request, etag)
+        ? { response: revalidated(etag), outcome: "not_modified" }
+        : {
+            response: stylesheet(body, REVALIDATE, etag),
+            outcome: "published",
+          };
+    } catch {
+      return degraded(request, "unavailable");
+    }
+  };
+}
+
+// The process-wide published stylesheet answerer.
+export const themeStylesheet = createThemeStylesheet();
 
 // ---------------------------------------------------------------------------
 // The studio's preview (editors only)

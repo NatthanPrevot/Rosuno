@@ -863,7 +863,7 @@
 }
 .rz .save.on {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .rz .save.on svg {
   fill: currentColor;
@@ -1079,7 +1079,7 @@
   place-items: center;
   flex: none;
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 
 /* skeleton (loading) */
@@ -1143,7 +1143,7 @@
 }
 .rz .cal .d.sel {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .rz .slot {
   display: flex;
@@ -1277,7 +1277,7 @@
 }
 .rz .qa.open .pm {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
   box-shadow: none;
 }
 .rz .qa.open .pm svg {
@@ -1492,11 +1492,11 @@
 }
 .rz .fbtn.on {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
   box-shadow: none;
 }
 .rz .fbtn.on svg {
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .rz .fbtn svg {
   color: var(--subtle);
@@ -1788,7 +1788,7 @@
 }
 .rz .stepper .done .sn {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
   box-shadow: none;
 }
 .rz .stepper .cur .sn {
@@ -1833,7 +1833,7 @@
 }
 .rz .vstep.done .sn {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
   box-shadow: none;
 }
 .rz .vstep.cur {
@@ -1898,7 +1898,7 @@
   padding: 0 6px;
   border-radius: 999px;
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
   font-size: 11px;
   font-weight: 600;
   display: grid;
@@ -2019,7 +2019,7 @@
   display: grid;
   place-items: center;
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .rz .wk .col {
   position: relative;
@@ -2227,7 +2227,7 @@
 }
 .rz .slot.on {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
   box-shadow: none;
 }
 .pm-inline .pm-head {
@@ -2659,7 +2659,7 @@
 .rz .gcard.on .cbx {
   background: var(--ink);
   box-shadow: none;
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 @media (max-height: 780px) {
   .rz .gm-h {
@@ -2732,7 +2732,7 @@
 }
 .rz .kind.bk {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .rz .upd-dot {
   width: 8px;
@@ -2936,7 +2936,7 @@
 .rz .cal-hd.today b {
   border-radius: 13px;
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .rz .cal-hd .cts {
   display: flex;
@@ -3210,7 +3210,7 @@
 }
 .rz .mc.today .mn {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .rz .mc .mt {
   max-width: 100%;
@@ -3574,7 +3574,7 @@
 }
 .rz .life li.done .sn {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
   box-shadow: none;
 }
 .rz .life li.cur .sn {

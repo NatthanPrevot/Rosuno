@@ -643,7 +643,7 @@
   display: grid !important;
   place-items: center !important;
   background: var(--ink) !important;
-  color: #fff !important;
+  color: var(--rz-on-ink, #fff) !important;
   font-size: 13px !important;
   font-weight: 600 !important;
 }
@@ -656,7 +656,7 @@
   display: grid !important;
   place-items: center !important;
   background: var(--ink) !important;
-  color: #fff !important;
+  color: var(--rz-on-ink, #fff) !important;
   font-size: 13px !important;
   font-weight: 600 !important;
 }
@@ -1842,7 +1842,7 @@
 .rzw .l-h26-bgink-cfff {
   height: 26px !important;
   background: var(--ink) !important;
-  color: #fff !important;
+  color: var(--rz-on-ink, #fff) !important;
 }
 .rz .l-h26-bgpaper-shinset-0-0-0-1-line-cink-2,
 .rzw .l-h26-bgpaper-shinset-0-0-0-1-line-cink-2 {
@@ -3519,7 +3519,7 @@
   display: grid !important;
   place-items: center !important;
   background: var(--ink) !important;
-  color: #fff !important;
+  color: var(--rz-on-ink, #fff) !important;
   font-size: 13px !important;
   font-weight: 600 !important;
 }
@@ -3544,7 +3544,7 @@
   display: grid !important;
   place-items: center !important;
   background: var(--ink) !important;
-  color: #fff !important;
+  color: var(--rz-on-ink, #fff) !important;
 }
 .rz .l-w30-h30-r50pc-dgrid-picenter-bgpaper,
 .rzw .l-w30-h30-r50pc-dgrid-picenter-bgpaper {

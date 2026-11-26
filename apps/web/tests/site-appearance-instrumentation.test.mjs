@@ -485,32 +485,119 @@ test("SI-6 no stylesheet selects a data-rz attribute; the three hook tokens are 
       file,
     );
   }
+  // DEV-001: website & appearance studio (G3, the G2 carry-over): every
+  // owner rule (and the canonical .rz-ink surface) that sets white text or an
+  // icon on an ink fill now reads the on-ink hook, the literal unchanged as
+  // its fallback; each wrapper is pinned with its file, its rule and its
+  // declaration.
   const wrapped = styles.flatMap((file) =>
-    [...read(file).matchAll(/var\((--rz-[a-z-]+), ([^)]+)\)/g)].map((m) => [
-      file,
-      m[1],
-      m[2],
-    ]),
-  );
-  assert.deepEqual(
-    wrapped.map(([file, name, fallback]) => `${file} ${name} ${fallback}`),
     [
-      "app/styles/client.css --rz-on-ink #fff",
-      "app/styles/product-staff.css --rz-on-ink #fff",
-      "app/styles/staff.css --rz-on-ink #fff",
-      "app/styles/staff.css --rz-on-ink #fff",
-      "app/styles/theme.css --rz-on-ink #fff",
-      "app/styles/theme.css --rz-ink-hover #24262b",
-      "app/styles/theme.css --rz-ink-hover #24262b",
-      "app/styles/theme.css --rz-surface-hover #fcfcfb",
-      "app/styles/theme.css --rz-surface-hover #fcfcfb",
-      "app/styles/theme.css --rz-on-ink #fff",
-      "app/styles/workspace.css --rz-on-ink #fff",
-      "app/styles/workspace.css --rz-ink-hover #26282e",
-      "app/styles/workspace.css --rz-surface-hover #fcfcfb",
-      "app/styles/workspace.css --rz-on-ink #fff",
-    ],
+      ...read(file)
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .matchAll(/([^{}]+)\{([^{}]*)\}/g),
+    ].flatMap((m) =>
+      m[2]
+        .split(";")
+        .map((declaration) => declaration.trim())
+        .filter((declaration) => /var\(--rz-/.test(declaration))
+        .map(
+          (declaration) =>
+            `${file} | ${m[1].trim().replace(/\s+/g, " ")} | ${declaration}`,
+        ),
+    ),
   );
+  assert.deepEqual(wrapped, [
+    "app/styles/attorney.css | .W .w-chd.today > b | color: var(--rz-on-ink, #fff)",
+    "app/styles/attorney.css | .W .w-mc.today .w-mcn | color: var(--rz-on-ink, #fff)",
+    "app/styles/attorney.css | .W .w-mb.me | color: var(--rz-on-ink, #fff)",
+    "app/styles/client.css | .cx .cx-chip.on | color: var(--rz-on-ink, #fff)",
+    "app/styles/client.css | .cx .cx-chip2.on | color: var(--rz-on-ink, #fff)",
+    "app/styles/client.css | .cx .cx-chip2.on svg | color: var(--rz-on-ink, #fff)",
+    "app/styles/layout.css | .rz .l-fnone-w28-h28-r50pc-dgrid-picenter-7eb0e7, .rzw .l-fnone-w28-h28-r50pc-dgrid-picenter-7eb0e7 | color: var(--rz-on-ink, #fff) !important",
+    "app/styles/layout.css | .rz .l-fnone-w32-h32-r50pc-dgrid-picenter-166ebb, .rzw .l-fnone-w32-h32-r50pc-dgrid-picenter-166ebb | color: var(--rz-on-ink, #fff) !important",
+    "app/styles/layout.css | .rz .l-h26-bgink-cfff, .rzw .l-h26-bgink-cfff | color: var(--rz-on-ink, #fff) !important",
+    "app/styles/layout.css | .rz .l-w28-h28-r50pc-dgrid-picenter-bgink-c8181b, .rzw .l-w28-h28-r50pc-dgrid-picenter-bgink-c8181b | color: var(--rz-on-ink, #fff) !important",
+    "app/styles/layout.css | .rz .l-w30-h30-r50pc-dgrid-picenter-bgink-cfff, .rzw .l-w30-h30-r50pc-dgrid-picenter-bgink-cfff | color: var(--rz-on-ink, #fff) !important",
+    "app/styles/product-staff.css | .W.st button.btn-ink | color: var(--rz-on-ink, #fff)",
+    "app/styles/site.css | .rz .rz-ink | color: var(--rz-on-ink, #fff)",
+    "app/styles/staff.css | .W.st .st-nav .w-ni.on | color: var(--rz-on-ink, #fff)",
+    "app/styles/staff.css | .W.st .st-nav .w-ni.on svg | color: var(--rz-on-ink, #fff)",
+    "app/styles/staff.css | .W.st .st-av | color: var(--rz-on-ink, #fff)",
+    "app/styles/staff.css | .W.st .st-fn | color: var(--rz-on-ink, #fff)",
+    "app/styles/staff.css | .W.st .pm-done .pm-dot | color: var(--rz-on-ink, #fff)",
+    "app/styles/staff.css | .W.st .pm-do .btn-ink | color: var(--rz-on-ink, #fff)",
+    "app/styles/staff.css | .W.st .p2-fb .btn-ink | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .btn-ink | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .btn-ink:hover | background: var(--rz-ink-hover, #24262b)",
+    "app/styles/theme.css | .rz .btn-ink:hover | border-color: var(--rz-ink-hover, #24262b)",
+    "app/styles/theme.css | .rz .btn-line:hover | background: var(--rz-surface-hover, #fcfcfb)",
+    "app/styles/theme.css | .rz .opt-chip:hover | background: var(--rz-surface-hover, #fcfcfb)",
+    "app/styles/theme.css | .rz .opt-chip.on | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .save.on | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .handoff .hi | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .cal .d.sel | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .qa.open .pm | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .fbtn.on | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .fbtn.on svg | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .stepper .done .sn | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .vstep.done .sn | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .nav-i .ct | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .wk .hd.today b | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .slot.on | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .gcard.on .cbx | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .kind.bk | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .cal-hd.today b | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .mc.today .mn | color: var(--rz-on-ink, #fff)",
+    "app/styles/theme.css | .rz .life li.done .sn | color: var(--rz-on-ink, #fff)",
+    "app/styles/workspace.css | .rzw .btn-ink | color: var(--rz-on-ink, #fff)",
+    "app/styles/workspace.css | .rzw .btn-ink:hover | background: var(--rz-ink-hover, #26282e)",
+    "app/styles/workspace.css | .rzw .btn-line:hover | background: var(--rz-surface-hover, #fcfcfb)",
+    "app/styles/workspace.css | .rzw .kind.bk | color: var(--rz-on-ink, #fff)",
+    "app/styles/workspace.css | .rzw .chip.on | color: var(--rz-on-ink, #fff)",
+  ]);
+  const rules = styles.flatMap((file) =>
+    [
+      ...read(file)
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .matchAll(/([^{}]+)\{([^{}]*)\}/g),
+    ].map((m) => ({
+      selectors: m[1].trim().replace(/\s+/g, " ").split(/,\s*/),
+      body: m[2],
+    })),
+  );
+  // Every on-ink wrapper sits on an ink fill: its own rule fills with ink,
+  // its element carries the classes of an ink-filled rule (a staff button
+  // keeping the shared primary button's fill), or its selector is inside a
+  // rule that fills with ink; its fallback is the owner's white.
+  const inkFill = /background(?:-color)?:\s*var\(--ink\)/;
+  const inkSelectors = rules
+    .filter((rule) => inkFill.test(rule.body))
+    .flatMap((rule) => rule.selectors);
+  const classesOf = (selector) =>
+    selector
+      .split(/[\s>]+/)
+      .pop()
+      .match(/\.[\w-]+/g) ?? [];
+  for (const rule of rules.filter((r) => /var\(--rz-on-ink/.test(r.body))) {
+    assert.ok(
+      inkFill.test(rule.body) ||
+        rule.selectors.every(
+          (selector) =>
+            inkSelectors.some((ink) => selector.startsWith(`${ink} `)) ||
+            inkSelectors.some(
+              (ink) =>
+                classesOf(ink).length > 0 &&
+                classesOf(ink).every((c) => classesOf(selector).includes(c)),
+            ),
+        ),
+      rule.selectors.join(", "),
+    );
+    assert.deepEqual(
+      [...rule.body.matchAll(/var\(--rz-on-ink, ([^)]+)\)/g)].map((m) => m[1]),
+      ["#fff"],
+      rule.selectors.join(", "),
+    );
+  }
   // Each wrapper sits in exactly its rule (studio specification 1.4).
   const rule = (file, selector) => {
     const css = read(file);

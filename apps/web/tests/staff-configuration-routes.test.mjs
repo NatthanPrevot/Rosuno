@@ -239,7 +239,11 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
     assert.match(code, /robots: \{ index: false, follow: false \},/, file);
     assert.ok(code.indexOf("await connection();") > 0, file);
     assert.doesNotMatch(code, FORBIDDEN_IN_PAGES, file);
-    assert.doesNotMatch(code, /STAFF_CONFIGURATION_SOURCES|searchParams|params/, file);
+    assert.doesNotMatch(
+      code,
+      /STAFF_CONFIGURATION_SOURCES|searchParams|params/,
+      file,
+    );
     assert.match(
       code,
       /import \{ APPEARANCE_SOURCES \} from "\.\.\/\.\.\/\.\.\/src\/infrastructure\/appearance\/appearance-adapter\.ts";/,

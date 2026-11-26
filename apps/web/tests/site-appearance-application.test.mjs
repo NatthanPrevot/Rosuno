@@ -46,6 +46,7 @@ import {
   createAppearanceWrites,
   invalidatePublishedAppearance,
   PUBLISHED_MEMO_MS,
+  PUBLISHED_READ_DEADLINE_MS,
 } from "../src/infrastructure/appearance/appearance-adapter.ts";
 import {
   addStaff,
@@ -1384,4 +1385,40 @@ test("APP-14 the application modules stay provider-neutral and registry-agnostic
   for (const [call] of adapter.matchAll(/logRequestEvent\([^;]*;/g)) {
     assert.doesNotMatch(call, /configuration|base64|text|bytes|label/i, call);
   }
+});
+
+// DEV-001: website & appearance studio (G3, the G2 carry-over).
+test("APP-14 the published read never waits longer than 1.5 s, whatever the call deadline, and a timed-out read is not kept", async () => {
+  invalidatePublishedAppearance();
+  assert.equal(PUBLISHED_READ_DEADLINE_MS, 1500);
+  let calls = 0;
+  const { client } = fakeClient({
+    public_site_appearance: () => {
+      calls += 1;
+      return new Promise(() => undefined);
+    },
+  });
+  const reads = await createAppearanceReads(async () => client, 8000)();
+  const started = Date.now();
+  assert.deepEqual(await reads.published(), { kind: "unreadable" });
+  const took = Date.now() - started;
+  assert.ok(took >= 1400 && took < 3000, String(took));
+  // Not kept: the next read asks again.
+  const again = reads.published();
+  assert.equal(calls, 2);
+  invalidatePublishedAppearance();
+  void again;
+  // Any other call keeps the call deadline.
+  const source = codeOf(
+    read("src/infrastructure/appearance/appearance-adapter.ts"),
+  );
+  assert.equal(
+    source.match(/Math\.min\(deadlineMs, PUBLISHED_READ_DEADLINE_MS\)/g).length,
+    1,
+  );
+  assert.ok(
+    source.includes(
+      '          observedRead(\n            "public_site_appearance",\n            Math.min(deadlineMs, PUBLISHED_READ_DEADLINE_MS),',
+    ),
+  );
 });

@@ -381,7 +381,7 @@
 }
 .rzw .kind.bk {
   background: var(--ink);
-  color: #fff;
+  color: var(--rz-on-ink, #fff);
 }
 .rzw .kind.off {
   background: var(--paper-2);
