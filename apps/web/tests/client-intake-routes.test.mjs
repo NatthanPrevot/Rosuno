@@ -189,6 +189,21 @@ test("2. pages decide access on the server for every request through the client 
     overview,
     /\bsearchParams\b|\bheaders\s*\(|\bcookies\s*\(|\bparams\b/,
   );
+  // DEV-001: the owner's UI/UX design's "Awaiting attorney response" adds
+  // exactly one read, after the Consultation list: the first page of the
+  // client's own open Requests, through the participant workspace sources
+  // (whose use case re-verifies the client through the same client intake
+  // sources before anything is read). Its query values are fixed: the page
+  // still reads no request value.
+  assert.match(
+    overview,
+    /const requests = await resolveClientRequests\(\s*CLIENT_WORKSPACE_SOURCES,\s*"open",\s*"1",\s*\);/,
+  );
+  assert.equal(overview.match(/resolveClientRequests\(/g).length, 1);
+  assert.ok(
+    overview.indexOf("await resolveClientConsultations(") <
+      overview.indexOf("await resolveClientRequests("),
+  );
   const intake = codeOf(read("app/client/intakes/[intake]/page.tsx"));
   assert.match(intake, /await connection\(\);/);
   assert.match(

@@ -21,7 +21,11 @@
 // account navigation, the consultation's card (its time, length, type and
 // state), the room panel, the cancellation, review and report actions, the
 // design's "More details" and attendance facts, and the Messages and
-// documents sections with their existing markup.
+// documents sections with their existing markup. The card and "More details"
+// also show the attorney's presentable name and the client's own practice
+// area answer, from the client's own parties read
+// (client_consultation_parties), this Consultation's row picked by its id;
+// when that read is unavailable the page is shown without them, as before.
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -34,7 +38,10 @@ import {
   type CommunicationView,
   type HistoryView,
 } from "../../../../src/application/consultation-communication.ts";
-import { cancellable } from "../../../../src/application/consultation-outcomes.ts";
+import {
+  cancellable,
+  resolveClientConsultationParties,
+} from "../../../../src/application/consultation-outcomes.ts";
 import { resolveClientConsultation } from "../../../../src/application/consultations.ts";
 import { resolveClientReviews } from "../../../../src/application/reviews.ts";
 import {
@@ -42,7 +49,10 @@ import {
   type ShellView,
 } from "../../../../src/application/shell.ts";
 import { CLIENT_COMMUNICATION_SOURCES } from "../../../../src/infrastructure/communications/communication-adapter.ts";
-import { CLIENT_REVIEW_SOURCES } from "../../../../src/infrastructure/consultations/completion-adapter.ts";
+import {
+  CLIENT_OUTCOME_SOURCES,
+  CLIENT_REVIEW_SOURCES,
+} from "../../../../src/infrastructure/consultations/completion-adapter.ts";
 import { CLIENT_CONSULTATION_SOURCES } from "../../../../src/infrastructure/consultations/consultation-adapter.ts";
 import { SUPABASE_SERVER_SESSION_SOURCE } from "../../../../src/infrastructure/identity/server-session-source.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
@@ -457,6 +467,25 @@ export default async function ClientConsultationPage({
     );
   }
   const record = view.consultation;
+  // DEV-001: the attorney's presentable name and the client's own practice
+  // area, this Consultation's row of the client's parties read, after the
+  // Consultation read; without it the page is shown as before.
+  const parties = await resolveClientConsultationParties(
+    CLIENT_OUTCOME_SOURCES,
+  );
+  if (parties.status !== "ready") {
+    await logRequestEvent("warn", "consultation.view_unavailable", {
+      route: "/client/consultations/[consultation]",
+      operation: "resolveClientConsultationParties",
+      outcome: parties.status,
+    });
+  }
+  const party =
+    parties.status === "ready"
+      ? (parties.parties.get(record.id) ?? null)
+      : null;
+  const attorneyName = party?.attorneyName ?? null;
+  const practiceArea = party?.practiceArea ?? null;
   const state = CLIENT_STATE_LABELS[view.displayState];
   const ended = [
     "completed",
@@ -479,6 +508,19 @@ export default async function ClientConsultationPage({
                   ? PATH_LABELS[record.path]
                   : whenText(record.bookingStart)}
               </h2>
+              {attorneyName === null && practiceArea === null ? null : (
+                <p className="cx-next-who">
+                  {attorneyName === null ? null : (
+                    <span className="nw">{attorneyName}</span>
+                  )}
+                  {attorneyName === null || practiceArea === null ? null : (
+                    <span className="cx-sep">·</span>
+                  )}
+                  {practiceArea === null ? null : (
+                    <span className="cx-next-area">{practiceArea}</span>
+                  )}
+                </p>
+              )}
               <p className="xs subtle cux-ty l-dflex">
                 {record.durationMinutes === null
                   ? null
@@ -533,6 +575,12 @@ export default async function ClientConsultationPage({
           <span className="xs subtle">{TIMES_IN_UTC}</span>
         </div>
         <dl className="cux-more l-mt10">
+          {attorneyName === null ? null : (
+            <Fact term="Attorney">{attorneyName}</Fact>
+          )}
+          {practiceArea === null ? null : (
+            <Fact term="Practice area">{practiceArea}</Fact>
+          )}
           <Fact term="How soon">{PATH_LABELS[record.path]}</Fact>
           {record.bookingStart === null || record.bookingEnd === null ? null : (
             <Fact term="Time">{`${whenText(record.bookingStart)} to ${whenText(record.bookingEnd)}`}</Fact>

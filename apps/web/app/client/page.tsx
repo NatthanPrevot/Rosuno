@@ -14,8 +14,17 @@
 // notification center (the existing S10 read). The client's Intakes are
 // listed on the Legal matters page. Refused and unavailable requests each see
 // one fixed message and no data; an unavailable workspace also writes one log
-// line with no client data. Nothing about the attorney is shown: no read
-// gives it to the client's lists yet.
+// line with no client data.
+//
+// DEV-001: the owner's UI/UX design's "Awaiting attorney response": the first
+// page of the client's own open Requests (the client_requests read, through
+// the participant workspace sources, which re-verify the client), each with
+// the attorney's presentable name, the path, the time asked for and the
+// response deadline (UTC) and a link to its request page; one the server
+// reports past its deadline is shown expired, as the request page shows it.
+// Nothing else of a Request (no message, amount or quote) is read here. With
+// none the card is not shown, as in the design; an unreadable list shows the
+// card's unavailable line and writes one log line with no client data.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -29,13 +38,18 @@ import {
   resolveClientNotifications,
   type CenterEntry,
 } from "../../src/application/notification-center.ts";
-import { clientHomeOf } from "../../src/application/participant-workspaces.ts";
+import {
+  clientHomeOf,
+  resolveClientRequests,
+} from "../../src/application/participant-workspaces.ts";
 import { getShellView } from "../../src/application/shell.ts";
 import { CLIENT_CENTER_SOURCES } from "../../src/infrastructure/communications/communication-adapter.ts";
 import { CLIENT_OUTCOME_SOURCES } from "../../src/infrastructure/consultations/completion-adapter.ts";
 import { SUPABASE_SERVER_SESSION_SOURCE } from "../../src/infrastructure/identity/server-session-source.ts";
 import { logRequestEvent } from "../../src/infrastructure/observability/request-log.ts";
+import { CLIENT_WORKSPACE_SOURCES } from "../../src/infrastructure/workspaces/workspace-adapter.ts";
 import {
+  AwaitingRequests,
   ClientAccount,
   ClientGate,
   ClientPill,
@@ -205,12 +219,33 @@ export default async function ClientWorkspacePage() {
       outcome: center.status,
     });
   }
+  // DEV-001: the owner's UI/UX design's "Awaiting attorney response": the
+  // first page of the client's own open Requests, after the existing reads.
+  const requests = await resolveClientRequests(
+    CLIENT_WORKSPACE_SOURCES,
+    "open",
+    "1",
+  );
+  if (requests.status !== "ready") {
+    await logRequestEvent("warn", "client_workspace.unavailable", {
+      route: "/client",
+      operation: "resolveClientRequests",
+      outcome: requests.status,
+    });
+  }
+  const open = requests.status === "ready" ? requests.requests : [];
+  // Requests still awaiting the attorney (one shown expired is not): as in
+  // the design, they stand in for the "No upcoming consultations" card.
+  const awaiting = open.filter((entry) => entry.displayState !== "expired");
   const activity =
     center.status === "ready" ? center.entries.slice(0, RECENT_ACTIVITY) : [];
   const firstVisit =
     view.entries.length === 0 &&
     center.status === "ready" &&
-    center.entries.length === 0;
+    center.entries.length === 0 &&
+    requests.status === "ready" &&
+    open.length === 0;
+  const pendingCard = requests.status !== "ready" || open.length > 0;
   return (
     <SitePage session={shell.session} signOut={signOut}>
       <ClientAccount area="overview" heading="Overview">
@@ -271,7 +306,7 @@ export default async function ClientWorkspacePage() {
                 </li>
               </ol>
             </section>
-          ) : (
+          ) : awaiting.length > 0 ? null : (
             <section className="cx-card cx-none" aria-labelledby="cx-none-h">
               <div>
                 <h2 className="cx-ct2" id="cx-none-h">
@@ -287,7 +322,8 @@ export default async function ClientWorkspacePage() {
             </section>
           )}
           {firstVisit ? null : (
-            <div className="cx-ov2-row one">
+            <div className={pendingCard ? "cx-ov2-row" : "cx-ov2-row one"}>
+              <AwaitingRequests view={requests} primary={focus === null} />
               <section className="cx-card cx-sec" aria-labelledby="cx-act-h">
                 <div className="cx-ch">
                   <h2 className="cx-ct2" id="cx-act-h">

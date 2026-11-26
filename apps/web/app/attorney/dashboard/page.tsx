@@ -21,6 +21,17 @@
 // "Needs your attention" and "Coming up" lists show their entries; the
 // server clock the dashboard reads is kept likewise to draw the countdown
 // ring. A visitor the page does not admit sees the design's signed-out panel.
+//
+// DEV-001: the design's performance panel, for the calendar month in UTC of
+// that same server clock reading (no other clock is read): the Requests the
+// attorney received in the month by outcome, "answered" being accepted and
+// declined, and the Consultations that ended in it by outcome, read after the
+// dashboard through the attorney's own activity counts
+// (attorney_activity_counts, behind the Security Shell again). Counts only:
+// no rate, rating, ranking or score. Beside them, the ledger-derived net of
+// the earnings section, per currency and never added across currencies. When
+// the counts cannot be read the panel says so and one log line with no
+// attorney data is written; the rest of the dashboard is still shown.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -44,6 +55,7 @@ import {
 } from "../../../src/application/consultations.ts";
 import { resolveAttorneyNotifications } from "../../../src/application/notification-center.ts";
 import {
+  resolveAttorneyActivity,
   resolveAttorneyComplianceRecords,
   resolveAttorneyDashboard,
   type AttorneyDashboardSources,
@@ -60,6 +72,7 @@ import { ATTORNEY_REQUEST_SOURCES } from "../../../src/infrastructure/requests/a
 import { ATTORNEY_SCHEDULE_SOURCES } from "../../../src/infrastructure/scheduling/attorney-schedule-adapter.ts";
 import { ATTORNEY_WORKSPACE_SOURCES } from "../../../src/infrastructure/workspaces/workspace-adapter.ts";
 import {
+  ActivityPanel,
   AttorneyGate,
   AttorneyWorkspace,
   Calm,
@@ -68,6 +81,8 @@ import {
   CountdownRing,
   DateBadge,
   dayText,
+  monthPeriodOf,
+  monthText,
   Pill,
   ringStepOf,
   whenText,
@@ -345,6 +360,20 @@ export default async function AttorneyDashboardPage() {
     requests === null ? null : requests.instant + requests.scheduled;
   const now =
     kept.now !== undefined && Number.isFinite(kept.now) ? kept.now : null;
+  // DEV-001: the owner's UI/UX design's performance panel: the calendar month
+  // in UTC of the dashboard's own clock reading, read after the dashboard.
+  const period = monthPeriodOf(now);
+  const activity = await resolveAttorneyActivity(
+    ATTORNEY_WORKSPACE_SOURCES,
+    period,
+  );
+  if (activity.status !== "ready") {
+    await logRequestEvent("warn", "attorney_dashboard.unavailable", {
+      route: "/attorney/dashboard",
+      operation: "resolveAttorneyActivity",
+      outcome: activity.status,
+    });
+  }
   // Every upcoming Consultation of the list, in its order.
   const coming =
     consultations !== null && kept.consultations?.status === "ready"
@@ -416,11 +445,16 @@ export default async function AttorneyDashboardPage() {
           )}
         </Card>
         <Card
-          id="dashboard-earnings"
-          title="Earnings"
+          id="dashboard-performance"
+          title="Performance"
           link={{ href: "/attorney/earnings", label: "Earnings" }}
           place="w-z7 w-perf"
         >
+          <ActivityPanel
+            month={period === null ? null : monthText(period.from)}
+            activity={activity.status === "ready" ? activity.activity : null}
+          />
+          <p className="lbl aw-perf-ledger">Earnings in the ledger</p>
           {earnings === null ? (
             <Unavailable />
           ) : earnings.totals.length === 0 ? (

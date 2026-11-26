@@ -18,9 +18,21 @@
 // takes one of a finite set of steps through a data attribute. Times are
 // shown in UTC with the label saying so: the viewer's time zone is not part
 // of the reads.
+//
+// DEV-001: the owner's UI/UX design's Overview performance panel, for one
+// calendar month in UTC taken from the server clock reading the page passes:
+// the Requests the attorney received in the month by outcome ("answered"
+// being accepted and declined) and the Consultations that ended in it by
+// outcome, exactly the counts the database answers (attorney_activity_counts).
+// No rate, rating, ranking or score is derived.
 
 import type { ReactNode } from "react";
 
+import type {
+  ActivityCounts,
+  ConsultationOutcome,
+  RequestOutcome,
+} from "../application/participant-workspaces.ts";
 import type { Tone } from "./design-system.tsx";
 
 export type AttorneySection =
@@ -712,6 +724,159 @@ export function RowChevron() {
     >
       <path d="m9 6 6 6-6 6" />
     </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DEV-001: the owner's UI/UX design's Overview performance panel
+// ---------------------------------------------------------------------------
+
+// The calendar month in UTC of a server clock reading: from its first instant
+// to the first instant of the next month (the database counts [from, until)).
+// None without a usable reading.
+export function monthPeriodOf(
+  now: number | null,
+): { readonly from: string; readonly until: string } | null {
+  if (now === null || !Number.isFinite(now)) {
+    return null;
+  }
+  const at = new Date(now);
+  if (Number.isNaN(at.getTime())) {
+    return null;
+  }
+  const year = at.getUTCFullYear();
+  const month = at.getUTCMonth();
+  return Object.freeze({
+    from: new Date(Date.UTC(year, month, 1)).toISOString(),
+    until: new Date(Date.UTC(year, month + 1, 1)).toISOString(),
+  });
+}
+
+const MONTH = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
+  month: "long",
+  year: "numeric",
+});
+
+// "November 2026" (the UTC month of the instant).
+export function monthText(timestamp: string): string {
+  return MONTH.format(new Date(timestamp));
+}
+
+// The outcomes in the database's own order, in the attorney workspace's
+// words.
+export const REQUEST_OUTCOME_TEXT: Readonly<Record<RequestOutcome, string>> =
+  Object.freeze({
+    accepted: "Accepted",
+    declined: "Declined",
+    expired: "Expired",
+    withdrawn: "Withdrawn by the client",
+    could_not_proceed: "Could not go ahead",
+  });
+
+export const CONSULTATION_OUTCOME_TEXT: Readonly<
+  Record<ConsultationOutcome, string>
+> = Object.freeze({
+  completed: "Completed",
+  cancelled: "Cancelled",
+  no_show: "Did not take place",
+  technical_failure: "Ended by a technical problem",
+});
+
+export const ACTIVITY_UNAVAILABLE =
+  "These counts could not be shown right now.";
+export const ACTIVITY_NOTE =
+  "A request counts in the month it was received, whenever it was answered. Counts only, as Rosuno recorded them.";
+
+// One count of the design's KPI row.
+function Kpi({
+  term,
+  value,
+  note,
+}: {
+  readonly term: string;
+  readonly value: number;
+  readonly note: string;
+}) {
+  return (
+    <div className="w-kpi">
+      <span className="xs muted">{term}</span>
+      <b className="num">{String(value)}</b>
+      <span className="xs subtle">{note}</span>
+    </div>
+  );
+}
+
+// One outcome list (the design's paper box of label and count rows).
+function OutcomeCounts<K extends string>({
+  title,
+  labels,
+  counts,
+}: {
+  readonly title: string;
+  readonly labels: Readonly<Record<K, string>>;
+  readonly counts: Readonly<Record<K, number>>;
+}) {
+  return (
+    <div className="w-otoday" role="group" aria-label={title}>
+      <p className="lbl">{title}</p>
+      {(Object.keys(labels) as K[]).map((key) => (
+        <div className="row between sm" key={key}>
+          <span>{labels[key]}</span>
+          <b className="num">{String(counts[key])}</b>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// The panel's counts for the month: requests answered and consultations
+// completed, then both outcome lists; zeros are shown as zeros. Without the
+// counts, one line says they could not be shown.
+export function ActivityPanel({
+  month,
+  activity,
+}: {
+  // The month's name ("November 2026"), or null without a clock reading.
+  readonly month: string | null;
+  readonly activity: ActivityCounts | null;
+}) {
+  const period = month ?? "This month";
+  return (
+    <div className="aw-perf">
+      <p className="lbl">{`${period} · UTC`}</p>
+      {activity === null ? (
+        <p className="sm muted">{ACTIVITY_UNAVAILABLE}</p>
+      ) : (
+        <>
+          <div className="w-kpis aw-kpis2">
+            <Kpi
+              term="Requests answered"
+              value={activity.answered}
+              note={`Accepted or declined, received in ${period}`}
+            />
+            <Kpi
+              term="Consultations completed"
+              value={activity.consultations.completed}
+              note={`Ended in ${period}`}
+            />
+          </div>
+          <div className="aw-perf-split">
+            <OutcomeCounts
+              title={`Requests received in ${period}`}
+              labels={REQUEST_OUTCOME_TEXT}
+              counts={activity.requests}
+            />
+            <OutcomeCounts
+              title={`Consultations ended in ${period}`}
+              labels={CONSULTATION_OUTCOME_TEXT}
+              counts={activity.consultations}
+            />
+          </div>
+          <p className="xs subtle">{ACTIVITY_NOTE}</p>
+        </>
+      )}
+    </div>
   );
 }
 

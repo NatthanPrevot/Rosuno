@@ -37,6 +37,12 @@
   width: 28px;
   height: 28px;
 }
+/* The Overview's lists use the design's smaller portrait size (its cx-li3 image). */
+.cx .rz-cx-tile[data-size="list"] {
+  width: 40px;
+  height: 46px;
+  border-radius: 9px;
+}
 
 /* Rows that open their own page: the design's expand control points to the page instead of opening in place. */
 .cx .rz-cx-row:hover .cx-rn,
@@ -141,5 +147,21 @@
   .cx .rz-cx-tile[data-size="next"] .cux-ico {
     width: 20px;
     height: 20px;
+  }
+  /* The Overview's open Requests: on a phone the row's button goes under its text, so the name, state and times
+     keep the row's width, and a long state word wraps inside its pill instead of running under the button. */
+  .cx .cx-li3 {
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: start;
+  }
+  .cx .cx-li3 > .btn {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .cx .cx-li3 .cx-lt3 .pill {
+    max-width: 100%;
+    height: auto;
+    min-height: 22px;
+    white-space: normal;
   }
 }

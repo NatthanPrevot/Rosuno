@@ -159,6 +159,37 @@
 .aw .w-feed li > .link {
   flex: none;
 }
+/* The performance panel for one month: two counts above the two outcome lists, side by side (stacked on a phone),
+   then the ledger's net per currency. */
+.aw .aw-perf {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.aw .w-kpis.aw-kpis2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.aw .aw-perf-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.aw .aw-perf-split > .w-otoday {
+  margin: 0;
+}
+.aw .w-perf .aw-perf-ledger {
+  margin-top: 4px;
+}
+@media (max-width: 700px) {
+  .aw .aw-perf-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* The panel's two short counts stay side by side on a phone (the design stacks its three-count rows, which would
+     leave the second count indented behind its divider). */
+  .aw .w-kpis.aw-kpis2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
 
 /* ---------- Requests ---------- */
 .aw .aw-reqgrid {

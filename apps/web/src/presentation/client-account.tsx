@@ -7,14 +7,28 @@
 // Presentation only: fixed first-party links and caller-supplied content.
 // Every linked page decides its own access on the server, and every state,
 // count, date and amount shown comes from the caller's server read. Nothing
-// here names a person, shows a portrait, states a policy value or keeps
-// state of its own, and nothing writes an inline style (the
-// Content-Security-Policy refuses them). Times are always shown in UTC with
-// the label saying so: the viewer's time zone is not part of the reads.
+// here names a person of its own (the one name shown, an attorney's, is the
+// presentable name the caller's read answered), shows a portrait, states a
+// policy value or keeps state of its own, and nothing writes an inline style
+// (the Content-Security-Policy refuses them). Times are always shown in UTC
+// with the label saying so: the viewer's time zone is not part of the reads.
+//
+// DEV-001: the owner's UI/UX design's open Requests (the Overview's "Awaiting
+// attorney response" card and My consultations' Pending rows), drawn from
+// the client's own Requests read (client_requests): the attorney's
+// presentable name, the path, the time asked for, the response deadline and
+// the state, a Request past its deadline shown expired as the request page
+// shows it. Nothing else of a Request (no message, amount or quote) is part
+// of that read or shown here.
 
 import type { ReactNode } from "react";
 
+import type {
+  ClientRequestEntry,
+  ClientRequestsView,
+} from "../application/participant-workspaces.ts";
 import type { Tone } from "./design-system.tsx";
+import { REQUEST_STATE_LABELS } from "./request-labels.ts";
 
 export type ClientArea =
   | "overview"
@@ -323,7 +337,8 @@ export function ConsultationTile({
   size = "row",
 }: {
   readonly modality: string;
-  readonly size?: "row" | "next";
+  // DEV-001: "list" is the design's smaller tile of the Overview's lists.
+  readonly size?: "row" | "next" | "list";
 }) {
   return (
     <span className="rz-cx-tile" data-size={size} aria-hidden="true">
@@ -402,3 +417,190 @@ export function whenText(timestamp: string): string {
 }
 
 export const TIMES_IN_UTC = "Times in UTC";
+
+// ---------------------------------------------------------------------------
+// DEV-001: the owner's UI/UX design's open Requests
+// ---------------------------------------------------------------------------
+
+// The design's words for the two paths.
+export const REQUEST_PATH_TEXT: Readonly<
+  Record<ClientRequestEntry["path"], string>
+> = Object.freeze({
+  instant: "Talk now",
+  scheduled: "Scheduled",
+});
+
+// The request page's words when the database answers no presentable name.
+export const ATTORNEY_NOT_SHOWN = "Attorney not shown";
+
+export const REQUESTS_NOT_BOOKED =
+  "Nothing is booked until the attorney accepts.";
+export const REQUESTS_UNAVAILABLE =
+  "Your requests could not be shown right now.";
+export const NO_OPEN_REQUESTS = "No requests awaiting a response";
+export const NO_OPEN_REQUESTS_NOTE =
+  "Requests you send appear here until the attorney responds.";
+
+export function requestHref(entry: ClientRequestEntry): string {
+  return `/client/requests/${entry.id}`;
+}
+
+// The time the Request asked for: the held start of a scheduled one, or else
+// when it was sent (UTC, labelled).
+export function requestTimeText(entry: ClientRequestEntry): string {
+  return entry.slotStart === null
+    ? `Requested ${whenText(entry.createdAt)}`
+    : whenText(entry.slotStart);
+}
+
+// The server's latest time for the attorney's answer (UTC, labelled).
+export function replyDueText(entry: ClientRequestEntry): string | null {
+  return entry.responseDeadline === null
+    ? null
+    : `Reply due ${whenText(entry.responseDeadline)}`;
+}
+
+// The state shown: the database's own, or expired once it reports the
+// deadline, quote or Hold passed (the browser never decides it).
+function RequestPill({ entry }: { readonly entry: ClientRequestEntry }) {
+  const state = REQUEST_STATE_LABELS[entry.displayState];
+  return <ClientPill tone={state.tone}>{state.label}</ClientPill>;
+}
+
+// One open Request in the Overview's list (the design's cx-li3 row).
+export function RequestItem({
+  entry,
+  primary,
+}: {
+  readonly entry: ClientRequestEntry;
+  // The design's filled button when no consultation card stands above.
+  readonly primary: boolean;
+}) {
+  const name = entry.attorneyName ?? ATTORNEY_NOT_SHOWN;
+  const due = replyDueText(entry);
+  return (
+    <div className="cx-li3">
+      <ConsultationTile modality={entry.modality} size="list" />
+      <span className="l-minw0">
+        <span className="cx-lt3">
+          <span>{name}</span>
+          <RequestPill entry={entry} />
+        </span>
+        <span className="cx-ls3">
+          {`${REQUEST_PATH_TEXT[entry.path]} · ${requestTimeText(entry)}`}
+        </span>
+        {due === null ? null : <span className="cx-ls3">{due}</span>}
+      </span>
+      <a
+        className={primary ? "btn btn-sm btn-ink" : "btn btn-sm btn-line"}
+        href={requestHref(entry)}
+        aria-label={
+          entry.attorneyName === null
+            ? "View request"
+            : `View request to ${entry.attorneyName}`
+        }
+      >
+        View request
+      </a>
+    </div>
+  );
+}
+
+// The Overview's "Awaiting attorney response" card: the client's open
+// Requests (one page, newest first) or, when they cannot be read, the
+// design's unavailable line. With no open Request the card is not shown, as
+// in the design.
+export function AwaitingRequests({
+  view,
+  primary,
+}: {
+  readonly view: ClientRequestsView;
+  readonly primary: boolean;
+}) {
+  if (view.status === "ready" && view.requests.length === 0) {
+    return null;
+  }
+  return (
+    <section className="cx-card cx-sec cx-pend" aria-labelledby="cx-pend-h">
+      <div className="cx-ch">
+        <h2 className="cx-ct2" id="cx-pend-h">
+          Awaiting attorney response
+        </h2>
+        {view.status === "ready" && view.pager.hasNext ? (
+          <a className="cx-link" href="/client/consultations?show=pending">
+            All requests
+          </a>
+        ) : null}
+      </div>
+      {view.status !== "ready" ? (
+        <p className="cx-once">{REQUESTS_UNAVAILABLE}</p>
+      ) : (
+        <>
+          <p className="cx-once">{REQUESTS_NOT_BOOKED}</p>
+          <div className="cx-list2">
+            {view.requests.map((entry) => (
+              <RequestItem key={entry.id} entry={entry} primary={primary} />
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+// One open Request in My consultations' Pending list (the design's record
+// row), opening the request page.
+export function RequestRow({ entry }: { readonly entry: ClientRequestEntry }) {
+  const due = replyDueText(entry);
+  return (
+    <div className="cx-rec">
+      <a className="cx-rbtn2 rz-cx-row" href={requestHref(entry)}>
+        <ConsultationTile modality={entry.modality} />
+        <span className="l-minw0">
+          <span className="cx-rn l-dblock">
+            {entry.attorneyName ?? ATTORNEY_NOT_SHOWN}
+          </span>
+          <span className="cx-rm l-dblock">
+            {REQUEST_PATH_TEXT[entry.path]}
+          </span>
+        </span>
+        <span className="l-minw0">
+          <span className="cx-rw l-dblock">{requestTimeText(entry)}</span>
+          {due === null ? null : <span className="cx-rw2 l-dblock">{due}</span>}
+        </span>
+        <span className="cx-rs">
+          <RequestPill entry={entry} />
+        </span>
+        <RowChevron />
+      </a>
+    </div>
+  );
+}
+
+// My consultations' Pending list body: the page's rows, or the design's
+// empty row, or the unavailable row.
+export function RequestRows({ view }: { readonly view: ClientRequestsView }) {
+  if (view.status !== "ready") {
+    return (
+      <div className="cx-emptyrow">
+        <p className="h4">Requests unavailable</p>
+        <p className="sm muted l-mt4">{REQUESTS_UNAVAILABLE}</p>
+      </div>
+    );
+  }
+  if (view.requests.length === 0) {
+    return (
+      <div className="cx-emptyrow">
+        <p className="h4">{NO_OPEN_REQUESTS}</p>
+        <p className="sm muted l-mt4">{NO_OPEN_REQUESTS_NOTE}</p>
+      </div>
+    );
+  }
+  return (
+    <>
+      {view.requests.map((entry) => (
+        <RequestRow key={entry.id} entry={entry} />
+      ))}
+    </>
+  );
+}
