@@ -1,1 +1,245 @@
-/* Canonical staff additions to the owner's design system (values from its tokens). Only staff screens add rules here. */
+/* Canonical staff additions to the owner's design system (values from its tokens). Only staff screens add rules here.
+   DEV-001: the staff workspace (Staff.dc.html, Admin 1B) on the canonical pages. The shared workspace layer
+   (product-workspace.css) gives the frame its full height and styles the design system's primitives inside .rzw;
+   these rules add what the staff pages need beyond the design's own layer (staff.css). */
+
+/* ---------- the page column: the destination's view tabs sit under the page header and lead ---------- */
+.W.st .st-wrap {
+  display: flex;
+  flex-direction: column;
+}
+.W.st .st-wrap > .st-top,
+.W.st .st-wrap > .st-lead {
+  order: -2;
+}
+.W.st .st-wrap > .st-vtabs {
+  order: -1;
+  align-self: flex-start;
+  max-width: 100%;
+  margin-bottom: 16px;
+}
+.W.st .st-wrap > .st-top:last-child {
+  margin-bottom: 0;
+}
+/* The view tabs are links (the design's tabs are buttons). */
+.W.st .st-tabs a.w-tb {
+  color: var(--muted);
+}
+.W.st .st-tabs a.w-tb:hover {
+  color: var(--ink);
+}
+.W.st .st-tabs a.w-tb.on {
+  color: var(--ink);
+}
+
+/* The account link at the foot of the sidebar (the design's role card, without a simulated persona). */
+.W.st a.st-who {
+  color: var(--ink);
+}
+.W.st .st-brand a.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- the page body: panels, lists and forms in one flow ---------- */
+.W.st .st-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--st-gap);
+  min-width: 0;
+}
+.W.st .st-page > .st-ph,
+.W.st .st-page > .st-chips,
+.W.st .st-page > .st-metrics {
+  margin: 0;
+}
+.W.st .st-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.W.st .st-panel > .st-ptop {
+  margin-bottom: 0;
+}
+.W.st .st-panel > .st-tk,
+.W.st .st-panel > .st-cov {
+  margin-top: -4px;
+}
+.W.st .st-lead > p {
+  margin: 0;
+}
+
+/* Headline figures as links or plain figures. */
+.W.st a.st-metric,
+.W.st div.st-metric {
+  color: inherit;
+}
+.W.st div.st-metric:hover {
+  background: transparent;
+}
+/* A row of fewer than four figures keeps the design's columns. */
+.W.st .st-metrics[data-count="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.W.st .st-metrics[data-count="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.W.st .st-metrics[data-count="1"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Count tables in a panel (the design's coverage table): a state, its count and an optional detail. */
+.W.st .st-cov caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.W.st .st-cov th[scope="row"] {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.W.st .st-cov td.d {
+  color: var(--subtle);
+  font-size: 12.5px;
+  text-align: right;
+  padding-left: 12px;
+}
+
+/* ---------- lists: a finite set of column layouts (the design sets them with inline styles, which the CSP refuses) ---------- */
+.W.st .st-thead[data-cols="2"],
+.W.st .st-row[data-cols="2"] {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+}
+.W.st .st-thead[data-cols="3"],
+.W.st .st-row[data-cols="3"] {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 0.9fr);
+}
+.W.st .st-thead[data-cols="4"],
+.W.st .st-row[data-cols="4"] {
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)) minmax(
+      0,
+      0.9fr
+    );
+}
+.W.st .st-thead[data-cols="5"],
+.W.st .st-row[data-cols="5"] {
+  grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr)) minmax(
+      0,
+      0.9fr
+    );
+}
+.W.st .st-thead[data-cols="6"],
+.W.st .st-row[data-cols="6"] {
+  grid-template-columns: minmax(0, 1.25fr) repeat(4, minmax(0, 1fr)) minmax(
+      0,
+      0.9fr
+    );
+}
+.W.st .st-thead[data-cols="7"],
+.W.st .st-row[data-cols="7"] {
+  grid-template-columns: minmax(0, 1.2fr) repeat(5, minmax(0, 1fr)) minmax(
+      0,
+      0.9fr
+    );
+}
+.W.st a.st-row {
+  color: inherit;
+}
+.W.st div.st-row:hover {
+  background: #fff;
+}
+/* A cell that holds a control keeps it whole. */
+.W.st .st-cell.st-cell-act {
+  overflow: visible;
+}
+.W.st .st-cell .st-cv:empty::before {
+  content: "—";
+}
+/* The pager under a list. */
+.W.st .st-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+}
+
+/* ---------- the record on its own page: the design's record panel, in the page column ---------- */
+.W.st .st-recpage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+  min-width: 0;
+}
+.W.st .st-det.st-det-page {
+  position: static;
+  z-index: auto;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  border-radius: var(--st-r);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 1px 2px rgba(15, 16, 19, 0.04),
+    0 12px 32px -12px rgba(15, 16, 19, 0.14);
+}
+.W.st .st-det-page > .st-dt:first-child {
+  margin-top: 0;
+}
+.W.st .st-det-page .st-blk > .rz-stack,
+.W.st .st-det-page .st-blk > .rz-alert,
+.W.st .st-det-page .st-blk > .rz-disclosure {
+  margin-top: 4px;
+}
+.W.st .st-blk > .st-h3 + .rz-alert,
+.W.st .st-blk > .st-h3 + .rz-stack {
+  margin-top: 6px;
+}
+.W.st .st-backrow {
+  margin: 0;
+}
+.W.st .st-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+}
+
+/* ---------- the "not permitted" card ---------- */
+.W.st .st-deny .st-emd {
+  font-size: 13.5px;
+}
+
+@media (max-width: 700px) {
+  .W.st .st-det.st-det-page {
+    width: auto;
+    max-width: none;
+    border-radius: var(--st-r);
+    padding: 16px 16px 22px;
+  }
+  .W.st .st-wrap > .st-vtabs {
+    align-self: stretch;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .W.st .st-vtabs a.w-tb {
+    height: 44px;
+    flex: none;
+  }
+  .W.st .st-back {
+    min-height: 44px;
+  }
+  .W.st .st-metrics[data-count="3"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

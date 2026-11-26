@@ -813,6 +813,11 @@ const MVP001_STAFF_APP = [
   "app/staff/launch/[jurisdiction]/page.tsx",
   "app/staff/launch/forms.tsx",
   "app/staff/launch/page.tsx",
+  // DEV-001: the owner's UI/UX design's staff workspace frame (a server
+  // layout) and its navigation (a client module); their own contract is
+  // SR-1 and SR-13 in staff-configuration-routes.test.mjs.
+  "app/staff/layout.tsx",
+  "app/staff/navigation.tsx",
   // MVP-001 S11: the Legal Holds page, its forms and its server action module.
   "app/staff/legal-holds/actions.ts",
   "app/staff/legal-holds/forms.tsx",

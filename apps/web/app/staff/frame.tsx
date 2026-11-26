@@ -5,47 +5,60 @@
 // decided. A refused request sees one fixed message and no configuration
 // data; an unavailable one also writes one log line naming the route, with
 // nothing the request carried.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, Staff.dc.html):
+// the page header and body inside the staff workspace frame the staff layout
+// draws, the design's "not permitted" card for a refused request, and its
+// links and pager. The layout's navigation is presentation only; every page
+// keeps its own access decision.
 
 import type { ReactNode } from "react";
 
 import type { Pager } from "../../src/application/staff-configuration.ts";
 import { logRequestEvent } from "../../src/infrastructure/observability/request-log.ts";
+import { Alert } from "../../src/presentation/design-system.tsx";
 import {
-  Alert,
-  ButtonLink,
-  Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Surface,
-  Text,
-} from "../../src/presentation/design-system.tsx";
+  Lead,
+  Pill,
+  StaffBody,
+  StaffHeader,
+  TIMES_IN_UTC,
+} from "../../src/presentation/staff-workspace.tsx";
 
 export function StaffFrame({
-  eyebrow,
   title,
+  description,
+  lead,
+  utc = false,
   children,
 }: {
-  readonly eyebrow: string;
+  // The destination's name for the page (the design's page header) and its
+  // one-line description.
   readonly title: string;
+  readonly description?: string;
+  // Plain context under the header (the design's lead).
+  readonly lead?: ReactNode;
+  // The page shows server instants, always in UTC.
+  readonly utc?: boolean;
+  // Accepted from pages not yet in the design's header; not shown.
+  readonly eyebrow?: string;
   readonly children: ReactNode;
 }) {
   return (
-    <Page density="admin">
-      <Surface emphasis="raised" labelledBy="staff-configuration-title">
-        <Stack>
-          <Eyebrow>{eyebrow}</Eyebrow>
-          <Heading as="h1" size="lg" id="staff-configuration-title">
-            {title}
-          </Heading>
-          {children}
-        </Stack>
-      </Surface>
-    </Page>
+    <>
+      <StaffHeader
+        titleId="staff-configuration-title"
+        title={title}
+        description={description}
+        aside={utc ? TIMES_IN_UTC : undefined}
+      />
+      {lead === undefined ? null : <Lead>{lead}</Lead>}
+      <StaffBody>{children}</StaffBody>
+    </>
   );
 }
 
+// A link back to the list a page belongs to, in the design's link style.
 export function BackLink({
   href,
   children,
@@ -54,11 +67,24 @@ export function BackLink({
   readonly children: ReactNode;
 }) {
   return (
-    <Cluster>
-      <ButtonLink variant="tertiary" href={href}>
+    <p className="st-backrow">
+      <a className="st-link st-back" href={href}>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m15 6-6 6 6 6" />
+        </svg>
         {children}
-      </ButtonLink>
-    </Cluster>
+      </a>
+    </p>
   );
 }
 
@@ -69,6 +95,39 @@ export function pageHref(base: string, page: number): string {
   return page === 1
     ? base
     : `${base}${base.includes("?") ? "&" : "?"}page=${page}`;
+}
+
+// The design's pager under a list: which page this is and links to its
+// neighbours, so no row of a list is ever left out without the page saying
+// so.
+export function PagerRow({
+  note,
+  previous,
+  next,
+}: {
+  readonly note: ReactNode;
+  readonly previous: string | null;
+  readonly next: string | null;
+}) {
+  return (
+    <div className="st-pager">
+      <p className="st-emd">{note}</p>
+      {previous === null && next === null ? null : (
+        <div className="st-links">
+          {previous === null ? null : (
+            <a className="btn btn-line btn-sm" href={previous}>
+              Previous page
+            </a>
+          )}
+          {next === null ? null : (
+            <a className="btn btn-line btn-sm" href={next}>
+              Next page
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Says which page this is and links to its neighbours, so no row of a list
@@ -89,31 +148,22 @@ export function PagerLinks({
   }
   const first = (pager.page - 1) * pager.pageSize + 1;
   return (
-    <>
-      <Text tone="muted">
-        {shown === 0
-          ? `There are no ${noun} on page ${pager.page}.`
-          : `Showing ${noun} ${first} to ${first + shown - 1}.`}
-        {pager.nextPage === null
-          ? ` There are no more ${noun}.`
-          : ` More ${noun} are on the next page.`}
-      </Text>
-      <Cluster>
-        {pager.previousPage === null ? null : (
-          <ButtonLink
-            variant="secondary"
-            href={pageHref(base, pager.previousPage)}
-          >
-            Previous page
-          </ButtonLink>
-        )}
-        {pager.nextPage === null ? null : (
-          <ButtonLink variant="secondary" href={pageHref(base, pager.nextPage)}>
-            Next page
-          </ButtonLink>
-        )}
-      </Cluster>
-    </>
+    <PagerRow
+      note={
+        <>
+          {shown === 0
+            ? `There are no ${noun} on page ${pager.page}.`
+            : `Showing ${noun} ${first} to ${first + shown - 1}.`}
+          {pager.nextPage === null
+            ? ` There are no more ${noun}.`
+            : ` More ${noun} are on the next page.`}
+        </>
+      }
+      previous={
+        pager.previousPage === null ? null : pageHref(base, pager.previousPage)
+      }
+      next={pager.nextPage === null ? null : pageHref(base, pager.nextPage)}
+    />
   );
 }
 
@@ -133,6 +183,30 @@ export function BoundNotice({
   );
 }
 
+// The design's card for a page that is not shown: its pill, the fixed
+// message and, where the design has them, links onward.
+export function DenyCard({
+  pill,
+  tone,
+  role,
+  children,
+  links,
+}: {
+  readonly pill: string;
+  readonly tone: "warning" | "error" | "neutral";
+  readonly role: "status" | "alert";
+  readonly children: ReactNode;
+  readonly links?: ReactNode;
+}) {
+  return (
+    <section className="w-card st-deny" role={role}>
+      <Pill tone={tone}>{pill}</Pill>
+      <p className="st-emd">{children}</p>
+      {links === undefined ? null : <div className="st-links">{links}</div>}
+    </section>
+  );
+}
+
 type Refused = {
   readonly status: "sign-in-required" | "denied" | "unavailable";
 };
@@ -146,26 +220,38 @@ export async function refusalPage(
 ): Promise<ReactNode> {
   if (view.status === "sign-in-required") {
     return (
-      <StaffFrame eyebrow="Staff" title="Sign in to continue">
-        <Text tone="muted">
+      <StaffFrame title="Sign in to continue">
+        <DenyCard
+          pill="Signed out"
+          tone="neutral"
+          role="status"
+          links={
+            <a className="btn btn-ink btn-sm" href="/sign-in">
+              Sign in
+            </a>
+          }
+        >
           {`${surface} is available only to signed-in staff with the required capability.`}
-        </Text>
-        <Cluster>
-          <ButtonLink variant="primary" href="/sign-in">
-            Sign in
-          </ButtonLink>
-        </Cluster>
+        </DenyCard>
       </StaffFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <StaffFrame eyebrow="Staff" title={`${surface} not available`}>
-        <Alert tone="warning" title="No access" role="status">
+      <StaffFrame title={`${surface} not available`}>
+        <DenyCard
+          pill="No access"
+          tone="warning"
+          role="status"
+          links={
+            <a className="btn btn-line btn-sm" href="/staff">
+              Go to Dashboard
+            </a>
+          }
+        >
           This account does not hold a current capability for this. A staff
           profile alone grants none.
-        </Alert>
-        <BackLink href="/staff">Staff tools</BackLink>
+        </DenyCard>
       </StaffFrame>
     );
   }
@@ -174,10 +260,10 @@ export async function refusalPage(
     outcome: "unavailable",
   });
   return (
-    <StaffFrame eyebrow="Staff" title={`${surface} unavailable`}>
-      <Alert tone="error" title="Could not be opened" role="alert">
+    <StaffFrame title={`${surface} unavailable`}>
+      <DenyCard pill="Could not be opened" tone="error" role="alert">
         This could not be opened right now. Please try again later.
-      </Alert>
+      </DenyCard>
     </StaffFrame>
   );
 }

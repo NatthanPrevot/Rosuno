@@ -24,6 +24,7 @@ import { join, posix } from "node:path";
 import { after, test } from "node:test";
 import { pathToFileURL } from "node:url";
 
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 
@@ -94,6 +95,10 @@ const CONFIGURATION_FILES = [
   "app/staff/launch/[jurisdiction]/page.tsx",
   "app/staff/launch/forms.tsx",
   "app/staff/launch/page.tsx",
+  // DEV-001: the owner's UI/UX design's staff workspace frame (a server
+  // layout) and its navigation (a client module the layout alone imports).
+  "app/staff/layout.tsx",
+  "app/staff/navigation.tsx",
   "app/staff/outcome.tsx",
   "app/staff/page.tsx",
   "app/staff/policies/[version]/page.tsx",
@@ -470,6 +475,60 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
     read("app/staff/frame.tsx"),
     /["']use (?:client|server)["']/,
   );
+  // DEV-001: the owner's UI/UX design's staff workspace frame. The layout is
+  // a server module rendered per request: it opts out of prerendering, asks
+  // the step-up gate first and then only the staff home's own use case with
+  // the trusted sources, reads nothing of the request, offers no form, and
+  // imports exactly these modules. Its navigation is a client module that
+  // reads only the browser path, imports no infrastructure and holds no
+  // state, and only the layout imports it.
+  const layout = read("app/staff/layout.tsx");
+  const layoutCode = codeOf(layout);
+  assert.doesNotMatch(layout, /["']use (?:client|server)["']/);
+  assert.ok(
+    layoutCode.includes(
+      '  await connection();\n  await requireSteppedUp("staff");\n  const home = await resolveStaffHome(STAFF_CONFIGURATION_SOURCES);\n',
+    ),
+  );
+  assert.equal(layoutCode.match(/\bawait /g).length, 3);
+  assert.doesNotMatch(layoutCode, FORBIDDEN_IN_PAGES);
+  assert.doesNotMatch(
+    layoutCode,
+    /searchParams|params|<form|action=|logRequestEvent/,
+  );
+  assert.deepEqual(importsOf(layout), [
+    "next/server",
+    "react",
+    "../../src/application/staff-configuration.ts",
+    "../../src/infrastructure/staff/staff-configuration-adapter.ts",
+    "../../src/presentation/staff-workspace.tsx",
+    "../account/gate.ts",
+    "./navigation.tsx",
+  ]);
+  const navigation = read("app/staff/navigation.tsx");
+  assert.match(navigation, /^"use client";\n/);
+  assert.deepEqual(importsOf(navigation), [
+    "next/navigation",
+    "../../src/application/staff-configuration.ts",
+    "../../src/presentation/staff-workspace.tsx",
+  ]);
+  assert.ok(
+    navigation.includes(
+      'import type { StaffSurface } from "../../src/application/staff-configuration.ts";',
+    ),
+  );
+  assert.doesNotMatch(
+    codeOf(navigation),
+    /\bstyle=|dangerouslySetInnerHTML|fetch\(|useEffect|useState|useSearchParams|useParams|document\.|window\.|<form/,
+  );
+  assert.deepEqual(
+    filesIn("app/").filter(
+      (f) =>
+        /\.tsx?$/.test(f) &&
+        importsOf(read(f)).some((s) => /(?:^|\/)navigation\.tsx$/.test(s)),
+    ),
+    ["app/staff/layout.tsx"],
+  );
 });
 
 test("SR-2. the server actions hand the form and the trusted sources to the use cases, never read the previous state, and log only the action and its outcome", () => {
@@ -553,7 +612,7 @@ const react = import.meta.resolve("react");
 
 write(
   "wiring.mjs",
-  `export const wiring = { sources: null, log: [] };
+  `export const wiring = { sources: null, log: [], path: "/staff" };
 const delegate = new Proxy({}, { get: (_t, key) => wiring.sources[key] });
 export const STAFF_CONFIGURATION_SOURCES = delegate;
 export const STAFF_VERIFICATION_SOURCES = delegate;
@@ -563,6 +622,13 @@ write(
   "next-server.mjs",
   `import { wiring } from "./wiring.mjs";
 export async function connection() { wiring.log.push("connection"); }
+`,
+);
+// DEV-001: the browser path the staff navigation marks, given by the test.
+write(
+  "next-navigation.mjs",
+  `import { wiring } from "./wiring.mjs";
+export function usePathname() { return wiring.path; }
 `,
 );
 write(
@@ -623,6 +689,11 @@ function targetOf(from, specifier) {
   }
   if (specifier === "next/server") {
     return target("next-server.mjs");
+  }
+  // DEV-001: only the staff navigation reads the browser path.
+  if (specifier === "next/navigation") {
+    assert.equal(from, "app/staff/navigation.tsx");
+    return target("next-navigation.mjs");
   }
   assert.ok(specifier.startsWith("."), `${from}: ${specifier}`);
   const path = posix.normalize(posix.join(posix.dirname(from), specifier));
@@ -1182,4 +1253,204 @@ test("SR-12. MVP-001 S3 part 2: the jurisdiction assessment review lists the Int
     firstPage,
   );
   assert.ok(refused.text.includes("No access"));
+});
+
+// ---------------------------------------------------------------------------
+// DEV-001: the staff workspace navigation (the owner's UI/UX design)
+// ---------------------------------------------------------------------------
+
+async function renderLayout(sources, path) {
+  wiring.sources = sources;
+  wiring.path = path;
+  wiring.log.length = 0;
+  const module = await page("app/staff/layout.tsx");
+  const html = renderToStaticMarkup(
+    await module.default({
+      children: createElement("p", { id: "page-marker" }, "Page content"),
+    }),
+  );
+  return {
+    html,
+    hrefs: [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]),
+    log: [...wiring.log],
+  };
+}
+
+function sliceOf(html, open, close) {
+  const start = html.indexOf(open);
+  if (start < 0) {
+    return null;
+  }
+  return html.slice(start, html.indexOf(close, start) + close.length);
+}
+
+const hrefsIn = (html) =>
+  html === null ? [] : [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+
+test("SR-13. DEV-001: the staff workspace navigation shows only the destinations whose surfaces the staff home's use case answered for the caller, marks where the caller is, and stands in for no page's own access decision", async () => {
+  const { STAFF_SURFACES } = await import(
+    real("src/application/staff-configuration.ts")
+  );
+  const shell = await import(build("src/presentation/staff-workspace.tsx"));
+  // Every destination's view is an existing staff page, every staff surface
+  // is one destination's view, and only the overview needs no surface.
+  const views = shell.STAFF_NAVIGATION.flatMap((group) =>
+    group.destinations.flatMap((destination) => destination.views),
+  );
+  for (const view of views) {
+    assert.match(view.href, /^\/staff(\/[a-z-]+)*$/, view.href);
+    assert.ok(
+      statSync(
+        new URL(`app${view.href}/page.tsx`.replace("//", "/"), appRoot),
+      ).isFile(),
+      view.href,
+    );
+  }
+  assert.deepEqual(
+    [...new Set(views.map((view) => view.surface).filter(Boolean))].sort(),
+    [...STAFF_SURFACES].sort(),
+  );
+  assert.deepEqual(
+    views.filter((view) => view.surface === null).map((view) => view.href),
+    ["/staff"],
+  );
+  // The Owner group holds Approvals only (no owner role exists); the
+  // design's Readiness and access matrix are not shipped.
+  assert.deepEqual(
+    shell.STAFF_NAVIGATION.map((group) => [
+      group.id,
+      group.destinations.map((destination) => destination.id),
+    ]),
+    [
+      ["home", ["overview"]],
+      ["owner", ["approvals"]],
+      ["operations", ["bookings", "support"]],
+      ["people", ["clients", "applications"]],
+      ["platform", ["marketplace", "finance"]],
+      ["admin", ["staff", "settings"]],
+    ],
+  );
+
+  const { w, admin, scoped, plain } = world();
+  const nav = (html) => hrefsIn(sliceOf(html, '<nav class="st-nav"', "</nav>"));
+  const tabs = (html) =>
+    hrefsIn(sliceOf(html, '<nav class="w-tabs st-tabs st-vtabs"', "</nav>"));
+  // A holder of every configuration capability: exactly the destinations
+  // holding the surfaces the staff home answered, each to its first held
+  // view, then the account link; the page follows unchanged.
+  const full = await renderLayout(sources(w, admin), "/staff/launch");
+  assert.deepEqual(full.log, ["connection"]);
+  assert.deepEqual(nav(full.html), [
+    "/staff",
+    "/staff/policies",
+    "/staff/verification",
+    "/staff/jurisdictions",
+    "/staff/capabilities",
+  ]);
+  assert.deepEqual(full.hrefs, [
+    "/",
+    ...nav(full.html),
+    "/account/security",
+    ...tabs(full.html),
+  ]);
+  assert.ok(
+    full.html.endsWith(
+      '<p id="page-marker">Page content</p></div></div></div></div></div>',
+    ),
+  );
+  // The current destination and its current view are marked, and the
+  // destination's held views are its tabs.
+  assert.equal(full.html.match(/aria-current="page"/g).length, 2);
+  assert.ok(
+    full.html.includes(
+      'class="w-ni on" href="/staff/jurisdictions" aria-current="page"',
+    ),
+  );
+  assert.deepEqual(tabs(full.html), [
+    "/staff/jurisdictions",
+    "/staff/launch",
+    "/staff/catalog",
+    "/staff/intake-configuration",
+    "/staff/jurisdiction-review",
+  ]);
+  assert.ok(
+    full.html.includes(
+      'class="w-tb on" href="/staff/launch" aria-current="page"',
+    ),
+  );
+  // A record page belongs to its list's view.
+  const record = await renderLayout(
+    sources(w, admin),
+    "/staff/capabilities/00000000-0000-4000-8000-000000000001",
+  );
+  assert.ok(
+    record.html.includes(
+      'class="w-ni on" href="/staff/capabilities" aria-current="page"',
+    ),
+  );
+  // Only the held views are tabs (the activity log needs view_audit_events,
+  // which this caller does not hold), the list's view marked.
+  assert.deepEqual(tabs(record.html), [
+    "/staff/capabilities",
+    "/staff/break-glass",
+  ]);
+  assert.ok(
+    record.html.includes(
+      'class="w-tb on" href="/staff/capabilities" aria-current="page"',
+    ),
+  );
+  // A destination with one held view shows no tabs.
+  const policies = await renderLayout(sources(w, scoped), "/staff/policies");
+  assert.deepEqual(nav(policies.html), [
+    "/staff",
+    "/staff/policies",
+    "/staff/break-glass",
+  ]);
+  assert.deepEqual(tabs(policies.html), []);
+  // An active staff member without any grant: the dashboard and break-glass
+  // access only.
+  const none = await renderLayout(sources(w, plain), "/staff");
+  assert.deepEqual(nav(none.html), ["/staff", "/staff/break-glass"]);
+  assert.deepEqual(tabs(none.html), []);
+  for (const forbidden of [
+    "/staff/policies",
+    "/staff/verification",
+    "/staff/finance",
+    "/staff/capabilities",
+    "/staff/jobs",
+  ]) {
+    assert.equal(none.hrefs.includes(forbidden), false, forbidden);
+  }
+  // On a page the caller does not hold, nothing of it is advertised: the
+  // page's own refusal decides, the navigation adds no way in.
+  const elsewhere = await renderLayout(sources(w, plain), "/staff/catalog");
+  assert.deepEqual(nav(elsewhere.html), ["/staff", "/staff/break-glass"]);
+  assert.equal(elsewhere.html.includes('aria-current="page"'), false);
+  assert.deepEqual(tabs(elsewhere.html), []);
+  const operator = jobWorld();
+  const jobs = await renderLayout(
+    sources(operator.w, operator.operator),
+    "/staff/jobs",
+  );
+  assert.deepEqual(nav(jobs.html), [
+    "/staff",
+    "/staff/break-glass",
+    "/staff/jobs",
+  ]);
+  // A visitor the staff home does not admit, or a home that cannot be read:
+  // the frame with the brand only, no navigation, no account link.
+  for (const [name, refused] of [
+    ["signed out", configurationSources(w, null)],
+    ["unavailable", { ...sources(w, admin), reads: async () => null }],
+  ]) {
+    const frame = await renderLayout(refused, "/staff");
+    assert.deepEqual(frame.hrefs, ["/"], name);
+    assert.equal(frame.html.includes("<nav"), false, name);
+    assert.ok(
+      frame.html.includes('<p id="page-marker">Page content</p>'),
+      name,
+    );
+  }
+  // The frame offers no form, field or button of its own.
+  assert.doesNotMatch(full.html, /<form|<input|<select|<textarea|<button/);
 });
