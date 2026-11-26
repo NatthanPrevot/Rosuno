@@ -11,6 +11,11 @@
 // approve a request (with a duration they choose; never their own) or revoke
 // a request or an active access. The two query values read, state and page,
 // only choose the list and the page.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Administration › Staff):
+// the request form and the caller's own requests in the design's panels, then
+// the approval queue's state tabs and one card per grant inside the one slot of
+// the decision forms, and the pager.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -24,22 +29,21 @@ import {
 import { BREAK_GLASS_SOURCES } from "../../../src/infrastructure/privacy/privacy-adapter.ts";
 import { utcText } from "../../../src/presentation/completion-labels.ts";
 import {
-  Alert,
-  ButtonLink,
-  Cluster,
-  Heading,
-  Stack,
-  Status,
-  Surface,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
-import {
   BREAK_GLASS_NOTE,
   BREAK_GLASS_STAFF_REQUIRED,
   GRANT_STATE_LABELS,
 } from "../../../src/presentation/privacy-labels.ts";
+import {
+  DenyCard,
+  Empty,
+  KeyValues,
+  PagerRow,
+  Panel,
+  Pill,
+  TabLinks,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../frame.tsx";
+import { refusalPage, StaffFrame } from "../frame.tsx";
 import {
   ApproveAccessForm,
   GrantDecisions,
@@ -85,11 +89,19 @@ export default async function BreakGlassPage({
   if (view.status === "denied") {
     // The surface needs an active Staff Profile, not a capability.
     return (
-      <StaffFrame eyebrow="Security" title="Break-glass access not available">
-        <Alert tone="warning" title="No access" role="status">
+      <StaffFrame title="Break-glass access not available">
+        <DenyCard
+          pill="No access"
+          tone="warning"
+          role="status"
+          links={
+            <a className="btn btn-line btn-sm" href="/staff">
+              Go to Dashboard
+            </a>
+          }
+        >
           {BREAK_GLASS_STAFF_REQUIRED}
-        </Alert>
-        <BackLink href="/staff">Staff tools</BackLink>
+        </DenyCard>
       </StaffFrame>
     );
   }
@@ -100,129 +112,137 @@ export default async function BreakGlassPage({
   const base =
     queue === null ? "" : `/staff/break-glass?state=${queue.grantState}`;
   return (
-    <StaffFrame eyebrow="Security" title="Break-glass access">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Text tone="muted">{BREAK_GLASS_NOTE}</Text>
-      <Heading as="h2" size="md" id="request-title">
-        Request access
-      </Heading>
-      <RequestAccessForm />
-      <Heading as="h2" size="md" id="mine-title">
-        Your requests
-      </Heading>
-      {view.mine.length === 0 ? (
-        <Text>You have not requested break-glass access.</Text>
-      ) : (
-        view.mine.map((grant) => (
-          <Surface key={grant.id} labelledBy={`mine-${grant.id}`}>
-            <Stack gap="tight">
-              <Heading as="h3" size="sm" id={`mine-${grant.id}`}>
-                {`Consultation ${grant.resourceId}`}
-              </Heading>
-              <Cluster>
-                <Status tone={GRANT_STATE_LABELS[grant.state].tone}>
+    <StaffFrame
+      title="Staff"
+      subtitle="Break-glass access: time-limited, audited read access to one consultation."
+      lead={<p>{BREAK_GLASS_NOTE}</p>}
+      utc
+    >
+      <Panel id="request-title" title="Request access">
+        <RequestAccessForm />
+      </Panel>
+      <Panel id="mine-title" title="Your requests">
+        {view.mine.length === 0 ? (
+          <Empty small title="You have not requested break-glass access." />
+        ) : (
+          view.mine.map((grant) => (
+            <article
+              key={grant.id}
+              className="st-subcard"
+              aria-labelledby={`mine-${grant.id}`}
+            >
+              <div className="st-ptop">
+                <h3 className="st-h2s" id={`mine-${grant.id}`}>
+                  {`Consultation ${grant.resourceId}`}
+                </h3>
+                <span className="grow"></span>
+                <Pill tone={GRANT_STATE_LABELS[grant.state].tone}>
                   {GRANT_STATE_LABELS[grant.state].label}
-                </Status>
-              </Cluster>
-              <Text size="small">{`Reason: ${grant.reason}`}</Text>
-              <Text size="small" tone="muted">
-                {timesOf(grant)}
-              </Text>
+                </Pill>
+              </div>
+              <KeyValues
+                items={[
+                  ["Reason", grant.reason],
+                  ["Times", timesOf(grant)],
+                ]}
+              />
               {grant.state === "active" ? (
-                <Cluster>
-                  <ButtonLink
-                    variant="primary"
+                <div className="st-links">
+                  <a
+                    className="btn btn-ink btn-sm"
                     href={breakGlassPathFor(grant.id)}
                   >
                     Open the read-only view
-                  </ButtonLink>
-                </Cluster>
+                  </a>
+                </div>
               ) : null}
-            </Stack>
-          </Surface>
-        ))
-      )}
+            </article>
+          ))
+        )}
+      </Panel>
       {queue === null ? null : (
         <>
-          <Heading as="h2" size="md" id="queue-title">
+          <h2 className="st-h2" id="queue-title">
             Requests and grants to decide on
-          </Heading>
-          <Cluster>
-            {GRANT_STATES.map((entry) => (
-              <ButtonLink
-                key={entry}
-                variant={entry === queue.grantState ? "primary" : "secondary"}
-                href={`/staff/break-glass?state=${entry}`}
-                aria-current={entry === queue.grantState ? "page" : undefined}
-              >
-                {GRANT_STATE_LABELS[entry].label}
-              </ButtonLink>
-            ))}
-          </Cluster>
+          </h2>
+          <TabLinks
+            label="Grants by state"
+            links={GRANT_STATES.map((entry) => ({
+              href: `/staff/break-glass?state=${entry}`,
+              label: GRANT_STATE_LABELS[entry].label,
+            }))}
+            current={base}
+          />
           <GrantDecisions>
             {queue.grants.length === 0 ? (
-              <Text>
-                {queue.pager.page === 1
-                  ? "There is nothing in this list."
-                  : "There is nothing on this page."}
-              </Text>
+              <section className="st-listbox" aria-label="Grants">
+                <Empty
+                  title={
+                    queue.pager.page === 1
+                      ? "There is nothing in this list."
+                      : "There is nothing on this page."
+                  }
+                />
+              </section>
             ) : (
               queue.grants.map((grant) => (
-                <Surface key={grant.id} labelledBy={`grant-${grant.id}`}>
-                  <Stack gap="tight">
-                    <Heading as="h3" size="sm" id={`grant-${grant.id}`}>
+                <section
+                  key={grant.id}
+                  className="w-card st-panel"
+                  aria-labelledby={`grant-${grant.id}`}
+                >
+                  <div className="st-ptop">
+                    <h3 className="st-h2" id={`grant-${grant.id}`}>
                       {`Consultation ${grant.resourceId}`}
-                    </Heading>
-                    <Cluster>
-                      <Status tone={GRANT_STATE_LABELS[grant.state].tone}>
-                        {GRANT_STATE_LABELS[grant.state].label}
-                      </Status>
-                      {grant.requestedByMe ? (
-                        <Status tone="neutral">Requested by you</Status>
-                      ) : null}
-                    </Cluster>
-                    <Text size="small">{`Reason: ${grant.reason}`}</Text>
-                    <Text size="small" tone="muted">
-                      {timesOf(grant)}
-                    </Text>
-                    {grant.state === "requested" && !grant.requestedByMe ? (
-                      <ApproveAccessForm grant={grant.id} />
+                    </h3>
+                    <span className="grow"></span>
+                    {grant.requestedByMe ? (
+                      <Pill tone="neutral">Requested by you</Pill>
                     ) : null}
-                    {grant.state === "requested" ? (
-                      <RevokeAccessForm
-                        grant={grant.id}
-                        label="Refuse the request"
-                      />
-                    ) : null}
-                    {grant.state === "active" ? (
-                      <RevokeAccessForm
-                        grant={grant.id}
-                        label="Revoke the access"
-                      />
-                    ) : null}
-                  </Stack>
-                </Surface>
+                    <Pill tone={GRANT_STATE_LABELS[grant.state].tone}>
+                      {GRANT_STATE_LABELS[grant.state].label}
+                    </Pill>
+                  </div>
+                  <KeyValues
+                    items={[
+                      ["Reason", grant.reason],
+                      ["Times", timesOf(grant)],
+                    ]}
+                  />
+                  {grant.state === "requested" && !grant.requestedByMe ? (
+                    <ApproveAccessForm grant={grant.id} />
+                  ) : null}
+                  {grant.state === "requested" ? (
+                    <RevokeAccessForm
+                      grant={grant.id}
+                      label="Refuse the request"
+                    />
+                  ) : null}
+                  {grant.state === "active" ? (
+                    <RevokeAccessForm
+                      grant={grant.id}
+                      label="Revoke the access"
+                    />
+                  ) : null}
+                </section>
               ))
             )}
           </GrantDecisions>
-          <Cluster>
-            {queue.pager.page > 1 ? (
-              <ButtonLink
-                variant="secondary"
-                href={`${base}&page=${queue.pager.page - 1}`}
-              >
-                Previous page
-              </ButtonLink>
-            ) : null}
-            {queue.pager.hasNext ? (
-              <ButtonLink
-                variant="secondary"
-                href={`${base}&page=${queue.pager.page + 1}`}
-              >
-                Next page
-              </ButtonLink>
-            ) : null}
-          </Cluster>
+          {queue.pager.page === 1 && !queue.pager.hasNext ? null : (
+            <PagerRow
+              note={`Page ${queue.pager.page} of this list.`}
+              previous={
+                queue.pager.page > 1
+                  ? `${base}&page=${queue.pager.page - 1}`
+                  : null
+              }
+              next={
+                queue.pager.hasNext
+                  ? `${base}&page=${queue.pager.page + 1}`
+                  : null
+              }
+            />
+          )}
         </>
       )}
     </StaffFrame>

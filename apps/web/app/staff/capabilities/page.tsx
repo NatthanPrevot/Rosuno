@@ -6,6 +6,11 @@
 // jurisdictions, exactly as its row policies and functions do. Staff members
 // are listed one page at a time. The one query value read, page, only asks
 // which page to show; the server checks it.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Administration › Staff,
+// staff members): the design's list of staff members, each row opening the
+// member's grants, then the pager. Inviting a staff member waits for
+// decisions (A5, A3) and is shown as not available yet.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -13,18 +18,23 @@ import { connection } from "next/server";
 import { resolveCapabilityAdministration } from "../../../src/application/staff-configuration.ts";
 import { STAFF_CONFIGURATION_SOURCES } from "../../../src/infrastructure/staff/staff-configuration-adapter.ts";
 import {
-  ButtonLink,
-  Status,
-  Table,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
+  Cell,
+  Empty,
+  ListBox,
+  ListRow,
+  NotAvailableYet,
+  Panel,
+  PillCell,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
+import { PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
 
 export const metadata: Metadata = {
   title: "Staff capabilities",
   robots: { index: false, follow: false },
 };
+
+const COLUMNS = ["Staff member", "Account", "Staff profile"] as const;
 
 export default async function CapabilitiesPage({
   searchParams,
@@ -43,65 +53,52 @@ export default async function CapabilitiesPage({
     return refusalPage(view, "/staff/capabilities", "Staff capabilities");
   }
   return (
-    <StaffFrame eyebrow="Staff configuration" title="Staff capabilities">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Text tone="muted">
-        A staff profile alone grants nothing. Each capability is a separate
-        grant, for all jurisdictions or one, and can expire or be revoked.
-      </Text>
-      {view.members.length === 0 ? (
-        <Text>There are no staff members on this page.</Text>
-      ) : (
-        <Table id="staff-members" caption="Staff members">
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Account</th>
-              <th scope="col">Staff profile</th>
-              <th scope="col">Capabilities</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.members.map((member) => (
-              <tr key={member.userId}>
-                <td>{member.isYou ? `${member.name} (you)` : member.name}</td>
-                <td>
-                  <Status
-                    tone={
-                      member.accountState === "active" ? "success" : "neutral"
-                    }
-                  >
-                    {member.accountState}
-                  </Status>
-                </td>
-                <td>
-                  <Status
-                    tone={
-                      member.staffState === "active" ? "success" : "neutral"
-                    }
-                  >
-                    {member.staffState}
-                  </Status>
-                </td>
-                <td>
-                  <ButtonLink
-                    variant="tertiary"
-                    href={`/staff/capabilities/${member.userId}`}
-                  >
-                    Open
-                  </ButtonLink>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+    <StaffFrame
+      title="Staff"
+      subtitle="Staff members and the capabilities granted to them."
+      lead={
+        <p>
+          A staff profile alone grants nothing. Each capability is a separate
+          grant, for all jurisdictions or one, and can expire or be revoked.
+        </p>
+      }
+    >
+      <ListBox label="Staff members" columns={COLUMNS}>
+        {view.members.length === 0 ? (
+          <Empty title="There are no staff members on this page." />
+        ) : (
+          view.members.map((member) => (
+            <ListRow
+              key={member.userId}
+              href={`/staff/capabilities/${member.userId}`}
+              columns={3}
+            >
+              <Cell label="Staff member" strong>
+                {member.isYou ? `${member.name} (you)` : member.name}
+              </Cell>
+              <Cell label="Account">{member.accountState}</Cell>
+              <PillCell
+                label="Staff profile"
+                tone={member.staffState === "active" ? "success" : "neutral"}
+              >
+                {member.staffState}
+              </PillCell>
+            </ListRow>
+          ))
+        )}
+      </ListBox>
       <PagerLinks
         pager={view.pager}
         base="/staff/capabilities"
         noun="staff members"
         shown={view.members.length}
       />
+      <Panel id="staff-invite-title" title="Invite a staff member">
+        <NotAvailableYet
+          what={["Invite a staff member"]}
+          reason="who may invite staff members, and how an invitation is approved, wait for decisions. Staff membership is never self-service."
+        />
+      </Panel>
     </StaffFrame>
   );
 }

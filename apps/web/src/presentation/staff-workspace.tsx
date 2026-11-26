@@ -1106,6 +1106,55 @@ export function Timeline({
   );
 }
 
+// The design's steps of a record (from the record's own state): each step
+// done, current, not reached, or blocked with the note saying why.
+export type StepState = "done" | "cur" | "todo" | "blocked";
+
+const STEP_MARKS: Readonly<Record<StepState, string>> = {
+  done: "✓",
+  cur: "●",
+  todo: "",
+  blocked: "",
+};
+
+const STEP_WORDS: Readonly<Record<StepState, string>> = {
+  done: "done",
+  cur: "current step",
+  todo: "not reached",
+  blocked: "blocked",
+};
+
+export function Steps({
+  label,
+  steps,
+}: {
+  readonly label: string;
+  readonly steps: readonly {
+    readonly label: string;
+    readonly state: StepState;
+    readonly note?: ReactNode;
+  }[];
+}) {
+  return (
+    <ol className="pm-steps" aria-label={label}>
+      {steps.map((step) => (
+        <li key={step.label} className={`pm-step pm-${step.state}`}>
+          <span className="pm-dot" aria-hidden="true">
+            {STEP_MARKS[step.state]}
+          </span>
+          <span className="pm-stt">
+            <span className="pm-stl">{step.label}</span>
+            <span className="st-sr">{` — ${STEP_WORDS[step.state]}`}</span>
+            {step.note === undefined ? null : (
+              <span className="pm-stn">{step.note}</span>
+            )}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 // The design's notes: plain, and quiet (shaded).
 export function Note({ children }: { readonly children: ReactNode }) {
   return <p className="st-note">{children}</p>;

@@ -10,6 +10,11 @@
 // document content is available here). There is no form and no link to any
 // change. Any other grant (another staff member's, one requested, expired or
 // revoked, an unknown or malformed id) gets one fixed message.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, the record panel): the
+// design's record panel holding the read-only Consultation record, its
+// Messages and its documents' metadata, with the access note and its end as
+// the key fact. Still no change, no document content and no link onward.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -20,14 +25,7 @@ import {
   outcomeLabelOf,
   utcText,
 } from "../../../../src/presentation/completion-labels.ts";
-import {
-  Alert,
-  Heading,
-  Stack,
-  Surface,
-  Table,
-  Text,
-} from "../../../../src/presentation/design-system.tsx";
+import { Alert } from "../../../../src/presentation/design-system.tsx";
 import {
   BREAK_GLASS_ACCESS_NOTE,
   BREAK_GLASS_NOT_ACTIVE,
@@ -35,6 +33,14 @@ import {
   PARTICIPANT_ROLE_LABELS,
   SHARING_LABELS,
 } from "../../../../src/presentation/privacy-labels.ts";
+import {
+  Block,
+  DenyCard,
+  KeyFact,
+  KeyValues,
+  RecordPanel,
+  Timeline,
+} from "../../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
 import { BackLink, refusalPage, StaffFrame } from "../../frame.tsx";
 
@@ -45,6 +51,8 @@ export const metadata: Metadata = {
 
 const timeOrNone = (value: string | null) =>
   value === null ? "None" : utcText(value);
+
+const BACK = { href: "/staff/break-glass", label: "Break-glass access" };
 
 export default async function BreakGlassViewPage({
   params,
@@ -58,22 +66,30 @@ export default async function BreakGlassViewPage({
   const view = await resolveBreakGlassAccess(BREAK_GLASS_SOURCES, grant);
   if (view.status === "not-active") {
     return (
-      <StaffFrame eyebrow="Security" title="Break-glass view">
-        <BackLink href="/staff/break-glass">Break-glass access</BackLink>
-        <Alert tone="warning" title="Not available" role="status">
+      <StaffFrame title="Break-glass view">
+        <BackLink href={BACK.href}>{BACK.label}</BackLink>
+        <DenyCard pill="Not available" tone="warning" role="status">
           {BREAK_GLASS_NOT_ACTIVE}
-        </Alert>
+        </DenyCard>
       </StaffFrame>
     );
   }
   if (view.status === "denied") {
     // The surface needs an active Staff Profile, not a capability.
     return (
-      <StaffFrame eyebrow="Security" title="Break-glass view not available">
-        <Alert tone="warning" title="No access" role="status">
+      <StaffFrame title="Break-glass view not available">
+        <DenyCard
+          pill="No access"
+          tone="warning"
+          role="status"
+          links={
+            <a className="btn btn-line btn-sm" href="/staff">
+              Go to Dashboard
+            </a>
+          }
+        >
           {BREAK_GLASS_STAFF_REQUIRED}
-        </Alert>
-        <BackLink href="/staff">Staff tools</BackLink>
+        </DenyCard>
       </StaffFrame>
     );
   }
@@ -102,82 +118,67 @@ export default async function BreakGlassViewPage({
     ],
   ];
   return (
-    <StaffFrame eyebrow="Security" title="Break-glass view">
-      <BackLink href="/staff/break-glass">Break-glass access</BackLink>
-      <Alert tone="warning" title="Break-glass access" role="status">
-        {`${BREAK_GLASS_ACCESS_NOTE} This access ends ${utcText(record.expiresAt)}.`}
-      </Alert>
-      <Table id="break-glass-consultation" caption="Consultation record">
-        <tbody>
-          {rows.map(([label, value]) => (
-            <tr key={label}>
-              <th scope="row">{label}</th>
-              <td>{value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-      <Heading as="h2" size="md" id="break-glass-messages-title">
-        Messages
-      </Heading>
-      {record.olderMessagesNotShown ? (
-        <Text tone="muted">Only the most recent messages are shown.</Text>
-      ) : null}
-      {record.messages.length === 0 ? (
-        <Text>There are no messages.</Text>
-      ) : (
-        record.messages.map((message) => (
-          <Surface key={message.id} labelledBy={`message-${message.id}`}>
-            <Stack gap="tight">
-              <Heading as="h3" size="sm" id={`message-${message.id}`}>
-                {`${PARTICIPANT_ROLE_LABELS[message.senderRole]}, ${utcText(message.sentAt)}`}
-              </Heading>
-              <Text>{message.body}</Text>
-            </Stack>
-          </Surface>
-        ))
-      )}
-      <Heading as="h2" size="md" id="break-glass-documents-title">
-        Documents
-      </Heading>
-      {record.olderDocumentsNotShown ? (
-        <Text tone="muted">Only the most recent documents are shown.</Text>
-      ) : null}
-      {record.documents.length === 0 ? (
-        <Text>There are no documents.</Text>
-      ) : (
-        <Table
-          id="break-glass-documents"
-          caption="Documents (current versions)"
-        >
-          <thead>
-            <tr>
-              <th scope="col">Uploaded by</th>
-              <th scope="col">Version</th>
-              <th scope="col">Type</th>
-              <th scope="col">Size (bytes)</th>
-              <th scope="col">Uploaded</th>
-              <th scope="col">Sharing</th>
-            </tr>
-          </thead>
-          <tbody>
-            {record.documents.map((document) => (
-              <tr key={document.id}>
-                <td>{PARTICIPANT_ROLE_LABELS[document.uploadedBy]}</td>
-                <td>{document.versionLabel ?? "None"}</td>
-                <td>{document.mimeType ?? "Unknown"}</td>
-                <td>
-                  {document.byteSize === null
-                    ? "Unknown"
-                    : String(document.byteSize)}
-                </td>
-                <td>{utcText(document.createdAt)}</td>
-                <td>{SHARING_LABELS[document.sharing]}</td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
-    </StaffFrame>
+    <RecordPanel
+      titleId="staff-configuration-title"
+      title="Break-glass view"
+      sub="Read-only · times in UTC"
+      pill={{ tone: "warning", label: "Break-glass access" }}
+      back={BACK}
+    >
+      <KeyFact
+        label="This access ends"
+        value={utcText(record.expiresAt)}
+        attention
+      />
+      <Block>
+        <Alert tone="warning" title="Break-glass access" role="status">
+          {`${BREAK_GLASS_ACCESS_NOTE} This access ends ${utcText(record.expiresAt)}.`}
+        </Alert>
+      </Block>
+      <Block title="Consultation record">
+        <KeyValues items={rows} />
+      </Block>
+      <Block title="Messages">
+        {record.olderMessagesNotShown ? (
+          <p className="st-emd">Only the most recent messages are shown.</p>
+        ) : null}
+        <Timeline
+          items={record.messages.map((message) => ({
+            key: message.id,
+            at: `${PARTICIPANT_ROLE_LABELS[message.senderRole]}, ${utcText(message.sentAt)}`,
+            text: message.body,
+          }))}
+          none="There are no messages."
+        />
+      </Block>
+      <Block title="Documents">
+        {record.olderDocumentsNotShown ? (
+          <p className="st-emd">Only the most recent documents are shown.</p>
+        ) : null}
+        {record.documents.length === 0 ? (
+          <p className="st-emd">There are no documents.</p>
+        ) : (
+          record.documents.map((document) => (
+            <div key={document.id} className="st-subcard">
+              <KeyValues
+                items={[
+                  ["Uploaded by", PARTICIPANT_ROLE_LABELS[document.uploadedBy]],
+                  ["Version", document.versionLabel ?? "None"],
+                  ["Type", document.mimeType ?? "Unknown"],
+                  [
+                    "Size (bytes)",
+                    document.byteSize === null
+                      ? "Unknown"
+                      : String(document.byteSize),
+                  ],
+                  ["Uploaded", utcText(document.createdAt)],
+                  ["Sharing", SHARING_LABELS[document.sharing]],
+                ]}
+              />
+            </div>
+          ))
+        )}
+      </Block>
+    </RecordPanel>
   );
 }

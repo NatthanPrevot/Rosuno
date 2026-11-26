@@ -6,6 +6,12 @@
 // cannot read looks exactly like one that does not exist. A grant is offered
 // only to an active staff member other than the caller; the database refuses
 // a self-grant and an inactive target again.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, the staff member record):
+// the design's record panel with the staff profile pill, the member, the
+// grants (each with its revoke form while it stands) and the unchanged grant
+// form or the fixed reason none is offered. The member's sessions wait for a
+// decision (A42) and are shown as not available yet.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -15,22 +21,20 @@ import { STAFF_CONFIGURATION_SOURCES } from "../../../../src/infrastructure/staf
 import {
   Alert,
   Disclosure,
-  Heading,
-  Status,
-  Table,
-  Text,
 } from "../../../../src/presentation/design-system.tsx";
 import {
   GRANT_STATE_LABELS,
   utcDateTime,
 } from "../../../../src/presentation/staff-configuration-labels.ts";
-import { requireSteppedUp } from "../../../account/gate.ts";
 import {
-  BackLink,
-  BoundNotice,
-  refusalPage,
-  StaffFrame,
-} from "../../frame.tsx";
+  Block,
+  KeyValues,
+  NotAvailableYet,
+  Pill,
+  RecordPanel,
+} from "../../../../src/presentation/staff-workspace.tsx";
+import { requireSteppedUp } from "../../../account/gate.ts";
+import { BoundNotice, refusalPage } from "../../frame.tsx";
 import { GrantCapabilityForm, RevokeCapabilityForm } from "../forms.tsx";
 
 export const metadata: Metadata = {
@@ -60,94 +64,89 @@ export default async function MemberCapabilitiesPage({
   }
   const m = view.member;
   return (
-    <StaffFrame
-      eyebrow="Staff capabilities"
+    <RecordPanel
+      titleId="staff-configuration-title"
       title={m.isYou ? `${m.name} (you)` : m.name}
+      sub="Staff member · times in UTC"
+      pill={{
+        tone: m.staffState === "active" ? "success" : "neutral",
+        label: `Staff profile ${m.staffState}`,
+      }}
+      back={{ href: "/staff/capabilities", label: "Back to staff members" }}
     >
-      <BackLink href="/staff/capabilities">Back to staff members</BackLink>
-      <Table id="staff-member" caption="Staff member">
-        <tbody>
-          <tr>
-            <th scope="row">Account</th>
-            <td>{m.accountState}</td>
-          </tr>
-          <tr>
-            <th scope="row">Staff profile</th>
-            <td>{m.staffState}</td>
-          </tr>
-        </tbody>
-      </Table>
-      <Heading as="h2" size="md">
-        Capability grants
-      </Heading>
-      <BoundNotice complete={view.grantsComplete} noun="grants" />
-      {view.grants.length === 0 ? (
-        <Text tone="muted">No capability has been granted.</Text>
-      ) : (
-        <Table id="grants" caption="Grants, newest first">
-          <thead>
-            <tr>
-              <th scope="col">Capability</th>
-              <th scope="col">Scope</th>
-              <th scope="col">Granted</th>
-              <th scope="col">Expires</th>
-              <th scope="col">State</th>
-              <th scope="col">Change</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.grants.map((grant) => (
-              <tr key={grant.id}>
-                <td>{grant.capability}</td>
-                <td>{grant.jurisdiction}</td>
-                <td>{utcDateTime(grant.grantedAt)}</td>
-                <td>
-                  {grant.expiresAt === null
-                    ? "Does not expire"
-                    : utcDateTime(grant.expiresAt)}
-                </td>
-                <td>
-                  <Status tone={GRANT_STATE_LABELS[grant.state].tone}>
-                    {grant.revokedAt === null
-                      ? GRANT_STATE_LABELS[grant.state].label
-                      : `${GRANT_STATE_LABELS[grant.state].label} ${utcDateTime(grant.revokedAt)}`}
-                  </Status>
-                </td>
-                <td>
-                  {grant.revokedAt === null ? (
-                    <RevokeCapabilityForm grant={grant.id} />
-                  ) : null}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
-      {view.canGrant ? (
-        <>
-          <BoundNotice
-            complete={view.capabilitiesComplete}
-            noun="capabilities"
-          />
-          <BoundNotice
-            complete={view.jurisdictionsComplete}
-            noun="jurisdictions"
-          />
-          <Disclosure summary="Grant a capability">
-            <GrantCapabilityForm
-              member={m.userId}
-              capabilities={view.capabilities}
-              jurisdictions={view.jurisdictions}
+      <Block title="Staff member">
+        <KeyValues
+          items={[
+            ["Account", m.accountState],
+            ["Staff profile", m.staffState],
+          ]}
+        />
+      </Block>
+      <Block title="Capability grants">
+        <BoundNotice complete={view.grantsComplete} noun="grants" />
+        {view.grants.length === 0 ? (
+          <p className="st-emd">No capability has been granted.</p>
+        ) : (
+          view.grants.map((grant) => (
+            <div key={grant.id} className="st-subcard">
+              <div className="st-ptop">
+                <h3 className="st-h2s">{grant.capability}</h3>
+                <span className="grow"></span>
+                <Pill tone={GRANT_STATE_LABELS[grant.state].tone}>
+                  {grant.revokedAt === null
+                    ? GRANT_STATE_LABELS[grant.state].label
+                    : `${GRANT_STATE_LABELS[grant.state].label} ${utcDateTime(grant.revokedAt)}`}
+                </Pill>
+              </div>
+              <KeyValues
+                items={[
+                  ["Scope", grant.jurisdiction],
+                  ["Granted", utcDateTime(grant.grantedAt)],
+                  [
+                    "Expires",
+                    grant.expiresAt === null
+                      ? "Does not expire"
+                      : utcDateTime(grant.expiresAt),
+                  ],
+                ]}
+              />
+              {grant.revokedAt === null ? (
+                <RevokeCapabilityForm grant={grant.id} />
+              ) : null}
+            </div>
+          ))
+        )}
+      </Block>
+      <Block title="Grant a capability">
+        {view.canGrant ? (
+          <>
+            <BoundNotice
+              complete={view.capabilitiesComplete}
+              noun="capabilities"
             />
-          </Disclosure>
-        </>
-      ) : (
-        <Alert tone="information" role="status">
-          {m.isYou
-            ? "You cannot grant capabilities to yourself. Another staff member with capability administration must do it."
-            : "Capabilities can be granted only to an active User with an active staff profile."}
-        </Alert>
-      )}
-    </StaffFrame>
+            <BoundNotice
+              complete={view.jurisdictionsComplete}
+              noun="jurisdictions"
+            />
+            <Disclosure summary="Grant a capability">
+              <GrantCapabilityForm
+                member={m.userId}
+                capabilities={view.capabilities}
+                jurisdictions={view.jurisdictions}
+              />
+            </Disclosure>
+          </>
+        ) : (
+          <Alert tone="information" role="status">
+            {m.isYou
+              ? "You cannot grant capabilities to yourself. Another staff member with capability administration must do it."
+              : "Capabilities can be granted only to an active User with an active staff profile."}
+          </Alert>
+        )}
+      </Block>
+      <Block title="Sessions">
+        <NotAvailableYet reason="a staff member's sign-in sessions, and who may end them, wait for a decision." />
+      </Block>
+    </RecordPanel>
   );
 }

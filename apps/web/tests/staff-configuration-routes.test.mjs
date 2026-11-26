@@ -1114,17 +1114,20 @@ test("SR-10. the job view is listed for its capability holders, shows escalated 
   }
   assert.equal(view.text.includes("Synthetic message never shown"), false);
   assert.equal(view.html.includes("synthetic-worker"), false);
+  // DEV-001: the owner's UI/UX design: the group tabs only (the other staff
+  // tools are in the staff layout's navigation, SR-13), the current group
+  // marked.
   assert.deepEqual(view.hrefs, [
-    "/staff",
     "/staff/jobs",
     "/staff/jobs?state=open",
     "/staff/jobs?state=finished",
   ]);
   assert.ok(
     view.html.includes(
-      'aria-current="page" class="btn btn-ink" data-variant="primary" href="/staff/jobs"',
+      'class="w-tb on" href="/staff/jobs" aria-current="page"',
     ),
   );
+  assert.equal(view.html.match(/aria-current="page"/g).length, 1);
 });
 
 test("SR-11. waiting and running jobs show that they wait for a worker run, finished jobs offer no change, and every group pages on its own address", async () => {

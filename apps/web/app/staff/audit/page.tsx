@@ -12,6 +12,10 @@
 // malformed one reads nothing. Every page opened here is itself audited by
 // the database. The list shows identifiers, codes and times only; one
 // event's recorded snapshots are on its own page.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Administration › Staff,
+// the activity log): the unchanged filter form in the design's panel, then the
+// design's list of events, each row opening the event, and the pager.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -29,8 +33,6 @@ import {
   Choice,
   Cluster,
   Stack,
-  Table,
-  Text,
   TextField,
 } from "../../../src/presentation/design-system.tsx";
 import {
@@ -39,8 +41,16 @@ import {
   SECURITY_GROUP_NOTE,
   utcText,
 } from "../../../src/presentation/operations-labels.ts";
+import {
+  Cell,
+  Empty,
+  ListBox,
+  ListRow,
+  PagerRow,
+  Panel,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../frame.tsx";
+import { refusalPage, StaffFrame } from "../frame.tsx";
 
 export const metadata: Metadata = {
   title: "Audit and security events",
@@ -48,6 +58,14 @@ export const metadata: Metadata = {
 };
 
 type Query = Readonly<Record<string, string | string[] | undefined>>;
+
+const COLUMNS = [
+  "When (UTC)",
+  "Action",
+  "Performed by",
+  "Resource",
+  "Jurisdiction",
+] as const;
 
 // The address of a page of the same filters.
 function pageAddress(values: AuditFilterValues, page: number): string {
@@ -91,161 +109,151 @@ export default async function AuditEventsPage({
   }
   const { values } = view;
   return (
-    <StaffFrame eyebrow="Security and audit" title="Audit and security events">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Text tone="muted">{AUDIT_INTRO}</Text>
-      <form method="get" action="/staff/audit">
-        <Stack gap="tight">
-          <Cluster>
-            <TextField
-              id="audit-from"
-              name="from"
-              type="date"
-              label="From (UTC day)"
-              defaultValue={values.from}
+    <StaffFrame
+      title="Staff"
+      subtitle="Activity log: the audit record and the security events, read-only."
+      lead={<p>{AUDIT_INTRO}</p>}
+      utc
+    >
+      <Panel id="audit-filters-title" title="Filters">
+        <form method="get" action="/staff/audit">
+          <Stack gap="tight">
+            <Cluster>
+              <TextField
+                id="audit-from"
+                name="from"
+                type="date"
+                label="From (UTC day)"
+                defaultValue={values.from}
+              />
+              <TextField
+                id="audit-until"
+                name="until"
+                type="date"
+                label="Until (UTC day, included)"
+                defaultValue={values.until}
+              />
+            </Cluster>
+            <Cluster>
+              <TextField
+                id="audit-action"
+                name="action"
+                label="Action code"
+                defaultValue={values.action}
+                maxLength={100}
+                autoComplete="off"
+              />
+              <TextField
+                id="audit-resource-type"
+                name="resource_type"
+                label="Resource type"
+                defaultValue={values.resourceType}
+                maxLength={64}
+                autoComplete="off"
+              />
+              <TextField
+                id="audit-resource"
+                name="resource"
+                label="Resource identifier"
+                defaultValue={values.resource}
+                maxLength={36}
+                autoComplete="off"
+              />
+            </Cluster>
+            <Cluster>
+              <TextField
+                id="audit-performer-type"
+                name="performer_type"
+                label="Performed by (type)"
+                hint="For example staff, system, client or attorney."
+                defaultValue={values.performerType}
+                maxLength={64}
+                autoComplete="off"
+              />
+              <TextField
+                id="audit-performer"
+                name="performer"
+                label="Performed by (user identifier)"
+                defaultValue={values.performer}
+                maxLength={36}
+                autoComplete="off"
+              />
+            </Cluster>
+            <Choice
+              type="checkbox"
+              name="security"
+              value="yes"
+              defaultChecked={values.security}
+              label="Security events only"
+              hint={SECURITY_GROUP_NOTE}
             />
-            <TextField
-              id="audit-until"
-              name="until"
-              type="date"
-              label="Until (UTC day, included)"
-              defaultValue={values.until}
-            />
-          </Cluster>
-          <Cluster>
-            <TextField
-              id="audit-action"
-              name="action"
-              label="Action code"
-              defaultValue={values.action}
-              maxLength={100}
-              autoComplete="off"
-            />
-            <TextField
-              id="audit-resource-type"
-              name="resource_type"
-              label="Resource type"
-              defaultValue={values.resourceType}
-              maxLength={64}
-              autoComplete="off"
-            />
-            <TextField
-              id="audit-resource"
-              name="resource"
-              label="Resource identifier"
-              defaultValue={values.resource}
-              maxLength={36}
-              autoComplete="off"
-            />
-          </Cluster>
-          <Cluster>
-            <TextField
-              id="audit-performer-type"
-              name="performer_type"
-              label="Performed by (type)"
-              hint="For example staff, system, client or attorney."
-              defaultValue={values.performerType}
-              maxLength={64}
-              autoComplete="off"
-            />
-            <TextField
-              id="audit-performer"
-              name="performer"
-              label="Performed by (user identifier)"
-              defaultValue={values.performer}
-              maxLength={36}
-              autoComplete="off"
-            />
-          </Cluster>
-          <Choice
-            type="checkbox"
-            name="security"
-            value="yes"
-            defaultChecked={values.security}
-            label="Security events only"
-            hint={SECURITY_GROUP_NOTE}
-          />
-          <Cluster>
-            <Button variant="primary" type="submit">
-              Show events
-            </Button>
-            <ButtonLink variant="tertiary" href="/staff/audit">
-              Clear the filters
-            </ButtonLink>
-          </Cluster>
-        </Stack>
-      </form>
+            <Cluster>
+              <Button variant="primary" type="submit">
+                Show events
+              </Button>
+              <ButtonLink variant="tertiary" href="/staff/audit">
+                Clear the filters
+              </ButtonLink>
+            </Cluster>
+          </Stack>
+        </form>
+      </Panel>
       {view.filtersValid ? null : (
         <Alert tone="warning" title="Check the filters" role="status">
           {AUDIT_FILTERS_INVALID}
         </Alert>
       )}
-      {view.filtersValid && view.events.length === 0 ? (
-        <Text>
-          {view.pager.page === 1
-            ? "No event matches these filters."
-            : "There are no events on this page."}
-        </Text>
+      {view.filtersValid ? (
+        <ListBox label="Audit events, newest first" columns={COLUMNS}>
+          {view.events.length === 0 ? (
+            <Empty
+              title={
+                view.pager.page === 1
+                  ? "No event matches these filters."
+                  : "There are no events on this page."
+              }
+            />
+          ) : null}
+          {view.events.map((event) => (
+            <ListRow
+              key={event.id}
+              href={`/staff/audit/${event.id}`}
+              columns={5}
+            >
+              <Cell label="When" strong>
+                {utcText(event.occurredAt)}
+              </Cell>
+              <Cell label="Action">{event.actionCode}</Cell>
+              <Cell label="Performed by">
+                {event.actorUserId === null
+                  ? event.actorType
+                  : `${event.actorType} ${event.actorUserId}`}
+              </Cell>
+              <Cell label="Resource">
+                {event.resourceId === null
+                  ? event.resourceType
+                  : `${event.resourceType} ${event.resourceId}`}
+              </Cell>
+              <Cell label="Jurisdiction">
+                {jurisdictionLabel(view.names, event.jurisdictionId)}
+              </Cell>
+            </ListRow>
+          ))}
+        </ListBox>
       ) : null}
-      {view.events.length === 0 ? null : (
-        <Table id="audit-events" caption="Audit events, newest first">
-          <thead>
-            <tr>
-              <th scope="col">When (UTC)</th>
-              <th scope="col">Action</th>
-              <th scope="col">Performed by</th>
-              <th scope="col">Resource</th>
-              <th scope="col">Jurisdiction</th>
-              <th scope="col">Open</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.events.map((event) => (
-              <tr key={event.id}>
-                <td>{utcText(event.occurredAt)}</td>
-                <td>{event.actionCode}</td>
-                <td>
-                  {event.actorUserId === null
-                    ? event.actorType
-                    : `${event.actorType} ${event.actorUserId}`}
-                </td>
-                <td>
-                  {event.resourceId === null
-                    ? event.resourceType
-                    : `${event.resourceType} ${event.resourceId}`}
-                </td>
-                <td>{jurisdictionLabel(view.names, event.jurisdictionId)}</td>
-                <td>
-                  <ButtonLink
-                    variant="tertiary"
-                    href={`/staff/audit/${event.id}`}
-                  >
-                    Open
-                  </ButtonLink>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+      {view.pager.page === 1 && !view.pager.hasNext ? null : (
+        <PagerRow
+          note={`Page ${view.pager.page} of the events.`}
+          previous={
+            view.pager.page > 1
+              ? pageAddress(values, view.pager.page - 1)
+              : null
+          }
+          next={
+            view.pager.hasNext ? pageAddress(values, view.pager.page + 1) : null
+          }
+        />
       )}
-      <Cluster>
-        {view.pager.page > 1 ? (
-          <ButtonLink
-            variant="secondary"
-            href={pageAddress(values, view.pager.page - 1)}
-          >
-            Previous page
-          </ButtonLink>
-        ) : null}
-        {view.pager.hasNext ? (
-          <ButtonLink
-            variant="secondary"
-            href={pageAddress(values, view.pager.page + 1)}
-          >
-            Next page
-          </ButtonLink>
-        ) : null}
-      </Cluster>
     </StaffFrame>
   );
 }

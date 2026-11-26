@@ -41,8 +41,6 @@ export function StaffFrame({
   readonly lead?: ReactNode;
   // The page shows server instants, always in UTC.
   readonly utc?: boolean;
-  // Accepted from pages not yet in the design's header; not shown.
-  readonly eyebrow?: string;
   readonly children: ReactNode;
 }) {
   return (
