@@ -11,6 +11,13 @@
 // an address, a provider or the client's identity is shown. An
 // acknowledgement-required Notification offers the acknowledge form; the
 // database decides again on submission.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace Settings & help, Notifications): the workspace frame around the
+// design's Settings categories and panel, the notification center as the
+// design's rows (with the existing acknowledgement form), and preferences in
+// the design's "Not available yet" state with the policy placeholder. A
+// visitor the page does not admit sees the design's signed-out panel.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -22,6 +29,13 @@ import {
 } from "../../../src/application/notification-center.ts";
 import { ATTORNEY_CENTER_SOURCES } from "../../../src/infrastructure/communications/communication-adapter.ts";
 import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";
+import {
+  AttorneyGate,
+  AttorneyWorkspace,
+  NotAvailableYet,
+  Pill,
+  SettingsPanel,
+} from "../../../src/presentation/attorney-workspace.tsx";
 import {
   CENTER_INTRO,
   CENTER_TITLE,
@@ -35,13 +49,6 @@ import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
-  Table,
   Text,
 } from "../../../src/presentation/design-system.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
@@ -52,7 +59,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function CenterFrame({
+function GateFrame({
   title,
   children,
 }: {
@@ -60,17 +67,9 @@ function CenterFrame({
   readonly children: ReactNode;
 }) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-notifications-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-notifications-title">
-            {title}
-          </Heading>
-          {children}
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate titleId="attorney-notifications-title" title={title}>
+      {children}
+    </AttorneyGate>
   );
 }
 
@@ -82,61 +81,49 @@ const BACK = (
   </Cluster>
 );
 
-function CenterTable({
-  entries,
-  prefix,
-}: {
-  readonly entries: readonly CenterEntry[];
-  readonly prefix: string;
-}) {
+// The notification center as the design's Settings rows: what happened and
+// when on the left, what can be done on the right.
+function CenterRows({ entries }: { readonly entries: readonly CenterEntry[] }) {
   if (entries.length === 0) {
     return <Text tone="muted">{NO_NOTIFICATIONS}</Text>;
   }
   return (
-    <Table id={`${prefix}-notifications`} caption="Your notifications">
-      <thead>
-        <tr>
-          <th scope="col">Notification</th>
-          <th scope="col">Received (UTC)</th>
-          <th scope="col">Email</th>
-          <th scope="col">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {entries.map((entry) => (
-          <tr key={entry.id}>
-            <td>
+    <ul className="aw-rows" aria-label="Your notifications">
+      {entries.map((entry) => (
+        <li className="set-row" key={entry.id}>
+          <div>
+            <p className="b">
               {entry.critical ? (
-                <Status tone="warning">Important</Status>
-              ) : null}{" "}
+                <>
+                  <Pill tone="warning">Important</Pill>{" "}
+                </>
+              ) : null}
               {NOTIFICATION_LABELS[entry.type]}
-            </td>
-            <td>{utcText(entry.createdAt)}</td>
-            <td>
-              {entry.emailState === null
-                ? "No email"
-                : EMAIL_STATE_LABELS[entry.emailState]}
-            </td>
-            <td>
-              <Stack gap="tight">
-                {entry.linkPath === null ? null : (
-                  <ButtonLink variant="tertiary" href={entry.linkPath}>
-                    {OPEN_NOTIFICATION_LABEL}
-                  </ButtonLink>
-                )}
-                {entry.acknowledgementRequired &&
-                entry.state !== "acknowledged" ? (
-                  <AcknowledgeForm notificationId={entry.id} />
-                ) : null}
-                {entry.state === "acknowledged" ? (
-                  <Text size="small">Acknowledged</Text>
-                ) : null}
-              </Stack>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
+            </p>
+            <p className="xs subtle">
+              {`Received ${utcText(entry.createdAt)} · ${
+                entry.emailState === null
+                  ? "No email"
+                  : EMAIL_STATE_LABELS[entry.emailState]
+              }`}
+            </p>
+          </div>
+          <div className="aw-row-acts">
+            {entry.linkPath === null ? null : (
+              <a className="link sm" href={entry.linkPath}>
+                {OPEN_NOTIFICATION_LABEL}
+              </a>
+            )}
+            {entry.acknowledgementRequired && entry.state !== "acknowledged" ? (
+              <AcknowledgeForm notificationId={entry.id} />
+            ) : null}
+            {entry.state === "acknowledged" ? (
+              <Pill tone="success">Acknowledged</Pill>
+            ) : null}
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -147,7 +134,7 @@ export default async function AttorneyNotificationsPage() {
   const view = await resolveAttorneyNotifications(ATTORNEY_CENTER_SOURCES);
   if (view.status === "sign-in-required") {
     return (
-      <CenterFrame title="Sign in to continue">
+      <GateFrame title="Sign in to continue">
         <Text tone="muted">
           Notifications are available only to signed-in attorney accounts.
         </Text>
@@ -156,16 +143,16 @@ export default async function AttorneyNotificationsPage() {
             Sign in
           </ButtonLink>
         </Cluster>
-      </CenterFrame>
+      </GateFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <CenterFrame title="Notifications not available">
+      <GateFrame title="Notifications not available">
         <Alert tone="warning" title="Not available" role="status">
           This account does not have access to the attorney workspace.
         </Alert>
-      </CenterFrame>
+      </GateFrame>
     );
   }
   if (view.status !== "ready") {
@@ -174,20 +161,40 @@ export default async function AttorneyNotificationsPage() {
       outcome: view.status,
     });
     return (
-      <CenterFrame title="Notifications unavailable">
+      <GateFrame title="Notifications unavailable">
         <Alert tone="error" title="Something went wrong" role="alert">
           Your notifications could not be shown right now. Please try again
           later.
         </Alert>
         {BACK}
-      </CenterFrame>
+      </GateFrame>
     );
   }
   return (
-    <CenterFrame title={CENTER_TITLE}>
-      <Text tone="muted">{CENTER_INTRO}</Text>
-      <CenterTable entries={view.entries} prefix="attorney" />
+    <AttorneyWorkspace
+      section="settings"
+      titleId="attorney-notifications-title"
+      title="Settings & help"
+      width="settings"
+    >
+      <SettingsPanel
+        current="/attorney/notifications"
+        labelledBy="attorney-center-title"
+      >
+        <div className="w-seth">
+          <h2 className="set-h" id="attorney-center-title">
+            {CENTER_TITLE}
+          </h2>
+        </div>
+        <p className="sm muted w-setlead">{CENTER_INTRO}</p>
+        <CenterRows entries={view.entries} />
+        <h3 className="w-setgrp">Preferences</h3>
+        <NotAvailableYet
+          reason="notification preferences cannot be changed here."
+          placeholder="[notification channels and wording — per communications policy]"
+        />
+      </SettingsPanel>
       {BACK}
-    </CenterFrame>
+    </AttorneyWorkspace>
   );
 }

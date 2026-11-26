@@ -704,3 +704,164 @@
 .aw .w-th .pill {
   flex: none;
 }
+
+/* ---------- Earnings ---------- */
+.aw .aw-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.aw .aw-totals .w-ekpi {
+  flex-wrap: wrap;
+  gap: 12px 32px;
+}
+.aw .aw-kpi-sub {
+  font-size: 18px;
+}
+.aw .aw-ledger .w-lh,
+.aw .aw-ledger .w-lr {
+  grid-template-columns:
+    minmax(150px, 1.2fr) minmax(0, 1fr) minmax(0, 1fr)
+    minmax(0, 1fr);
+}
+.aw .aw-ledger ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.aw .aw-ledger .w-lr:last-child {
+  border-bottom: 0;
+}
+.aw .aw-ledger .w-lr:hover {
+  background: none;
+}
+.aw .aw-end {
+  text-align: right;
+}
+.aw .aw-lk {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .aw .aw-ledger .w-lh {
+    display: none;
+  }
+  .aw .aw-ledger .w-lr {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .aw .aw-ledger .aw-lk {
+    position: static;
+    width: auto;
+    height: auto;
+    clip: auto;
+    color: var(--subtle);
+  }
+  .aw .aw-ledger .aw-end {
+    text-align: left;
+  }
+}
+
+/* ---------- Compliance & readiness ---------- */
+.aw details.w-cri > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.aw details.w-cri > summary::-webkit-details-marker {
+  display: none;
+}
+.aw details.w-cri[open] .w-chev {
+  transform: rotate(180deg);
+}
+.aw .aw-cri .w-crib {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 16px;
+}
+.aw .aw-cri .w-crih .pill {
+  flex: none;
+}
+.aw .aw-crrows {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.aw .aw-crrows .pill {
+  height: auto;
+  min-height: 22px;
+  white-space: normal;
+}
+
+/* ---------- Reviews ---------- */
+.aw .aw-reviews li {
+  padding: 12px 0;
+}
+.aw .aw-review {
+  gap: 4px;
+}
+.aw .aw-review-text {
+  color: var(--ink-2);
+  white-space: pre-line;
+}
+
+/* ---------- Settings & help ---------- */
+.aw .aw-setbody {
+  min-width: 0;
+}
+.aw .aw-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.aw .aw-rows > .set-row:last-child {
+  border-bottom: 0;
+}
+.aw .aw-rows .b .pill {
+  vertical-align: 1px;
+}
+.aw .aw-row-acts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.aw .aw-setform {
+  padding: 4px 0 8px;
+}
+.aw .w-setbody > .aw-gated {
+  margin-top: 6px;
+}
+@media (max-width: 700px) {
+  .aw .w-set .w-setnav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .aw .w-set .w-sc {
+    width: auto;
+  }
+  .aw .aw-rows > .set-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .aw .aw-row-acts {
+    align-items: flex-start;
+  }
+}
+
+/* The design's policy placeholder inside the workspace (the public root's own rule, restated for this root). */
+.aw .ph {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #fbf3e2;
+  color: #85570a;
+  border: 1px dashed #e6cd96;
+  font-size: 0.92em;
+  font-weight: 500;
+  white-space: normal;
+}

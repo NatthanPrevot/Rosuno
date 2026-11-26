@@ -119,6 +119,17 @@ write(
     "./actions.ts": target("actions.mjs"),
   }),
 );
+// DEV-001: the owner's UI/UX design's workspace frame, linked as written.
+write(
+  "attorney-workspace.mjs",
+  relink(
+    transpile(
+      read("src/presentation/attorney-workspace.tsx"),
+      "attorney-workspace.tsx",
+    ),
+    { "react/jsx-runtime": jsxRuntime },
+  ),
+);
 write(
   "attorney-page.mjs",
   relink(transpile(read("app/attorney/professional/page.tsx"), "page.tsx"), {
@@ -129,6 +140,9 @@ write(
     ),
     "../../../src/infrastructure/professional/attorney-professional-adapter.ts":
       target("wiring.mjs"),
+    "../../../src/presentation/attorney-workspace.tsx": target(
+      "attorney-workspace.mjs",
+    ),
     "../../../src/presentation/design-system.tsx": target("design-system.mjs"),
     "../../account/gate.ts": target("attorney-gate.mjs"),
     "./forms.tsx": target("attorney-forms.mjs"),

@@ -714,3 +714,44 @@ export function RowChevron() {
     </svg>
   );
 }
+
+// The design's expandable group (the compliance list): a native disclosure,
+// open by default, so it needs no script.
+export function ExpandGroup({
+  title,
+  note,
+  summary,
+  children,
+}: {
+  readonly title: ReactNode;
+  readonly note?: ReactNode;
+  readonly summary: ReactNode;
+  readonly children: ReactNode;
+}) {
+  return (
+    <details className="w-cri aw-cri" open>
+      <summary className="w-crih">
+        <span className="col grow l-g0-minw0">
+          <span className="sm b">{title}</span>
+          {note === undefined ? null : <span className="xs muted">{note}</span>}
+        </span>
+        {summary}
+        <svg
+          className="w-chev"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M6 9.5l6 6 6-6" />
+        </svg>
+      </summary>
+      <div className="w-crib">{children}</div>
+    </details>
+  );
+}

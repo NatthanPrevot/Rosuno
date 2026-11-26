@@ -9,6 +9,12 @@
 // current Consultations, or the Consultation the attorney came from (the one
 // query value read, only to preselect it); the database checks it again on
 // submission.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace Settings & help, Help & support): the workspace frame around the
+// design's Settings categories and panel, the existing report form and the
+// attorney's own reports as the design's rows. A visitor the page does not
+// admit sees the design's signed-out panel.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -20,6 +26,12 @@ import { isUuid } from "../../../src/application/professional-records.ts";
 import { ATTORNEY_COMPLAINT_SOURCES } from "../../../src/infrastructure/consultations/completion-adapter.ts";
 import { ATTORNEY_CONSULTATION_SOURCES } from "../../../src/infrastructure/consultations/consultation-adapter.ts";
 import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";
+import {
+  AttorneyGate,
+  AttorneyWorkspace,
+  Pill,
+  SettingsPanel,
+} from "../../../src/presentation/attorney-workspace.tsx";
 import {
   COMPLAINT_NOTE,
   COMPLAINT_STATE_LABELS,
@@ -33,12 +45,6 @@ import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
   Text,
 } from "../../../src/presentation/design-system.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
@@ -49,24 +55,20 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function Frame({ children }: { readonly children: ReactNode }) {
+const BACK = (
+  <Cluster>
+    <ButtonLink variant="tertiary" href="/attorney">
+      Back to your workspace
+    </ButtonLink>
+  </Cluster>
+);
+
+function GateFrame({ children }: { readonly children: ReactNode }) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-complaints-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-complaints-title">
-            Report a problem
-          </Heading>
-          {children}
-          <Cluster>
-            <ButtonLink variant="tertiary" href="/attorney">
-              Back to your workspace
-            </ButtonLink>
-          </Cluster>
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate titleId="attorney-complaints-title" title="Report a problem">
+      {children}
+      {BACK}
+    </AttorneyGate>
   );
 }
 
@@ -84,23 +86,23 @@ export default async function AttorneyComplaintsPage({
   const view = await resolveAttorneyComplaints(ATTORNEY_COMPLAINT_SOURCES);
   if (view.status === "sign-in-required") {
     return (
-      <Frame>
+      <GateFrame>
         <Text tone="muted">Sign in to report a problem.</Text>
         <Cluster>
           <ButtonLink variant="primary" href="/sign-in">
             Sign in
           </ButtonLink>
         </Cluster>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="warning" title="Not available" role="status">
           This account cannot report problems here.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status !== "ready") {
@@ -109,11 +111,11 @@ export default async function AttorneyComplaintsPage({
       outcome: view.status,
     });
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="error" title="Something went wrong" role="alert">
           Your reports could not be shown right now. Please try again later.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   const list = await resolveAttorneyConsultations(
@@ -142,46 +144,62 @@ export default async function AttorneyComplaintsPage({
           ...consultations,
         ];
   return (
-    <Frame>
-      <Text tone="muted">{COMPLAINT_NOTE}</Text>
-      <ReportForm consultations={choices} selected={selected} />
-      <Heading as="h2" size="md" id="attorney-reports-title">
-        Your reports
-      </Heading>
-      {view.cases.length === 0 ? (
-        <Text>You have not reported a problem.</Text>
-      ) : (
-        view.cases.map((entry) => (
-          <Surface key={entry.id} labelledBy={`report-${entry.id}`}>
-            <Stack gap="tight">
-              <Heading as="h3" size="sm" id={`report-${entry.id}`}>
-                {`Reported ${utcText(entry.openedAt)}`}
-              </Heading>
-              <Cluster>
-                <Status tone={COMPLAINT_STATE_LABELS[entry.state].tone}>
+    <AttorneyWorkspace
+      section="settings"
+      titleId="attorney-complaints-title"
+      title="Settings & help"
+      width="settings"
+    >
+      <SettingsPanel
+        current="/attorney/complaints"
+        labelledBy="attorney-report-title"
+      >
+        <div className="w-seth">
+          <h2 className="set-h" id="attorney-report-title">
+            Report a problem
+          </h2>
+        </div>
+        <p className="sm muted w-setlead">{COMPLAINT_NOTE}</p>
+        <div className="aw-form aw-setform">
+          <ReportForm consultations={choices} selected={selected} />
+        </div>
+        <h3 className="w-setgrp" id="attorney-reports-title">
+          Your reports
+        </h3>
+        {view.cases.length === 0 ? (
+          <Text>You have not reported a problem.</Text>
+        ) : (
+          <ul className="aw-rows" aria-labelledby="attorney-reports-title">
+            {view.cases.map((entry) => (
+              <li className="set-row" key={entry.id}>
+                <div>
+                  <p className="b" id={`report-${entry.id}`}>
+                    {`Reported ${utcText(entry.openedAt)}`}
+                  </p>
+                  {entry.resolvedAt === null ? null : (
+                    <p className="xs subtle">{`Resolved ${utcText(entry.resolvedAt)}`}</p>
+                  )}
+                  {entry.statement === null ? null : (
+                    <p className="xs subtle aw-wraps">{`What you described: ${entry.statement}`}</p>
+                  )}
+                  {entry.consultationId === null ? null : (
+                    <a
+                      className="link xs"
+                      href={`/attorney/consultations/${entry.consultationId}`}
+                    >
+                      Open the consultation
+                    </a>
+                  )}
+                </div>
+                <Pill tone={COMPLAINT_STATE_LABELS[entry.state].tone}>
                   {COMPLAINT_STATE_LABELS[entry.state].label}
-                </Status>
-              </Cluster>
-              {entry.consultationId === null ? null : (
-                <Cluster>
-                  <ButtonLink
-                    variant="tertiary"
-                    href={`/attorney/consultations/${entry.consultationId}`}
-                  >
-                    Open the consultation
-                  </ButtonLink>
-                </Cluster>
-              )}
-              {entry.resolvedAt === null ? null : (
-                <Text size="small">{`Resolved ${utcText(entry.resolvedAt)}`}</Text>
-              )}
-              {entry.statement === null ? null : (
-                <Text size="small">{`What you described: ${entry.statement}`}</Text>
-              )}
-            </Stack>
-          </Surface>
-        ))
-      )}
-    </Frame>
+                </Pill>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SettingsPanel>
+      {BACK}
+    </AttorneyWorkspace>
   );
 }

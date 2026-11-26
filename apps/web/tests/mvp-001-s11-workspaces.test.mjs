@@ -559,8 +559,7 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
   // DEV-001: the owner's UI/UX design renders the attorney pages in the
   // workspace frame, whose grouped section navigation (fixed first-party
   // links, each to an attorney page that exists, the current section marked)
-  // replaces the workspace navigation component screen group by screen
-  // group. A page the section navigation does not hold itself is one page of
+  // replaces the workspace navigation component on every page of the set. A page the section navigation does not hold itself is one page of
   // its section's page switch, which marks the page and holds the section's
   // own page.
   const shell = codeOf(read("src/presentation/attorney-workspace.tsx"));
@@ -633,7 +632,7 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
       label: "Consultation pages",
       pages: "CONSULTATION_PAGES",
     },
-    "app/attorney/compliance/page.tsx": { legacy: true },
+    "app/attorney/compliance/page.tsx": { section: "compliance" },
   };
   assert.deepEqual(
     Object.keys(ATTORNEY_FRAMES).sort(),
@@ -642,17 +641,6 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
   for (const [file, frame] of Object.entries(ATTORNEY_FRAMES)) {
     const code = codeOf(read(file));
     const flat = code.replace(/\s+/g, " ");
-    if (frame.legacy) {
-      assert.ok(
-        code.includes(`<AttorneyNavigation current="${pathOf(file)}" />`),
-        file,
-      );
-      assert.ok(
-        labels.ATTORNEY_NAVIGATION.some((link) => link.href === pathOf(file)),
-        file,
-      );
-      continue;
-    }
     assert.doesNotMatch(code, /<AttorneyNavigation\b/, file);
     assert.ok(
       flat.includes(`<AttorneyWorkspace section="${frame.section}"`),
