@@ -3139,6 +3139,9 @@ const COMPLETION_RPCS = Object.freeze([
   "staff_legal_holds",
   "staff_place_legal_hold",
   "staff_release_legal_hold",
+  // DEV-001 (20261129010000): the attorney name and practice area on the
+  // client's own consultations.
+  "client_consultation_parties",
 ]);
 // MVP-001 S11 pass 2: the staff operations adapter calls the database's own
 // audit reads, the counts-only operations summary, the referral reads, the
@@ -3182,6 +3185,10 @@ const WORKSPACE_RPCS = Object.freeze([
   "attorney_consultation_history",
   "attorney_documents",
   "attorney_compliance_records",
+  // DEV-001 (20261129010000): the client's own requests and the attorney's
+  // own activity counts.
+  "client_requests",
+  "attorney_activity_counts",
 ]);
 // MVP-001 S11 PS-A6: the privacy and security actions adapter calls the six
 // break-glass and seven data request functions, each as a literal call
@@ -3219,6 +3226,8 @@ const PAYMENT_RPCS = Object.freeze([
   "staff_assign_reconciliation_exception",
   "staff_resolve_reconciliation_exception",
   "staff_request_reconciliation",
+  // DEV-001 (20261129010000): one payment's dispute events for finance staff.
+  "staff_payment_dispute_events",
 ]);
 const CAPABILITY_PREDICATE_RPC =
   'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';

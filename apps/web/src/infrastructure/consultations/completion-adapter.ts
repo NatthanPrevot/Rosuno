@@ -394,6 +394,10 @@ function callsOf(client: RequestClient, deadlineMs: number) {
       observedRead("client_consultations", deadlineMs, () =>
         client.rpc("client_consultations"),
       ),
+    clientParties: () =>
+      observedRead("client_consultation_parties", deadlineMs, () =>
+        client.rpc("client_consultation_parties"),
+      ),
     cancel: (consultationId: string) =>
       isId(consultationId)
         ? observedWrite(
@@ -682,6 +686,7 @@ export function createParticipantOutcomeReads(
   return portSource(
     (calls): ParticipantOutcomeReads => ({
       clientList: calls.clientList,
+      clientParties: calls.clientParties,
       environmentIdentity: calls.environmentIdentity,
     }),
     clientSource,

@@ -18,6 +18,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { assertTailThenRegistered } from "./migration-lifecycle.mjs";
+
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54392;
 const REPOSITORY_ROOT =
@@ -198,7 +200,10 @@ function migrationPaths() {
   const committed = fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort();
   const draft = process.env.P2_924_DRAFT_MIGRATION;
   if (committed.includes(P2_924_MIGRATION)) {
-    assert.equal(committed[committed.length - 1], P2_924_MIGRATION, "P2-924 is the newest migration");
+    // DEV-001: later DEV-001 migrations may follow P2-924; each one must be
+    // exactly the register's next row, in order, in a consistent lifecycle.
+    const own = committed.indexOf(P2_924_MIGRATION);
+    assertTailThenRegistered(committed.slice(own + 1), [], P2_924_MIGRATION);
     return committed.map((f) => path.join(MIGRATIONS, f));
   }
   assert.ok(draft, "the P2-924 migration is neither committed nor supplied as a draft");
@@ -262,7 +267,7 @@ const BOOTSTRAP_SIGNATURE = "public.bootstrap_staff_administrators(text, text, u
 async function prove() {
   startCluster();
   const files = migrationPaths();
-  const p2924 = files[files.length - 1];
+  const p2924 = files.find((file) => path.basename(file) === P2_924_MIGRATION);
   check("the P2-924 migration bytes are the pinned bytes", () =>
     assert.equal(createHash("sha256").update(fs.readFileSync(p2924)).digest("hex"), P2_924_SHA256));
   sql(

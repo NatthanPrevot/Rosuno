@@ -8,7 +8,9 @@
 // records are each one database read of the caller's own records only (the
 // database decides the caller from the request's own session; no read takes
 // an identifier). The dashboards and the week view reuse the existing use
-// cases and reads unchanged and only summarize what they answer.
+// cases and reads unchanged and only summarize what they answer. DEV-001
+// adds two more such reads: one page of the client's Requests across their
+// Intakes, and the attorney's activity counts for a period.
 //
 // Nothing here decides anything the database decides: every answer is read
 // strictly (an unexpected column, value or combination makes the whole
@@ -33,6 +35,12 @@ import {
 import type { EarningsView } from "./client-payments.ts";
 import type { ClientIntakeSources } from "./client-intake.ts";
 import type { OwnComplaintsView } from "./complaints.ts";
+import {
+  REQUEST_PATHS,
+  REQUEST_STATES,
+  type RequestPath,
+  type RequestState,
+} from "./consultation-request.ts";
 import {
   clientDisplayStateOf,
   isTerminalState,
@@ -172,6 +180,50 @@ export const COMPLIANCE_RECORD_COLUMNS = Object.freeze([
   "recorded_at",
 ]);
 
+// DEV-001: the client's own Requests across their Intakes, one page at a
+// time (client_requests).
+export const CLIENT_REQUEST_COLUMNS = Object.freeze([
+  "request_id",
+  "intake_id",
+  "state",
+  "expired_due",
+  "request_path",
+  "attorney_display_name",
+  "requested_modality",
+  "duration_minutes",
+  "slot_start_at",
+  "slot_end_at",
+  "response_deadline_at",
+  "created_at",
+  "consultation_id",
+]);
+
+// The segments the database pages the client's Requests by: the undecided
+// ones, or every one.
+export const REQUEST_SEGMENTS = Object.freeze(["open", "all"] as const);
+export type RequestSegment = (typeof REQUEST_SEGMENTS)[number];
+
+// DEV-001: the attorney's own activity counts for a period
+// (attorney_activity_counts), in the database's fixed order.
+export const ACTIVITY_COLUMNS = Object.freeze(["metric", "dimension", "value"]);
+export const REQUEST_OUTCOMES = Object.freeze([
+  "accepted",
+  "declined",
+  "expired",
+  "withdrawn",
+  "could_not_proceed",
+] as const);
+export type RequestOutcome = (typeof REQUEST_OUTCOMES)[number];
+export const CONSULTATION_OUTCOMES = Object.freeze([
+  "completed",
+  "cancelled",
+  "no_show",
+  "technical_failure",
+] as const);
+export type ConsultationOutcome = (typeof CONSULTATION_OUTCOMES)[number];
+// The longest period the database counts: 366 days of 86400 seconds.
+export const MAX_ACTIVITY_PERIOD_MS = 366 * 86400000;
+
 // The bounds the database answers within (the history, threads and documents
 // at most 200 rows; the documents one more to say more exist; the compliance
 // records at most 400 claims and 200 findings).
@@ -204,6 +256,11 @@ export type ClientWorkspaceReads = {
   readonly overview: () => Promise<RowsResult>;
   // consultation_threads(p_role)
   readonly threads: (role: ThreadRole) => Promise<RowsResult>;
+  // client_requests(p_segment, p_offset)
+  readonly requests: (
+    segment: RequestSegment,
+    offset: number,
+  ) => Promise<RowsResult>;
 };
 
 export type AttorneyWorkspaceReads = {
@@ -215,6 +272,8 @@ export type AttorneyWorkspaceReads = {
   readonly documents: () => Promise<RowsResult>;
   // attorney_compliance_records()
   readonly compliance: () => Promise<RowsResult>;
+  // attorney_activity_counts(p_from, p_until)
+  readonly activity: (from: string, until: string) => Promise<RowsResult>;
 };
 
 export type ClientWorkspaceSources = {
@@ -486,6 +545,179 @@ function readComplianceRecord(row: unknown): ComplianceRecord | null {
   });
 }
 
+export type ClientRequestEntry = {
+  readonly id: string;
+  readonly intakeId: string;
+  readonly state: RequestState;
+  // The database's own flag: an undecided Request whose deadline, quote or
+  // Hold expiry has passed (the expiry has not been recorded yet).
+  readonly expiredDue: boolean;
+  // What to show: such a Request is shown expired (the browser never decides
+  // this).
+  readonly displayState: RequestState;
+  readonly path: RequestPath;
+  readonly attorneyName: string | null;
+  readonly modality: string;
+  readonly durationMinutes: number | null;
+  readonly slotStart: string | null;
+  readonly slotEnd: string | null;
+  readonly responseDeadline: string | null;
+  readonly createdAt: string;
+  readonly consultationId: string | null;
+};
+
+// The states before the attorney's decision (the database's open segment).
+const UNDECIDED_STATES = Object.freeze([
+  "created",
+  "payment_authorized",
+  "slot_held",
+  "awaiting_attorney",
+] as const);
+const MODALITY = /^[a-z][a-z0-9_]{1,31}$/;
+
+const isDuration = (value: unknown): value is number =>
+  Number.isSafeInteger(value) &&
+  (value as number) >= 1 &&
+  (value as number) <= 1440;
+const isName = (value: unknown): value is string =>
+  typeof value === "string" && value.trim() !== "" && value.length <= 200;
+const optionalTime = (value: unknown): value is string | null =>
+  value === null || isTimestamp(value);
+
+function readClientRequest(row: unknown): ClientRequestEntry | null {
+  const f = readExact(row, CLIENT_REQUEST_COLUMNS);
+  if (f === null) {
+    return null;
+  }
+  const id = f.get("request_id");
+  const intakeId = f.get("intake_id");
+  const state = f.get("state");
+  const expiredDue = f.get("expired_due");
+  const path = f.get("request_path");
+  const name = f.get("attorney_display_name");
+  const modality = f.get("requested_modality");
+  const duration = f.get("duration_minutes");
+  const slotStart = f.get("slot_start_at");
+  const slotEnd = f.get("slot_end_at");
+  const deadline = f.get("response_deadline_at");
+  const createdAt = f.get("created_at");
+  const consultationId = f.get("consultation_id");
+  if (
+    !isUuid(id) ||
+    !isUuid(intakeId) ||
+    !isOneOf(REQUEST_STATES, state) ||
+    typeof expiredDue !== "boolean" ||
+    (expiredDue && !isOneOf(UNDECIDED_STATES, state)) ||
+    !isOneOf(REQUEST_PATHS, path) ||
+    !(name === null || isName(name)) ||
+    typeof modality !== "string" ||
+    !MODALITY.test(modality) ||
+    !(duration === null || isDuration(duration)) ||
+    !optionalTime(slotStart) ||
+    !optionalTime(slotEnd) ||
+    (slotStart === null) !== (slotEnd === null) ||
+    (path === "instant" && slotStart !== null) ||
+    !optionalTime(deadline) ||
+    !isTimestamp(createdAt) ||
+    !(consultationId === null || isUuid(consultationId)) ||
+    (consultationId !== null && state !== "accepted")
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    id,
+    intakeId,
+    state,
+    expiredDue,
+    displayState: expiredDue ? "expired" : state,
+    path,
+    attorneyName: name as string | null,
+    modality,
+    durationMinutes: duration as number | null,
+    slotStart: slotStart as string | null,
+    slotEnd: slotEnd as string | null,
+    responseDeadline: deadline as string | null,
+    createdAt,
+    consultationId: consultationId as string | null,
+  });
+}
+
+export type ActivityPeriod = {
+  readonly from: string;
+  readonly until: string;
+};
+
+// A period the database counts: two instants, the end after the start and at
+// most 366 days of 86400 seconds later. Anything else is never sent.
+export function isActivityPeriod(value: unknown): value is ActivityPeriod {
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+  const from = Object.getOwnPropertyDescriptor(value, "from")?.value;
+  const until = Object.getOwnPropertyDescriptor(value, "until")?.value;
+  if (!isTimestamp(from) || !isTimestamp(until)) {
+    return false;
+  }
+  const span = Date.parse(until) - Date.parse(from);
+  return span > 0 && span <= MAX_ACTIVITY_PERIOD_MS;
+}
+
+export type ActivityCounts = {
+  readonly requests: Readonly<Record<RequestOutcome, number>>;
+  readonly consultations: Readonly<Record<ConsultationOutcome, number>>;
+  // Answered: accepted and declined; resolved: answered and expired.
+  readonly answered: number;
+  readonly resolved: number;
+};
+
+// The nine counts read strictly: exactly the database's fixed dimensions, in
+// its order, each a whole count.
+function readActivity(rows: readonly unknown[]): ActivityCounts | null {
+  const dimensions = [
+    ...REQUEST_OUTCOMES.map((outcome) => ["requests", outcome] as const),
+    ...CONSULTATION_OUTCOMES.map(
+      (outcome) => ["consultations", outcome] as const,
+    ),
+  ];
+  if (rows.length !== dimensions.length) {
+    return null;
+  }
+  const values: number[] = [];
+  for (const [index, [metric, dimension]] of dimensions.entries()) {
+    const f = readExact(rows[index], ACTIVITY_COLUMNS);
+    const value = f?.get("value");
+    if (
+      f === null ||
+      f.get("metric") !== metric ||
+      f.get("dimension") !== dimension ||
+      !isCount(value)
+    ) {
+      return null;
+    }
+    values.push(value);
+  }
+  const requests = Object.freeze(
+    Object.fromEntries(
+      REQUEST_OUTCOMES.map((outcome, index) => [outcome, values[index]]),
+    ) as Record<RequestOutcome, number>,
+  );
+  const consultations = Object.freeze(
+    Object.fromEntries(
+      CONSULTATION_OUTCOMES.map((outcome, index) => [
+        outcome,
+        values[REQUEST_OUTCOMES.length + index],
+      ]),
+    ) as Record<ConsultationOutcome, number>,
+  );
+  const answered = requests.accepted + requests.declined;
+  return Object.freeze({
+    requests,
+    consultations,
+    answered,
+    resolved: answered + requests.expired,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Client surfaces
 // ---------------------------------------------------------------------------
@@ -559,6 +791,64 @@ export async function resolveClientAccount(
     return account === null
       ? UNAVAILABLE
       : Object.freeze({ status: "ready", account });
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+export type ClientRequestsView =
+  | {
+      readonly status: "ready";
+      readonly segment: RequestSegment;
+      readonly requests: readonly ClientRequestEntry[];
+      readonly pager: StaffPager;
+    }
+  | Refusal;
+
+// The segment a query value names: "all", or the open Requests for anything
+// else.
+export function requestSegmentOf(value: unknown): RequestSegment {
+  return value === "all" ? "all" : "open";
+}
+
+// One page (25, newest first) of the client's own Requests across their
+// Intakes, the open ones or all; the query values only name the segment and
+// the page. It never throws; a Request outside the segment asked for makes
+// the page unavailable.
+export async function resolveClientRequests(
+  sources: ClientWorkspaceSources,
+  segmentValue: unknown,
+  pageValue: unknown,
+): Promise<ClientRequestsView> {
+  try {
+    const access = await admittedClient(sources.clientIntake);
+    if (access !== "granted") {
+      return access;
+    }
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE;
+    }
+    const segment = requestSegmentOf(segmentValue);
+    const page = staffPageOf(pageValue);
+    const rows = rowsOf(
+      await attempt(() => reads.requests(segment, staffOffsetOf(page))),
+    );
+    const read = staffPageRows(rows, readClientRequest, page);
+    if (
+      read === null ||
+      new Set(read.rows.map((r) => r.id)).size !== read.rows.length ||
+      (segment === "open" &&
+        read.rows.some((r) => !isOneOf(UNDECIDED_STATES, r.state)))
+    ) {
+      return UNAVAILABLE;
+    }
+    return Object.freeze({
+      status: "ready",
+      segment,
+      requests: read.rows,
+      pager: read.pager,
+    });
   } catch {
     return UNAVAILABLE;
   }
@@ -779,6 +1069,51 @@ export async function resolveAttorneyComplianceRecords(
       return UNAVAILABLE;
     }
     return Object.freeze({ status: "ready", records });
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+export type ActivityView =
+  | {
+      readonly status: "ready";
+      readonly period: ActivityPeriod;
+      readonly activity: ActivityCounts;
+    }
+  | Refusal;
+
+// The attorney's own activity counts for a period [from, until): the
+// Requests offered to them by outcome (counted by creation) and their ended
+// Consultations by state (counted by end). Counts only; the period's earnings
+// stay the ledger-derived ones of the earnings use case, per currency. It
+// never throws; a period the database does not count is unavailable.
+export async function resolveAttorneyActivity(
+  sources: AttorneyWorkspaceSources,
+  period: unknown,
+): Promise<ActivityView> {
+  try {
+    const access = await admitAttorney(sources);
+    if (access !== "granted") {
+      return access;
+    }
+    if (!isActivityPeriod(period)) {
+      return UNAVAILABLE;
+    }
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE;
+    }
+    const rows = rowsOf(
+      await attempt(() => reads.activity(period.from, period.until)),
+    );
+    const activity = rows === null ? null : readActivity(rows);
+    return activity === null
+      ? UNAVAILABLE
+      : Object.freeze({
+          status: "ready",
+          period: Object.freeze({ from: period.from, until: period.until }),
+          activity,
+        });
   } catch {
     return UNAVAILABLE;
   }

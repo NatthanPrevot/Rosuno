@@ -216,6 +216,16 @@ export const CLIENT_LIST_COLUMNS = Object.freeze([
   "outcome_code",
 ]);
 
+// DEV-001: who the client's Consultations are with
+// (client_consultation_parties).
+export const CLIENT_PARTY_COLUMNS = Object.freeze([
+  "consultation_id",
+  "consultation_request_id",
+  "intake_id",
+  "attorney_display_name",
+  "practice_area_name",
+]);
+
 export const STALE_COLUMNS = Object.freeze([
   "consultation_id",
   "jurisdiction_id",
@@ -285,6 +295,8 @@ export const MAX_CLIENT_CONSULTATIONS = 200;
 export type ParticipantOutcomeReads = {
   // client_consultations()
   readonly clientList: () => Promise<RowsResult>;
+  // client_consultation_parties()
+  readonly clientParties: () => Promise<RowsResult>;
   // deployment_environment_identity()
   readonly environmentIdentity: () => Promise<RowsResult>;
 };
@@ -513,6 +525,94 @@ export async function resolveClientConsultations(
       return UNAVAILABLE;
     }
     return Object.freeze({ status: "ready", entries });
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+export type ConsultationParty = {
+  readonly consultationId: string;
+  readonly requestId: string;
+  readonly intakeId: string;
+  // The attorney's presentable display name; null when the database refuses
+  // it or none is recorded.
+  readonly attorneyName: string | null;
+  // The client's own practice area answer (their latest revision of the
+  // Intake); null when it names none.
+  readonly practiceArea: string | null;
+};
+
+function readParty(row: unknown): ConsultationParty | null {
+  const f = readExact(row, CLIENT_PARTY_COLUMNS);
+  if (f === null) {
+    return null;
+  }
+  const consultationId = f.get("consultation_id");
+  const requestId = f.get("consultation_request_id");
+  const intakeId = f.get("intake_id");
+  const name = f.get("attorney_display_name");
+  const area = f.get("practice_area_name");
+  if (
+    !isUuid(consultationId) ||
+    !isUuid(requestId) ||
+    !isUuid(intakeId) ||
+    !(
+      name === null ||
+      (typeof name === "string" && name.trim() !== "" && name.length <= 200)
+    ) ||
+    !(area === null || (typeof area === "string" && area.trim() !== ""))
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    consultationId,
+    requestId,
+    intakeId,
+    attorneyName: name as string | null,
+    practiceArea: area as string | null,
+  });
+}
+
+export type ConsultationPartiesView =
+  | {
+      readonly status: "ready";
+      // By Consultation id, for the Consultations the client's list holds.
+      readonly parties: ReadonlyMap<string, ConsultationParty>;
+    }
+  | Refusal;
+
+// Who each of the client's own Consultations is with: the attorney's
+// presentable name and the client's own practice area answer, for exactly
+// the Consultations of the client's list (pages join the two by Consultation
+// id). It never throws.
+export async function resolveClientConsultationParties(
+  sources: Pick<ClientOutcomeSources, "clientIntake" | "reads">,
+): Promise<ConsultationPartiesView> {
+  try {
+    const access = await admittedClient(sources.clientIntake);
+    if (access !== "granted") {
+      return access;
+    }
+    const reads = await portFrom(sources.reads);
+    if (reads === null) {
+      return UNAVAILABLE;
+    }
+    const rows = rowsOf(await attempt(() => reads.clientParties()));
+    if (rows === null || rows.length > MAX_CLIENT_CONSULTATIONS) {
+      return UNAVAILABLE;
+    }
+    const parties = readRows(rows, readParty);
+    if (
+      parties === null ||
+      new Set(parties.map((party) => party.consultationId)).size !==
+        parties.length
+    ) {
+      return UNAVAILABLE;
+    }
+    return Object.freeze({
+      status: "ready",
+      parties: new Map(parties.map((party) => [party.consultationId, party])),
+    });
   } catch {
     return UNAVAILABLE;
   }

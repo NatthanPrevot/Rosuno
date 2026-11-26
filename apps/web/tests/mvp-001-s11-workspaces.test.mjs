@@ -722,6 +722,13 @@ test("S11C-3 the participant workspace adapter calls each of its six reads by it
   await attorneyReads.history();
   await attorneyReads.documents();
   await attorneyReads.compliance();
+  // DEV-001 (20261129010000): the client's own Requests (one segment, one
+  // page of 25) and the attorney's own activity counts (one period).
+  await clientReads.requests("open", 25);
+  await attorneyReads.activity(
+    "2026-11-01T00:00:00.000Z",
+    "2026-12-01T00:00:00.000Z",
+  );
   assert.deepEqual(log, [
     ["client_payments", { p_offset: 25 }],
     ["client_account_overview", undefined],
@@ -730,6 +737,14 @@ test("S11C-3 the participant workspace adapter calls each of its six reads by it
     ["attorney_consultation_history", undefined],
     ["attorney_documents", undefined],
     ["attorney_compliance_records", undefined],
+    ["client_requests", { p_segment: "open", p_offset: 25 }],
+    [
+      "attorney_activity_counts",
+      {
+        p_from: "2026-11-01T00:00:00.000Z",
+        p_until: "2026-12-01T00:00:00.000Z",
+      },
+    ],
   ]);
   log.length = 0;
   for (const offset of [-25, 7, 100025, 1.5, "0", null]) {
@@ -738,13 +753,35 @@ test("S11C-3 the participant workspace adapter calls each of its six reads by it
   for (const role of ["staff", "Client", "", null]) {
     assert.deepEqual(await clientReads.threads(role), UNREADABLE);
   }
+  // DEV-001: a malformed segment, offset or period is refused before
+  // anything is sent.
+  for (const [segment, offset] of [
+    ["pending", 0],
+    ["Open", 0],
+    [null, 0],
+    ["all", 7],
+    ["all", -25],
+    ["all", 100025],
+  ]) {
+    assert.deepEqual(await clientReads.requests(segment, offset), UNREADABLE);
+  }
+  for (const [from, until] of [
+    ["2026-12-01T00:00:00.000Z", "2026-11-01T00:00:00.000Z"],
+    ["2025-01-01T00:00:00.000Z", "2026-11-01T00:00:00.000Z"],
+    ["not a time", "2026-11-01T00:00:00.000Z"],
+    [null, null],
+  ]) {
+    assert.deepEqual(await attorneyReads.activity(from, until), UNREADABLE);
+  }
   assert.deepEqual(log, []);
   assert.deepEqual(Object.keys(clientReads).sort(), [
     "overview",
     "payments",
+    "requests",
     "threads",
   ]);
   assert.deepEqual(Object.keys(attorneyReads).sort(), [
+    "activity",
     "compliance",
     "documents",
     "history",

@@ -2930,6 +2930,7 @@
         "Forward-only migrations with unapplied register rows; this work item and DEC-20261125-DEV-001-ENGINEERING-PROGRAM cover every DEV-001 migration.",
         "First migration 20261128010000_p2_924_development_regulatory_mode_and_staff_bootstrap: the reviewed P2-924 revision 3.1 design (non-production development regulatory mode and audited first-staff bootstrap), with its disposable-database proof apps/web/tests/p2-924-db-proof.mjs.",
         "The D4 proof-tail helper assertTailThenRegistered in apps/web/tests/migration-lifecycle.mjs and its use in the eleven slice proofs that pinned the later-migration list; the S11 PS-A6 proof's DDL inventory compared through its known tail only, so a later migration's own objects stay out of the PS-A6 inventory.",
+        "Second migration 20261129010000_dev_001_workspace_reads: four read-only functions for the UI/UX integration (client_requests, client_consultation_parties, attorney_activity_counts, staff_payment_dispute_events), each mirroring the authorization of the existing read it extends, with its disposable-database proof apps/web/tests/dev-001-workspace-reads-db-proof.mjs.",
         "Fact records allowed under a grant: this work item, its decision, unapplied register rows and readiness items."
       ],
       "out_of_scope": [
@@ -2977,11 +2978,12 @@
       "environment": "none",
       "release_refs": [],
       "migration_refs": [
-        "20261128010000_p2_924_development_regulatory_mode_and_staff_bootstrap"
+        "20261128010000_p2_924_development_regulatory_mode_and_staff_bootstrap",
+        "20261129010000_dev_001_workspace_reads"
       ],
       "rollback_reference": "Forward-only: a defect is corrected by a further DEV-001 change, a migration by a separately authorized forward corrective migration. The owner revokes the program by setting DEV-001 or the activation to revoked on rosuno-grants.",
       "created_at": "2026-11-25T06:19:41Z",
-      "updated_at": "2026-11-25T06:19:41Z"
+      "updated_at": "2026-11-26T00:21:35Z"
     }
   ]
 }

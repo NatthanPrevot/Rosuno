@@ -478,6 +478,14 @@ export function createFinanceReads(
                 }),
               )
             : UNREADABLE_ROWS,
+        disputeEvents: async (paymentId: string) =>
+          isId(paymentId)
+            ? observedRead("staff_payment_dispute_events", deadlineMs, () =>
+                client.rpc("staff_payment_dispute_events", {
+                  p_payment_id: paymentId,
+                }),
+              )
+            : UNREADABLE_ROWS,
         environmentIdentity: () => environmentRead(client, deadlineMs),
       },
       deadlineMs,
