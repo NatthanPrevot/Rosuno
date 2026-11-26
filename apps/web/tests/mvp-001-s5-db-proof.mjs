@@ -1249,10 +1249,15 @@ async function inventoryChecks() {
       // further anon function (inventoried by the S6 proofs).
       // MVP-001 S11 (20261127040000): and exactly the public read of an
       // attorney's published reviews (inventoried by the S11 proof).
+      // DEV-001: website & appearance studio (20261130010000): and exactly the
+      // two public reads of the published appearance (inventoried by the
+      // DEV-001 site appearance proof).
       const expected = [
         ...Object.keys(PUBLIC_FUNCTIONS),
         "public_attorney_offers(uuid, uuid)",
         "public_attorney_reviews(uuid)",
+        "public_site_appearance()",
+        "public_site_appearance_asset(text)",
       ]
         .map((signature) =>
           sql(`select 'public.${signature}'::regprocedure::text;`),

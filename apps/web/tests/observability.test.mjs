@@ -407,7 +407,9 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // adapter (a failed call, with the call name and how it failed only) write
   // lines too. DEV-001: the owner's UI/UX design's Legal matters and Account
   // security pages (a view unavailable, with the route and outcome only)
-  // write lines too.
+  // write lines too. DEV-001: website & appearance studio: the appearance
+  // adapter (a failed call, with the call name and how it failed only; never
+  // a configuration, a page text or image bytes) writes lines too.
   assert.deepEqual(callers, [
     "app/attorney/complaints/actions.ts",
     "app/attorney/complaints/page.tsx",
@@ -464,6 +466,8 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/staff/legal-holds/actions.ts",
     "app/staff/reviews/actions.ts",
     "app/staff/verification/actions.ts",
+    // DEV-001: website & appearance studio: the appearance adapter.
+    "src/infrastructure/appearance/appearance-adapter.ts",
     "src/infrastructure/client/client-intake-adapter.ts",
     "src/infrastructure/client/intake-suggestion-adapter.ts",
     "src/infrastructure/communications/communication-adapter.ts",

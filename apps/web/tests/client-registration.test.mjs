@@ -3210,6 +3210,29 @@ const PRIVACY_RPCS = Object.freeze([
   "staff_assign_data_request",
   "staff_decide_data_request",
 ]);
+// DEV-001: website & appearance studio: the appearance adapter calls the two
+// public appearance reads and the twelve staff appearance functions, each as
+// a literal call through the request's own unprivileged session; it builds or
+// receives no privileged client, and no other file names any of the fourteen
+// functions.
+const APPEARANCE_ADAPTER =
+  "src/infrastructure/appearance/appearance-adapter.ts";
+const APPEARANCE_RPCS = Object.freeze([
+  "public_site_appearance",
+  "public_site_appearance_asset",
+  "staff_site_appearance_overview",
+  "staff_site_appearance_versions",
+  "staff_site_appearance_version",
+  "staff_site_appearance_preview",
+  "staff_site_appearance_assets",
+  "staff_site_appearance_asset",
+  "staff_save_site_appearance_draft",
+  "staff_publish_site_appearance",
+  "staff_restore_site_appearance",
+  "staff_reset_site_appearance",
+  "staff_discard_site_appearance_draft",
+  "staff_upload_site_appearance_asset",
+]);
 const PAYMENT_ADAPTER = "src/infrastructure/payments/payment-adapter.ts";
 const PAYMENT_RPCS = Object.freeze([
   "client_request_payment",
@@ -3296,6 +3319,9 @@ const RPC_OCCURRENCES = Object.freeze({
   // MVP-001 S11 PS-A6: the thirteen privacy and security functions, plus the
   // environment accessor.
   [PRIVACY_ADAPTER]: PRIVACY_RPCS.length + 1,
+  // DEV-001: website & appearance studio: the fourteen appearance functions,
+  // plus the environment accessor.
+  [APPEARANCE_ADAPTER]: APPEARANCE_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -3621,6 +3647,33 @@ function assertQuotaRpcContract(codes) {
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
       );
     }
+    // DEV-001: website & appearance studio: the appearance functions, as for
+    // the privacy and security functions.
+    for (const name of APPEARANCE_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === APPEARANCE_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== APPEARANCE_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === APPEARANCE_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        APPEARANCE_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
     // MVP-001 S7: the payment functions, as for the offer functions.
     for (const name of PAYMENT_RPCS) {
       assert.equal(
@@ -3672,7 +3725,10 @@ function assertQuotaRpcContract(codes) {
         file === COMPLETION_ADAPTER ||
         file === OPERATIONS_ADAPTER ||
         // MVP-001 S11 PS-A6: the privacy adapter's environment accessor.
-        file === PRIVACY_ADAPTER
+        file === PRIVACY_ADAPTER ||
+        // DEV-001: website & appearance studio: the appearance adapter's
+        // environment accessor.
+        file === APPEARANCE_ADAPTER
         ? 1
         : 0,
       file,

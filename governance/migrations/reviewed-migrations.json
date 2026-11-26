@@ -2099,6 +2099,34 @@
       "depends_on": [
         "20261128010000_p2_924_development_regulatory_mode_and_staff_bootstrap"
       ]
+    },
+    {
+      "migration_id": "20261130010000_dev_001_site_appearance",
+      "migration_kind": "product",
+      "sequence": 79,
+      "artifact_path": "supabase/migrations/20261130010000_dev_001_site_appearance.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+        "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-DEV-001-ENGINEERING-PROGRAM"],
+      "decision_refs": ["DEC-20261125-DEV-001-ENGINEERING-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Not applied anywhere. Forward-only: a separately authorized, reviewed corrective migration may drop the three appearance relations and their functions, and remove the capability catalogue code manage_site_appearance only if no grant references it; audit events stay. This migration, every earlier migration and the migration history stay byte-identical.",
+      "depends_on": ["20261129010000_dev_001_workspace_reads"]
     }
   ]
 }

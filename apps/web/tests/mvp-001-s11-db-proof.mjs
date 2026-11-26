@@ -2782,7 +2782,11 @@ async function migrationChecks() {
         // two codes of the later registered PS-A6 migrations
         // (approve_break_glass, 20261127190000; manage_data_requests,
         // 20261127200000).
-        "approve_break_glass,authorize_jurisdiction_launch,manage_attorney_verification,manage_client_accounts,manage_complaints,manage_compliance_reviews,manage_consultation_operations,manage_data_requests,manage_financial_operations,manage_intake_configuration,manage_jurisdiction_configuration,manage_legal_holds,manage_operational_jobs,manage_policy_configuration,manage_staff_capabilities,moderate_reviews,view_audit_events,view_operations,view_referral_operations",
+        // DEV-001: website & appearance studio re-pin: and exactly the one code
+        // of the later registered site appearance migration
+        // (manage_site_appearance, 20261130010000; pending owner confirmation
+        // A53).
+        "approve_break_glass,authorize_jurisdiction_launch,manage_attorney_verification,manage_client_accounts,manage_complaints,manage_compliance_reviews,manage_consultation_operations,manage_data_requests,manage_financial_operations,manage_intake_configuration,manage_jurisdiction_configuration,manage_legal_holds,manage_operational_jobs,manage_policy_configuration,manage_site_appearance,manage_staff_capabilities,moderate_reviews,view_audit_events,view_operations,view_referral_operations",
       );
       assert.equal(
         sql(

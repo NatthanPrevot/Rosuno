@@ -1036,6 +1036,9 @@ async function privilegeChecks() {
         // registered S11 operations-integrity migration (20261127080000).
         // MVP-001 S11 PS-A6 re-pin: and exactly the two codes of the later
         // registered PS-A6 migrations (20261127190000, 20261127200000).
+        // DEV-001: website & appearance studio re-pin: and exactly the one
+        // code of the later registered site appearance migration
+        // (20261130010000; pending owner confirmation A53).
         [
           "approve_break_glass",
           "authorize_jurisdiction_launch",
@@ -1051,6 +1054,7 @@ async function privilegeChecks() {
           "manage_legal_holds",
           "manage_operational_jobs",
           "manage_policy_configuration",
+          "manage_site_appearance",
           "manage_staff_capabilities",
           "moderate_reviews",
           "view_audit_events",

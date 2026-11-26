@@ -77,6 +77,9 @@ const S2_MIGRATIONS = Object.freeze([
 // MVP-001 S11 PS-A6 re-pin: the later registered PS-A6 migrations
 // (20261127190000, 20261127200000) add exactly approve_break_glass and
 // manage_data_requests.
+// DEV-001: website & appearance studio re-pin: the later registered site
+// appearance migration (20261130010000) adds exactly manage_site_appearance
+// (pending owner confirmation A53).
 const CAPABILITIES = Object.freeze([
   "approve_break_glass",
   "authorize_jurisdiction_launch",
@@ -92,6 +95,7 @@ const CAPABILITIES = Object.freeze([
   "manage_legal_holds",
   "manage_operational_jobs",
   "manage_policy_configuration",
+  "manage_site_appearance",
   "manage_staff_capabilities",
   "moderate_reviews",
   "view_audit_events",

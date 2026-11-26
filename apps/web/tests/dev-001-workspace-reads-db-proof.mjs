@@ -66,6 +66,12 @@ const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54393;
 const DB = "rosuno_dev001_workspace_reads_proof";
 const BASE_DB = "rosuno_dev001_workspace_reads_proof_base";
+// DEV-001: website & appearance studio re-pin: the catalog comparison (MIG-2)
+// compares BASE_DB with a database migrated exactly through this proof's own
+// migration, so a later registered migration's own objects never enter this
+// migration's inventory (each later migration's own proof inventories it);
+// every behavioural check still runs on DB, which holds every migration.
+const INVENTORY_DB = "rosuno_dev001_workspace_reads_proof_inventory";
 const PREPARATION = process.env.DEV_001_WORKSPACE_READS_REPOSITORY_ROOT;
 const REPOSITORY_ROOT =
   PREPARATION ??
@@ -479,8 +485,10 @@ function applyMigrations() {
   sql(ROLES, "postgres");
   sql(fixtureFor(DB), "postgres");
   sql(fixtureFor(BASE_DB), "postgres");
+  sql(fixtureFor(INVENTORY_DB), "postgres");
   report.migrations.notices = applyMigrationsTo(DB, files);
   applyMigrationsTo(BASE_DB, files.slice(0, own));
+  applyMigrationsTo(INVENTORY_DB, files.slice(0, own + 1));
   report.migrations.applied = files.length;
   report.migrations.base_applied = own;
 }
@@ -1147,7 +1155,9 @@ async function migrationChecks() {
         if (name === "functions") {
           continue;
         }
-        if (sql(query, BASE_DB) !== sql(query)) {
+        // DEV-001: website & appearance studio re-pin: through this
+        // migration only (INVENTORY_DB; see above).
+        if (sql(query, BASE_DB) !== sql(query, INVENTORY_DB)) {
           differences[name] = true;
         }
       }
@@ -1155,7 +1165,7 @@ async function migrationChecks() {
       const before = new Set(
         sql(CATALOG_QUERIES.functions, BASE_DB).split("|"),
       );
-      const added = sql(CATALOG_QUERIES.functions)
+      const added = sql(CATALOG_QUERIES.functions, INVENTORY_DB)
         .split("|")
         .filter((signature) => !before.has(signature));
       assert.deepEqual(

@@ -118,6 +118,9 @@ export const STAFF_CAPABILITIES = Object.freeze([
   // handling data requests.
   "approve_break_glass",
   "manage_data_requests",
+  // DEV-001: the website and appearance studio (catalogue code pending owner
+  // confirmation A53).
+  "manage_site_appearance",
 ] as const);
 export type StaffCapability = (typeof STAFF_CAPABILITIES)[number];
 

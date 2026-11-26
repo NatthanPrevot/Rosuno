@@ -2713,12 +2713,17 @@ async function publicChecks() {
         // MVP-001 S11 re-pin: and exactly the public read of an attorney's
         // published reviews of the later registered S11 reviews migration
         // (20261127040000).
+        // DEV-001: website & appearance studio re-pin: and exactly the two
+        // public reads of the published appearance of the later registered
+        // site appearance migration (20261130010000).
         [
           "public_attorney_directory(uuid,uuid,text,integer)",
           "public_attorney_offers(uuid,uuid)",
           "public_attorney_profile(uuid,uuid)",
           "public_attorney_reviews(uuid)",
           "public_discovery_filters()",
+          "public_site_appearance()",
+          "public_site_appearance_asset(text)",
         ],
       );
       const after = allCounts();

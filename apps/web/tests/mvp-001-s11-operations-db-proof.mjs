@@ -2953,16 +2953,48 @@ const PS_A6_CAPABILITIES = Object.freeze([
   "approve_break_glass",
   "manage_data_requests",
 ]);
+// DEV-001: website & appearance studio re-pin: the catalog objects the later
+// registered site appearance migration adds (20261130010000), admitted
+// exactly by name as the PS-A6 objects are (their exact columns, constraints,
+// indexes, triggers, rows and privileges are checked by the DEV-001 site
+// appearance proof): the relations site_appearance_activation,
+// site_appearance_assets and site_appearance_versions with their row types,
+// named indexes, constraints and four guard triggers; the one capability
+// catalog row manage_site_appearance (pending owner confirmation A53).
+const APPEARANCE_RELATIONS = Object.freeze([
+  "site_appearance_activation",
+  "site_appearance_assets",
+  "site_appearance_versions",
+]);
+const APPEARANCE_INDEXES = Object.freeze([
+  "site_appearance_activation_pkey",
+  "site_appearance_assets_list_idx",
+  "site_appearance_assets_pkey",
+  "site_appearance_assets_sha256_key",
+  "site_appearance_versions_list_idx",
+  "site_appearance_versions_number_idx",
+  "site_appearance_versions_one_draft_idx",
+  "site_appearance_versions_one_published_idx",
+  "site_appearance_versions_pkey",
+]);
+const APPEARANCE_TRIGGERS = Object.freeze([
+  "site_appearance_assets.site_appearance_assets_guard",
+  "site_appearance_assets.site_appearance_assets_no_truncate",
+  "site_appearance_versions.site_appearance_versions_guard",
+  "site_appearance_versions.site_appearance_versions_no_truncate",
+]);
+const APPEARANCE_CAPABILITIES = Object.freeze(["manage_site_appearance"]);
 const psA6List = (names) => names.map((n) => `'${n}'`).join(", ");
 // The same listings without exactly those objects (for the database with
-// every migration applied).
+// every migration applied). DEV-001: website & appearance studio re-pin: and
+// without exactly the site appearance objects (see above).
 const CATALOG_QUERIES_BEFORE_PS_A6 = Object.freeze({
   ...CATALOG_QUERIES,
-  relations: `select coalesce(string_agg(relkind::text || ':' || relname, ',' order by relname), '') from pg_class where relnamespace = 'public'::regnamespace and relname not in (${psA6List([...PS_A6_RELATIONS, ...PS_A6_INDEXES])});`,
-  columns: `select coalesce(string_agg(table_name || '.' || column_name || ':' || data_type || ':' || is_nullable || ':' || coalesce(column_default, ''), ',' order by table_name, ordinal_position), '') from information_schema.columns where table_schema = 'public' and table_name not in (${psA6List(PS_A6_RELATIONS)}) and not (table_name = 'complaint_cases' and column_name = 'statement');`,
-  constraints: `select coalesce(string_agg(conrelid::regclass::text || '.' || conname || ':' || pg_get_constraintdef(oid), ',' order by conrelid::regclass::text, conname), '') from pg_constraint where connamespace = 'public'::regnamespace and conrelid::regclass::text not in (${psA6List(PS_A6_RELATIONS)}) and conname <> 'complaint_cases_statement_v1_check';`,
-  indexes: `select coalesce(string_agg(indexdef, ',' order by indexname), '') from pg_indexes where schemaname = 'public' and indexname not in (${psA6List(PS_A6_INDEXES)});`,
-  types: `select coalesce(string_agg(typname, ',' order by typname), '') from pg_type where typnamespace = 'public'::regnamespace and typname not in (${psA6List([...PS_A6_RELATIONS, ...PS_A6_RELATIONS.map((n) => `_${n}`)])});`,
+  relations: `select coalesce(string_agg(relkind::text || ':' || relname, ',' order by relname), '') from pg_class where relnamespace = 'public'::regnamespace and relname not in (${psA6List([...PS_A6_RELATIONS, ...PS_A6_INDEXES, ...APPEARANCE_RELATIONS, ...APPEARANCE_INDEXES])});`,
+  columns: `select coalesce(string_agg(table_name || '.' || column_name || ':' || data_type || ':' || is_nullable || ':' || coalesce(column_default, ''), ',' order by table_name, ordinal_position), '') from information_schema.columns where table_schema = 'public' and table_name not in (${psA6List([...PS_A6_RELATIONS, ...APPEARANCE_RELATIONS])}) and not (table_name = 'complaint_cases' and column_name = 'statement');`,
+  constraints: `select coalesce(string_agg(conrelid::regclass::text || '.' || conname || ':' || pg_get_constraintdef(oid), ',' order by conrelid::regclass::text, conname), '') from pg_constraint where connamespace = 'public'::regnamespace and conrelid::regclass::text not in (${psA6List([...PS_A6_RELATIONS, ...APPEARANCE_RELATIONS])}) and conname <> 'complaint_cases_statement_v1_check';`,
+  indexes: `select coalesce(string_agg(indexdef, ',' order by indexname), '') from pg_indexes where schemaname = 'public' and indexname not in (${psA6List([...PS_A6_INDEXES, ...APPEARANCE_INDEXES])});`,
+  types: `select coalesce(string_agg(typname, ',' order by typname), '') from pg_type where typnamespace = 'public'::regnamespace and typname not in (${psA6List([...PS_A6_RELATIONS, ...PS_A6_RELATIONS.map((n) => `_${n}`), ...APPEARANCE_RELATIONS, ...APPEARANCE_RELATIONS.map((n) => `_${n}`)])});`,
   policy_types:
     "select coalesce(string_agg(code, ',' order by code), '') from public.policy_types where code <> 'complaint';",
 });
@@ -3002,8 +3034,13 @@ async function opsMigrationChecks() {
       }
       assert.deepEqual(differences, {});
       const before = new Set(triggersOf(BASE_DB));
+      // DEV-001: website & appearance studio re-pin: without exactly the four
+      // site appearance guard triggers (asserted exactly below).
       const added = triggersOf(DB).filter(
-        (t) => !before.has(t) && !PS_A6_TRIGGERS.includes(t),
+        (t) =>
+          !before.has(t) &&
+          !PS_A6_TRIGGERS.includes(t) &&
+          !APPEARANCE_TRIGGERS.includes(t),
       );
       assert.deepEqual(added, [
         "attorney_profiles.attorney_profiles_rejoin_detection",
@@ -3014,9 +3051,15 @@ async function opsMigrationChecks() {
         triggersOf(DB).filter((t) => PS_A6_TRIGGERS.includes(t)),
         [...PS_A6_TRIGGERS],
       );
+      // DEV-001: website & appearance studio re-pin: and exactly the four
+      // site appearance guard triggers.
+      assert.deepEqual(
+        triggersOf(DB).filter((t) => APPEARANCE_TRIGGERS.includes(t)),
+        [...APPEARANCE_TRIGGERS],
+      );
       assert.equal(
         triggersOf(DB).length,
-        before.size + 2 + PS_A6_TRIGGERS.length,
+        before.size + 2 + PS_A6_TRIGGERS.length + APPEARANCE_TRIGGERS.length,
       );
       const admittedCatalog =
         "insert into public.capability_definitions (capability_code)";
@@ -3051,9 +3094,14 @@ async function opsMigrationChecks() {
           db,
         ).split(",");
       const before = new Set(catalog(BASE_DB));
+      // DEV-001: website & appearance studio re-pin: without exactly the
+      // site appearance catalog row (asserted exactly below).
       assert.deepEqual(
         catalog(PROD_DB).filter(
-          (c) => !before.has(c) && !PS_A6_CAPABILITIES.includes(c),
+          (c) =>
+            !before.has(c) &&
+            !PS_A6_CAPABILITIES.includes(c) &&
+            !APPEARANCE_CAPABILITIES.includes(c),
         ),
         [
           "manage_client_accounts",
@@ -3066,6 +3114,12 @@ async function opsMigrationChecks() {
       assert.deepEqual(
         catalog(PROD_DB).filter((c) => PS_A6_CAPABILITIES.includes(c)),
         [...PS_A6_CAPABILITIES],
+      );
+      // DEV-001: website & appearance studio re-pin: and exactly the one site
+      // appearance catalog row.
+      assert.deepEqual(
+        catalog(PROD_DB).filter((c) => APPEARANCE_CAPABILITIES.includes(c)),
+        [...APPEARANCE_CAPABILITIES],
       );
       assert.equal(
         sql("select count(*) from public.capability_grants;", PROD_DB),
