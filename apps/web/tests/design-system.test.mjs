@@ -33,6 +33,7 @@ const partials = Object.freeze([
   "site.css",
   "product.css",
   "product-client.css",
+  "product-workspace.css",
   "product-attorney.css",
   "product-staff.css",
   "product-auth.css",

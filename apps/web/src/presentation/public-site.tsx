@@ -27,7 +27,7 @@ export const PUBLIC_NAVIGATION = Object.freeze([
 // The site-pages list, with the current page marked.
 export function PublicNavigation({ current }: { readonly current?: string }) {
   return (
-    <nav className="stack l-g2-possticky-t24" aria-label="Rosuno">
+    <nav className="stack l-g2-possticky-t24" aria-label="Site pages">
       <span className="lbl-sm l-p0-10-8">Rosuno</span>
       {PUBLIC_NAVIGATION.map((entry) => (
         <a

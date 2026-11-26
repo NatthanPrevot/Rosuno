@@ -197,7 +197,9 @@ function assertContentPage(page, title, label) {
     label,
   );
   assert.deepEqual(page.metadata, { title }, label);
-  assert.match(page.html, /<nav [^>]*aria-label="Rosuno">/);
+  // DEV-001: the owner's UI/UX design names the site-pages list "Site pages";
+  // its phone rule (one column, the list as a row) keys on that name.
+  assert.match(page.html, /<nav [^>]*aria-label="Site pages">/);
   // The current page is marked in the site-pages list, exactly once.
   assert.equal(page.html.match(/aria-current="page"/g)?.length, 1, label);
   // Fail closed: nothing on the page could be policy, legal or contact text.

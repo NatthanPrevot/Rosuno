@@ -1,0 +1,402 @@
+/* Canonical workspace additions shared by the attorney and staff workspaces (the .rzw root), with values from the
+   owner's design tokens. The design system's primitives are styled for the public root (.rz); these rules give them
+   the design's look inside a workspace. Area-specific rules stay in product-attorney.css and product-staff.css. */
+
+/* The workspace frame fills the viewport: the product has no demo bar above it, so the design's chrome offset is
+   zero at every width, and the page body scrolls inside the frame as in the design. */
+.rzw.W {
+  --chrome: 0px;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* The shared theme shortens every workspace root on a phone by the prototype's 100 px demo bar; the product has none. */
+@media (max-width: 700px) {
+  .rzw.W {
+    height: 100vh !important;
+    height: 100dvh !important;
+  }
+}
+:where(.rzw) a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ---------- the shared primitives inside the workspace (their own rules are scoped to the public root) ---------- */
+.rzw .rz-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rzw .rz-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rzw .rz-stack[data-gap="tight"] {
+  gap: 8px;
+}
+.rzw .rz-stack[data-gap="loose"] {
+  gap: 24px;
+}
+.rzw .rz-stack:empty {
+  display: none;
+}
+.rzw .rz-cluster {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rzw .rz-columns {
+  display: grid;
+  gap: 16px;
+}
+.rzw .rz-columns[data-columns="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.rzw .rz-columns[data-columns="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.rzw .rz-columns[data-columns="split"] {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+.rzw .rz-rule {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 0;
+  width: 100%;
+}
+.rzw .rz-text {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.rzw .rz-text.lead {
+  font-size: 15px;
+}
+.rzw .rz-text.sm {
+  font-size: 13px;
+}
+.rzw .rz-text.xs {
+  font-size: 12px;
+}
+.rzw .rz-text[data-tone="muted"] {
+  color: var(--muted);
+}
+.rzw .rz-text[data-tone="accent"] {
+  color: var(--accent);
+}
+.rzw .kicker {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.rzw .h2 {
+  font-family: var(--f-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+.rzw .h3 {
+  font-family: var(--f-display);
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.rzw .h4 {
+  font-family: var(--f-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+/* A surface inside a card: the design's row with a hairline. */
+.rzw .rz-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--page);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.rzw .rz-surface.well {
+  background: var(--paper);
+  box-shadow: none;
+}
+
+/* Fields */
+.rzw .fld {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.rzw .fld > label,
+.rzw .fld > .fl {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.rzw .rz-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rzw .rz-errors .err {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.rzw .rz-errors .rz-icon {
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+}
+.rzw .rz-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rzw .rz-fieldset > legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.rzw .rz-choice {
+  align-items: flex-start;
+}
+.rzw .rz-choice > .stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rzw .rz-choice input {
+  margin-top: 2px;
+}
+.rzw .selx {
+  appearance: none;
+  padding-right: 30px;
+  background-image: url("/icons/chevron-down.svg");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+.rzw button.btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Disclosure */
+.rzw .rz-disclosure {
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--page);
+}
+.rzw .rz-disclosure__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.rzw .rz-disclosure__summary::-webkit-details-marker {
+  display: none;
+}
+.rzw .rz-disclosure[open] > .rz-disclosure__summary .rz-icon {
+  transform: rotate(180deg);
+}
+.rzw .rz-disclosure__content {
+  padding: 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Tables: the design's list rows inside a card, scrolling sideways on narrow screens. */
+.rzw .rz-table-region {
+  overflow-x: auto;
+  border-radius: 12px;
+  background: var(--page);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.rzw .rz-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rzw .rz-table__caption {
+  text-align: left;
+  padding: 12px 14px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.rzw .rz-table th {
+  text-align: left;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--subtle);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.rzw .rz-table tbody th {
+  color: var(--ink);
+  font-weight: 600;
+  white-space: normal;
+}
+.rzw .rz-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  color: var(--ink-2);
+}
+.rzw .rz-table tbody th {
+  padding: 10px 14px;
+  vertical-align: top;
+}
+.rzw .rz-table tbody tr:last-child td,
+.rzw .rz-table tbody tr:last-child th {
+  border-bottom: 0;
+}
+.rzw .rz-table [data-align="end"] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.rzw .rz-table .btn {
+  white-space: nowrap;
+}
+
+/* Status pill icon */
+.rzw .rz-status .rz-icon {
+  width: 12px;
+  height: 12px;
+}
+.rzw .rz-status[data-emphasis="strong"] {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+/* Alerts in the design's note colours; the icon shape carries the meaning too. */
+.rzw .rz-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.rzw .rz-alert > .rz-icon {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+.rzw .rz-alert__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rzw .rz-alert__title {
+  font-weight: 600;
+  color: var(--ink);
+}
+.rzw .rz-alert[data-tone="success"] {
+  background: var(--live-bg);
+}
+.rzw .rz-alert[data-tone="success"] > .rz-icon {
+  color: var(--live-ink);
+}
+.rzw .rz-alert[data-tone="warning"] {
+  background: var(--hold-bg);
+}
+.rzw .rz-alert[data-tone="warning"] > .rz-icon {
+  color: var(--hold);
+}
+.rzw .rz-alert[data-tone="error"] {
+  background: var(--no-bg);
+}
+.rzw .rz-alert[data-tone="error"] > .rz-icon {
+  color: var(--no);
+}
+.rzw .rz-alert[data-tone="information"] {
+  background: var(--accent-2);
+}
+.rzw .rz-alert[data-tone="information"] > .rz-icon {
+  color: var(--accent);
+}
+
+/* Media frame (the consultation room's provider frame) */
+.rzw .rz-media {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rzw .rz-media__content {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--paper-2);
+  aspect-ratio: 16 / 9;
+}
+.rzw .rz-media__content > iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+@media (max-width: 980px) {
+  .rzw .rz-columns[data-columns="3"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .rzw .rz-columns[data-columns="split"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .rzw .rz-columns[data-columns] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rzw .w-side .w-me {
+    gap: 6px;
+  }
+}
+
+/* The design's policy placeholder inside the workspace (the public root's own rule, restated for this root). */
+.rzw .ph {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #fbf3e2;
+  color: #85570a;
+  border: 1px dashed #e6cd96;
+  font-size: 0.92em;
+  font-weight: 500;
+  white-space: normal;
+}
