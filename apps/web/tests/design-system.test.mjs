@@ -179,15 +179,26 @@ function contrast(foreground, background) {
 
 // DEV-001: website & appearance studio: a hook token (--rz-*) is defined by
 // no repository stylesheet, only by a published appearance, so a wrapped
-// value computes its fallback; the fallback is the owner's literal.
+// value computes its fallback; the fallback is the owner's literal. The one
+// repository declaration of a hook is the studio root's reset to the
+// guaranteed-invalid value (initial), which computes the same fallback.
 function resolve(value) {
   const hook = /^var\((--rz-[a-z-]+), ([^()]+)\)$/.exec(value.trim());
   if (hook) {
+    const declared = allRules.filter((rule) =>
+      rule.declarations.some(([property]) => property === hook[1]),
+    );
     assert.ok(
-      !allRules.some((rule) =>
-        rule.declarations.some(([property]) => property === hook[1]),
+      declared.every(
+        (rule) =>
+          rule.prelude === ".W.st .rz-studio" &&
+          rule.context.length === 0 &&
+          rule.declarations.filter(([property]) => property === hook[1])
+            .length === 1 &&
+          rule.declarations.find(([property]) => property === hook[1])[1] ===
+            "initial",
       ),
-      `${hook[1]} is defined by no repository stylesheet`,
+      `${hook[1]} is defined by no repository stylesheet but the studio's reset to initial`,
     );
     return hook[2];
   }

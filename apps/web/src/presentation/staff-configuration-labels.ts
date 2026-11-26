@@ -172,6 +172,13 @@ export const SURFACE_LINKS: Readonly<
     summary:
       "See the data requests clients submit, assign them and record a decision.",
   },
+  // DEV-001: the website and appearance studio.
+  appearance: {
+    href: "/staff/appearance",
+    title: "Website & appearance",
+    summary:
+      "Change the site’s colours, fonts, page text and sections, preview them, and publish when ready.",
+  },
 });
 
 // MVP-001 S11 pass 2: the areas the staff home groups its links into, in
@@ -215,6 +222,8 @@ export const SURFACE_AREAS: readonly {
     surfaces: ["finance", "finance-summary"],
   },
   { id: "system-health", title: "System health", surfaces: ["system-health"] },
+  // DEV-001: the website and appearance studio.
+  { id: "website", title: "Website", surfaces: ["appearance"] },
 ]);
 
 // MVP-001 S2: the operational job states and the groups the job view lists.

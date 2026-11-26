@@ -444,6 +444,8 @@ test("S11B-3 the staff home groups its links by area (operations, attorneys, pol
       "compliance",
       "finance",
       "system-health",
+      // DEV-001: website & appearance studio: its own area, last.
+      "website",
     ],
   );
   const listed = SURFACE_AREAS.flatMap((area) => area.surfaces);
@@ -486,6 +488,16 @@ test("S11B-3 the staff home groups its links by area (operations, attorneys, pol
   assert.deepEqual(await home([["manage_data_requests", ID(5)]]), [
     "break-glass",
   ]);
+  // DEV-001: website & appearance studio: the studio needs the global
+  // manage_site_appearance grant; a scoped one opens nothing.
+  assert.deepEqual(await home([["manage_site_appearance"]]), [
+    "break-glass",
+    "appearance",
+  ]);
+  assert.deepEqual(await home([["manage_site_appearance", ID(5)]]), [
+    "break-glass",
+  ]);
+  assert.deepEqual(SURFACE_LINKS.appearance.href, "/staff/appearance");
   const page = codeOf(read("app/staff/page.tsx"));
   assert.match(page, /SURFACE_AREAS\.map\(/);
   assert.doesNotMatch(page, /searchParams|params/);

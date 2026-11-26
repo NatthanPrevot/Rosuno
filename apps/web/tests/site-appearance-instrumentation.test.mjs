@@ -411,12 +411,31 @@ test("SI-5 the Home section group: the hero fixed first, only the two-ways, how-
 });
 
 test("SI-6 no stylesheet selects a data-rz attribute; the three hook tokens are defined by no stylesheet; the wrappers are exactly the listed ones, with the owner's values as fallbacks", () => {
+  // DEV-001: website & appearance studio: the one declaration of a hook in
+  // the repository is the studio root's reset of all three to the
+  // guaranteed-invalid value (initial), so inside the studio every wrapped
+  // owner rule computes its own literal fallback, exactly as with nothing
+  // published; no stylesheet gives a hook a value.
+  const STUDIO_HOOK_RESET = [
+    "  --rz-on-ink: initial;\n",
+    "  --rz-ink-hover: initial;\n",
+    "  --rz-surface-hover: initial;\n",
+  ].join("");
   for (const file of styles) {
     const css = read(file);
     assert.doesNotMatch(css, /\[data-rz/, file);
-    assert.doesNotMatch(
-      css,
-      /--rz-(?:on-ink|ink-hover|surface-hover)\s*:/,
+    const hooks = css.match(/--rz-(?:on-ink|ink-hover|surface-hover)\s*:/g);
+    if (file !== "app/styles/product-staff.css") {
+      assert.equal(hooks, null, file);
+      continue;
+    }
+    assert.equal(hooks.length, 3, file);
+    assert.equal(css.split(STUDIO_HOOK_RESET).length, 2, file);
+    const start = css.indexOf("\n.W.st .rz-studio {\n");
+    assert.ok(start >= 0, file);
+    assert.ok(
+      css.indexOf(STUDIO_HOOK_RESET) > start &&
+        css.indexOf(STUDIO_HOOK_RESET) < css.indexOf("}", start),
       file,
     );
   }

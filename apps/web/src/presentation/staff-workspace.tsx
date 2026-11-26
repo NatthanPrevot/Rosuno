@@ -302,6 +302,13 @@ export const STAFF_NAVIGATION: readonly StaffNavigationGroup[] = Object.freeze([
             surface: "system-health",
           },
           { href: "/staff/jobs", label: "Jobs", surface: "jobs" },
+          // DEV-001: the website and appearance studio (the design
+          // package's name for this module).
+          {
+            href: "/staff/appearance",
+            label: "Content & brand",
+            surface: "appearance",
+          },
         ],
       },
     ],

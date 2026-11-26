@@ -314,3 +314,808 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* ---------- DEV-001: the website and appearance studio (/staff/appearance) ---------- */
+/* The studio keeps the owner's design whatever theme is published: its root sets every workspace token back to the
+   owner's workspace value, and the three appearance hooks back to the guaranteed-invalid value (so every wrapped
+   owner rule computes its own literal fallback). A published theme's workspace roles and elements also end
+   :not(.rz-studio *). */
+.W.st .rz-studio {
+  --ink: #0f1013;
+  --ink-2: #2b2d33;
+  --muted: #565a62;
+  --subtle: #6b6f77;
+  --faint: #a3a6ac;
+  --line: #eae8e4;
+  --line-2: #dddad4;
+  --line-3: #c9c5be;
+  --page: #ffffff;
+  --paper: #f7f6f3;
+  --paper-2: #efede8;
+  --canvas: #fafaf8;
+  --accent: #2f3a9e;
+  --accent-2: #e9ecfa;
+  --st-r: 16px;
+  --f-display: "Instrument Sans", "Inter", system-ui, sans-serif;
+  --f-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --e1: 0 1px 1px rgba(15, 16, 19, 0.03), 0 1px 3px rgba(15, 16, 19, 0.05);
+  --e2: 0 1px 2px rgba(15, 16, 19, 0.04), 0 8px 20px -6px rgba(15, 16, 19, 0.1);
+  --e3:
+    0 1px 2px rgba(15, 16, 19, 0.04), 0 4px 8px -2px rgba(15, 16, 19, 0.04),
+    0 22px 48px -12px rgba(15, 16, 19, 0.18);
+  --rz-on-ink: initial;
+  --rz-ink-hover: initial;
+  --rz-surface-hover: initial;
+  color: var(--ink);
+  font-family: var(--f-body);
+  min-width: 0;
+}
+.W.st .st-wrap:has(.rz-studio) {
+  max-width: none;
+}
+.W.st .rz-studio .rzs-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.W.st .rz-studio .rzs-narrow {
+  display: none;
+}
+
+/* toolbar */
+.W.st .rz-studio .rzs-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--page);
+  box-shadow: var(--st-ring);
+}
+.W.st .rz-studio .rzs-tgroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.W.st .rz-studio .rzs-toolbar .grow {
+  flex: 1;
+}
+.W.st .rz-studio .rzs-page {
+  width: 220px;
+  height: 32px;
+}
+.W.st .rz-studio .rzs-zoom {
+  width: 84px;
+  height: 32px;
+}
+.W.st .rz-studio .rzs-status {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  max-width: 260px;
+}
+.W.st .rz-studio .rzs-status[data-save="failed"],
+.W.st .rz-studio .rzs-status[data-save="conflict"],
+.W.st .rz-studio .rzs-status[data-save="invalid"] {
+  color: var(--no);
+  font-weight: 600;
+}
+.W.st .rz-studio .rzs-hidden-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.W.st .rz-studio .rzs-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.W.st .rz-studio .rzs-unit {
+  font-weight: 400;
+  color: var(--subtle);
+}
+
+/* messages and banners: the tone is always said in words too */
+.W.st .rz-studio .rzs-banners {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.W.st .rz-studio .rzs-banners:empty {
+  display: none;
+}
+.W.st .rz-studio .rzs-note {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  background: var(--paper);
+  color: var(--ink-2);
+  border-left: 3px solid var(--line-3);
+}
+.W.st .rz-studio .rzs-note[data-tone="success"] {
+  border-left-color: var(--live);
+}
+.W.st .rz-studio .rzs-note[data-tone="warning"] {
+  border-left-color: var(--hold);
+  background: var(--hold-bg);
+}
+.W.st .rz-studio .rzs-note[data-tone="error"] {
+  border-left-color: var(--no);
+  background: var(--no-bg);
+}
+.W.st .rz-studio .rzs-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.W.st .rz-studio .rzs-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.W.st .rz-studio .rzs-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--page);
+  box-shadow: var(--st-ring);
+  font-size: 13px;
+}
+.W.st .rz-studio .rzs-banner p {
+  margin: 0;
+  flex: 1 1 320px;
+}
+
+/* the three columns: layers, preview, inspector */
+.W.st .rz-studio .rzs-main {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr) 312px;
+  gap: 12px;
+  align-items: start;
+}
+.W.st .rz-studio .rzs-layers,
+.W.st .rz-studio .rzs-inspector {
+  border-radius: 12px;
+  background: var(--page);
+  box-shadow: var(--st-ring);
+  max-height: 820px;
+  overflow-y: auto;
+}
+.W.st .rz-studio .rzs-layers {
+  padding: 8px 6px;
+}
+.W.st .rz-studio .rzs-inspector {
+  padding: 12px;
+}
+.W.st .rz-studio .rzs-centre {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.W.st .rz-studio .rzs-mode-hint,
+.W.st .rz-studio .rzs-open {
+  margin: 0;
+}
+
+/* the preview: a finite set of device widths and zoom steps (never an inline style); the visible frame is 640 px high */
+.W.st .rz-studio .rzs-stage {
+  overflow: auto;
+  min-width: 0;
+}
+.W.st .rz-studio .rzs-device {
+  position: relative;
+  overflow: hidden;
+  height: 640px;
+  margin: 0 auto;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px var(--line-2),
+    var(--e2);
+}
+.W.st .rz-studio .rzs-frame {
+  display: block;
+  border: 0;
+  transform-origin: 0 0;
+  background: #fff;
+}
+.W.st .rz-studio .rzs-device[data-device="desktop"] .rzs-frame {
+  width: 1440px;
+}
+.W.st .rz-studio .rzs-device[data-device="tablet"] .rzs-frame {
+  width: 768px;
+}
+.W.st .rz-studio .rzs-device[data-device="phone"] .rzs-frame {
+  width: 390px;
+}
+.W.st .rz-studio .rzs-device[data-zoom="100"] .rzs-frame {
+  height: 640px;
+}
+.W.st .rz-studio .rzs-device[data-zoom="75"] .rzs-frame {
+  height: 853.334px;
+  transform: scale(0.75);
+}
+.W.st .rz-studio .rzs-device[data-zoom="60"] .rzs-frame {
+  height: 1066.667px;
+  transform: scale(0.6);
+}
+.W.st .rz-studio .rzs-device[data-zoom="50"] .rzs-frame {
+  height: 1280px;
+  transform: scale(0.5);
+}
+.W.st .rz-studio .rzs-device[data-zoom="40"] .rzs-frame {
+  height: 1600px;
+  transform: scale(0.4);
+}
+.W.st .rz-studio .rzs-device[data-zoom="33"] .rzs-frame {
+  height: 1939.394px;
+  transform: scale(0.33);
+}
+.W.st .rz-studio .rzs-device[data-zoom="25"] .rzs-frame {
+  height: 2560px;
+  transform: scale(0.25);
+}
+.W.st .rz-studio .rzs-device[data-device="desktop"][data-zoom="100"] {
+  width: 1440px;
+}
+.W.st .rz-studio .rzs-device[data-device="desktop"][data-zoom="75"] {
+  width: 1080px;
+}
+.W.st .rz-studio .rzs-device[data-device="desktop"][data-zoom="60"] {
+  width: 864px;
+}
+.W.st .rz-studio .rzs-device[data-device="desktop"][data-zoom="50"] {
+  width: 720px;
+}
+.W.st .rz-studio .rzs-device[data-device="desktop"][data-zoom="40"] {
+  width: 576px;
+}
+.W.st .rz-studio .rzs-device[data-device="desktop"][data-zoom="33"] {
+  width: 475.2px;
+}
+.W.st .rz-studio .rzs-device[data-device="desktop"][data-zoom="25"] {
+  width: 360px;
+}
+.W.st .rz-studio .rzs-device[data-device="tablet"][data-zoom="100"] {
+  width: 768px;
+}
+.W.st .rz-studio .rzs-device[data-device="tablet"][data-zoom="75"] {
+  width: 576px;
+}
+.W.st .rz-studio .rzs-device[data-device="tablet"][data-zoom="60"] {
+  width: 460.8px;
+}
+.W.st .rz-studio .rzs-device[data-device="tablet"][data-zoom="50"] {
+  width: 384px;
+}
+.W.st .rz-studio .rzs-device[data-device="tablet"][data-zoom="40"] {
+  width: 307.2px;
+}
+.W.st .rz-studio .rzs-device[data-device="tablet"][data-zoom="33"] {
+  width: 253.44px;
+}
+.W.st .rz-studio .rzs-device[data-device="tablet"][data-zoom="25"] {
+  width: 192px;
+}
+.W.st .rz-studio .rzs-device[data-device="phone"][data-zoom="100"] {
+  width: 390px;
+}
+.W.st .rz-studio .rzs-device[data-device="phone"][data-zoom="75"] {
+  width: 292.5px;
+}
+.W.st .rz-studio .rzs-device[data-device="phone"][data-zoom="60"] {
+  width: 234px;
+}
+.W.st .rz-studio .rzs-device[data-device="phone"][data-zoom="50"] {
+  width: 195px;
+}
+.W.st .rz-studio .rzs-device[data-device="phone"][data-zoom="40"] {
+  width: 156px;
+}
+.W.st .rz-studio .rzs-device[data-device="phone"][data-zoom="33"] {
+  width: 128.7px;
+}
+.W.st .rz-studio .rzs-device[data-device="phone"][data-zoom="25"] {
+  width: 97.5px;
+}
+.W.st .rz-studio .rzs-frame-note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+}
+
+/* layers: a tree */
+.W.st .rz-studio .rzs-tree,
+.W.st .rz-studio .rzs-tgi {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.W.st .rz-studio .rzs-tg {
+  border-radius: 8px;
+}
+.W.st .rz-studio .rzs-tgl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.W.st .rz-studio .rzs-caret {
+  width: 12px;
+  font-size: 11px;
+}
+.W.st .rz-studio .rzs-ti {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  min-height: 30px;
+  padding: 5px 8px 5px 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.W.st .rz-studio .rzs-ti:hover {
+  background: var(--paper);
+}
+.W.st .rz-studio .rzs-ti.on {
+  background: var(--accent-2);
+  color: var(--ink);
+  font-weight: 600;
+}
+.W.st .rz-studio .rzs-ti.absent .rzs-til {
+  color: var(--subtle);
+}
+.W.st .rz-studio .rzs-tag {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.W.st .rz-studio .rzs-tin {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--subtle);
+}
+
+/* inspector */
+.W.st .rz-studio .rzs-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.W.st .rz-studio .rzs-tab {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.W.st .rz-studio .rzs-tab.on {
+  background: var(--accent-2);
+  color: var(--ink);
+  font-weight: 600;
+}
+.W.st .rz-studio .rzs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.W.st .rz-studio .rzs-ihead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.W.st .rz-studio .rzs-ititle {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+.W.st .rz-studio .rzs-kind {
+  font-size: 11.5px;
+  color: var(--subtle);
+}
+.W.st .rz-studio .rzs-scope {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.45;
+  background: var(--paper);
+  color: var(--ink-2);
+}
+.W.st .rz-studio .rzs-scope[data-scope="global"] {
+  background: var(--accent-2);
+}
+.W.st .rz-studio .rzs-scope[data-scope="override"] {
+  background: var(--paper-2);
+}
+.W.st .rz-studio .rzs-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.W.st .rz-studio .rzs-legend {
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.W.st .rz-studio .rzs-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.W.st .rz-studio .rzs-field-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+}
+.W.st .rz-studio .rzs-inherits {
+  font-size: 11.5px;
+  color: var(--subtle);
+}
+.W.st .rz-studio .rzs-reset {
+  margin-left: auto;
+  height: 24px;
+  padding: 0 8px;
+}
+.W.st .rz-studio .rzs-color,
+.W.st .rz-studio .rzs-number,
+.W.st .rz-studio .rzs-scale,
+.W.st .rz-studio .rzs-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.W.st .rz-studio .rzs-swatch {
+  flex: none;
+  width: 40px;
+  height: 34px;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  background: var(--page);
+}
+.W.st .rz-studio .rzs-hex {
+  font-variant-numeric: tabular-nums;
+}
+.W.st .rz-studio .rzs-range {
+  flex: 1;
+  min-width: 0;
+  accent-color: #0f1013;
+}
+.W.st .rz-studio .rzs-num {
+  flex: none;
+  width: 88px;
+}
+.W.st .rz-studio .rzs-scale .selx {
+  flex: 1;
+}
+.W.st .rz-studio .rzs-ta {
+  min-height: 64px;
+}
+.W.st .rz-studio .rzs-over {
+  color: var(--no);
+}
+.W.st .rz-studio .rzs-field .hint,
+.W.st .rz-studio .rzs-field .err {
+  margin: 0;
+}
+.W.st .rz-studio .rzs-field .err:empty {
+  display: none;
+}
+.W.st .rz-studio .rzs-bp {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 10px;
+  background: var(--paper-2);
+}
+.W.st .rz-studio .rzs-bp-o {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+}
+.W.st .rz-studio .rzs-bp-o input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.W.st .rz-studio .rzs-bp-o:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.W.st .rz-studio .rzs-bp-o.on {
+  background: var(--page);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(15, 16, 19, 0.08);
+}
+.W.st .rz-studio .rzs-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+.W.st .rz-studio .rzs-contrast {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.W.st .rz-studio .rzs-logo-pv {
+  max-width: 100%;
+  height: 40px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+/* sections: drag and drop, with Move up and Move down */
+.W.st .rz-studio .rzs-sec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.W.st .rz-studio .rzs-sec {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--page);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.W.st .rz-studio .rzs-sec.locked {
+  background: var(--paper);
+}
+.W.st .rz-studio .rzs-sec.off .rzs-sec-name {
+  color: var(--subtle);
+  text-decoration: line-through;
+}
+.W.st .rz-studio .rzs-sec.dragging {
+  opacity: 0.55;
+}
+.W.st .rz-studio .rzs-sec.drop,
+.W.st .rz-studio .rzs-sec-end.drop {
+  box-shadow:
+    inset 0 0 0 1px var(--line-2),
+    0 -3px 0 var(--accent);
+}
+.W.st .rz-studio .rzs-sec-name {
+  flex: 1 1 120px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.W.st .rz-studio .rzs-handle {
+  cursor: grab;
+  color: var(--subtle);
+}
+.W.st .rz-studio .rzs-sec-acts {
+  display: flex;
+  gap: 4px;
+}
+.W.st .rz-studio .rzs-sec-acts .btn {
+  min-width: 32px;
+  padding: 0 8px;
+}
+.W.st .rz-studio .rzs-sec-why {
+  flex-basis: 100%;
+}
+.W.st .rz-studio .rzs-lock {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.W.st .rz-studio .rzs-sec-end {
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--subtle);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+/* dialogs (native modal dialogs) */
+.W.st .rz-studio .rzs-dialog,
+.rz-studio .rzs-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: var(--page);
+  color: var(--ink);
+  box-shadow: var(--e3);
+}
+.rz-studio .rzs-dialog.wide {
+  width: min(760px, calc(100vw - 32px));
+}
+.rz-studio .rzs-dialog::backdrop {
+  background: rgba(15, 16, 19, 0.32);
+}
+.rz-studio .rzs-dhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 8px;
+}
+.rz-studio .rzs-dtitle {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 18px;
+  font-weight: 600;
+}
+.rz-studio .rzs-dbody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 18px 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  overflow-y: auto;
+}
+.rz-studio .rzs-dbody p {
+  margin: 0;
+}
+.rz-studio .rzs-dacts {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--line);
+}
+.rz-studio .rzs-summary {
+  margin: 0;
+  padding-left: 18px;
+}
+.rz-studio .rzs-old {
+  color: var(--subtle);
+  text-decoration: line-through;
+}
+.rz-studio .rzs-new {
+  font-weight: 600;
+}
+
+/* versions and images */
+.rz-studio .rzs-versions,
+.rz-studio .rzs-assets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rz-studio .rzs-version {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.rz-studio .rzs-version[data-state="published"] {
+  box-shadow: inset 0 0 0 1px var(--live);
+}
+.rz-studio .rzs-vmain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.rz-studio .rzs-vstate,
+.rz-studio .rzs-vlabel {
+  font-size: 12px;
+  color: var(--muted);
+}
+.rz-studio .rzs-vacts,
+.rz-studio .rzs-asset-acts,
+.rz-studio .rzs-pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rz-studio .rzs-assets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+.rz-studio .rzs-asset {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.rz-studio .rzs-thumb {
+  width: 100%;
+  height: 110px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: var(--paper);
+}
+.rz-studio .rzs-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rz-studio .rzs-file {
+  font-size: 13px;
+}
+
+/* narrower windows: the preview first, then the layers and the inspector side by side; phones: no editing */
+@media (max-width: 1279px) {
+  .W.st .rz-studio .rzs-main {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+  .W.st .rz-studio .rzs-inspector {
+    grid-column: 1 / -1;
+    max-height: none;
+  }
+}
+@media (max-width: 1100px) {
+  .W.st .rz-studio .rzs-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .W.st .rz-studio .rzs-layers {
+    max-height: 320px;
+  }
+}
+@media (max-width: 700px) {
+  .W.st .rz-studio .rzs-editor {
+    display: none;
+  }
+  .W.st .rz-studio .rzs-narrow {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .rz-studio .rzs-version {
+    min-height: 44px;
+  }
+}

@@ -848,6 +848,19 @@ const MVP001_STAFF_APP = [
   "app/staff/data-requests/actions.ts",
   "app/staff/data-requests/forms.tsx",
   "app/staff/data-requests/page.tsx",
+  // DEV-001: website & appearance studio: its server page, its one server
+  // action module and its client modules; their own contract is the studio
+  // test (site-appearance-studio.test.mjs) and SR-1 in
+  // staff-configuration-routes.test.mjs.
+  "app/staff/appearance/actions.ts",
+  "app/staff/appearance/assets.tsx",
+  "app/staff/appearance/inspector.tsx",
+  "app/staff/appearance/layers.tsx",
+  "app/staff/appearance/page.tsx",
+  "app/staff/appearance/preview-frame.tsx",
+  "app/staff/appearance/publish-dialog.tsx",
+  "app/staff/appearance/studio.tsx",
+  "app/staff/appearance/versions.tsx",
 ];
 
 // MVP-001 D-4: the verification queue page reads exactly one query value,

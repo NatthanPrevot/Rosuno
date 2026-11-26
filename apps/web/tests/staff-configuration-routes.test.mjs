@@ -162,6 +162,21 @@ const S11_PS_A6_STAFF_FILES = [
   "app/staff/data-requests/page.tsx",
 ];
 
+// DEV-001: website & appearance studio: its own staff surface (the
+// appearance adapter's sources and its own use cases), admitted by its exact
+// files: one server page, one server action module and its client modules.
+const APPEARANCE_STAFF_FILES = [
+  "app/staff/appearance/actions.ts",
+  "app/staff/appearance/assets.tsx",
+  "app/staff/appearance/inspector.tsx",
+  "app/staff/appearance/layers.tsx",
+  "app/staff/appearance/page.tsx",
+  "app/staff/appearance/preview-frame.tsx",
+  "app/staff/appearance/publish-dialog.tsx",
+  "app/staff/appearance/studio.tsx",
+  "app/staff/appearance/versions.tsx",
+];
+
 // Each list page: its use case. Each reads exactly one query value, page.
 const LIST_PAGES = {
   "app/staff/policies/page.tsx": "resolvePolicyWorkspace",
@@ -202,10 +217,51 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
         !f.startsWith("app/staff/finance/") &&
         !S11_STAFF_FILES.includes(f) &&
         !S11_OPERATIONS_STAFF_FILES.includes(f) &&
-        !S11_PS_A6_STAFF_FILES.includes(f),
+        !S11_PS_A6_STAFF_FILES.includes(f) &&
+        !APPEARANCE_STAFF_FILES.includes(f),
     ),
     CONFIGURATION_FILES,
   );
+  // DEV-001: website & appearance studio: its exact files; the page is a
+  // server module rendered per request and unindexed that reads the
+  // appearance adapter's sources and nothing this list forbids, the actions
+  // are one server module, and every other file is a client module that
+  // imports no infrastructure and renders no inline style or raw markup.
+  assert.deepEqual(
+    filesIn("app/staff/").filter((f) => f.startsWith("app/staff/appearance/")),
+    APPEARANCE_STAFF_FILES,
+  );
+  {
+    const file = "app/staff/appearance/page.tsx";
+    const source = read(file);
+    const code = codeOf(source);
+    assert.doesNotMatch(source, /["']use (?:client|server)["']/, file);
+    assert.match(code, /robots: \{ index: false, follow: false \},/, file);
+    assert.ok(code.indexOf("await connection();") > 0, file);
+    assert.doesNotMatch(code, FORBIDDEN_IN_PAGES, file);
+    assert.doesNotMatch(code, /STAFF_CONFIGURATION_SOURCES|searchParams|params/, file);
+    assert.match(
+      code,
+      /import \{ APPEARANCE_SOURCES \} from "\.\.\/\.\.\/\.\.\/src\/infrastructure\/appearance\/appearance-adapter\.ts";/,
+      file,
+    );
+  }
+  assert.match(read("app/staff/appearance/actions.ts"), /^"use server";\n/);
+  for (const file of APPEARANCE_STAFF_FILES.filter(
+    (f) => !f.endsWith("page.tsx") && !f.endsWith("actions.ts"),
+  )) {
+    const source = read(file);
+    assert.match(source, /^"use client";\n/, file);
+    assert.ok(
+      importsOf(source).every((specifier) => !/infrastructure/.test(specifier)),
+      file,
+    );
+    assert.doesNotMatch(
+      codeOf(source),
+      /\bstyle=|dangerouslySetInnerHTML|innerHTML|\.rpc\(|process\.env/,
+      file,
+    );
+  }
   // MVP-001 S11 PS-A6: break-glass access and data requests are their own
   // staff surfaces, admitted by their exact files: server pages rendered per
   // request and unindexed that read the privacy adapter's sources and nothing
@@ -1444,6 +1500,33 @@ test("SR-13. DEV-001: the staff workspace navigation shows only the destinations
   assert.deepEqual(nav(elsewhere.html), ["/staff", "/staff/break-glass"]);
   assert.equal(elsewhere.html.includes('aria-current="page"'), false);
   assert.deepEqual(tabs(elsewhere.html), []);
+  // DEV-001: website & appearance studio: a holder of the global
+  // manage_site_appearance grant only sees Settings, opening the studio (its
+  // one held view, so no tabs); a scoped grant opens nothing.
+  const designer = addStaff(w, 13);
+  grant(w, designer.userId, "manage_site_appearance");
+  const studio = await renderLayout(sources(w, designer), "/staff/appearance");
+  assert.deepEqual(nav(studio.html), [
+    "/staff",
+    "/staff/break-glass",
+    "/staff/appearance",
+  ]);
+  assert.ok(
+    studio.html.includes(
+      'class="w-ni on" href="/staff/appearance" aria-current="page"',
+    ),
+  );
+  assert.deepEqual(tabs(studio.html), []);
+  const scopedDesigner = addStaff(w, 14);
+  grant(w, scopedDesigner.userId, "manage_site_appearance", {
+    jurisdiction_id: addJurisdiction(w, 2, "SYN_B"),
+  });
+  const scopedStudio = await renderLayout(
+    sources(w, scopedDesigner),
+    "/staff/appearance",
+  );
+  assert.deepEqual(nav(scopedStudio.html), ["/staff", "/staff/break-glass"]);
+  assert.equal(scopedStudio.html.includes("/staff/appearance"), false);
   const operator = jobWorld();
   const jobs = await renderLayout(
     sources(operator.w, operator.operator),

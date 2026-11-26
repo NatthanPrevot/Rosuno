@@ -412,7 +412,9 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // a configuration, a page text or image bytes) writes lines too, and so do
   // the published stylesheet and appearance image routes (the default sheet
   // served or an image unavailable, with the fixed outcome only; never a
-  // configuration, a digest or bytes).
+  // configuration, a digest or bytes). DEV-001: website & appearance studio:
+  // the studio's actions (an action not completed, with its fixed outcome
+  // only; never a configuration, a page text or image bytes) write lines too.
   assert.deepEqual(callers, [
     // DEV-001: website & appearance studio: the two appearance routes.
     "app/appearance/assets/[asset]/route.ts",
@@ -460,6 +462,8 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/find-an-attorney/select/page.tsx",
     "app/sign-in/actions.ts",
     "app/staff/actions.ts",
+    // DEV-001: website & appearance studio: the studio's actions.
+    "app/staff/appearance/actions.ts",
     "app/staff/attorneys/actions.ts",
     "app/staff/break-glass/actions.ts",
     "app/staff/clients/actions.ts",
