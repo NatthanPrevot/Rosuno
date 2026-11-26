@@ -10,6 +10,12 @@
 // the outcome is recorded. Holders of the global grant also see the
 // operations family's review items. The query values read (page, status and
 // items page) only choose the pages and the list; the server checks them.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Bookings & consultations):
+// the design's list, one row per consultation opening its own page (the
+// booked time or how soon, since when an outcome may be recorded, the
+// attendance facts, the latest payment state and the state pill), then the
+// operations review items. Never a participant's identity.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -27,16 +33,15 @@ import {
 } from "../../../src/presentation/completion-labels.ts";
 import { PATH_LABELS } from "../../../src/presentation/consultation-labels.ts";
 import {
-  ButtonLink,
-  Cluster,
-  Heading,
-  Stack,
-  Status,
-  Surface,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
+  Cell,
+  Empty,
+  ListBox,
+  ListRow,
+  PagerRow,
+  PillCell,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../frame.tsx";
+import { refusalPage, StaffFrame } from "../frame.tsx";
 import { ReviewItemList } from "../review-item-list.tsx";
 import {
   assignOperationsItemAction,
@@ -49,6 +54,13 @@ export const metadata: Metadata = {
 };
 
 const yes = (value: boolean) => (value ? "yes" : "no");
+
+const COLUMNS = [
+  "Consultation (UTC)",
+  "Attendance",
+  "Payment",
+  "State",
+] as const;
 
 export default async function StaffConsultationsPage({
   searchParams,
@@ -76,74 +88,84 @@ export default async function StaffConsultationsPage({
       )
     : null;
   return (
-    <StaffFrame eyebrow="Operations" title="Consultation operations">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Text tone="muted">{OPERATIONS_NOTE}</Text>
-      <Heading as="h2" size="md" id="stale-title">
+    <StaffFrame
+      title="Bookings & consultations"
+      description="Consultations waiting for an outcome, and the operations review items."
+      lead={<p>{OPERATIONS_NOTE}</p>}
+      utc
+    >
+      <h2 className="st-h2" id="stale-title">
         Consultations waiting for an outcome
-      </Heading>
-      {view.consultations.length === 0 ? (
-        <Text>
-          {view.pager.page === 1
-            ? "No consultation is waiting for an outcome."
-            : "There are no consultations on this page."}
-        </Text>
-      ) : (
-        view.consultations.map((entry) => (
-          <Surface key={entry.id} labelledBy={`stale-${entry.id}`}>
-            <Stack gap="tight">
-              <Heading as="h3" size="sm" id={`stale-${entry.id}`}>
+      </h2>
+      <ListBox
+        label="Consultations waiting for an outcome"
+        columns={COLUMNS}
+        sub
+      >
+        {view.consultations.length === 0 ? (
+          <Empty
+            title={
+              view.pager.page === 1
+                ? "No consultation is waiting for an outcome."
+                : "There are no consultations on this page."
+            }
+            note="A consultation appears here once its time has passed and nobody ended it."
+          />
+        ) : (
+          view.consultations.map((entry) => (
+            <ListRow
+              key={entry.id}
+              href={`/staff/consultations/${entry.id}`}
+              columns={4}
+              sub
+            >
+              <Cell label="Consultation" strong>
                 {entry.bookingStart === null
                   ? PATH_LABELS[entry.path]
                   : `${utcText(entry.bookingStart)} to ${entry.bookingEnd === null ? "" : utcText(entry.bookingEnd)}`}
-              </Heading>
-              <Cluster>
-                <Status tone="neutral">{entry.state}</Status>
-                {entry.paymentState === null ? null : (
-                  <Status tone="neutral">{`payment ${entry.paymentState.replaceAll("_", " ")}`}</Status>
-                )}
-              </Cluster>
-              <Text size="small">{`Outcome may be recorded since ${utcText(entry.recordableSince)} (${WINDOW_BASIS_LABELS[entry.windowBasis]})`}</Text>
-              <Text size="small">{`Attorney joined: ${yes(entry.attorneyJoined)}. Client joined: ${yes(entry.clientJoined)}. Both present together: ${yes(entry.bothPresent)}.`}</Text>
-              <Cluster>
-                <ButtonLink
-                  variant="tertiary"
-                  href={`/staff/consultations/${entry.id}`}
-                >
-                  Open the consultation
-                </ButtonLink>
-              </Cluster>
-            </Stack>
-          </Surface>
-        ))
+              </Cell>
+              <Cell label="">
+                {`Outcome may be recorded since ${utcText(entry.recordableSince)} (${WINDOW_BASIS_LABELS[entry.windowBasis]})`}
+              </Cell>
+              <Cell label="Attendance">
+                {`Attorney ${yes(entry.attorneyJoined)} · client ${yes(entry.clientJoined)} · together ${yes(entry.bothPresent)}`}
+              </Cell>
+              <Cell label="Payment">
+                {entry.paymentState === null
+                  ? "No payment"
+                  : `payment ${entry.paymentState.replaceAll("_", " ")}`}
+              </Cell>
+              <PillCell label="State" tone="neutral">
+                {entry.state}
+              </PillCell>
+            </ListRow>
+          ))
+        )}
+      </ListBox>
+      {view.pager.page === 1 && !view.pager.hasNext ? null : (
+        <PagerRow
+          note={`Page ${view.pager.page} of the consultations waiting for an outcome.`}
+          previous={
+            view.pager.page > 1
+              ? `/staff/consultations?page=${view.pager.page - 1}`
+              : null
+          }
+          next={
+            view.pager.hasNext
+              ? `/staff/consultations?page=${view.pager.page + 1}`
+              : null
+          }
+        />
       )}
-      <Cluster>
-        {view.pager.page > 1 ? (
-          <ButtonLink
-            variant="secondary"
-            href={`/staff/consultations?page=${view.pager.page - 1}`}
-          >
-            Previous page
-          </ButtonLink>
-        ) : null}
-        {view.pager.hasNext ? (
-          <ButtonLink
-            variant="secondary"
-            href={`/staff/consultations?page=${view.pager.page + 1}`}
-          >
-            Next page
-          </ButtonLink>
-        ) : null}
-      </Cluster>
       {family === null ? null : (
         <>
-          <Heading as="h2" size="md" id="operations-items-title">
+          <h2 className="st-h2" id="operations-items-title">
             {FAMILY_TITLES.operations}
-          </Heading>
+          </h2>
           {family.status !== "ready" ? (
-            <Text tone="muted">
+            <p className="st-emd">
               The review items could not be shown right now.
-            </Text>
+            </p>
           ) : (
             <ReviewItemList
               view={family}

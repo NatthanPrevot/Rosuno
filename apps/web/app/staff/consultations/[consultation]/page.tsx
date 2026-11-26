@@ -11,6 +11,11 @@
 // While the database reports an outcome recordable, the outcome command is
 // offered with the codes the state admits; the database decides everything
 // again on submission. Never a participant's identity or any content.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, the Bookings &
+// consultations record): the design's record panel with the state pill, the
+// time from which an outcome may be recorded as its key fact, the details,
+// the attendance evidence and the payment facts, then the outcome command.
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -28,14 +33,14 @@ import {
   PATH_LABELS,
 } from "../../../../src/presentation/consultation-labels.ts";
 import {
-  Cluster,
-  Heading,
-  Status,
-  Table,
-  Text,
-} from "../../../../src/presentation/design-system.tsx";
+  Block,
+  KeyFact,
+  KeyValues,
+  Note,
+  RecordPanel,
+} from "../../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../../frame.tsx";
+import { refusalPage } from "../../frame.tsx";
 import { RecordOutcomeForm } from "../forms.tsx";
 
 export const metadata: Metadata = {
@@ -66,7 +71,7 @@ export default async function StaffConsultationPage({
     );
   }
   const record = view.consultation;
-  const rows: [string, string][] = [
+  const details: [string, string][] = [
     ["How soon", PATH_LABELS[record.path]],
     ...(record.durationMinutes === null
       ? []
@@ -88,63 +93,71 @@ export default async function StaffConsultationPage({
     ],
     ["Ended", record.endedAt === null ? "Not ended" : utcText(record.endedAt)],
     ["How it ended", outcomeLabelOf(record.outcomeCode) ?? "Not decided"],
-    [
-      "Outcome may be recorded",
-      record.recordableSince === null
-        ? WINDOW_BASIS_LABELS.unavailable
-        : `from ${utcText(record.recordableSince)} (${WINDOW_BASIS_LABELS[record.windowBasis]})`,
-    ],
+  ];
+  const attendance: [string, string][] = [
     ["Attorney joined", yes(record.attorneyJoined)],
     ["Client joined", yes(record.clientJoined)],
     ["Both present together", yes(record.bothPresent)],
     ["Either participant left", yes(record.eitherLeft)],
     ["Room sessions recorded", String(record.providerSessions)],
     ["Interruptions recorded", String(record.interruptions)],
-    [
-      "Latest payment state",
-      record.paymentState === null
-        ? "No payment"
-        : record.paymentState.replaceAll("_", " "),
-    ],
-    ["Open review items", String(record.openExceptions)],
   ];
   return (
-    <StaffFrame eyebrow="Operations" title="Consultation">
-      <BackLink href="/staff/consultations">Consultation operations</BackLink>
-      <Cluster>
-        <Status tone="neutral">{record.state}</Status>
-      </Cluster>
-      <Table
-        id="staff-consultation"
-        caption="Consultation and attendance evidence"
-      >
-        <tbody>
-          {rows.map(([label, value]) => (
-            <tr key={label}>
-              <th scope="row">{label}</th>
-              <td>{value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-      <Text tone="muted">
-        Attendance is what the consultation room recorded. Missing attendance is
-        not proof by itself; the outcome is your decision, and an outcome the
-        evidence contradicts needs your explicit confirmation.
-      </Text>
-      <Heading as="h2" size="md" id="record-title">
-        Record the outcome
-      </Heading>
-      <RecordOutcomeForm consultation={record.id} codes={view.offeredCodes} />
-      {view.offeredCodes.length > 0 ? null : (
-        <Text>
-          {record.endedAt !== null
-            ? "This consultation already has an outcome."
-            : record.recordableSince === null
-              ? "No outcome can be recorded: the consultation's end cannot be derived."
-              : "No outcome can be recorded yet: the participants can still proceed."}
-        </Text>
-      )}
-    </StaffFrame>
+    <RecordPanel
+      titleId="staff-configuration-title"
+      title="Consultation"
+      sub={`${PATH_LABELS[record.path]} · times in UTC`}
+      pill={{ tone: "neutral", label: record.state }}
+      back={{
+        href: "/staff/consultations",
+        label: "Consultation operations",
+      }}
+    >
+      <KeyFact
+        label="Outcome may be recorded"
+        value={
+          record.recordableSince === null
+            ? WINDOW_BASIS_LABELS.unavailable
+            : `from ${utcText(record.recordableSince)} (${WINDOW_BASIS_LABELS[record.windowBasis]})`
+        }
+        attention={view.offeredCodes.length > 0}
+      />
+      <Block title="Details">
+        <KeyValues items={details} />
+      </Block>
+      <Block title="Attendance evidence">
+        <KeyValues items={attendance} />
+        <Note>
+          Attendance is what the consultation room recorded. Missing attendance
+          is not proof by itself; the outcome is your decision, and an outcome
+          the evidence contradicts needs your explicit confirmation.
+        </Note>
+      </Block>
+      <Block title="Payment and review">
+        <KeyValues
+          items={[
+            [
+              "Latest payment state",
+              record.paymentState === null
+                ? "No payment"
+                : record.paymentState.replaceAll("_", " "),
+            ],
+            ["Open review items", String(record.openExceptions)],
+          ]}
+        />
+      </Block>
+      <Block title="Record the outcome">
+        <RecordOutcomeForm consultation={record.id} codes={view.offeredCodes} />
+        {view.offeredCodes.length > 0 ? null : (
+          <p className="st-note">
+            {record.endedAt !== null
+              ? "This consultation already has an outcome."
+              : record.recordableSince === null
+                ? "No outcome can be recorded: the consultation's end cannot be derived."
+                : "No outcome can be recorded yet: the participants can still proceed."}
+          </p>
+        )}
+      </Block>
+    </RecordPanel>
   );
 }

@@ -812,7 +812,12 @@ export function Cell({
 }) {
   return (
     <span className={strong ? "st-cell b" : "st-cell"} data-k={label}>
-      <span className="st-cv">{children}</span>
+      <span
+        className="st-cv"
+        title={typeof children === "string" ? children : undefined}
+      >
+        {children}
+      </span>
     </span>
   );
 }
@@ -872,6 +877,39 @@ export function Pill({
       <i />
       {children}
     </span>
+  );
+}
+
+// The design's pager under a list: which page this is and links to its
+// neighbours, so no row of a list is ever left out without the page saying
+// so.
+export function PagerRow({
+  note,
+  previous,
+  next,
+}: {
+  readonly note: ReactNode;
+  readonly previous: string | null;
+  readonly next: string | null;
+}) {
+  return (
+    <div className="st-pager">
+      <p className="st-emd">{note}</p>
+      {previous === null && next === null ? null : (
+        <div className="st-links">
+          {previous === null ? null : (
+            <a className="btn btn-line btn-sm" href={previous}>
+              Previous page
+            </a>
+          )}
+          {next === null ? null : (
+            <a className="btn btn-line btn-sm" href={next}>
+              Next page
+            </a>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -955,6 +993,27 @@ export function RecordPanel({
         {sub === undefined ? null : <p className="st-dsub">{sub}</p>}
         {children}
       </section>
+    </div>
+  );
+}
+
+// The design's key fact under a record's title (for example, a deadline),
+// shaded when it asks for attention.
+export function KeyFact({
+  label,
+  value,
+  attention = false,
+}: {
+  readonly label: ReactNode;
+  readonly value: ReactNode;
+  readonly attention?: boolean;
+}) {
+  return (
+    <div className={attention ? "st-key hold" : "st-key"}>
+      <span>{label}</span>
+      <span className="st-keyv">
+        <b className="num">{value}</b>
+      </span>
     </div>
   );
 }

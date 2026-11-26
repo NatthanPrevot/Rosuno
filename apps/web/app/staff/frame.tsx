@@ -19,6 +19,7 @@ import { logRequestEvent } from "../../src/infrastructure/observability/request-
 import { Alert } from "../../src/presentation/design-system.tsx";
 import {
   Lead,
+  PagerRow,
   Pill,
   StaffBody,
   StaffHeader,
@@ -95,39 +96,6 @@ export function pageHref(base: string, page: number): string {
   return page === 1
     ? base
     : `${base}${base.includes("?") ? "&" : "?"}page=${page}`;
-}
-
-// The design's pager under a list: which page this is and links to its
-// neighbours, so no row of a list is ever left out without the page saying
-// so.
-export function PagerRow({
-  note,
-  previous,
-  next,
-}: {
-  readonly note: ReactNode;
-  readonly previous: string | null;
-  readonly next: string | null;
-}) {
-  return (
-    <div className="st-pager">
-      <p className="st-emd">{note}</p>
-      {previous === null && next === null ? null : (
-        <div className="st-links">
-          {previous === null ? null : (
-            <a className="btn btn-line btn-sm" href={previous}>
-              Previous page
-            </a>
-          )}
-          {next === null ? null : (
-            <a className="btn btn-line btn-sm" href={next}>
-              Next page
-            </a>
-          )}
-        </div>
-      )}
-    </div>
-  );
 }
 
 // Says which page this is and links to its neighbours, so no row of a list
