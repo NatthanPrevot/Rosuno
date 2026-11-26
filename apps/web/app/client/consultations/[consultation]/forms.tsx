@@ -290,7 +290,11 @@ export function DocumentControls({
       <CommunicationOutcome state={revoked} />
       {opened.status === "download" ? (
         <Cluster>
-          <a className="rs-button" data-variant="tertiary" href={opened.url}>
+          <a
+            className="btn btn-quiet"
+            data-variant="tertiary"
+            href={opened.url}
+          >
             {DOWNLOAD_LINK_LABEL}
           </a>
         </Cluster>

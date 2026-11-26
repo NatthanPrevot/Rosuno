@@ -13,6 +13,11 @@
 // cancelled; the database decides again and audits each change. The two
 // query values read, state and page, only choose the group and the page; the
 // server checks both.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Administration ›
+// Settings): the design's group tabs above one card per job (its type and
+// state pill, the subject, attempts, last error code and times, and the retry
+// and cancel forms it allows), then the pager.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -24,20 +29,18 @@ import {
 } from "../../../src/application/staff-configuration.ts";
 import { STAFF_CONFIGURATION_SOURCES } from "../../../src/infrastructure/staff/staff-configuration-adapter.ts";
 import {
-  ButtonLink,
-  Cluster,
-  Stack,
-  Status,
-  Table,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
-import {
   JOB_GROUP_LINKS,
   JOB_STATE_LABELS,
   utcDateTime,
 } from "../../../src/presentation/staff-configuration-labels.ts";
+import {
+  Empty,
+  KeyValues,
+  Pill,
+  TabLinks,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
+import { PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
 import { CancelJobForm, RetryJobForm } from "./forms.tsx";
 
 export const metadata: Metadata = {
@@ -93,90 +96,76 @@ export default async function OperationalJobsPage({
   }
   const current = JOB_GROUP_LINKS[view.group];
   return (
-    <StaffFrame eyebrow="Staff" title="Operational jobs">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Text tone="muted">
-        Background jobs carry out side effects after the change that needs them
-        is saved. A failed attempt is retried after a delay, and a job whose
-        attempts are used up is escalated here. A job past its due time waits
-        until the next worker run picks it up.
-      </Text>
-      <Cluster>
-        {JOB_GROUPS.map((group) => (
-          <ButtonLink
-            key={group}
-            variant={group === view.group ? "primary" : "secondary"}
-            href={JOB_GROUP_LINKS[group].href}
-            aria-current={group === view.group ? "page" : undefined}
-          >
-            {JOB_GROUP_LINKS[group].title}
-          </ButtonLink>
-        ))}
-      </Cluster>
+    <StaffFrame
+      title="Settings"
+      subtitle="Jobs: escalated, waiting and finished background jobs."
+      lead={
+        <p>
+          Background jobs carry out side effects after the change that needs
+          them is saved. A failed attempt is retried after a delay, and a job
+          whose attempts are used up is escalated here. A job past its due time
+          waits until the next worker run picks it up.
+        </p>
+      }
+      utc
+    >
+      <TabLinks
+        label="Jobs by group"
+        links={JOB_GROUPS.map((group) => ({
+          href: JOB_GROUP_LINKS[group].href,
+          label: JOB_GROUP_LINKS[group].title,
+        }))}
+        current={current.href}
+      />
+      <h2 className="st-h2" id="operational-jobs">{`${current.title} jobs`}</h2>
       {view.jobs.length === 0 ? (
-        <Text>
-          {view.pager.page === 1
-            ? EMPTY_GROUP[view.group]
-            : "There are no jobs on this page."}
-        </Text>
+        <section className="st-listbox" aria-labelledby="operational-jobs">
+          <Empty
+            title={
+              view.pager.page === 1
+                ? EMPTY_GROUP[view.group]
+                : "There are no jobs on this page."
+            }
+          />
+        </section>
       ) : (
-        <Table id="operational-jobs" caption={`${current.title} jobs`}>
-          <thead>
-            <tr>
-              <th scope="col">Job type</th>
-              <th scope="col">Subject</th>
-              <th scope="col">State</th>
-              <th scope="col">Attempts</th>
-              <th scope="col">Last error</th>
-              <th scope="col">Times</th>
-              <th scope="col">Change</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.jobs.map((job) => (
-              <tr key={job.id}>
-                <td>{job.jobType}</td>
-                <td>
-                  {job.subjectType === null ? (
-                    "None"
-                  ) : (
-                    <Stack gap="tight">
-                      <span>{job.subjectType}</span>
-                      <Text size="small" tone="muted">
-                        {job.subjectId}
-                      </Text>
-                    </Stack>
-                  )}
-                </td>
-                <td>
-                  <Status tone={JOB_STATE_LABELS[job.state].tone}>
-                    {JOB_STATE_LABELS[job.state].label}
-                  </Status>
-                </td>
-                <td>{`${job.attempts} of ${job.maxAttempts}`}</td>
-                <td>{job.lastErrorCode ?? "None"}</td>
-                <td>
-                  <Stack gap="tight">
-                    <span>{timing(job)}</span>
-                    <Text size="small" tone="muted">
-                      {`Created at ${utcDateTime(job.createdAt)}`}
-                    </Text>
-                  </Stack>
-                </td>
-                <td>
-                  {job.canRetry || job.canCancel ? (
-                    <Stack gap="tight">
-                      {job.canRetry ? <RetryJobForm job={job.id} /> : null}
-                      {job.canCancel ? <CancelJobForm job={job.id} /> : null}
-                    </Stack>
-                  ) : (
-                    "None"
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+        view.jobs.map((job) => (
+          <section
+            key={job.id}
+            className="w-card st-panel"
+            aria-labelledby={`job-${job.id}`}
+          >
+            <div className="st-ptop">
+              <h3 className="st-h2" id={`job-${job.id}`}>
+                {job.jobType}
+              </h3>
+              <span className="grow"></span>
+              <Pill tone={JOB_STATE_LABELS[job.state].tone}>
+                {JOB_STATE_LABELS[job.state].label}
+              </Pill>
+            </div>
+            <KeyValues
+              items={[
+                [
+                  "Subject",
+                  job.subjectType === null
+                    ? "None"
+                    : `${job.subjectType} ${job.subjectId ?? ""}`,
+                ],
+                ["Attempts", `${job.attempts} of ${job.maxAttempts}`],
+                ["Last error", job.lastErrorCode ?? "None"],
+                ["Times", timing(job)],
+                ["Created", `Created at ${utcDateTime(job.createdAt)}`],
+              ]}
+            />
+            {job.canRetry || job.canCancel ? (
+              <div className="st-links">
+                {job.canRetry ? <RetryJobForm job={job.id} /> : null}
+                {job.canCancel ? <CancelJobForm job={job.id} /> : null}
+              </div>
+            ) : null}
+          </section>
+        ))
       )}
       <PagerLinks
         pager={view.pager}

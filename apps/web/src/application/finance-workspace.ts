@@ -191,6 +191,27 @@ export const EXCEPTION_COLUMNS = Object.freeze([
   "resolution_notes",
 ]);
 
+// DEV-001: one payment's provider dispute events, the review items the
+// payment engine opens for them (staff_payment_dispute_events).
+export const DISPUTE_EVENT_TYPES = Object.freeze([
+  "dispute_opened",
+  "dispute_updated",
+  "dispute_closed",
+] as const);
+export type DisputeEventType = (typeof DISPUTE_EVENT_TYPES)[number];
+export const DISPUTE_EVENT_COLUMNS = Object.freeze([
+  "exception_id",
+  "exception_type",
+  "severity",
+  "status",
+  "detected_at",
+  "evidence_reference",
+  "resolved_at",
+  "resolution_notes",
+]);
+// The most dispute events the database answers for one payment.
+export const MAX_DISPUTE_EVENTS = 200;
+
 export const REFUND_OUTCOMES = Object.freeze([
   "requested",
   "invalid",
@@ -239,6 +260,8 @@ export type FinanceReads = {
     status: ExceptionStatus,
     offset: number,
   ) => Promise<RowsResult>;
+  // staff_payment_dispute_events(payment)
+  readonly disputeEvents: (paymentId: string) => Promise<RowsResult>;
   // deployment_environment_identity()
   readonly environmentIdentity: () => Promise<RowsResult>;
 };
@@ -839,6 +862,103 @@ export async function resolveFinanceExceptions(
           exceptions: read.rows,
           pager: read.pager,
         });
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+export type DisputeEvent = {
+  readonly id: string;
+  readonly eventType: DisputeEventType;
+  readonly severity: (typeof SEVERITIES)[number];
+  readonly status: ExceptionStatus;
+  readonly detectedAt: string;
+  // The evidence the database kept, as compact text (as on the exception
+  // list).
+  readonly evidence: string;
+  readonly resolvedAt: string | null;
+  readonly resolutionNotes: string | null;
+};
+
+function readDisputeEvent(row: unknown): DisputeEvent | null {
+  const f = readExact(row, DISPUTE_EVENT_COLUMNS);
+  if (f === null) {
+    return null;
+  }
+  const id = f.get("exception_id");
+  const eventType = f.get("exception_type");
+  const severity = f.get("severity");
+  const status = f.get("status");
+  const detectedAt = f.get("detected_at");
+  const evidence = f.get("evidence_reference");
+  const resolvedAt = f.get("resolved_at");
+  const notes = f.get("resolution_notes");
+  if (
+    !isUuid(id) ||
+    !isOneOf(DISPUTE_EVENT_TYPES, eventType) ||
+    !isOneOf(SEVERITIES, severity) ||
+    !isOneOf(EXCEPTION_STATUSES, status) ||
+    !isTimestamp(detectedAt) ||
+    evidence === null ||
+    typeof evidence !== "object" ||
+    Array.isArray(evidence) ||
+    !nullableTime(resolvedAt) ||
+    !(notes === null || typeof notes === "string") ||
+    (status === "resolved") !== (resolvedAt !== null)
+  ) {
+    return null;
+  }
+  let text: string;
+  try {
+    text = JSON.stringify(evidence);
+  } catch {
+    return null;
+  }
+  return Object.freeze({
+    id,
+    eventType,
+    severity,
+    status,
+    detectedAt,
+    evidence: text.length > 2000 ? `${text.slice(0, 2000)}…` : text,
+    resolvedAt,
+    resolutionNotes: notes as string | null,
+  });
+}
+
+export type FinanceDisputeTimelineView =
+  | { readonly status: "ready"; readonly events: readonly DisputeEvent[] }
+  | typeof NOT_FOUND
+  | Refusal;
+
+// One payment's provider dispute events, oldest first; none for a payment
+// without any. It never throws.
+export async function resolveFinanceDisputeTimeline(
+  sources: FinanceSources,
+  paymentId: unknown,
+): Promise<FinanceDisputeTimelineView> {
+  try {
+    if (!isUuid(paymentId)) {
+      return NOT_FOUND;
+    }
+    const context = await financeContext(sources);
+    if (!("userId" in context)) {
+      return context;
+    }
+    const rows = rowsOf(
+      await attempt(() => context.reads.disputeEvents(paymentId)),
+    );
+    const events =
+      rows === null || rows.length > MAX_DISPUTE_EVENTS
+        ? null
+        : readRows(rows, readDisputeEvent);
+    if (
+      events === null ||
+      new Set(events.map((event) => event.id)).size !== events.length
+    ) {
+      return UNAVAILABLE;
+    }
+    return Object.freeze({ status: "ready", events });
   } catch {
     return UNAVAILABLE;
   }

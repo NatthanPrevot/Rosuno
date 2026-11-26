@@ -9,6 +9,12 @@
 // settings have their declared shape (configured or not configured, never a
 // value). Hosted checks are out of scope here. It reads no query, header or
 // cookie.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Administration ›
+// Settings, system health): the environment in the design's panel, then the
+// design's lists of the provider areas and the scheduled sweeps, each with
+// its status pill as the server reports it, and the notes on what this view
+// does not check.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -19,14 +25,7 @@ import {
   type Sweep,
 } from "../../../src/application/operations-workspace.ts";
 import { OPERATIONS_WORKSPACE_SOURCES } from "../../../src/infrastructure/staff/operations-adapter.ts";
-import {
-  Alert,
-  ButtonLink,
-  Cluster,
-  Status,
-  Table,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
+import { Alert, Status } from "../../../src/presentation/design-system.tsx";
 import {
   HOSTED_CHECKS_NOTE,
   PROVIDER_AREA_LABELS,
@@ -37,8 +36,16 @@ import {
   SYSTEM_HEALTH_NOTE,
 } from "../../../src/presentation/operations-labels.ts";
 import { ENVIRONMENT_LABELS } from "../../../src/presentation/staff-configuration-labels.ts";
+import {
+  Cell,
+  KeyValues,
+  ListBox,
+  ListRow,
+  Panel,
+  PillCell,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../frame.tsx";
+import { refusalPage, StaffFrame } from "../frame.tsx";
 
 export const metadata: Metadata = {
   title: "System health",
@@ -58,24 +65,35 @@ export default async function SystemHealthPage() {
   const scheduler = summary.counts.scheduler;
   const installed = scheduler[0]?.value === 1;
   return (
-    <StaffFrame eyebrow="Operations" title="System health">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Table id="system-health-environment" caption="Environment">
-        <tbody>
-          <tr>
-            <th scope="row">Recorded database environment</th>
-            <td>{ENVIRONMENT_CLASS_LABELS[summary.environmentClass]}</td>
-          </tr>
-          <tr>
-            <th scope="row">Environment record</th>
-            <td>
-              <Status tone={status.tone}>{status.label}</Status>
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">This deployment&apos;s settings</th>
-            <td>
+    <StaffFrame
+      title="Settings"
+      subtitle="System health: the recorded environment, the scheduled sweeps and each provider area."
+      lead={<p>{SYSTEM_HEALTH_NOTE}</p>}
+    >
+      <Panel
+        id="system-health-environment"
+        title="Environment"
+        link={{
+          href: "/staff/operations",
+          label: "Open the operations dashboard",
+        }}
+      >
+        <KeyValues
+          items={[
+            [
+              "Recorded database environment",
+              ENVIRONMENT_CLASS_LABELS[summary.environmentClass],
+            ],
+            [
+              "Environment record",
+              <Status key="record" tone={status.tone}>
+                {status.label}
+              </Status>,
+            ],
+            [
+              "This deployment's settings",
               <Status
+                key="binding"
                 tone={
                   binding === "unrecorded" || binding === "mismatch"
                     ? "error"
@@ -83,55 +101,46 @@ export default async function SystemHealthPage() {
                 }
               >
                 {ENVIRONMENT_LABELS[binding]}
-              </Status>
-            </td>
-          </tr>
-        </tbody>
-      </Table>
-      <Table id="system-health-providers" caption="Provider configuration">
-        <thead>
-          <tr>
-            <th scope="col">Area</th>
-            <th scope="col">Settings</th>
-          </tr>
-        </thead>
-        <tbody>
-          {PROVIDER_AREAS.map((area) => {
-            const label = PROVIDER_STATUS_LABELS[providers[area]];
-            return (
-              <tr key={area}>
-                <td>{PROVIDER_AREA_LABELS[area]}</td>
-                <td>
-                  <Status tone={label.tone}>{label.label}</Status>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </Table>
-      <Text size="small" tone="muted">
-        {SYSTEM_HEALTH_NOTE}
-      </Text>
-      <Table id="system-health-sweeps" caption="Scheduled database sweeps">
-        <thead>
-          <tr>
-            <th scope="col">Sweep</th>
-            <th scope="col">Registered</th>
-          </tr>
-        </thead>
-        <tbody>
-          {scheduler.slice(1).map((sweep) => (
-            <tr key={sweep.dimension}>
-              <td>{SWEEP_LABELS[sweep.dimension as Sweep]}</td>
-              <td>
-                <Status tone={sweep.value === 1 ? "success" : "warning"}>
-                  {sweep.value === 1 ? "Registered" : "Not registered"}
-                </Status>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
+              </Status>,
+            ],
+          ]}
+        />
+      </Panel>
+      <h2 className="st-h2">Provider configuration</h2>
+      <ListBox label="Provider configuration" columns={["Area", "Settings"]}>
+        {PROVIDER_AREAS.map((area) => {
+          const label = PROVIDER_STATUS_LABELS[providers[area]];
+          return (
+            <ListRow key={area} columns={2}>
+              <Cell label="Area" strong>
+                {PROVIDER_AREA_LABELS[area]}
+              </Cell>
+              <PillCell label="Settings" tone={label.tone}>
+                {label.label}
+              </PillCell>
+            </ListRow>
+          );
+        })}
+      </ListBox>
+      <h2 className="st-h2">Scheduled database sweeps</h2>
+      <ListBox
+        label="Scheduled database sweeps"
+        columns={["Sweep", "Registered"]}
+      >
+        {scheduler.slice(1).map((sweep) => (
+          <ListRow key={sweep.dimension} columns={2}>
+            <Cell label="Sweep" strong>
+              {SWEEP_LABELS[sweep.dimension as Sweep]}
+            </Cell>
+            <PillCell
+              label="Registered"
+              tone={sweep.value === 1 ? "success" : "warning"}
+            >
+              {sweep.value === 1 ? "Registered" : "Not registered"}
+            </PillCell>
+          </ListRow>
+        ))}
+      </ListBox>
       {installed ? null : (
         <Alert tone="warning" title="No database scheduler" role="status">
           The database scheduler is not installed in this database, so no sweep
@@ -142,11 +151,6 @@ export default async function SystemHealthPage() {
       <Alert tone="information" title="Hosted checks" role="status">
         {HOSTED_CHECKS_NOTE}
       </Alert>
-      <Cluster>
-        <ButtonLink variant="secondary" href="/staff/operations">
-          Open the operations dashboard
-        </ButtonLink>
-      </Cluster>
     </StaffFrame>
   );
 }

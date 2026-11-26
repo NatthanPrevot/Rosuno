@@ -1483,6 +1483,9 @@ function probes() {
           // functions, jobs and audit events; no M4 relation (eligibility is
           // read FOR SHARE by the S5 recorder).
           "attorney_accept_request:v",
+          // DEV-001 (20261129010000): four participant and finance reads
+          // (authenticated; stable), which write nothing.
+          "attorney_activity_counts:s",
           "attorney_change_practice_area_request:v",
           // MVP-001 S11 pass 2B (20261127170000): the participants' own
           // workspace reads (authenticated; the attorney reads at aal2), which
@@ -1571,6 +1574,9 @@ function probes() {
           // MVP-001 S9 (20261125030000): the client's own Consultation read
           // (authenticated), which writes nothing.
           "client_consultation:s",
+          // DEV-001 (20261129010000): four participant and finance reads
+          // (authenticated; stable), which write nothing.
+          "client_consultation_parties:s",
           // MVP-001 S11 (20261127020000): the client's own Consultation list
           // (authenticated), which writes nothing.
           "client_consultations:s",
@@ -1611,6 +1617,9 @@ function probes() {
           // MVP-001 S6 re-pin (20261122020000): the client's request review
           // read (authenticated only), which writes nothing.
           "client_request_review:s",
+          // DEV-001 (20261129010000): four participant and finance reads
+          // (authenticated; stable), which write nothing.
+          "client_requests:s",
           // MVP-001 S11 (20261127040000): the client's own reviews and reviewable
           // Consultations (authenticated), which writes nothing.
           "client_reviews:s",
@@ -1774,6 +1783,12 @@ function probes() {
           // published reviews (anon and authenticated), which writes nothing.
           "public_attorney_reviews:s",
           "public_discovery_filters:s",
+          // DEV-001: website & appearance studio (20261130010000): the public
+          // reads of the published appearance (anon, authenticated; stable)
+          // and the staff appearance reads (authenticated, aal2,
+          // manage_site_appearance; stable), which write nothing.
+          "public_site_appearance:s",
+          "public_site_appearance_asset:s",
           // MVP-001 S5 re-pin (20261121030000): the client's selection
           // (authenticated only), which writes Referral evidence, audit
           // events and, of the M4 relations, only appends decision-point
@@ -1898,6 +1913,11 @@ function probes() {
           "staff_decide_policy_authority_reference:v",
           "staff_decide_practice_area:v",
           "staff_define_launch_gate:v",
+          // DEV-001: website & appearance studio (20261130010000): the staff
+          // appearance commands (authenticated, aal2, manage_site_appearance),
+          // which write only the appearance relations and audit events; no M4
+          // relation.
+          "staff_discard_site_appearance_draft:v",
           "staff_end_policy_version:v",
           // MVP-001 S7 re-pin (20261123020000): finance reads, as above.
           "staff_finance_exceptions:s",
@@ -1933,11 +1953,19 @@ function probes() {
           // MVP-001 S11 pass 2 (20261127100000): the counts-only operations summary
           // (authenticated, aal2, view_operations), which writes nothing.
           "staff_operations_summary:s",
+          // DEV-001 (20261129010000): four participant and finance reads
+          // (authenticated; stable), which write nothing.
+          "staff_payment_dispute_events:s",
           "staff_place_legal_hold:v",
           // MVP-001 S11 pass 2 (20261127110000): policy version status changes
           // (authenticated, aal2, manage_policy_configuration), which writes nothing.
           "staff_policy_changes:s",
           "staff_publish_intake_question_set:v",
+          // DEV-001: website & appearance studio (20261130010000): the staff
+          // appearance commands (authenticated, aal2, manage_site_appearance),
+          // which write only the appearance relations and audit events; no M4
+          // relation.
+          "staff_publish_site_appearance:v",
           // MVP-001 S11 (20261127020000): staff outcome recording (authenticated,
           // aal2, manage_consultation_operations), which writes only the
           // Consultation, payment transitions through the S7 release path,
@@ -1967,11 +1995,21 @@ function probes() {
           // manage_financial_operations), which writes only the payment
           // transition, a job and an audit event; no M4 relation.
           "staff_request_release:v",
+          // DEV-001: website & appearance studio (20261130010000): the staff
+          // appearance commands (authenticated, aal2, manage_site_appearance),
+          // which write only the appearance relations and audit events; no M4
+          // relation.
+          "staff_reset_site_appearance:v",
           // MVP-001 S11 (20261127060000): complaint resolution (authenticated,
           // aal2, manage_complaints), which writes only Complaint Cases and audit
           // events; no M4 relation.
           "staff_resolve_complaint:v",
           "staff_resolve_reconciliation_exception:v",
+          // DEV-001: website & appearance studio (20261130010000): the staff
+          // appearance commands (authenticated, aal2, manage_site_appearance),
+          // which write only the appearance relations and audit events; no M4
+          // relation.
+          "staff_restore_site_appearance:v",
           "staff_retry_job:v",
           // MVP-001 S11 (20261127030000): one family's review exceptions
           // (authenticated, aal2, the family's capability), which writes nothing.
@@ -1988,7 +2026,22 @@ function probes() {
           "staff_revoke_break_glass:v",
           "staff_revoke_capability:v",
           "staff_revoke_launch_authorization:v",
+          // DEV-001: website & appearance studio (20261130010000): the staff
+          // appearance commands (authenticated, aal2, manage_site_appearance),
+          // which write only the appearance relations and audit events; no M4
+          // relation.
+          "staff_save_site_appearance_draft:v",
           "staff_set_practice_area_active:v",
+          // DEV-001: website & appearance studio (20261130010000): the public
+          // reads of the published appearance (anon, authenticated; stable)
+          // and the staff appearance reads (authenticated, aal2,
+          // manage_site_appearance; stable), which write nothing.
+          "staff_site_appearance_asset:s",
+          "staff_site_appearance_assets:s",
+          "staff_site_appearance_overview:s",
+          "staff_site_appearance_preview:s",
+          "staff_site_appearance_version:s",
+          "staff_site_appearance_versions:s",
           // MVP-001 S11 (20261127020000): the undecided Consultations whose
           // outcome may be recorded (authenticated, aal2,
           // manage_consultation_operations), which writes nothing.
@@ -1998,6 +2051,11 @@ function probes() {
           // (authenticated, aal2, manage_complaints), which writes only Complaint
           // Cases and audit events; no M4 relation.
           "staff_update_complaint:v",
+          // DEV-001: website & appearance studio (20261130010000): the staff
+          // appearance commands (authenticated, aal2, manage_site_appearance),
+          // which write only the appearance relations and audit events; no M4
+          // relation.
+          "staff_upload_site_appearance_asset:v",
         ].join(","),
       );
       assert.equal(

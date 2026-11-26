@@ -13,6 +13,13 @@
 // same fixed message, and no state shows an identifier or record. Starting an
 // application records an applicant stage only; this page establishes no
 // professional verification, approval, or eligibility.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8,
+// Apply.dc.html): the application page on the design's paper background,
+// with the breadcrumb back to For attorneys, the page title, and the
+// design's steps beside the step card (starting the application here, the
+// professional details in professional setup, then Rosuno's review). The
+// one start form and every fixed state are unchanged.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -33,11 +40,6 @@ import {
   Button,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Surface,
   Text,
 } from "../../../src/presentation/design-system.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
@@ -50,22 +52,90 @@ export const metadata: Metadata = {
 
 type ApplicationFrameProps = {
   readonly title: string;
+  // The design's steps, shown once the account may hold an application:
+  // where this page is in them (the start is current, or done once on
+  // record).
+  readonly steps?: "start" | "on-record";
   readonly children: ReactNode;
 };
 
-function ApplicationFrame({ title, children }: ApplicationFrameProps) {
+// The design's application steps, in order. Only the first is taken here.
+const STEPS = Object.freeze([
+  "Start your application",
+  "Professional details",
+  "Review by Rosuno",
+] as const);
+
+function ApplicationFrame({ title, steps, children }: ApplicationFrameProps) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-application-title">
-        <Stack>
-          <Eyebrow>Attorney application</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-application-title">
+    <div className="rz l-bgpaper-minh100vh rz-apply">
+      <div className="wrap ap-wrap l-pt32-pb88-mw1200">
+        <nav className="crumbs" aria-label="Breadcrumb">
+          <a href="/for-attorneys">For attorneys</a>
+          <span aria-hidden="true">/</span>
+          <span className="l-cink" aria-current="page">
+            Apply
+          </span>
+        </nav>
+        <div className="row between ap-title l-mt12-aiflex-end">
+          <h1 className="h2 ap-h1 l-fs38" id="attorney-application-title">
             {title}
-          </Heading>
-          {children}
-        </Stack>
-      </Surface>
-    </Page>
+          </h1>
+        </div>
+        {steps === undefined ? (
+          <section
+            className="panel ap-sec l-p30-34 rz-ap-sec rz-ap-solo"
+            aria-labelledby="attorney-application-title"
+          >
+            {children}
+          </section>
+        ) : (
+          <div className="ap-grid l-dgrid-cols260-mm0-1fr-g24-mt24-aistart">
+            <aside
+              className="panel ap-aside l-p12-possticky-t16"
+              aria-label="Application steps"
+            >
+              <ol className="vsteps">
+                {STEPS.map((step, index) => (
+                  <li
+                    key={step}
+                    className={
+                      index === 0
+                        ? steps === "start"
+                          ? "vstep cur"
+                          : "vstep done"
+                        : "vstep"
+                    }
+                    aria-current={
+                      index === 0 && steps === "start" ? "step" : undefined
+                    }
+                  >
+                    <span className="sn">
+                      {index === 0 && steps === "on-record" ? "✓" : index + 1}
+                    </span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="xs subtle l-p10-10-4">
+                One application is kept per account.
+              </p>
+            </aside>
+            <section
+              className="panel ap-sec l-p30-34 rz-ap-sec"
+              aria-labelledby="attorney-application-title"
+            >
+              <p className="kicker">
+                <span>
+                  {steps === "start" ? "Step 1 of 3" : "Step 1 of 3 · done"}
+                </span>
+              </p>
+              {children}
+            </section>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -102,7 +172,7 @@ export default async function AttorneyApplicationPage() {
   });
   if (entry.status === "can-start") {
     return (
-      <ApplicationFrame title="Start an attorney application">
+      <ApplicationFrame title="Start an attorney application" steps="start">
         <Text tone="muted">
           Your signed-in account can start an attorney application. One
           application is kept per account, so starting it again never creates
@@ -127,7 +197,10 @@ export default async function AttorneyApplicationPage() {
   }
   if (entry.status === "on-record") {
     return (
-      <ApplicationFrame title="Attorney application on record">
+      <ApplicationFrame
+        title="Attorney application on record"
+        steps="on-record"
+      >
         <Alert tone="success" title="Application on record" role="status">
           This account has an attorney application. Another cannot be started,
           and the existing application is unchanged.

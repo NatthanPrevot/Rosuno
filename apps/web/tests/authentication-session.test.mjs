@@ -190,16 +190,19 @@ test("6. default server session source is immutable and exposes only the trusted
   );
 });
 
-test("7. Proxy is only a thin authentication-session refresh entrypoint", () => {
+test("7. Proxy is only a thin authentication-session refresh entrypoint behind the Staging access gate", () => {
   const proxy = read("proxy.ts");
 
   assert.match(proxy, /refreshSupabaseSession/);
 
   assert.match(proxy, /export async function proxy/);
 
-  assert.match(proxy, /_next\/static/);
+  // Updated for the reviewed Staging access gate design (P2-925, DEV-001): the matcher is exactly this one entry, skipping only /_next/static/, so _next/image, favicon.ico and image-looking paths are no longer excluded.
+  assert.ok(proxy.includes('  matcher: ["/((?!_next/static/).*)"],\n'));
 
-  assert.match(proxy, /_next\/image/);
+  assert.equal(proxy.match(/matcher/g).length, 1);
+
+  assert.doesNotMatch(proxy, /_next\/image|favicon|svg|png|jpe?g|gif|webp/i);
 
   assert.doesNotMatch(proxy, /\bredirect\b/i);
 

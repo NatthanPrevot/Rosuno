@@ -9,6 +9,10 @@
 // are redacted there; codes and identifiers are kept). Opening the page is
 // itself audited by the database. The one route value read, event, only
 // names the event.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, the activity log record):
+// the design's record panel with the recorded event and its snapshots, shown
+// as the database answers them.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -18,12 +22,13 @@ import {
   resolveAuditEvent,
 } from "../../../../src/application/operations-workspace.ts";
 import { OPERATIONS_WORKSPACE_SOURCES } from "../../../../src/infrastructure/staff/operations-adapter.ts";
-import {
-  Heading,
-  Table,
-  Text,
-} from "../../../../src/presentation/design-system.tsx";
 import { utcText } from "../../../../src/presentation/operations-labels.ts";
+import {
+  Block,
+  Empty,
+  KeyValues,
+  RecordPanel,
+} from "../../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
 import { BackLink, refusalPage, StaffFrame } from "../../frame.tsx";
 
@@ -31,6 +36,8 @@ export const metadata: Metadata = {
   title: "Audit event",
   robots: { index: false, follow: false },
 };
+
+const BACK = { href: "/staff/audit", label: "Audit and security events" };
 
 function Snapshot({
   title,
@@ -40,16 +47,13 @@ function Snapshot({
   readonly text: string | null;
 }) {
   return (
-    <>
-      <Heading as="h2" size="sm">
-        {title}
-      </Heading>
+    <Block title={title}>
       {text === null ? (
-        <Text tone="muted">None recorded.</Text>
+        <p className="st-emd">None recorded.</p>
       ) : (
-        <pre>{text}</pre>
+        <pre className="st-pre">{text}</pre>
       )}
-    </>
+    </Block>
   );
 }
 
@@ -67,62 +71,54 @@ export default async function AuditEventPage({
     return refusalPage(view, "/staff/audit/[event]", "Audit event");
   }
   const { event } = view;
+  if (event === null) {
+    return (
+      <StaffFrame title="Audit event">
+        <BackLink href={BACK.href}>{BACK.label}</BackLink>
+        <section className="w-card st-panel">
+          <Empty title="No such event is available to you." />
+        </section>
+      </StaffFrame>
+    );
+  }
   return (
-    <StaffFrame eyebrow="Security and audit" title="Audit event">
-      <BackLink href="/staff/audit">Audit and security events</BackLink>
-      {event === null ? (
-        <Text>No such event is available to you.</Text>
-      ) : (
-        <>
-          <Table id="audit-event" caption="Recorded event">
-            <tbody>
-              <tr>
-                <th scope="row">Identifier</th>
-                <td>{event.id}</td>
-              </tr>
-              <tr>
-                <th scope="row">When (UTC)</th>
-                <td>{utcText(event.occurredAt)}</td>
-              </tr>
-              <tr>
-                <th scope="row">Recorded (UTC)</th>
-                <td>{utcText(event.createdAt)}</td>
-              </tr>
-              <tr>
-                <th scope="row">Action</th>
-                <td>{event.actionCode}</td>
-              </tr>
-              <tr>
-                <th scope="row">Performed by</th>
-                <td>
-                  {event.actorUserId === null
-                    ? event.actorType
-                    : `${event.actorType} ${event.actorUserId}`}
-                </td>
-              </tr>
-              <tr>
-                <th scope="row">Resource</th>
-                <td>
-                  {event.resourceId === null
-                    ? event.resourceType
-                    : `${event.resourceType} ${event.resourceId}`}
-                </td>
-              </tr>
-              <tr>
-                <th scope="row">Jurisdiction</th>
-                <td>{jurisdictionLabel(view.names, event.jurisdictionId)}</td>
-              </tr>
-              <tr>
-                <th scope="row">Reason</th>
-                <td>{event.reasonCode ?? "None recorded"}</td>
-              </tr>
-            </tbody>
-          </Table>
-          <Snapshot title="Before" text={event.beforeSnapshot} />
-          <Snapshot title="After" text={event.afterSnapshot} />
-          <Snapshot title="Policy references" text={event.policyReferences} />
-        </>
-      )}
-    </StaffFrame>
+    <RecordPanel
+      titleId="staff-configuration-title"
+      title="Audit event"
+      sub={`${event.actionCode} · times in UTC`}
+      reference={utcText(event.occurredAt)}
+      back={BACK}
+    >
+      <Block title="Recorded event">
+        <KeyValues
+          items={[
+            ["Identifier", event.id],
+            ["When (UTC)", utcText(event.occurredAt)],
+            ["Recorded (UTC)", utcText(event.createdAt)],
+            ["Action", event.actionCode],
+            [
+              "Performed by",
+              event.actorUserId === null
+                ? event.actorType
+                : `${event.actorType} ${event.actorUserId}`,
+            ],
+            [
+              "Resource",
+              event.resourceId === null
+                ? event.resourceType
+                : `${event.resourceType} ${event.resourceId}`,
+            ],
+            [
+              "Jurisdiction",
+              jurisdictionLabel(view.names, event.jurisdictionId),
+            ],
+            ["Reason", event.reasonCode ?? "None recorded"],
+          ]}
+        />
+      </Block>
+      <Snapshot title="Before" text={event.beforeSnapshot} />
+      <Snapshot title="After" text={event.afterSnapshot} />
+      <Snapshot title="Policy references" text={event.policyReferences} />
+    </RecordPanel>
   );
 }

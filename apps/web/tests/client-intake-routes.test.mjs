@@ -43,6 +43,9 @@ const P5_MODULES = Object.freeze([
   "app/client/actions.ts",
   "app/client/forms.tsx",
   "app/client/page.tsx",
+  // DEV-001: the owner's UI/UX design lists the Intakes on the Legal matters
+  // page, which is held to every rule of the workspace page it took them from.
+  "app/client/intakes/page.tsx",
   "app/client/intakes/[intake]/forms.tsx",
   "app/client/intakes/[intake]/page.tsx",
 ]);
@@ -63,6 +66,10 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
   // the profile and settings page, four read-only server pages (no form and
   // no action). MVP-001 S11 PS-A6: plus exactly the privacy and data page's
   // data request form (a client module) and action (a server action module).
+  // DEV-001: the owner's UI/UX design adds exactly the Legal matters page, a
+  // server page that lists the Intakes (no form or action of its own: it
+  // renders the existing start form), and the Account security page, a
+  // read-only server page (no form and no action).
   assert.deepEqual(filesIn("app/client/"), [
     "app/client/actions.ts",
     "app/client/complaints/actions.ts",
@@ -75,6 +82,7 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     "app/client/forms.tsx",
     "app/client/intakes/[intake]/forms.tsx",
     "app/client/intakes/[intake]/page.tsx",
+    "app/client/intakes/page.tsx",
     "app/client/messages/page.tsx",
     "app/client/notifications/actions.ts",
     "app/client/notifications/forms.tsx",
@@ -94,6 +102,7 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     "app/client/reviews/forms.tsx",
     "app/client/reviews/page.tsx",
     "app/client/settings/page.tsx",
+    "app/client/settings/security/page.tsx",
   ]);
   assert.match(read("app/client/actions.ts"), /^"use server";\n/);
   for (const file of [
@@ -105,14 +114,8 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     assert.match(read(file), /^"use server";\n/, file);
   }
   assert.match(read("app/client/requests/actions.ts"), /^"use server";\n/);
-  assert.match(
-    read("app/client/consultations/actions.ts"),
-    /^"use server";\n/,
-  );
-  assert.match(
-    read("app/client/notifications/actions.ts"),
-    /^"use server";\n/,
-  );
+  assert.match(read("app/client/consultations/actions.ts"), /^"use server";\n/);
+  assert.match(read("app/client/notifications/actions.ts"), /^"use server";\n/);
   for (const file of [
     "app/client/consultations/[consultation]/forms.tsx",
     "app/client/notifications/forms.tsx",
@@ -140,13 +143,19 @@ test("1. the client routes are exactly the workspace, the Intake page, their for
     "app/client/payments/page.tsx",
     "app/client/privacy/page.tsx",
     "app/client/settings/page.tsx",
+    // DEV-001.
+    "app/client/intakes/page.tsx",
+    "app/client/settings/security/page.tsx",
   ]) {
     assert.doesNotMatch(read(file), /["']use (?:client|server)["']/, file);
   }
 });
 
 test("2. pages decide access on the server for every request through the client intake use cases and the production sources", () => {
-  const workspace = codeOf(read("app/client/page.tsx"));
+  // DEV-001: the owner's UI/UX design lists the Intakes, their paging and the
+  // start form on the Legal matters page, which keeps every pin the
+  // workspace page had.
+  const workspace = codeOf(read("app/client/intakes/page.tsx"));
   assert.match(workspace, /await connection\(\);/);
   // MVP-001 D-3: the workspace shows one page of the client's own Intakes.
   // The only request value it reads is the page query value, which it hands
@@ -158,6 +167,43 @@ test("2. pages decide access on the server for every request through the client 
   );
   assert.equal(workspace.match(/\bsearchParams\b/g).length, 3);
   assert.doesNotMatch(workspace, /\bheaders\s*\(|\bcookies\s*\(|\bparams\b/);
+  assert.ok(
+    workspace.indexOf("await connection();") <
+      workspace.indexOf("await resolveClientWorkspace("),
+  );
+  // DEV-001: the overview reads no request value at all, and decides access
+  // for every request through the client's own Consultation list (the S11
+  // use case, which re-verifies the client through the client intake
+  // sources before anything is read) and its production sources.
+  const overview = codeOf(read("app/client/page.tsx"));
+  assert.match(overview, /await connection\(\);/);
+  assert.match(
+    overview,
+    /const view = await resolveClientConsultations\(CLIENT_OUTCOME_SOURCES\);/,
+  );
+  assert.ok(
+    overview.indexOf("await connection();") <
+      overview.indexOf("await resolveClientConsultations("),
+  );
+  assert.doesNotMatch(
+    overview,
+    /\bsearchParams\b|\bheaders\s*\(|\bcookies\s*\(|\bparams\b/,
+  );
+  // DEV-001: the owner's UI/UX design's "Awaiting attorney response" adds
+  // exactly one read, after the Consultation list: the first page of the
+  // client's own open Requests, through the participant workspace sources
+  // (whose use case re-verifies the client through the same client intake
+  // sources before anything is read). Its query values are fixed: the page
+  // still reads no request value.
+  assert.match(
+    overview,
+    /const requests = await resolveClientRequests\(\s*CLIENT_WORKSPACE_SOURCES,\s*"open",\s*"1",\s*\);/,
+  );
+  assert.equal(overview.match(/resolveClientRequests\(/g).length, 1);
+  assert.ok(
+    overview.indexOf("await resolveClientConsultations(") <
+      overview.indexOf("await resolveClientRequests("),
+  );
   const intake = codeOf(read("app/client/intakes/[intake]/page.tsx"));
   assert.match(intake, /await connection\(\);/);
   assert.match(

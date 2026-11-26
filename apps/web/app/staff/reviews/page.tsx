@@ -9,6 +9,10 @@
 // submitted review can be published or rejected and a published one taken
 // down; nothing is published automatically. The two query values read,
 // state and page, only choose the list and the page.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Support): the design's
+// status tabs above one card per review (the rating, the state pill, the
+// text, its instants and the moderation form), then the pager.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -24,16 +28,14 @@ import {
   utcText,
 } from "../../../src/presentation/completion-labels.ts";
 import {
-  ButtonLink,
-  Cluster,
-  Heading,
-  Stack,
-  Status,
-  Surface,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
+  Empty,
+  Note,
+  PagerRow,
+  Pill,
+  TabLinks,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../frame.tsx";
+import { refusalPage, StaffFrame } from "../frame.tsx";
 import { ModerationForm } from "./forms.tsx";
 
 export const metadata: Metadata = {
@@ -59,74 +61,75 @@ export default async function ReviewModerationPage({
   }
   const base = `/staff/reviews?state=${view.reviewState}`;
   return (
-    <StaffFrame eyebrow="Reviews" title="Review moderation">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Text tone="muted">
-        Reviews come from clients of completed consultations. Publish a review
-        only after reading it; a published review can be taken down. Nothing is
-        published automatically.
-      </Text>
-      <Cluster>
-        {REVIEW_STATES.map((entry) => (
-          <ButtonLink
-            key={entry}
-            variant={entry === view.reviewState ? "primary" : "secondary"}
-            href={`/staff/reviews?state=${entry}`}
-            aria-current={entry === view.reviewState ? "page" : undefined}
-          >
-            {REVIEW_STATE_LABELS[entry].label}
-          </ButtonLink>
-        ))}
-      </Cluster>
+    <StaffFrame
+      title="Support"
+      subtitle="Client reviews: read, publish or reject submitted reviews."
+      lead={
+        <p>
+          Reviews come from clients of completed consultations. Publish a review
+          only after reading it; a published review can be taken down. Nothing
+          is published automatically.
+        </p>
+      }
+      utc
+    >
+      <TabLinks
+        label="Reviews by state"
+        links={REVIEW_STATES.map((entry) => ({
+          href: `/staff/reviews?state=${entry}`,
+          label: REVIEW_STATE_LABELS[entry].label,
+        }))}
+        current={base}
+      />
       {view.reviews.length === 0 ? (
-        <Text>
-          {view.pager.page === 1
-            ? "There are no reviews in this list."
-            : "There are no reviews on this page."}
-        </Text>
+        <section className="st-listbox" aria-label="Reviews">
+          <Empty
+            title={
+              view.pager.page === 1
+                ? "There are no reviews in this list."
+                : "There are no reviews on this page."
+            }
+          />
+        </section>
       ) : (
         view.reviews.map((review) => (
-          <Surface key={review.id} labelledBy={`queued-${review.id}`}>
-            <Stack gap="tight">
-              <Heading as="h2" size="sm" id={`queued-${review.id}`}>
+          <section
+            key={review.id}
+            className="w-card st-panel"
+            aria-labelledby={`queued-${review.id}`}
+          >
+            <div className="st-ptop">
+              <h2 className="st-h2" id={`queued-${review.id}`}>
                 {`Rating: ${RATING_LABELS[review.rating]}`}
-              </Heading>
-              <Cluster>
-                <Status tone={REVIEW_STATE_LABELS[review.state].tone}>
-                  {REVIEW_STATE_LABELS[review.state].label}
-                </Status>
-              </Cluster>
-              {review.text === null ? (
-                <Text tone="muted">No text.</Text>
-              ) : (
-                <Text>{review.text}</Text>
-              )}
-              <Text size="small" tone="muted">
-                {`Submitted ${utcText(review.submittedAt)}${review.publishedAt === null ? "" : `; published ${utcText(review.publishedAt)}`}`}
-              </Text>
-              <ModerationForm review={review.id} state={review.state} />
-            </Stack>
-          </Surface>
+              </h2>
+              <span className="grow"></span>
+              <Pill tone={REVIEW_STATE_LABELS[review.state].tone}>
+                {REVIEW_STATE_LABELS[review.state].label}
+              </Pill>
+            </div>
+            {review.text === null ? (
+              <p className="st-emd">No text.</p>
+            ) : (
+              <Note>{review.text}</Note>
+            )}
+            <p className="st-emd">
+              {`Submitted ${utcText(review.submittedAt)}${review.publishedAt === null ? "" : `; published ${utcText(review.publishedAt)}`}`}
+            </p>
+            <ModerationForm review={review.id} state={review.state} />
+          </section>
         ))
       )}
-      <Cluster>
-        {view.pager.page > 1 ? (
-          <ButtonLink
-            variant="secondary"
-            href={`${base}&page=${view.pager.page - 1}`}
-          >
-            Previous page
-          </ButtonLink>
-        ) : null}
-        {view.pager.hasNext ? (
-          <ButtonLink
-            variant="secondary"
-            href={`${base}&page=${view.pager.page + 1}`}
-          >
-            Next page
-          </ButtonLink>
-        ) : null}
-      </Cluster>
+      {view.pager.page === 1 && !view.pager.hasNext ? null : (
+        <PagerRow
+          note={`Page ${view.pager.page} of this list.`}
+          previous={
+            view.pager.page > 1 ? `${base}&page=${view.pager.page - 1}` : null
+          }
+          next={
+            view.pager.hasNext ? `${base}&page=${view.pager.page + 1}` : null
+          }
+        />
+      )}
     </StaffFrame>
   );
 }

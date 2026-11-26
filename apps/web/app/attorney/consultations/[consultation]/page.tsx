@@ -17,6 +17,14 @@
 // attorney's declaration of normal completion). The
 // database decides again on every submission. Nothing of the client's
 // identity is shown.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace consultation record): the workspace frame around the design's
+// cards: the consultation (its state, time, facts and the existing room,
+// start and end, cancellation and early-end panels), the attendance
+// recorded, the messages as the design's conversation and the shared
+// documents with their existing controls. A visitor the page does not admit
+// sees the design's signed-out panel.
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -79,15 +87,20 @@ import {
   versionSharingLabel,
 } from "../../../../src/presentation/communication-labels.ts";
 import {
+  AttorneyGate,
+  AttorneyWorkspace,
+  Card,
+  Facts,
+  ModalityTile,
+  Pill,
+  TIMES_IN_UTC,
+  whenText,
+} from "../../../../src/presentation/attorney-workspace.tsx";
+import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
   Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
   Table,
   Text,
 } from "../../../../src/presentation/design-system.tsx";
@@ -118,7 +131,7 @@ function HistorySection({
   readonly prefix: string;
 }) {
   return (
-    <Stack>
+    <div className="aw-history">
       <Heading as="h3" size="sm" id={`${prefix}-history`}>
         {HISTORY_HEADING}
       </Heading>
@@ -171,7 +184,7 @@ function HistorySection({
           {HISTORY_CLOSE_LABEL}
         </ButtonLink>
       </Cluster>
-    </Stack>
+    </div>
   );
 }
 
@@ -202,120 +215,113 @@ function CommunicationSection({
       </Alert>
     );
   }
+  // DEV-001: the messages as the design's conversation, then the shared
+  // documents, each in its own card.
   const note = messagingNote(view.messaging, view.closesAt, utcText);
   const open = view.messaging === "open";
   return (
-    <Stack>
-      <Heading as="h2" size="md" id={`${prefix}-messages-title`}>
-        {MESSAGES_HEADING}
-      </Heading>
-      <Text tone="muted">{MESSAGES_NOTE}</Text>
-      {note === null ? null : <Text>{note}</Text>}
-      {view.olderMessagesNotShown ? (
-        <Text tone="muted">{OLDER_MESSAGES_NOTE}</Text>
-      ) : null}
-      {view.messages.length === 0 ? (
-        <Text tone="muted">{NO_MESSAGES}</Text>
-      ) : (
-        <Table
-          id={`${prefix}-messages`}
-          caption="Messages in this consultation"
-        >
-          <thead>
-            <tr>
-              <th scope="col">From</th>
-              <th scope="col">Sent (UTC)</th>
-              <th scope="col">Message</th>
-            </tr>
-          </thead>
-          <tbody>
+    <>
+      <Card id={`${prefix}-messages-title`} title={MESSAGES_HEADING}>
+        <Text tone="muted">{MESSAGES_NOTE}</Text>
+        {note === null ? null : <p className="w-mwin xs">{note}</p>}
+        {view.olderMessagesNotShown ? (
+          <Text tone="muted">{OLDER_MESSAGES_NOTE}</Text>
+        ) : null}
+        {view.messages.length === 0 ? (
+          <Text tone="muted">{NO_MESSAGES}</Text>
+        ) : (
+          <ol
+            className="w-mcol aw-thread"
+            aria-label="Messages in this consultation"
+          >
             {view.messages.map((message) => (
-              <tr key={message.id}>
-                <td>{senderLabel(message.senderRole, message.mine)}</td>
-                <td>{utcText(message.sentAt)}</td>
-                <td>{message.body}</td>
-              </tr>
+              <li
+                className={message.mine ? "w-mb me" : "w-mb"}
+                key={message.id}
+              >
+                <p className="sm">{message.body}</p>
+                <span className="xs subtle">{`${senderLabel(message.senderRole, message.mine)} · ${utcText(message.sentAt)}`}</span>
+              </li>
             ))}
-          </tbody>
-        </Table>
-      )}
-      {open ? <MessageComposer consultationId={consultationId} /> : null}
-      <Heading as="h2" size="md" id={`${prefix}-documents-title`}>
-        {DOCUMENTS_HEADING}
-      </Heading>
-      <Text tone="muted">{DOCUMENTS_NOTE}</Text>
-      {view.olderDocumentsNotShown ? (
-        <Text tone="muted">{OLDER_DOCUMENTS_NOTE}</Text>
-      ) : null}
-      {view.documents.length === 0 ? (
-        <Text tone="muted">{NO_DOCUMENTS}</Text>
-      ) : (
-        <Table
-          id={`${prefix}-documents`}
-          caption="Documents in this consultation"
-        >
-          <thead>
-            <tr>
-              <th scope="col">Document</th>
-              <th scope="col">{VERSION_COLUMN}</th>
-              <th scope="col">Added by</th>
-              <th scope="col">Added (UTC)</th>
-              <th scope="col">Sharing</th>
-              <th scope="col">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.documents.map((document) => (
-              <tr key={document.lineageId}>
-                <td>{`${DOCUMENT_TYPE_LABELS[document.mimeType]}, ${byteSizeText(document.byteSize)}`}</td>
-                <td>{document.versionLabel}</td>
-                <td>{uploaderLabel(document.uploadedBy, document.mine)}</td>
-                <td>{utcText(document.createdAt)}</td>
-                <td>
-                  {currentSharingLabel(
-                    document.sharing,
-                    document.mine,
-                    document.earlierShared,
-                  )}
-                </td>
-                <td>
-                  <DocumentControls
-                    consultationId={consultationId}
-                    resourceId={document.resourceId}
-                    openable={document.accessible}
-                    revocable={document.mine && document.sharing === "active"}
-                  />
-                  {document.versionLabel === "v1" ? null : (
-                    <Cluster>
-                      <ButtonLink
-                        variant="tertiary"
-                        href={`/${prefix}/consultations/${consultationId}?history=${document.documentId}#${prefix}-history`}
-                      >
-                        {HISTORY_LINK_LABEL}
-                      </ButtonLink>
-                    </Cluster>
-                  )}
-                  {open && document.mine ? (
-                    <DocumentReplace
+          </ol>
+        )}
+        {open ? <MessageComposer consultationId={consultationId} /> : null}
+      </Card>
+      <Card id={`${prefix}-documents-title`} title={DOCUMENTS_HEADING}>
+        <Text tone="muted">{DOCUMENTS_NOTE}</Text>
+        {view.olderDocumentsNotShown ? (
+          <Text tone="muted">{OLDER_DOCUMENTS_NOTE}</Text>
+        ) : null}
+        {view.documents.length === 0 ? (
+          <Text tone="muted">{NO_DOCUMENTS}</Text>
+        ) : (
+          <Table
+            id={`${prefix}-documents`}
+            caption="Documents in this consultation"
+          >
+            <thead>
+              <tr>
+                <th scope="col">Document</th>
+                <th scope="col">{VERSION_COLUMN}</th>
+                <th scope="col">Added by</th>
+                <th scope="col">Added (UTC)</th>
+                <th scope="col">Sharing</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {view.documents.map((document) => (
+                <tr key={document.lineageId}>
+                  <td>{`${DOCUMENT_TYPE_LABELS[document.mimeType]}, ${byteSizeText(document.byteSize)}`}</td>
+                  <td>{document.versionLabel}</td>
+                  <td>{uploaderLabel(document.uploadedBy, document.mine)}</td>
+                  <td>{utcText(document.createdAt)}</td>
+                  <td>
+                    {currentSharingLabel(
+                      document.sharing,
+                      document.mine,
+                      document.earlierShared,
+                    )}
+                  </td>
+                  <td>
+                    <DocumentControls
                       consultationId={consultationId}
-                      documentId={document.documentId}
+                      resourceId={document.resourceId}
+                      openable={document.accessible}
+                      revocable={document.mine && document.sharing === "active"}
                     />
-                  ) : null}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
-      {history === null ? null : (
-        <HistorySection
-          history={history}
-          consultationId={consultationId}
-          prefix={prefix}
-        />
-      )}
-      {open ? <DocumentUpload consultationId={consultationId} /> : null}
-    </Stack>
+                    {document.versionLabel === "v1" ? null : (
+                      <Cluster>
+                        <ButtonLink
+                          variant="tertiary"
+                          href={`/${prefix}/consultations/${consultationId}?history=${document.documentId}#${prefix}-history`}
+                        >
+                          {HISTORY_LINK_LABEL}
+                        </ButtonLink>
+                      </Cluster>
+                    )}
+                    {open && document.mine ? (
+                      <DocumentReplace
+                        consultationId={consultationId}
+                        documentId={document.documentId}
+                      />
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+        {history === null ? null : (
+          <HistorySection
+            history={history}
+            consultationId={consultationId}
+            prefix={prefix}
+          />
+        )}
+        {open ? <DocumentUpload consultationId={consultationId} /> : null}
+      </Card>
+    </>
   );
 }
 
@@ -324,7 +330,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function ConsultationFrame({
+function GateFrame({
   title,
   children,
 }: {
@@ -332,17 +338,9 @@ function ConsultationFrame({
   readonly children: ReactNode;
 }) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-consultation-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-consultation-title">
-            {title}
-          </Heading>
-          {children}
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate titleId="attorney-consultation-title" title={title}>
+      {children}
+    </AttorneyGate>
   );
 }
 
@@ -379,7 +377,7 @@ export default async function AttorneyConsultationPage({
   }
   if (view.status === "sign-in-required") {
     return (
-      <ConsultationFrame title="Sign in to continue">
+      <GateFrame title="Sign in to continue">
         <Text tone="muted">
           Consultations are available only to a signed-in account with attorney
           access.
@@ -389,16 +387,16 @@ export default async function AttorneyConsultationPage({
             Sign in
           </ButtonLink>
         </Cluster>
-      </ConsultationFrame>
+      </GateFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <ConsultationFrame title="Consultation not available">
+      <GateFrame title="Consultation not available">
         <Alert tone="warning" title="No consultations access" role="status">
           This account does not have access to attorney consultations.
         </Alert>
-      </ConsultationFrame>
+      </GateFrame>
     );
   }
   if (view.status !== "ready") {
@@ -407,13 +405,13 @@ export default async function AttorneyConsultationPage({
       outcome: view.status,
     });
     return (
-      <ConsultationFrame title="Consultation unavailable">
+      <GateFrame title="Consultation unavailable">
         <Alert tone="error" title="Something went wrong" role="alert">
           This consultation could not be shown right now. Please try again
           later.
         </Alert>
         {BACK}
-      </ConsultationFrame>
+      </GateFrame>
     );
   }
   const record = view.consultation;
@@ -425,123 +423,135 @@ export default async function AttorneyConsultationPage({
     "technical_failure",
   ].includes(record.state);
   return (
-    <ConsultationFrame title="Consultation">
-      <Cluster>
-        <Status tone={state.tone}>{state.label}</Status>
-      </Cluster>
-      <Text tone="muted">{WORKSPACE_NOTE}</Text>
-      {ended ? <Text>{ENDED_NOTE}</Text> : null}
-      {view.startable ? <Text>{ATTORNEY_READY_NOTE}</Text> : null}
-      {!ended && !view.joinable && !view.waiting ? (
-        <Text>{view.windowPassed ? WINDOW_PASSED_NOTE : NOT_OPEN_NOTE}</Text>
-      ) : null}
-      <Table id="attorney-consultation-details" caption="Consultation details">
-        <tbody>
-          <tr>
-            <th scope="row">Consultation</th>
-            <td>
+    <AttorneyWorkspace
+      section="consultations"
+      titleId="attorney-consultation-title"
+      title="Consultation"
+      width="medium"
+    >
+      {BACK}
+      <Card
+        id="attorney-consultation-summary"
+        title={
+          record.bookingStart === null
+            ? PATH_LABELS[record.path]
+            : whenText(record.bookingStart)
+        }
+      >
+        <div className="row between l-g8">
+          <Pill tone={state.tone}>{state.label}</Pill>
+          <span className="xs subtle">{TIMES_IN_UTC}</span>
+        </div>
+        <div className="row w-rqhead">
+          <ModalityTile modality={record.modality} large />
+          <div className="col grow l-g1-minw0">
+            <p className="w-rqn">
               {record.durationMinutes === null
                 ? modalityText(record.modality)
                 : `${modalityText(record.modality)}, ${durationText(record.durationMinutes)}`}
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">How soon</th>
-            <td>{PATH_LABELS[record.path]}</td>
-          </tr>
-          {record.bookingStart === null || record.bookingEnd === null ? null : (
-            <tr>
-              <th scope="row">Time</th>
-              <td>{`${utcText(record.bookingStart)} to ${utcText(record.bookingEnd)}`}</td>
-            </tr>
-          )}
-          {record.opensAt === null || record.closesAt === null ? null : (
-            <tr>
-              <th scope="row">Room open</th>
-              <td>{`${utcText(record.opensAt)} to ${utcText(record.closesAt)}`}</td>
-            </tr>
-          )}
-          {record.startedAt === null ? null : (
-            <tr>
-              <th scope="row">Started</th>
-              <td>{utcText(record.startedAt)}</td>
-            </tr>
-          )}
-          {record.endedAt === null ? null : (
-            <tr>
-              <th scope="row">Ended</th>
-              <td>{utcText(record.endedAt)}</td>
-            </tr>
-          )}
-          {record.outcomeCode === null ? null : (
-            <tr>
-              <th scope="row">How it ended</th>
-              <td>
-                {outcomeLabelOf(record.outcomeCode) ??
-                  COMPLETION_LABELS[record.outcomeCode] ??
-                  "Ended"}
-              </td>
-            </tr>
-          )}
-          {record.mediaState === null ? null : (
-            <tr>
-              <th scope="row">Consultation room</th>
-              <td>{MEDIA_STATE_LABELS[record.mediaState]}</td>
-            </tr>
-          )}
-        </tbody>
-      </Table>
-      <RoomPanel consultationId={record.id} joinable={view.joinable} />
-      <CommandPanel
-        consultationId={record.id}
-        startable={view.startable}
-        endable={view.endable}
-      />
-      <CompletionPanel
-        consultationId={record.id}
-        cancellable={cancellable(record.state)}
-        endableEarly={earlyEndOffered(record, Date.now())}
-      />
-      <Cluster>
-        <ButtonLink
-          variant="tertiary"
-          href={`/attorney/complaints?consultation=${record.id}`}
-        >
-          Report a problem
-        </ButtonLink>
-      </Cluster>
-      <Table
-        id="attorney-consultation-attendance"
-        caption="Attendance recorded"
-      >
-        <tbody>
-          <tr>
-            <th scope="row">You joined</th>
-            <td>
-              {record.attorneyJoinedAt === null
+            </p>
+            <p className="sm muted">{PATH_LABELS[record.path]}</p>
+          </div>
+        </div>
+        <p className="xs subtle">{WORKSPACE_NOTE}</p>
+        {ended ? <p className="w-note info">{ENDED_NOTE}</p> : null}
+        {view.startable ? (
+          <p className="w-note ok">{ATTORNEY_READY_NOTE}</p>
+        ) : null}
+        {!ended && !view.joinable && !view.waiting ? (
+          <p className="w-note">
+            {view.windowPassed ? WINDOW_PASSED_NOTE : NOT_OPEN_NOTE}
+          </p>
+        ) : null}
+        <Facts
+          items={[
+            [
+              "Consultation",
+              record.durationMinutes === null
+                ? modalityText(record.modality)
+                : `${modalityText(record.modality)}, ${durationText(record.durationMinutes)}`,
+            ],
+            ["How soon", PATH_LABELS[record.path]],
+            ...(record.bookingStart === null || record.bookingEnd === null
+              ? []
+              : ([
+                  [
+                    "Time",
+                    `${utcText(record.bookingStart)} to ${utcText(record.bookingEnd)}`,
+                  ],
+                ] as const)),
+            ...(record.opensAt === null || record.closesAt === null
+              ? []
+              : ([
+                  [
+                    "Room open",
+                    `${utcText(record.opensAt)} to ${utcText(record.closesAt)}`,
+                  ],
+                ] as const)),
+            ...(record.startedAt === null
+              ? []
+              : ([["Started", utcText(record.startedAt)]] as const)),
+            ...(record.endedAt === null
+              ? []
+              : ([["Ended", utcText(record.endedAt)]] as const)),
+            ...(record.outcomeCode === null
+              ? []
+              : ([
+                  [
+                    "How it ended",
+                    outcomeLabelOf(record.outcomeCode) ??
+                      COMPLETION_LABELS[record.outcomeCode] ??
+                      "Ended",
+                  ],
+                ] as const)),
+            ...(record.mediaState === null
+              ? []
+              : ([
+                  ["Consultation room", MEDIA_STATE_LABELS[record.mediaState]],
+                ] as const)),
+          ]}
+        />
+        <RoomPanel consultationId={record.id} joinable={view.joinable} />
+        <CommandPanel
+          consultationId={record.id}
+          startable={view.startable}
+          endable={view.endable}
+        />
+        <CompletionPanel
+          consultationId={record.id}
+          cancellable={cancellable(record.state)}
+          endableEarly={earlyEndOffered(record, Date.now())}
+        />
+        <Cluster>
+          <ButtonLink
+            variant="tertiary"
+            href={`/attorney/complaints?consultation=${record.id}`}
+          >
+            Report a problem
+          </ButtonLink>
+        </Cluster>
+      </Card>
+      <Card id="attorney-consultation-attendance" title="Attendance recorded">
+        <Facts
+          items={[
+            [
+              "You joined",
+              record.attorneyJoinedAt === null
                 ? "Not yet"
-                : utcText(record.attorneyJoinedAt)}
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">The client joined</th>
-            <td>
-              {record.clientJoinedAt === null
+                : utcText(record.attorneyJoinedAt),
+            ],
+            [
+              "The client joined",
+              record.clientJoinedAt === null
                 ? "Not yet"
-                : utcText(record.clientJoinedAt)}
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">Both present together</th>
-            <td>{record.bothPresent ? "Yes" : "No"}</td>
-          </tr>
-          <tr>
-            <th scope="row">Reconnections</th>
-            <td>{String(record.reconnections)}</td>
-          </tr>
-        </tbody>
-      </Table>
-      <Text tone="muted">{EVIDENCE_NOTE}</Text>
+                : utcText(record.clientJoinedAt),
+            ],
+            ["Both present together", record.bothPresent ? "Yes" : "No"],
+            ["Reconnections", String(record.reconnections)],
+          ]}
+        />
+        <p className="xs subtle">{EVIDENCE_NOTE}</p>
+      </Card>
       <CommunicationSection
         view={await resolveAttorneyCommunication(
           ATTORNEY_COMMUNICATION_SOURCES,
@@ -560,6 +570,6 @@ export default async function AttorneyConsultationPage({
         }
       />
       {BACK}
-    </ConsultationFrame>
+    </AttorneyWorkspace>
   );
 }

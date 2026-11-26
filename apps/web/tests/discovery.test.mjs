@@ -953,6 +953,7 @@ test("S5-11. banned claims: no S5 label, message, navigation entry, content stat
     "app/find-an-attorney/select/forms.tsx",
     "app/attorneys/[attorney]/page.tsx",
     "src/presentation/public-site.tsx",
+    "src/presentation/attorney-card.tsx",
     "src/presentation/discovery-labels.ts",
     "src/application/discovery.ts",
     ...Object.keys(PUBLIC_CONTENT_TOPICS).map((t) => `app/${t}/page.tsx`),
@@ -1101,13 +1102,34 @@ test("S5-13. the public navigation is the fixed list of public pages, linked as 
       ["/disclosures", "Disclosures"],
     ],
   );
+  // DEV-001: the public frames render the site chrome of the owner's design.
   assert.deepEqual(importsOf(read("src/presentation/public-site.tsx")), [
     "react",
-    "./design-system.tsx",
+    "./site-chrome.tsx",
   ]);
+  // DEV-001: the home page renders the site chrome of the owner's design,
+  // whose primary navigation is fixed first-party links.
   assert.match(
     codeOf(read("app/page.tsx")),
-    /<Page density="public">\n {6}<PublicNavigation \/>/,
+    /<SitePage session=\{view\.session\} signOut=\{signOut\}>/,
+  );
+  assert.deepEqual(
+    [
+      ...codeOf(read("src/presentation/site-chrome.tsx"))
+        .slice(
+          0,
+          codeOf(read("src/presentation/site-chrome.tsx")).indexOf(
+            "SITE_FOOTER",
+          ),
+        )
+        .matchAll(/\{ href: "([^"]+)", label: "([^"]+)" \}/g),
+    ].map((m) => [m[1], m[2]]),
+    [
+      ["/find-an-attorney", "Find an attorney"],
+      ["/#legal-issues", "Legal matters"],
+      ["/how-it-works", "How it works"],
+      ["/help", "Help"],
+    ],
   );
 });
 

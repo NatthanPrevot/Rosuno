@@ -1092,6 +1092,9 @@ test("13. the route is a server-rendered, parameter-free page that reads access 
     "../../src/application/attorney-access.ts",
     "../../src/infrastructure/identity/attorney-principal-source.ts",
     "../../src/infrastructure/identity/server-session-source.ts",
+    // DEV-001: the owner's UI/UX design's workspace frame (presentation only:
+    // fixed first-party links and the page's own content).
+    "../../src/presentation/attorney-workspace.tsx",
     "../../src/presentation/design-system.tsx",
     // MVP-001 S2: the step-up gate, and nothing else, is added.
     "../account/gate.ts",
@@ -1294,6 +1297,17 @@ async function buildPageHarness() {
       { "react/jsx-runtime": jsxRuntime },
     ),
   );
+  // DEV-001: the owner's UI/UX design's workspace frame, linked as written.
+  write(
+    "attorney-workspace.mjs",
+    relink(
+      transpile(
+        read("src/presentation/attorney-workspace.tsx"),
+        "attorney-workspace.tsx",
+      ),
+      { "react/jsx-runtime": jsxRuntime },
+    ),
+  );
   write(
     "page.mjs",
     relink(transpile(read("app/attorney/page.tsx"), "page.tsx"), {
@@ -1307,13 +1321,17 @@ async function buildPageHarness() {
         target("wiring.mjs"),
       "../../src/infrastructure/identity/server-session-source.ts":
         target("wiring.mjs"),
+      "../../src/presentation/attorney-workspace.tsx": target(
+        "attorney-workspace.mjs",
+      ),
       "../../src/presentation/design-system.tsx": target("design-system.mjs"),
       "../account/gate.ts": target("gate.mjs"),
     }),
   );
   const { wiring } = await import(target("wiring.mjs"));
   const page = await import(target("page.mjs"));
-  return { directory, wiring, page };
+  const shell = await import(target("attorney-workspace.mjs"));
+  return { directory, wiring, page, shell };
 }
 
 const harness = await buildPageHarness();
@@ -1355,8 +1373,9 @@ const STATUS_ICONS = {
   warning: "M12 4.5 2.75 20h18.5L12 4.5Z M12 10v4.5 M12 17.25v.01",
   neutral: "M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z",
 };
+const STATUS_PILLS = { success: "ok", warning: "pending", neutral: "muted" };
 function statusOf(tone, text) {
-  return `<span class="rs-status" data-tone="${tone}" data-emphasis="subtle"><svg class="rs-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${STATUS_ICONS[tone]}"></path></svg><span>${text}</span></span>`;
+  return `<span class="pill ${STATUS_PILLS[tone]} rz-status" data-tone="${tone}" data-emphasis="subtle"><svg class="rz-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${STATUS_ICONS[tone]}"></path></svg><span>${text}</span></span>`;
 }
 
 // Nothing private, internal, or credential-like reaches the page.
@@ -1407,7 +1426,7 @@ function assertNoAdvertisedCapability(html, name) {
 // wording the workspace route admits, and only on its refusal page; every
 // other state still advertises nothing.
 const APPLICATION_ENTRY_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/apply">Attorney application</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/apply">Attorney application</a>';
 const REFUSAL_TITLE = "Attorney workspace not available";
 
 // MVP-001 S4: the one fixed link the granted page offers to the attorney's
@@ -1415,50 +1434,50 @@ const REFUSAL_TITLE = "Attorney workspace not available";
 // only scheduling wording the workspace route admits, and only on its granted
 // page; every other state still advertises no scheduling.
 const SCHEDULE_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/schedule">Schedule</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/schedule">Schedule</a>';
 // MVP-001 S6 PS-A3: the one fixed link the granted page offers to the
 // attorney's offers (which decides its own access), in exactly this form,
 // right after the schedule link; every other state advertises neither.
 const OFFERS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/offers">Offers</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/offers">Offers</a>';
 // MVP-001 S7: the one fixed link the granted page offers to the attorney's
 // ledger-derived earnings (which decides its own access), in exactly this
 // form, right after the offers link. It is the only earnings wording the
 // workspace route admits, and only on its granted page; every other state
 // advertises none of the three.
 const EARNINGS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/earnings">Earnings</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/earnings">Earnings</a>';
 // MVP-001 S8: the one fixed link the granted page offers to the attorney's
 // request queue (which decides its own access), in exactly this form, right
 // after the earnings link; every other state advertises none of the four.
 const REQUESTS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/requests">Requests</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/requests">Requests</a>';
 // MVP-001 S9: the one fixed link the granted page offers to the attorney's
 // consultations (which decides its own access), in exactly this form, right
 // after the requests link. It is the only consultation wording the workspace
 // route admits, and only on its granted page; every other state advertises
 // none of the five.
 const CONSULTATIONS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/consultations">Consultations</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/consultations">Consultations</a>';
 // MVP-001 S10: the one fixed link the granted page offers to the attorney's
 // notification center (which decides its own access), in exactly this form,
 // right after the consultations link; every other state advertises none of
 // the six.
 const NOTIFICATIONS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/notifications">Notifications</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/notifications">Notifications</a>';
 // MVP-001 S11: the two fixed links the granted page offers to the
 // attorney's published reviews and reported problems (each decides its own
 // access), in exactly this form, right after the consultations link.
 const REVIEWS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/reviews">Reviews</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/reviews">Reviews</a>';
 const COMPLAINTS_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/complaints">Report a problem</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/complaints">Report a problem</a>';
 // MVP-001 S11 pass 2B: the one fixed link the granted page offers to the
 // attorney's dashboard (which decides its own access), in exactly this form,
 // right after the professional setup and before the schedule link; every
 // other state advertises none.
 const DASHBOARD_LINK =
-  '<a class="rs-button" data-variant="secondary" href="/attorney/dashboard">Dashboard</a>';
+  '<a class="btn btn-line" data-variant="secondary" href="/attorney/dashboard">Dashboard</a>';
 const GRANTED_TITLE = "Restricted attorney workspace";
 
 function assertFrame(html, title, name) {
@@ -1522,20 +1541,103 @@ function assertFrame(html, title, name) {
   assertFrameOf(html, title, name);
 }
 
-function assertFrameOf(html, title, name) {
-  assert.match(
-    html,
-    /^<div class="rs-page" data-density="attorney"><section class="rs-surface" data-tone="light" data-emphasis="raised" aria-labelledby="attorney-workspace-title">/,
+// DEV-001: the owner's UI/UX design's workspace sidebar, which only the
+// granted page shows: fixed first-party links in this order (the brand to the
+// home page, the Talk Now card to the schedule, the grouped sections and the
+// account links), no section marked (the entry is not one of them), Instant
+// mode's state not shown (this page does not read it), and no form, field or
+// button. It is exactly the frame module's own sidebar.
+const SIDEBAR_HREFS = [
+  "/",
+  "/attorney/schedule",
+  "/attorney/dashboard",
+  "/attorney/requests",
+  "/attorney/schedule/week",
+  "/attorney/consultations",
+  "/attorney/messages",
+  "/attorney/schedule",
+  "/attorney/professional",
+  "/attorney/earnings",
+  "/attorney/compliance",
+  "/attorney/notifications",
+  "/account/security",
+  "/help",
+];
+const SIDEBAR_TEXT =
+  "rosuno for attorneys Talk Now Talk Now settings Automatically turns off when you sign out. Work Overview Requests Calendar Consultations Messages Practice Availability &amp; pricing Public profile Earnings Account Compliance &amp; readiness Settings &amp; help Account security Help";
+
+// DEV-001: website & appearance studio: the frame's elements carry their
+// data-rz ids (right after the class), which change nothing else.
+function sidebarOf(html) {
+  const start = html.indexOf(
+    '<aside class="w-side" data-rz="attorney.sidebar" aria-label="Workspace">',
+  );
+  const end = html.indexOf("</aside>");
+  assert.ok(start > 0 && end > start);
+  return html.slice(start, end + "</aside>".length);
+}
+
+function withoutSidebar(html, name) {
+  const sidebar = sidebarOf(html);
+  assert.equal(html.split("<aside").length, 2, name);
+  assert.deepEqual(hrefsOf(sidebar), SIDEBAR_HREFS, name);
+  assert.equal(textOf(sidebar), SIDEBAR_TEXT, name);
+  assert.doesNotMatch(
+    sidebar,
+    /<form|<input|<textarea|<select|<button|aria-current|w-tword/,
     name,
   );
+  const expected = renderToStaticMarkup(
+    harness.shell.AttorneyWorkspace({
+      section: null,
+      titleId: "attorney-workspace-title",
+      title: GRANTED_TITLE,
+      children: null,
+    }),
+  );
+  assert.equal(sidebar, sidebarOf(expected), name);
+  return html.replace(sidebar, "");
+}
+
+function assertFrameOf(html, title, name) {
+  if (title === GRANTED_TITLE) {
+    // The workspace frame: the sidebar (pinned above, then set aside), the
+    // page header with the one heading, and the page column.
+    assert.match(
+      html,
+      /^<div class="rzw W aw" data-rz="attorney.workspace"><div class="w-app"><aside class="w-side" data-rz="attorney.sidebar" aria-label="Workspace">/,
+      name,
+    );
+    const page = withoutSidebar(html, name);
+    assert.ok(
+      page.startsWith(
+        `<div class="rzw W aw" data-rz="attorney.workspace"><div class="w-app"><div class="w-main"><header class="w-top" data-rz="attorney.top"><div class="col grow l-g0-minw0"><h1 class="w-h1" data-rz="attorney.title" id="attorney-workspace-title">${title}</h1></div></header><div class="w-body"><div class="w-page"><div class="w-wrap w-wrap-m aw-page">`,
+      ),
+      name,
+    );
+    assert.equal(page.match(/<h1\b/g).length, 1, name);
+    assert.ok(textOf(page).startsWith(`${title} Access standing`), name);
+    assertNoPrivateData(html, name);
+    assertNoAdvertisedCapability(page, name);
+    return;
+  }
+  // Every other state: the design's signed-out panel, with no workspace
+  // navigation at all.
+  assert.match(
+    html,
+    /^<div class="rzw W aw" data-rz="attorney.workspace"><div class="signedout"><div class="col l-aicenter-tacenter-mw420-g0 aw-gate"><span class="brand l-fs22"><span class="mark" aria-hidden="true"><\/span>rosuno<\/span><span class="xs subtle">for attorneys<\/span>/,
+    name,
+  );
+  assert.equal(html.includes("<aside"), false, name);
+  assert.equal(html.includes("<nav"), false, name);
   assert.equal(html.match(/<h1\b/g).length, 1, name);
   assert.ok(
     html.includes(
-      `<h1 class="rs-heading" data-size="lg" id="attorney-workspace-title">${title}</h1>`,
+      `<h1 class="disp l-fs26-mt26" id="attorney-workspace-title">${title}</h1>`,
     ),
     name,
   );
-  assert.ok(textOf(html).startsWith(`Attorney workspace ${title}`), name);
+  assert.ok(textOf(html).startsWith(`rosuno for attorneys ${title}`), name);
   assertNoPrivateData(html, name);
   assertNoAdvertisedCapability(html, name);
 }
@@ -1587,9 +1689,12 @@ test("14. the route renders a restricted entry for each admitted stage that keep
     );
     assert.equal(html.match(/data-tone="success"/g).length, 2, stage);
     assert.ok(text.includes("Access is not verification"), stage);
+    // DEV-001: the owner's UI/UX design's sidebar links come first (pinned
+    // in withoutSidebar), then the page's own links in their fixed order.
     assert.deepEqual(
       hrefsOf(html),
       [
+        ...SIDEBAR_HREFS,
         "/attorney/professional",
         "/attorney/dashboard",
         "/attorney/schedule",

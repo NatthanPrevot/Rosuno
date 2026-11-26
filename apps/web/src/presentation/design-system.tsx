@@ -1,11 +1,14 @@
-// Rosuno design-system primitives (WI-P2-002).
+// Rosuno design-system primitives.
 //
 // Presentation only. Each primitive renders caller-supplied content with
-// native HTML semantics and the rs-* classes of app/globals.css. Variants,
-// labels, messages, and status meaning all arrive as props. No primitive
-// reads application or server state, validates input, runs an operation,
-// decides an outcome, or keeps state of its own, and interaction states are
-// native HTML and CSS, so the module needs no client directive.
+// native HTML semantics and the classes of the owner's design system (the
+// UI/UX build ported into app/styles: theme.css components, layout.css and
+// site.css). Variants, labels, messages, and status meaning all arrive as
+// props. No primitive reads application or server state, validates input,
+// runs an operation, decides an outcome, or keeps state of its own, and
+// interaction states are native HTML and CSS, so the module needs no client
+// directive. No primitive writes an inline style: the Content-Security-Policy
+// refuses them (style-src 'self').
 
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
@@ -59,6 +62,15 @@ const TONE_ICONS: Readonly<Record<Tone, IconName>> = {
   neutral: "neutral",
 };
 
+// The design system's status pill for each semantic family.
+const TONE_PILLS: Readonly<Record<Tone, string>> = {
+  success: "ok",
+  warning: "pending",
+  error: "no",
+  information: "info",
+  neutral: "muted",
+};
+
 // Whether an optional slot holds something to render.
 function present(node: ReactNode): boolean {
   return node !== undefined && node !== null && node !== false && node !== "";
@@ -98,7 +110,7 @@ type IconProps = {
 export function Icon({ name, label }: IconProps) {
   return (
     <svg
-      className="rs-icon"
+      className="rz-icon"
       viewBox="0 0 24 24"
       role={label === undefined ? undefined : "img"}
       aria-label={label}
@@ -117,10 +129,14 @@ type PageProps = {
   readonly children: ReactNode;
 };
 
+// The design root (.rz) and the page column. Every primitive below renders
+// inside it.
 export function Page({ density, children }: PageProps) {
   return (
-    <div className="rs-page" data-density={density}>
-      {children}
+    <div className="rz rz-page" data-density={density}>
+      <div className="app-scroll">
+        <div className="wrap rz-page__column">{children}</div>
+      </div>
     </div>
   );
 }
@@ -132,7 +148,7 @@ type StackProps = {
 
 export function Stack({ gap = "regular", children }: StackProps) {
   return (
-    <div className="rs-stack" data-gap={gap}>
+    <div className="stack rz-stack" data-gap={gap}>
       {children}
     </div>
   );
@@ -143,7 +159,7 @@ type ClusterProps = {
 };
 
 export function Cluster({ children }: ClusterProps) {
-  return <div className="rs-cluster">{children}</div>;
+  return <div className="row rz-cluster">{children}</div>;
 }
 
 type ColumnsProps = {
@@ -153,7 +169,7 @@ type ColumnsProps = {
 
 export function Columns({ columns, children }: ColumnsProps) {
   return (
-    <div className="rs-columns" data-columns={columns}>
+    <div className="rz-columns" data-columns={columns}>
       {children}
     </div>
   );
@@ -163,8 +179,10 @@ type RuleProps = {
   readonly tone?: "line" | "gold";
 };
 
+// "gold" is kept as a variant name for callers; it renders the emphasised
+// rule of the current design.
 export function Rule({ tone = "line" }: RuleProps) {
-  return <hr className="rs-rule" data-tone={tone} />;
+  return <hr className="rz-rule" data-tone={tone} />;
 }
 
 // Typography --------------------------------------------------------------
@@ -176,7 +194,7 @@ type EyebrowProps = {
 };
 
 export function Eyebrow({ children }: EyebrowProps) {
-  return <p className="rs-eyebrow">{children}</p>;
+  return <p className="kicker">{children}</p>;
 }
 
 type DisplayProps = {
@@ -184,18 +202,19 @@ type DisplayProps = {
   readonly children: ReactNode;
 };
 
-// System-serif display heading for major brand and editorial moments.
+// The display heading; its size steps down with the page density.
 export function Display({ as: Element = "h1", children }: DisplayProps) {
-  return <Element className="rs-display">{children}</Element>;
+  return <Element className="display rz-display">{children}</Element>;
 }
 
 type HeadingProps = {
   readonly as?: HeadingElement;
-  // "lg" is the serif section heading; "md" and "sm" are functional sans.
   readonly size?: "lg" | "md" | "sm";
   readonly id?: string;
   readonly children: ReactNode;
 };
+
+const HEADING_CLASSES = { lg: "h2", md: "h3", sm: "h4" } as const;
 
 export function Heading({
   as: Element = "h2",
@@ -204,7 +223,7 @@ export function Heading({
   children,
 }: HeadingProps) {
   return (
-    <Element className="rs-heading" data-size={size} id={id}>
+    <Element className={HEADING_CLASSES[size]} id={id}>
       {children}
     </Element>
   );
@@ -216,9 +235,16 @@ type TextProps = {
   readonly children: ReactNode;
 };
 
+const TEXT_SIZES = {
+  lede: "lead",
+  body: "body",
+  small: "sm",
+  meta: "xs",
+} as const;
+
 export function Text({ size = "body", tone = "default", children }: TextProps) {
   return (
-    <p className="rs-text" data-size={size} data-tone={tone}>
+    <p className={`rz-text ${TEXT_SIZES[size]}`} data-tone={tone}>
       {children}
     </p>
   );
@@ -228,14 +254,21 @@ export function Text({ size = "body", tone = "default", children }: TextProps) {
 
 type SurfaceProps = {
   readonly as?: "div" | "section" | "article" | "aside" | "header" | "footer";
-  // "light" is warm white and "cream" the canvas tone; "dark" is the premium
-  // deep-cocoa treatment and "chocolate" the supporting dark tone.
+  // "light" is the raised panel and "cream" the quiet well; "dark" and
+  // "chocolate" are the emphasised ink surfaces.
   readonly tone?: "light" | "cream" | "dark" | "chocolate";
   readonly emphasis?: "flat" | "raised" | "selected";
   readonly density?: Density;
   readonly labelledBy?: string;
   readonly children: ReactNode;
 };
+
+const SURFACE_CLASSES = {
+  light: "panel",
+  cream: "well",
+  dark: "rz-ink",
+  chocolate: "rz-ink",
+} as const;
 
 export function Surface({
   as: Element = "section",
@@ -247,7 +280,7 @@ export function Surface({
 }: SurfaceProps) {
   return (
     <Element
-      className="rs-surface"
+      className={`rz-surface ${SURFACE_CLASSES[tone]}`}
       data-tone={tone}
       data-emphasis={emphasis}
       data-density={density}
@@ -261,6 +294,12 @@ export function Surface({
 // Buttons -----------------------------------------------------------------
 
 type ButtonVariant = "primary" | "secondary" | "tertiary";
+
+const BUTTON_CLASSES: Readonly<Record<ButtonVariant, string>> = {
+  primary: "btn btn-ink",
+  secondary: "btn btn-line",
+  tertiary: "btn btn-quiet",
+};
 
 type ButtonProps = Native<"button"> & {
   readonly variant: ButtonVariant;
@@ -277,7 +316,7 @@ export function Button({
   return (
     <button
       {...native}
-      className="rs-button"
+      className={BUTTON_CLASSES[variant]}
       data-variant={variant}
       type={type}
     >
@@ -298,7 +337,12 @@ export function ButtonLink({
   ...native
 }: ButtonLinkProps) {
   return (
-    <a {...native} className="rs-button" data-variant={variant} href={href}>
+    <a
+      {...native}
+      className={BUTTON_CLASSES[variant]}
+      data-variant={variant}
+      href={href}
+    >
       {children}
     </a>
   );
@@ -325,20 +369,18 @@ type FieldFrameProps = FieldProps & {
 function FieldFrame({ id, label, hint, errors, children }: FieldFrameProps) {
   const presented = messagesOf(errors);
   return (
-    <div className="rs-field">
-      <label className="rs-field__label" htmlFor={id}>
-        {label}
-      </label>
+    <div className="fld">
+      <label htmlFor={id}>{label}</label>
       {present(hint) ? (
-        <p className="rs-field__hint" id={`${id}-hint`}>
+        <p className="hint" id={`${id}-hint`}>
           {hint}
         </p>
       ) : null}
       {children}
       {presented.length === 0 ? null : (
-        <ul className="rs-field__errors" id={`${id}-errors`}>
+        <ul className="rz-errors" id={`${id}-errors`}>
           {presented.map((message, index) => (
-            <li key={index}>
+            <li className="err" key={index}>
               <Icon name="error" />
               <span>{message}</span>
             </li>
@@ -366,7 +408,7 @@ export function TextField({
     <FieldFrame id={id} label={label} hint={hint} errors={errors}>
       <input
         {...native}
-        className="rs-control"
+        className={presented.length > 0 ? "inp bad" : "inp"}
         id={id}
         type={type}
         aria-describedby={describedBy(id, hint, presented)}
@@ -390,7 +432,7 @@ export function TextAreaField({
     <FieldFrame id={id} label={label} hint={hint} errors={errors}>
       <textarea
         {...native}
-        className="rs-control"
+        className={presented.length > 0 ? "ta bad" : "ta"}
         id={id}
         aria-describedby={describedBy(id, hint, presented)}
         aria-invalid={presented.length > 0 ? true : undefined}
@@ -416,18 +458,15 @@ export function SelectField({
   const presented = messagesOf(errors);
   return (
     <FieldFrame id={id} label={label} hint={hint} errors={errors}>
-      <span className="rs-select">
-        <select
-          {...native}
-          className="rs-control"
-          id={id}
-          aria-describedby={describedBy(id, hint, presented)}
-          aria-invalid={presented.length > 0 ? true : undefined}
-        >
-          {children}
-        </select>
-        <Icon name="chevron" />
-      </span>
+      <select
+        {...native}
+        className={presented.length > 0 ? "selx bad" : "selx"}
+        id={id}
+        aria-describedby={describedBy(id, hint, presented)}
+        aria-invalid={presented.length > 0 ? true : undefined}
+      >
+        {children}
+      </select>
     </FieldFrame>
   );
 }
@@ -440,11 +479,11 @@ type ChoiceProps = Omit<Native<"input">, "type" | "children"> & {
 
 export function Choice({ type, label, hint, ...native }: ChoiceProps) {
   return (
-    <label className="rs-choice">
-      <input {...native} className="rs-choice__input" type={type} />
-      <span className="rs-choice__text">
-        <span className="rs-choice__label">{label}</span>
-        {present(hint) ? <span className="rs-choice__hint">{hint}</span> : null}
+    <label className="check rz-choice">
+      <input {...native} type={type} />
+      <span className="stack">
+        <span>{label}</span>
+        {present(hint) ? <span className="hint">{hint}</span> : null}
       </span>
     </label>
   );
@@ -461,10 +500,10 @@ type FieldGroupProps = {
 export function FieldGroup({ id, legend, hint, children }: FieldGroupProps) {
   const hintId = id !== undefined && present(hint) ? `${id}-hint` : undefined;
   return (
-    <fieldset className="rs-fieldset" id={id} aria-describedby={hintId}>
-      <legend className="rs-fieldset__legend">{legend}</legend>
+    <fieldset className="fld rz-fieldset" id={id} aria-describedby={hintId}>
+      <legend className="fl">{legend}</legend>
       {present(hint) ? (
-        <p className="rs-field__hint" id={hintId}>
+        <p className="hint" id={hintId}>
           {hint}
         </p>
       ) : null}
@@ -482,12 +521,12 @@ type DisclosureProps = {
 // Progressive disclosure with the native details element.
 export function Disclosure({ summary, open, children }: DisclosureProps) {
   return (
-    <details className="rs-disclosure" open={open}>
-      <summary className="rs-disclosure__summary">
+    <details className="rz-disclosure" open={open}>
+      <summary className="rz-disclosure__summary">
         <span>{summary}</span>
         <Icon name="chevron" />
       </summary>
-      <div className="rs-disclosure__content">{children}</div>
+      <div className="rz-disclosure__content">{children}</div>
     </details>
   );
 }
@@ -505,13 +544,13 @@ type TableProps = {
 export function Table({ id, caption, children }: TableProps) {
   return (
     <div
-      className="rs-table-region"
+      className="panel rz-table-region"
       role="region"
       aria-labelledby={`${id}-caption`}
       tabIndex={0}
     >
-      <table className="rs-table" id={id}>
-        <caption className="rs-table__caption" id={`${id}-caption`}>
+      <table className="rz-table" id={id}>
+        <caption className="rz-table__caption" id={`${id}-caption`}>
           {caption}
         </caption>
         {children}
@@ -531,7 +570,11 @@ type StatusProps = {
 
 export function Status({ tone, emphasis = "subtle", children }: StatusProps) {
   return (
-    <span className="rs-status" data-tone={tone} data-emphasis={emphasis}>
+    <span
+      className={`pill ${TONE_PILLS[tone]} rz-status`}
+      data-tone={tone}
+      data-emphasis={emphasis}
+    >
       <Icon name={TONE_ICONS[tone]} />
       <span>{children}</span>
     </span>
@@ -567,14 +610,14 @@ export function Dialog({
 }: DialogProps) {
   return (
     <dialog
-      className="rs-dialog"
+      className="panel rz-dialog"
       id={id}
       data-presentation={presentation}
       open={open}
       aria-labelledby={`${id}-title`}
     >
-      <header className="rs-dialog__header">
-        <Title className="rs-dialog__title" id={`${id}-title`}>
+      <header className="rz-dialog__header">
+        <Title className="h4" id={`${id}-title`}>
           {title}
         </Title>
       </header>
@@ -589,17 +632,17 @@ type DialogAreaProps = {
 
 // Concise supporting content.
 export function DialogBody({ children }: DialogAreaProps) {
-  return <div className="rs-dialog__body">{children}</div>;
+  return <div className="rz-dialog__body">{children}</div>;
 }
 
 // The primary action area.
 export function DialogActions({ children }: DialogAreaProps) {
-  return <div className="rs-dialog__actions">{children}</div>;
+  return <div className="row rz-dialog__actions">{children}</div>;
 }
 
 // The quiet dismissal path.
 export function DialogDismissal({ children }: DialogAreaProps) {
-  return <div className="rs-dialog__dismissal">{children}</div>;
+  return <div className="rz-dialog__dismissal">{children}</div>;
 }
 
 // Notification / Alert ----------------------------------------------------
@@ -622,14 +665,14 @@ export function Alert({
 }: AlertProps) {
   return (
     <div
-      className="rs-alert"
+      className="rz-alert"
       data-tone={tone}
       data-presentation={presentation}
       role={role}
     >
       <Icon name={TONE_ICONS[tone]} />
-      <div className="rs-alert__content">
-        {present(title) ? <p className="rs-alert__title">{title}</p> : null}
+      <div className="rz-alert__content">
+        {present(title) ? <p className="rz-alert__title">{title}</p> : null}
         <div>{children}</div>
       </div>
     </div>
@@ -647,7 +690,7 @@ export function NotificationRegion({
   children,
 }: NotificationRegionProps) {
   return (
-    <div className="rs-notification-region" role="region" aria-label={label}>
+    <div className="rz-notification-region" role="region" aria-label={label}>
       {children}
     </div>
   );
@@ -670,10 +713,12 @@ export function MediaFrame({
   children,
 }: MediaFrameProps) {
   return (
-    <figure className="rs-media" data-ratio={ratio} data-overlay={overlay}>
-      <div className="rs-media__content">{children}</div>
+    <figure className="rz-media" data-ratio={ratio} data-overlay={overlay}>
+      <div className="rz-media__content">{children}</div>
       {present(caption) ? (
-        <figcaption className="rs-media__caption">{caption}</figcaption>
+        <figcaption className="rz-media__caption xs subtle">
+          {caption}
+        </figcaption>
       ) : null}
     </figure>
   );

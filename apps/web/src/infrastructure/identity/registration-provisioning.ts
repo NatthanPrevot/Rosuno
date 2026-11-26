@@ -36,7 +36,11 @@
 // only the three fixed notification recording calls of the worker and the
 // Resend webhook route (the notification job context, which answers the
 // recipient's address read at send time, a provider call's result, and one
-// authenticated provider event); it reads and writes no table. A further
+// authenticated provider event); it reads and writes no table. Another (the
+// reviewed P2-925 Staging access gate design, under DEV-001) makes only the
+// one fixed call of the PS-A2 API accessor deployment_environment_identity(),
+// which takes no argument and answers only the recorded environment class
+// and project reference; it reads and writes no table. A further
 // client, built from
 // the publishable key alone and never given the privileged credential, only
 // requests signup confirmation emails. No client receives a request cookie or
@@ -484,6 +488,40 @@ export function hasPrivilegedProjectBinding(
   environment: RegistrationEnvironment = runtimeEnvironment(),
 ): boolean {
   return readProjectBinding(environment) !== null;
+}
+
+// The deployment identity port of the Staging access gate (the reviewed
+// P2-925 design, under DEV-001), through its own cookie-free privileged
+// client: the gate runs before any session exists, and the accessor is not
+// granted to anonymous callers. It makes only the one fixed call of the
+// PS-A2 API accessor deployment_environment_identity(), with no argument,
+// under a two-second deadline, and passes its answer on as rows for the gate
+// to read strictly; anything else, including a failed, aborted, or thrown
+// call, is unreadable. It reads and writes no table and decides nothing.
+const IDENTITY_CALL_DEADLINE_MS = 2000;
+
+export async function createDeploymentIdentityPort(
+  environment: RegistrationEnvironment = runtimeEnvironment(),
+  create: ClientFactory = createClient,
+): Promise<{ readonly read: () => Promise<RowsResult> } | null> {
+  const binding = readProjectBinding(environment);
+  if (binding === null) {
+    return null;
+  }
+  const admin = create(binding.url, binding.adminKey, clientOptions());
+  return Object.freeze({
+    read: async () => {
+      try {
+        return rowsResultOf(
+          await admin
+            .rpc("deployment_environment_identity")
+            .abortSignal(AbortSignal.timeout(IDENTITY_CALL_DEADLINE_MS)),
+        );
+      } catch {
+        return UNREADABLE_ROWS;
+      }
+    },
+  });
 }
 
 // MVP-001 S7: the payment recording port (Packet S7 outbound reliability and

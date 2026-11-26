@@ -9,6 +9,11 @@
 // severity, ready, live and stale consultations, requests awaiting a
 // decision, payments in transitional states, profiles under review and
 // jurisdictions by lifecycle state. It reads no query, header or cookie.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, Staff.dc.html,
+// the Dashboard): the design's headline figures, each one exact count the
+// summary answered, above one panel per counted metric with its states,
+// counts and oldest entries. Nothing is summed, estimated or sampled.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -19,21 +24,20 @@ import {
 } from "../../../src/application/operations-workspace.ts";
 import { OPERATIONS_WORKSPACE_SOURCES } from "../../../src/infrastructure/staff/operations-adapter.ts";
 import {
-  ButtonLink,
-  Cluster,
-  Heading,
-  Table,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
-import {
   DIMENSION_LABELS,
   FAMILY_LABELS,
   METRIC_TITLES,
   OPERATIONS_INTRO,
   utcText,
 } from "../../../src/presentation/operations-labels.ts";
+import {
+  Metric,
+  Metrics,
+  Panel,
+  PanelGrid,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../frame.tsx";
+import { refusalPage, StaffFrame } from "../frame.tsx";
 
 export const metadata: Metadata = {
   title: "Operations dashboard",
@@ -50,6 +54,14 @@ const SHOWN = [
   "jurisdictions",
 ] as const;
 
+// The pages a panel's heading links to (the existing job view and system
+// health links of this page).
+const PANEL_LINKS: Readonly<
+  Partial<Record<string, { readonly href: string; readonly label: string }>>
+> = {
+  jobs: { href: "/staff/jobs", label: "Open the job view" },
+};
+
 function dimensionLabel(dimension: string): string {
   const [family, severity] = dimension.split(".");
   return severity === undefined
@@ -57,6 +69,23 @@ function dimensionLabel(dimension: string): string {
     : `${FAMILY_LABELS[family] ?? family}, ${severity}`;
 }
 
+// The count the summary answered for one state of one metric.
+function countOf(
+  counts: Readonly<Record<string, readonly SummaryCount[]>>,
+  metric: string,
+  dimension: string,
+): SummaryCount | null {
+  return counts[metric]?.find((count) => count.dimension === dimension) ?? null;
+}
+
+function oldestNote(count: SummaryCount | null, none: string): string {
+  return count === null || count.oldestAt === null
+    ? none
+    : `Oldest ${utcText(count.oldestAt)}`;
+}
+
+// The design's count table in a panel: each state, its count and its oldest
+// entry.
 function CountTable({
   id,
   title,
@@ -67,24 +96,31 @@ function CountTable({
   readonly counts: readonly SummaryCount[];
 }) {
   return (
-    <Table id={id} caption={title}>
+    <table className="st-cov" id={id}>
+      <caption>{title}</caption>
       <thead>
         <tr>
           <th scope="col">State</th>
-          <th scope="col">Count</th>
-          <th scope="col">Oldest</th>
+          <th scope="col" className="r">
+            Count
+          </th>
+          <th scope="col" className="r">
+            Oldest (UTC)
+          </th>
         </tr>
       </thead>
       <tbody>
         {counts.map((count) => (
           <tr key={count.dimension}>
-            <td>{dimensionLabel(count.dimension)}</td>
-            <td>{count.value}</td>
-            <td>{count.oldestAt === null ? "—" : utcText(count.oldestAt)}</td>
+            <th scope="row">{dimensionLabel(count.dimension)}</th>
+            <td className="r num">{count.value}</td>
+            <td className="d num">
+              {count.oldestAt === null ? "—" : utcText(count.oldestAt)}
+            </td>
           </tr>
         ))}
       </tbody>
-    </Table>
+    </table>
   );
 }
 
@@ -97,34 +133,73 @@ export default async function OperationsDashboardPage() {
     return refusalPage(view, "/staff/operations", "Operations dashboard");
   }
   const { counts } = view.summary;
+  const awaiting = countOf(counts, "requests", "awaiting_attorney");
+  const live = countOf(counts, "consultations", "live");
+  const stale = countOf(counts, "consultations", "stale");
+  const escalated = countOf(counts, "jobs", "escalated");
   return (
-    <StaffFrame eyebrow="Operations" title="Operations dashboard">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Text tone="muted">{OPERATIONS_INTRO}</Text>
-      <Cluster>
-        <ButtonLink variant="secondary" href="/staff/jobs">
-          Open the job view
-        </ButtonLink>
-        <ButtonLink variant="secondary" href="/staff/system-health">
-          Open system health
-        </ButtonLink>
-      </Cluster>
-      <Heading as="h2" size="md">
-        {METRIC_TITLES.review_exceptions}
-      </Heading>
-      <CountTable
-        id="operations-review-exceptions"
-        title={METRIC_TITLES.review_exceptions}
-        counts={counts.review_exceptions}
-      />
-      {SHOWN.map((metric) => (
-        <CountTable
-          key={metric}
-          id={`operations-${metric}`}
-          title={METRIC_TITLES[metric]}
-          counts={counts[metric]}
+    <StaffFrame
+      title="Dashboard"
+      subtitle="Operations: counts from the database at the moment this page was loaded."
+      lead={<p>{OPERATIONS_INTRO}</p>}
+      utc
+    >
+      <Metrics label="At a glance" count={4}>
+        <Metric
+          label="Awaiting the attorney"
+          value={awaiting?.value ?? "—"}
+          note={oldestNote(awaiting, "No request waiting")}
         />
-      ))}
+        <Metric
+          label="In progress now"
+          value={live?.value ?? "—"}
+          note={
+            live !== null && live.value > 0
+              ? "Live now"
+              : "No consultation is live"
+          }
+        />
+        <Metric
+          label="Need an outcome"
+          value={stale?.value ?? "—"}
+          note={oldestNote(stale, "None waiting")}
+        />
+        <Metric
+          label="Escalated jobs"
+          value={escalated?.value ?? "—"}
+          note={oldestNote(escalated, "None escalated")}
+          href="/staff/jobs"
+        />
+      </Metrics>
+      <PanelGrid>
+        <Panel
+          id="operations-review-exceptions-title"
+          title={METRIC_TITLES.review_exceptions}
+          place="s12"
+          link={{ href: "/staff/system-health", label: "Open system health" }}
+        >
+          <CountTable
+            id="operations-review-exceptions"
+            title={METRIC_TITLES.review_exceptions}
+            counts={counts.review_exceptions}
+          />
+        </Panel>
+        {SHOWN.map((metric) => (
+          <Panel
+            key={metric}
+            id={`operations-${metric}-title`}
+            title={METRIC_TITLES[metric]}
+            place="s6"
+            link={PANEL_LINKS[metric]}
+          >
+            <CountTable
+              id={`operations-${metric}`}
+              title={METRIC_TITLES[metric]}
+              counts={counts[metric]}
+            />
+          </Panel>
+        ))}
+      </PanelGrid>
     </StaffFrame>
   );
 }

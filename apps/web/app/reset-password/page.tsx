@@ -15,12 +15,12 @@ import {
   Cluster,
   Eyebrow,
   Heading,
-  Page,
   Stack,
   Surface,
   Text,
   TextField,
 } from "../../src/presentation/design-system.tsx";
+import { AuthFrame } from "../../src/presentation/auth-frame.tsx";
 import { completeRecovery } from "./actions.ts";
 
 type ResetPasswordPageProps = {
@@ -52,7 +52,7 @@ export default function ResetPasswordPage({
     <>
       <meta name="robots" content="noindex, nofollow, noarchive" />
       <meta name="referrer" content="strict-origin" />
-      <Page density="public">
+      <AuthFrame>
         <Surface emphasis="raised" labelledBy="reset-password-title">
           <Stack>
             <Eyebrow>Rosuno</Eyebrow>
@@ -193,7 +193,7 @@ export default function ResetPasswordPage({
             )}
           </Stack>
         </Surface>
-      </Page>
+      </AuthFrame>
     </>
   );
 }

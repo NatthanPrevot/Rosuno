@@ -1779,6 +1779,30 @@ test("S7-20. the S7 pages decide on the server for every request through the S7 
       file,
     );
   }
+  // DEV-001: the payment page also shows the payment's dispute timeline
+  // (E4) through the finance workspace's own use case and the same
+  // production sources, with the same payment identifier the route names,
+  // and asks it only once the payment itself is ready (a refused, unknown or
+  // unavailable payment reads no dispute event).
+  const payment = codeOf(read("app/staff/finance/[payment]/page.tsx"));
+  assert.ok(
+    payment
+      .replace(/\s+/g, " ")
+      .includes(
+        "const disputes = await resolveFinanceDisputeTimeline( FINANCE_SOURCES, paymentId, );",
+      ),
+  );
+  assert.equal(payment.match(/resolveFinanceDisputeTimeline\(/g).length, 1);
+  assert.equal(payment.match(/FINANCE_SOURCES\b/g).length, 3);
+  assert.ok(
+    payment.indexOf(
+      'return refusalPage(view, "/staff/finance/[payment]", "Finance");',
+    ) < payment.indexOf("await resolveFinanceDisputeTimeline("),
+  );
+  assert.ok(
+    payment.indexOf("notFound();") <
+      payment.indexOf("await resolveFinanceDisputeTimeline("),
+  );
   // The client never sees an infrastructure module or a provider key.
   for (const file of filesIn("app/").filter(
     (f) => /\.tsx?$/.test(f) && /["']use client["']/.test(read(f)),

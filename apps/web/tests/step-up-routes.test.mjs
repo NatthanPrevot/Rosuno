@@ -110,6 +110,10 @@ const GATED_ACTIONS = {
   "app/staff/break-glass/actions.ts": "staff",
   "app/staff/data-requests/actions.ts": "staff",
   "app/staff/clients/actions.ts": "staff",
+  // DEV-001: website & appearance studio: its save, publication, restore,
+  // reset, discard and upload, and its reads of the studio, versions and
+  // images.
+  "app/staff/appearance/actions.ts": "staff",
 };
 
 // ---------------------------------------------------------------------------
@@ -207,8 +211,12 @@ test("S2-R3. every attorney page and every staff page asks the step-up gate firs
   // pass 2: and the nine staff operations and administration pages. MVP-001
   // S11 pass 2B: and the attorney's dashboard, past consultations, week
   // view, messages, documents and compliance pages. MVP-001 S11 PS-A6: and
-  // the four staff break-glass and data request pages.
-  assert.equal(GATED_PAGES.length, 57);
+  // the four staff break-glass and data request pages. DEV-001: and the
+  // owner's UI/UX design's staff Attorneys list. DEV-001: website &
+  // appearance studio: and the studio page.
+  assert.equal(GATED_PAGES.length, 59);
+  assert.ok(GATED_PAGES.includes("app/staff/attorneys/page.tsx"));
+  assert.ok(GATED_PAGES.includes("app/staff/appearance/page.tsx"));
   for (const file of [
     "app/staff/break-glass/page.tsx",
     "app/staff/break-glass/[grant]/page.tsx",
@@ -370,6 +378,10 @@ test("S2-R4. every attorney and staff server action asks the gate before its use
       // and the data request assignment and decision.
       "app/staff/break-glass/actions.ts": 3,
       "app/staff/data-requests/actions.ts": 2,
+      // DEV-001: website & appearance studio: the six changes (save,
+      // publish, restore, reset, discard, upload) and the four reads (the
+      // studio, a page of versions, one version, a page of images).
+      "app/staff/appearance/actions.ts": 10,
     };
     const verification = file === "app/staff/verification/actions.ts";
     const offers = file === "app/attorney/offers/actions.ts";

@@ -280,17 +280,23 @@ test("5. correlation ids are fresh version 4 UUIDs, and the proxy always replace
   const proxy = codeOf(read("proxy.ts"));
   assert.deepEqual(importsOf(read("proxy.ts")), [
     "next/server",
+    // The reviewed Staging access gate design (P2-925, DEV-001).
+    "./src/infrastructure/environment/staging-access-gate.ts",
     "./src/infrastructure/identity/supabase-server.ts",
     "./src/infrastructure/observability/log.ts",
   ]);
   // A fresh id is set on the forwarded request before anything else reads
-  // it, and the same id is returned on the response. Nothing reads the
-  // browser's own value.
+  // it, and the same id is returned on the response, a gate refusal
+  // included. Nothing reads the browser's own value. Updated for the
+  // reviewed Staging access gate design (P2-925, DEV-001): the gate runs
+  // after the id is set and before the session refresh.
   assert.ok(
     proxy.includes(
-      "  const correlationId = newCorrelationId();\n  request.headers.set(CORRELATION_HEADER, correlationId);\n  const response = await refreshSupabaseSession(request);\n  response.headers.set(CORRELATION_HEADER, correlationId);\n  return response;\n",
+      '  const correlationId = newCorrelationId();\n  request.headers.set(CORRELATION_HEADER, correlationId);\n  const access = await stagingAccessGate(request);\n  const response =\n    access.kind === "refused"\n      ? access.response\n      : await refreshSupabaseSession(request);\n  if (access.kind !== "ungated") {\n    markGatedResponse(response);\n  }\n  response.headers.set(CORRELATION_HEADER, correlationId);\n  return response;\n',
     ),
   );
+  assert.equal(proxy.match(/newCorrelationId\(\)/g).length, 1);
+  assert.equal(proxy.match(/CORRELATION_HEADER, correlationId/g).length, 2);
   assert.doesNotMatch(proxy, /headers\.get\(|console\.|\blog\(/);
 });
 
@@ -399,8 +405,20 @@ test("6. the logger depends on nothing, and only server modules write log lines,
   // data request actions and the staff break-glass and data request actions
   // (an action not completed, with its fixed outcome only) and the privacy
   // adapter (a failed call, with the call name and how it failed only) write
-  // lines too.
+  // lines too. DEV-001: the owner's UI/UX design's Legal matters and Account
+  // security pages (a view unavailable, with the route and outcome only)
+  // write lines too. DEV-001: website & appearance studio: the appearance
+  // adapter (a failed call, with the call name and how it failed only; never
+  // a configuration, a page text or image bytes) writes lines too, and so do
+  // the published stylesheet and appearance image routes (the default sheet
+  // served or an image unavailable, with the fixed outcome only; never a
+  // configuration, a digest or bytes). DEV-001: website & appearance studio:
+  // the studio's actions (an action not completed, with its fixed outcome
+  // only; never a configuration, a page text or image bytes) write lines too.
   assert.deepEqual(callers, [
+    // DEV-001: website & appearance studio: the two appearance routes.
+    "app/appearance/assets/[asset]/route.ts",
+    "app/appearance/theme.css/route.ts",
     "app/attorney/complaints/actions.ts",
     "app/attorney/complaints/page.tsx",
     "app/attorney/compliance/page.tsx",
@@ -424,6 +442,7 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/client/consultations/actions.ts",
     "app/client/consultations/page.tsx",
     "app/client/intakes/[intake]/page.tsx",
+    "app/client/intakes/page.tsx",
     "app/client/messages/page.tsx",
     "app/client/notifications/page.tsx",
     "app/client/page.tsx",
@@ -437,11 +456,14 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/client/reviews/actions.ts",
     "app/client/reviews/page.tsx",
     "app/client/settings/page.tsx",
+    "app/client/settings/security/page.tsx",
     "app/find-an-attorney/page.tsx",
     "app/find-an-attorney/select/actions.ts",
     "app/find-an-attorney/select/page.tsx",
     "app/sign-in/actions.ts",
     "app/staff/actions.ts",
+    // DEV-001: website & appearance studio: the studio's actions.
+    "app/staff/appearance/actions.ts",
     "app/staff/attorneys/actions.ts",
     "app/staff/break-glass/actions.ts",
     "app/staff/clients/actions.ts",
@@ -454,6 +476,8 @@ test("6. the logger depends on nothing, and only server modules write log lines,
     "app/staff/legal-holds/actions.ts",
     "app/staff/reviews/actions.ts",
     "app/staff/verification/actions.ts",
+    // DEV-001: website & appearance studio: the appearance adapter.
+    "src/infrastructure/appearance/appearance-adapter.ts",
     "src/infrastructure/client/client-intake-adapter.ts",
     "src/infrastructure/client/intake-suggestion-adapter.ts",
     "src/infrastructure/communications/communication-adapter.ts",

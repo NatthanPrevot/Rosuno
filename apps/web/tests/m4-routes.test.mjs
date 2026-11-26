@@ -119,6 +119,17 @@ write(
     "./actions.ts": target("actions.mjs"),
   }),
 );
+// DEV-001: the owner's UI/UX design's workspace frame, linked as written.
+write(
+  "attorney-workspace.mjs",
+  relink(
+    transpile(
+      read("src/presentation/attorney-workspace.tsx"),
+      "attorney-workspace.tsx",
+    ),
+    { "react/jsx-runtime": jsxRuntime },
+  ),
+);
 write(
   "attorney-page.mjs",
   relink(transpile(read("app/attorney/professional/page.tsx"), "page.tsx"), {
@@ -129,10 +140,25 @@ write(
     ),
     "../../../src/infrastructure/professional/attorney-professional-adapter.ts":
       target("wiring.mjs"),
+    "../../../src/presentation/attorney-workspace.tsx": target(
+      "attorney-workspace.mjs",
+    ),
     "../../../src/presentation/design-system.tsx": target("design-system.mjs"),
     "../../account/gate.ts": target("attorney-gate.mjs"),
     "./forms.tsx": target("attorney-forms.mjs"),
   }),
+);
+// DEV-001: the owner's UI/UX design's staff workspace presentation, linked
+// as written.
+write(
+  "staff-workspace.mjs",
+  relink(
+    transpile(
+      read("src/presentation/staff-workspace.tsx"),
+      "staff-workspace.tsx",
+    ),
+    { "react/jsx-runtime": jsxRuntime },
+  ),
 );
 write(
   "staff-forms.mjs",
@@ -157,6 +183,9 @@ write(
     "../../../src/infrastructure/staff/staff-verification-adapter.ts":
       target("wiring.mjs"),
     "../../../src/presentation/design-system.tsx": target("design-system.mjs"),
+    "../../../src/presentation/staff-workspace.tsx": target(
+      "staff-workspace.mjs",
+    ),
     "../../account/gate.ts": target("staff-gate.mjs"),
   }),
 );
@@ -183,6 +212,9 @@ write(
         target("design-system.mjs"),
       "../../../../src/presentation/professional-labels.ts":
         target("labels.mjs"),
+      "../../../../src/presentation/staff-workspace.tsx": target(
+        "staff-workspace.mjs",
+      ),
       "../../../account/gate.ts": target("staff-gate.mjs"),
       "../forms.tsx": target("staff-forms.mjs"),
     },

@@ -12,12 +12,37 @@
 // resolved, and what the attorney's own records say today with no reminder
 // period applied). A section that cannot be read says so and the others are
 // still shown. Nothing of a client's identity is shown; nothing changes here.
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace Overview): the workspace frame around the design's cards. The
+// queue the Requests section reads and the Consultation list the
+// Consultations section reads are kept as their own use cases answered them
+// (the same single read each, through the same sources), so the design's
+// "Needs your attention" and "Coming up" lists show their entries; the
+// server clock the dashboard reads is kept likewise to draw the countdown
+// ring. A visitor the page does not admit sees the design's signed-out panel.
+//
+// DEV-001: the design's performance panel, for the calendar month in UTC of
+// that same server clock reading (no other clock is read): the Requests the
+// attorney received in the month by outcome, "answered" being accepted and
+// declined, and the Consultations that ended in it by outcome, read after the
+// dashboard through the attorney's own activity counts
+// (attorney_activity_counts, behind the Security Shell again). Counts only:
+// no rate, rating, ranking or score. Beside them, the ledger-derived net of
+// the earnings section, per currency and never added across currencies. When
+// the counts cannot be read the panel says so and one log line with no
+// attorney data is written; the rest of the dashboard is still shown.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 
-import { resolveAttorneyQueue } from "../../../src/application/attorney-requests.ts";
+import {
+  attorneyRequestPathFor,
+  resolveAttorneyQueue,
+  type AttorneyQueueView,
+  type QueueEntry,
+} from "../../../src/application/attorney-requests.ts";
 import { resolveAttorneySchedule } from "../../../src/application/attorney-schedule.ts";
 import { resolveAttorneyEarnings } from "../../../src/application/client-payments.ts";
 import { resolveAttorneyComplaints } from "../../../src/application/complaints.ts";
@@ -26,9 +51,11 @@ import {
   displayStateOf,
   resolveAttorneyConsultations,
   type ConsultationEntry,
+  type ConsultationListView,
 } from "../../../src/application/consultations.ts";
 import { resolveAttorneyNotifications } from "../../../src/application/notification-center.ts";
 import {
+  resolveAttorneyActivity,
   resolveAttorneyComplianceRecords,
   resolveAttorneyDashboard,
   type AttorneyDashboardSources,
@@ -45,7 +72,24 @@ import { ATTORNEY_REQUEST_SOURCES } from "../../../src/infrastructure/requests/a
 import { ATTORNEY_SCHEDULE_SOURCES } from "../../../src/infrastructure/scheduling/attorney-schedule-adapter.ts";
 import { ATTORNEY_WORKSPACE_SOURCES } from "../../../src/infrastructure/workspaces/workspace-adapter.ts";
 import {
+  ActivityPanel,
+  AttorneyGate,
+  AttorneyWorkspace,
+  Calm,
+  Card,
+  clockText,
+  CountdownRing,
+  DateBadge,
+  dayText,
+  monthPeriodOf,
+  monthText,
+  Pill,
+  ringStepOf,
+  whenText,
+} from "../../../src/presentation/attorney-workspace.tsx";
+import {
   ATTORNEY_STATE_LABELS,
+  durationText,
   modalityText,
   PATH_LABELS,
 } from "../../../src/presentation/consultation-labels.ts";
@@ -53,12 +97,6 @@ import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
   Text,
 } from "../../../src/presentation/design-system.tsx";
 import { formatInZone } from "../../../src/presentation/schedule-labels.ts";
@@ -79,9 +117,7 @@ import {
   SECTION_UNAVAILABLE,
   TIMES_NOTE,
   unacknowledgedText,
-  utcText,
 } from "../../../src/presentation/workspace-labels.ts";
-import { AttorneyNavigation } from "../../../src/presentation/workspace-navigation.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
 
 export const metadata: Metadata = {
@@ -105,70 +141,163 @@ const DASHBOARD_SOURCES: AttorneyDashboardSources = Object.freeze({
   clock: ATTORNEY_SCHEDULE_SOURCES.clock,
 });
 
-function Frame({ children }: { readonly children: ReactNode }) {
+// DEV-001: what this request's dashboard read through its own sources, kept
+// for the design's lists (each source still runs once, as the dashboard asks).
+type Kept = {
+  queue?: AttorneyQueueView;
+  consultations?: ConsultationListView;
+  now?: number;
+};
+
+function keepingSources(kept: Kept): AttorneyDashboardSources {
+  return Object.freeze({
+    ...DASHBOARD_SOURCES,
+    consultations: async () =>
+      (kept.consultations = await DASHBOARD_SOURCES.consultations()),
+    requests: async () => (kept.queue = await DASHBOARD_SOURCES.requests()),
+    clock: () => (kept.now = DASHBOARD_SOURCES.clock()),
+  });
+}
+
+function GateFrame({ children }: { readonly children: ReactNode }) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-dashboard-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-dashboard-title">
-            Dashboard
-          </Heading>
-          {children}
-          <AttorneyNavigation current="/attorney/dashboard" />
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate titleId="attorney-dashboard-title" title="Dashboard">
+      {children}
+    </AttorneyGate>
   );
 }
 
-function SectionOf<T>({
-  id,
-  title,
-  section,
-  links,
-  children,
+function Unavailable() {
+  return <Text tone="muted">{SECTION_UNAVAILABLE}</Text>;
+}
+
+function readyOf<T>(section: Section<T>): T | null {
+  return section.status === "ready" ? section.value : null;
+}
+
+function consultationText(entry: ConsultationEntry): string {
+  return entry.durationMinutes === null
+    ? modalityText(entry.modality)
+    : `${modalityText(entry.modality)} · ${durationText(entry.durationMinutes)}`;
+}
+
+// One Request awaiting the attorney: the consultation asked for, its timing
+// and the server's latest time to decide. Nothing about the client is shown
+// before acceptance.
+function QueueRow({
+  entry,
+  now,
 }: {
-  readonly id: string;
-  readonly title: string;
-  readonly section: Section<T>;
-  readonly links: ReactNode;
-  readonly children: (value: T) => ReactNode;
+  readonly entry: QueueEntry;
+  readonly now: number | null;
 }) {
+  const instant = entry.path === "instant";
+  const window =
+    entry.decideBy === null
+      ? NaN
+      : Date.parse(entry.decideBy) - Date.parse(entry.createdAt);
+  const remaining =
+    entry.decideBy === null || now === null
+      ? NaN
+      : Date.parse(entry.decideBy) - now;
+  const minutes = Math.max(Math.ceil(remaining / 60000), 0);
   return (
-    <Surface labelledBy={id}>
-      <Stack gap="tight">
-        <Heading as="h2" size="md" id={id}>
-          {title}
-        </Heading>
-        {section.status === "ready" ? (
-          children(section.value)
-        ) : (
-          <Text tone="muted">{SECTION_UNAVAILABLE}</Text>
+    <div className={instant ? "w-qr u" : "w-qr"}>
+      {instant && Number.isFinite(remaining) ? (
+        <CountdownRing step={ringStepOf(remaining, window)}>
+          {minutes < 1 ? "<1m" : `${minutes}m`}
+        </CountdownRing>
+      ) : entry.slotStart !== null ? (
+        <DateBadge timestamp={entry.slotStart} />
+      ) : null}
+      <div className="col grow l-g1-minw0">
+        <span className="row l-g6-minw0">
+          <span className="sm b ell">{`${modalityText(entry.modality)} · ${durationText(entry.durationMinutes)}`}</span>
+          <span className={instant ? "kind urgent" : "kind scheduled"}>
+            {instant ? "Talk Now" : "Scheduled"}
+          </span>
+        </span>
+        <span className="xs muted ell">
+          {entry.slotStart === null
+            ? PATH_LABELS[entry.path]
+            : whenText(entry.slotStart)}
+        </span>
+        {entry.decideBy === null ? null : (
+          <span className={instant ? "xs w-qmeta u" : "xs w-qmeta"}>
+            {`Respond by ${whenText(entry.decideBy)}`}
+          </span>
         )}
-        <Cluster>{links}</Cluster>
-      </Stack>
-    </Surface>
+      </div>
+      <a
+        className="btn btn-line btn-sm"
+        href={attorneyRequestPathFor(entry.id)}
+      >
+        Review
+      </a>
+    </div>
   );
 }
 
-function ConsultationLine({ entry }: { readonly entry: ConsultationEntry }) {
+// One upcoming Consultation in the design's "Coming up" row.
+function ComingRow({ entry }: { readonly entry: ConsultationEntry }) {
   const state = ATTORNEY_STATE_LABELS[displayStateOf(entry)];
   return (
-    <Cluster>
-      <Status tone={state.tone}>{state.label}</Status>
-      <Text size="small">
-        {entry.bookingStart !== null
-          ? `${modalityText(entry.modality)}, ${utcText(entry.bookingStart)}`
-          : `${modalityText(entry.modality)}, ${PATH_LABELS[entry.path]}`}
-      </Text>
-      <ButtonLink
-        variant="tertiary"
-        href={attorneyConsultationPathFor(entry.id)}
-      >
-        Open the consultation
-      </ButtonLink>
-    </Cluster>
+    <a className="w-upr" href={attorneyConsultationPathFor(entry.id)}>
+      {entry.bookingStart === null ? null : (
+        <DateBadge timestamp={entry.bookingStart} />
+      )}
+      <span className="col grow l-g0-minw0">
+        <span className="sm b ell">
+          {entry.bookingStart === null
+            ? PATH_LABELS[entry.path]
+            : clockText(entry.bookingStart)}
+        </span>
+        <span className="xs muted ell">{consultationText(entry)}</span>
+      </span>
+      <span className="tag">{state.label}</span>
+    </a>
+  );
+}
+
+// The consultation in progress, or the next one: the design's "Next up".
+function NextUp({ entry }: { readonly entry: ConsultationEntry }) {
+  const shown = displayStateOf(entry);
+  const state = ATTORNEY_STATE_LABELS[shown];
+  const active = shown === "live" || shown === "ready";
+  return (
+    <div className="w-next">
+      <div className="row between l-g8">
+        <span className="lbl">
+          {active
+            ? "Now"
+            : entry.bookingStart === null
+              ? "Next up"
+              : `Next up · ${dayText(entry.bookingStart)}`}
+        </span>
+        <Pill tone={state.tone}>{state.label}</Pill>
+      </div>
+      <div className="row aw-next-time">
+        <span className="w-ntime num">
+          {entry.bookingStart === null
+            ? PATH_LABELS[entry.path]
+            : clockText(entry.bookingStart)}
+        </span>
+      </div>
+      <p className="xs muted">{consultationText(entry)}</p>
+      <div className="row aw-next-acts">
+        <a
+          className={active ? "btn btn-ink btn-sm" : "btn btn-quiet btn-sm"}
+          href={attorneyConsultationPathFor(entry.id)}
+        >
+          {active ? "Join" : "Details"}
+        </a>
+        {active ? null : (
+          <span className="xs subtle grow aw-next-note">
+            Join opens when the room opens
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -176,10 +305,11 @@ export default async function AttorneyDashboardPage() {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
   await requireSteppedUp("attorney");
-  const view = await resolveAttorneyDashboard(DASHBOARD_SOURCES);
+  const kept: Kept = {};
+  const view = await resolveAttorneyDashboard(keepingSources(kept));
   if (view.status === "sign-in-required") {
     return (
-      <Frame>
+      <GateFrame>
         <Text tone="muted">
           The dashboard is available only to a signed-in account with attorney
           access.
@@ -189,16 +319,16 @@ export default async function AttorneyDashboardPage() {
             Sign in
           </ButtonLink>
         </Cluster>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="warning" title="Not available" role="status">
           This account does not have access to the attorney workspace.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status !== "ready") {
@@ -207,168 +337,311 @@ export default async function AttorneyDashboardPage() {
       outcome: view.status,
     });
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="error" title="Something went wrong" role="alert">
           Your dashboard could not be shown right now. Please try again later.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   const { dashboard } = view;
+  const requests = readyOf(dashboard.requests);
+  const consultations = readyOf(dashboard.consultations);
+  const availability = readyOf(dashboard.availability);
+  const earnings = readyOf(dashboard.earnings);
+  const alerts = readyOf(dashboard.alerts);
+  // The Requests the summary counts (one the server reports past its
+  // deadline is not counted), as the queue listed them.
+  const queue =
+    requests !== null && kept.queue?.status === "ready"
+      ? kept.queue.entries.filter((entry) => !entry.expiredDue)
+      : [];
+  const waiting =
+    requests === null ? null : requests.instant + requests.scheduled;
+  const now =
+    kept.now !== undefined && Number.isFinite(kept.now) ? kept.now : null;
+  // DEV-001: the owner's UI/UX design's performance panel: the calendar month
+  // in UTC of the dashboard's own clock reading, read after the dashboard.
+  const period = monthPeriodOf(now);
+  const activity = await resolveAttorneyActivity(
+    ATTORNEY_WORKSPACE_SOURCES,
+    period,
+  );
+  if (activity.status !== "ready") {
+    await logRequestEvent("warn", "attorney_dashboard.unavailable", {
+      route: "/attorney/dashboard",
+      operation: "resolveAttorneyActivity",
+      outcome: activity.status,
+    });
+  }
+  // Every upcoming Consultation of the list, in its order.
+  const coming =
+    consultations !== null && kept.consultations?.status === "ready"
+      ? kept.consultations.entries.filter(
+          (entry) =>
+            displayStateOf(entry) === "scheduled" &&
+            entry.bookingStart !== null,
+        )
+      : [];
+  const current =
+    consultations === null
+      ? null
+      : (consultations.active[0] ?? consultations.next);
   return (
-    <Frame>
-      <Text tone="muted">{DASHBOARD_INTRO}</Text>
-      <Text tone="muted">{TIMES_NOTE}</Text>
-      <SectionOf
-        id="dashboard-consultations"
-        title="Consultations"
-        section={dashboard.consultations}
-        links={
-          <ButtonLink variant="secondary" href="/attorney/consultations">
-            All current consultations
-          </ButtonLink>
-        }
-      >
-        {(value) => (
-          <Stack gap="tight">
-            {value.active.length === 0 && value.next === null ? (
-              <Text>No consultation is in progress or coming up.</Text>
-            ) : null}
-            {value.active.map((entry) => (
-              <ConsultationLine key={entry.id} entry={entry} />
-            ))}
-            {value.next === null ? null : (
-              <>
-                <Text size="small" tone="muted">
-                  Next consultation
-                </Text>
-                <ConsultationLine entry={value.next} />
-              </>
-            )}
-          </Stack>
-        )}
-      </SectionOf>
-      <SectionOf
-        id="dashboard-requests"
-        title="Requests"
-        section={dashboard.requests}
-        links={
-          <ButtonLink variant="secondary" href="/attorney/requests">
-            Requests awaiting your decision
-          </ButtonLink>
-        }
-      >
-        {(value) => <Text>{pendingText(value.instant, value.scheduled)}</Text>}
-      </SectionOf>
-      <SectionOf
-        id="dashboard-availability"
-        title="Availability"
-        section={dashboard.availability}
-        links={
-          <>
-            <ButtonLink variant="secondary" href="/attorney/schedule">
-              Schedule
-            </ButtonLink>
-            <ButtonLink variant="secondary" href="/attorney/schedule/week">
-              Week view
-            </ButtonLink>
-          </>
-        }
-      >
-        {(value) => (
-          <Stack gap="tight">
-            <Text>{instantText(value.instantOn, value.instantConfigured)}</Text>
-            <Text>{availabilityText(value.windows, value.days)}</Text>
-            {value.nextWindow === null ? null : (
-              <Text size="small">
-                {`Next availability: ${formatInZone(value.nextWindow.startsAt, value.nextWindow.timezone ?? "UTC")}`}
-              </Text>
-            )}
-            {value.blackouts === 0 ? null : (
-              <Text size="small">{`${value.blackouts} blackout(s) in the same period.`}</Text>
-            )}
-          </Stack>
-        )}
-      </SectionOf>
-      <SectionOf
-        id="dashboard-earnings"
-        title="Earnings"
-        section={dashboard.earnings}
-        links={
-          <ButtonLink variant="secondary" href="/attorney/earnings">
-            Earnings
-          </ButtonLink>
-        }
-      >
-        {(value) => (
-          <Stack gap="tight">
-            <Text size="small" tone="muted">
-              {EARNINGS_NOTE}
-            </Text>
-            {value.totals.length === 0 ? (
-              <Text>{NO_EARNINGS}</Text>
-            ) : (
-              value.totals.map((total) => (
-                <Text key={total.currency}>
-                  {moneyText(total.netMinor, total.currency)}
-                </Text>
-              ))
-            )}
-          </Stack>
-        )}
-      </SectionOf>
-      <SectionOf
-        id="dashboard-alerts"
-        title="Alerts"
-        section={dashboard.alerts}
-        links={
-          <>
-            <ButtonLink variant="secondary" href="/attorney/notifications">
-              Notifications
-            </ButtonLink>
-            <ButtonLink variant="secondary" href="/attorney/complaints">
-              Reported problems
-            </ButtonLink>
-            <ButtonLink variant="secondary" href="/attorney/compliance">
-              Compliance
-            </ButtonLink>
-          </>
-        }
-      >
-        {(value) => (
-          <Stack gap="tight">
-            <Text>{unacknowledgedText(value.unacknowledged)}</Text>
-            <Text>{openComplaintsText(value.openComplaints)}</Text>
-            {value.compliance === null ? (
-              <Text tone="muted">
-                Your compliance records could not be read right now.
-              </Text>
-            ) : (
-              <>
-                <Text size="small" tone="muted">
-                  {COMPLIANCE_ALERT_NOTE}
-                </Text>
-                {value.compliance.lapsed === 0 ? null : (
-                  <Status tone="warning">
-                    {lapsedText(value.compliance.lapsed)}
-                  </Status>
+    <AttorneyWorkspace
+      section="dashboard"
+      titleId="attorney-dashboard-title"
+      title="Overview"
+      description={TIMES_NOTE}
+      talk={availability === null ? null : availability.instantOn}
+      waiting={waiting}
+    >
+      <p className="xs subtle aw-lead">{DASHBOARD_INTRO}</p>
+      <div className="w-ov">
+        <Card
+          id="dashboard-requests"
+          title="Needs your attention"
+          count={waiting === null || waiting === 0 ? undefined : waiting}
+          link={{ href: "/attorney/requests", label: "All requests" }}
+          place="w-z7 w-att"
+        >
+          {requests === null ? (
+            <Unavailable />
+          ) : (
+            <div className="w-ql">
+              {queue.length === 0 ? (
+                <Calm
+                  title="You’re all caught up"
+                  note={pendingText(requests.instant, requests.scheduled)}
+                />
+              ) : (
+                queue.map((entry) => (
+                  <QueueRow key={entry.id} entry={entry} now={now} />
+                ))
+              )}
+            </div>
+          )}
+        </Card>
+        <Card
+          id="dashboard-consultations"
+          title="Up next"
+          link={{ href: "/attorney/schedule/week", label: "Calendar" }}
+          place="w-z5 w-today"
+        >
+          {consultations === null ? (
+            <Unavailable />
+          ) : current === null ? (
+            <Calm
+              title="No consultations coming up"
+              note="Accepted requests appear here."
+            />
+          ) : (
+            <>
+              <NextUp entry={current} />
+              {consultations.active.length > 1 ? (
+                <p className="xs muted">{`${consultations.active.length} consultations are in progress or ready to start.`}</p>
+              ) : null}
+            </>
+          )}
+        </Card>
+        <Card
+          id="dashboard-performance"
+          title="Performance"
+          link={{ href: "/attorney/earnings", label: "Earnings" }}
+          place="w-z7 w-perf"
+        >
+          <ActivityPanel
+            month={period === null ? null : monthText(period.from)}
+            activity={activity.status === "ready" ? activity.activity : null}
+          />
+          <p className="lbl aw-perf-ledger">Earnings in the ledger</p>
+          {earnings === null ? (
+            <Unavailable />
+          ) : earnings.totals.length === 0 ? (
+            <Calm title={NO_EARNINGS} />
+          ) : (
+            <div className="w-kpis">
+              {earnings.totals.map((total) => (
+                <div className="w-kpi" key={total.currency}>
+                  <span className="xs muted">{`Net, ${total.currency}`}</span>
+                  <b className="num">
+                    {moneyText(total.netMinor, total.currency)}
+                  </b>
+                  <span className="xs subtle">Recorded in the ledger</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="row w-defrow">
+            <span className="xs subtle grow">{EARNINGS_NOTE}</span>
+          </div>
+        </Card>
+        <Card
+          id="dashboard-coming"
+          title="Coming up"
+          count={consultations === null ? undefined : coming.length}
+          link={{
+            href: "/attorney/consultations",
+            label: "All consultations",
+          }}
+          place="w-z5 w-up"
+        >
+          {consultations === null ? (
+            <Unavailable />
+          ) : (
+            <div className="w-uplw">
+              <div
+                className="w-upl"
+                tabIndex={0}
+                role="region"
+                aria-labelledby="dashboard-coming"
+              >
+                {coming.length === 0 ? (
+                  <p className="sm muted aw-none">Nothing else booked yet.</p>
+                ) : (
+                  coming.map((entry) => (
+                    <ComingRow key={entry.id} entry={entry} />
+                  ))
                 )}
-                {value.compliance.evidenceAged === 0 ? null : (
-                  <Status tone="warning">
-                    {evidenceAgedText(value.compliance.evidenceAged)}
-                  </Status>
-                )}
-                {value.compliance.openFindings === 0 ? null : (
-                  <Status tone="information">
-                    {openFindingsText(value.compliance.openFindings)}
-                  </Status>
-                )}
-                <Text>{nextDateText(value.compliance.nextDate)}</Text>
-              </>
-            )}
-          </Stack>
-        )}
-      </SectionOf>
-    </Frame>
+              </div>
+            </div>
+          )}
+        </Card>
+        <Card id="dashboard-alerts" title="Alerts" place="w-rec">
+          {alerts === null ? (
+            <Unavailable />
+          ) : (
+            <ul className="w-feed">
+              <li>
+                <span
+                  className={
+                    alerts.unacknowledged === 0 ? "w-fd ok" : "w-fd hold"
+                  }
+                  aria-hidden="true"
+                ></span>
+                <span className="col grow l-g0-minw0">
+                  <span className="sm">
+                    {unacknowledgedText(alerts.unacknowledged)}
+                  </span>
+                </span>
+                <a className="link xs" href="/attorney/notifications">
+                  Notifications
+                </a>
+              </li>
+              <li>
+                <span
+                  className={
+                    alerts.openComplaints === 0 ? "w-fd ok" : "w-fd hold"
+                  }
+                  aria-hidden="true"
+                ></span>
+                <span className="col grow l-g0-minw0">
+                  <span className="sm">
+                    {openComplaintsText(alerts.openComplaints)}
+                  </span>
+                </span>
+                <a className="link xs" href="/attorney/complaints">
+                  Reported problems
+                </a>
+              </li>
+              {alerts.compliance === null ? (
+                <li>
+                  <span className="w-fd" aria-hidden="true"></span>
+                  <span className="col grow l-g0-minw0">
+                    <span className="sm muted">
+                      Your compliance records could not be read right now.
+                    </span>
+                  </span>
+                  <a className="link xs" href="/attorney/compliance">
+                    Compliance
+                  </a>
+                </li>
+              ) : (
+                <li>
+                  <span
+                    className={
+                      alerts.compliance.lapsed +
+                        alerts.compliance.evidenceAged >
+                      0
+                        ? "w-fd hold"
+                        : "w-fd info"
+                    }
+                    aria-hidden="true"
+                  ></span>
+                  <span className="col grow l-g0-minw0 aw-feed-col">
+                    <span className="sm">
+                      {nextDateText(alerts.compliance.nextDate)}
+                    </span>
+                    {alerts.compliance.lapsed === 0 ? null : (
+                      <Pill tone="warning">
+                        {lapsedText(alerts.compliance.lapsed)}
+                      </Pill>
+                    )}
+                    {alerts.compliance.evidenceAged === 0 ? null : (
+                      <Pill tone="warning">
+                        {evidenceAgedText(alerts.compliance.evidenceAged)}
+                      </Pill>
+                    )}
+                    {alerts.compliance.openFindings === 0 ? null : (
+                      <Pill tone="information">
+                        {openFindingsText(alerts.compliance.openFindings)}
+                      </Pill>
+                    )}
+                    <span className="xs muted">{COMPLIANCE_ALERT_NOTE}</span>
+                  </span>
+                  <a className="link xs" href="/attorney/compliance">
+                    Compliance
+                  </a>
+                </li>
+              )}
+            </ul>
+          )}
+        </Card>
+        <Card
+          id="dashboard-availability"
+          title="Availability"
+          link={{ href: "/attorney/schedule", label: "Schedule" }}
+          place="w-z5 w-todo"
+        >
+          {availability === null ? (
+            <Unavailable />
+          ) : (
+            <div>
+              <div className="w-todor">
+                <span className="col grow l-g0-minw0">
+                  <span className="sm">
+                    {instantText(
+                      availability.instantOn,
+                      availability.instantConfigured,
+                    )}
+                  </span>
+                  <span className="xs muted">
+                    Talk Now turns off when you sign out.
+                  </span>
+                </span>
+              </div>
+              <div className="w-todor">
+                <span className="col grow l-g0-minw0">
+                  <span className="sm">
+                    {availabilityText(availability.windows, availability.days)}
+                  </span>
+                  {availability.nextWindow === null ? null : (
+                    <span className="xs muted">
+                      {`Next availability: ${formatInZone(availability.nextWindow.startsAt, availability.nextWindow.timezone ?? "UTC")}`}
+                    </span>
+                  )}
+                  {availability.blackouts === 0 ? null : (
+                    <span className="xs muted">{`${availability.blackouts} blackout(s) in the same period.`}</span>
+                  )}
+                </span>
+                <a className="link sm" href="/attorney/schedule/week">
+                  Week view
+                </a>
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
+    </AttorneyWorkspace>
   );
 }

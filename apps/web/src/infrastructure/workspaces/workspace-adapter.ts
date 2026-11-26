@@ -2,7 +2,8 @@
 //
 // Builds the read ports of the client's payment history, account overview
 // and Message threads and of the attorney's Message threads, ended
-// Consultations, documents and compliance records for one request. Every
+// Consultations, documents and compliance records for one request (DEV-001:
+// and of the client's Requests and the attorney's activity counts). Every
 // database call goes through the request-scoped, unprivileged server client
 // (the publishable key and the request's own cookie session), so the
 // database decides the caller, the profile and (for the attorney reads) the
@@ -20,11 +21,14 @@ import { ATTORNEY_PRINCIPAL_SOURCE } from "../identity/attorney-principal-source
 import { SUPABASE_SERVER_SESSION_SOURCE } from "../identity/server-session-source.ts";
 import { CLIENT_INTAKE_SOURCES } from "../client/client-intake-adapter.ts";
 import {
+  isActivityPeriod,
+  REQUEST_SEGMENTS,
   THREAD_ROLES,
   type AttorneyWorkspaceReads,
   type AttorneyWorkspaceSources,
   type ClientWorkspaceReads,
   type ClientWorkspaceSources,
+  type RequestSegment,
   type ThreadRole,
 } from "../../application/participant-workspaces.ts";
 import {
@@ -46,7 +50,8 @@ import {
 
 const CALL_FAILED = "workspaces.call_failed";
 const EXPIRED = Symbol("expired");
-// The client payment list offsets the database pages by (25 rows a page).
+// The client payment and Request list offsets the database pages by (25 rows
+// a page).
 const MAX_OFFSET = 100000;
 
 function ownField(value: unknown, key: string): unknown {
@@ -127,6 +132,8 @@ const isOffset = (value: unknown): value is number =>
   (value as number) % 25 === 0;
 const isRole = (value: unknown): value is ThreadRole =>
   THREAD_ROLES.some((role) => role === value);
+const isSegment = (value: unknown): value is RequestSegment =>
+  REQUEST_SEGMENTS.some((segment) => segment === value);
 
 const refusedRead = () => Promise.resolve(UNREADABLE_ROWS);
 
@@ -162,6 +169,24 @@ function callsOf(client: RequestClient, deadlineMs: number) {
       observedRead("attorney_compliance_records", deadlineMs, () =>
         client.rpc("attorney_compliance_records"),
       ),
+    requests: (segment: RequestSegment, offset: number) =>
+      isSegment(segment) && isOffset(offset)
+        ? observedRead("client_requests", deadlineMs, () =>
+            client.rpc("client_requests", {
+              p_segment: segment,
+              p_offset: offset,
+            }),
+          )
+        : refusedRead(),
+    activity: (from: string, until: string) =>
+      isActivityPeriod({ from, until })
+        ? observedRead("attorney_activity_counts", deadlineMs, () =>
+            client.rpc("attorney_activity_counts", {
+              p_from: from,
+              p_until: until,
+            }),
+          )
+        : refusedRead(),
   });
 }
 
@@ -198,6 +223,7 @@ export function createClientWorkspaceReads(
       payments: calls.payments,
       overview: calls.overview,
       threads: calls.threads,
+      requests: calls.requests,
     }),
     clientSource,
     deadlineMs,
@@ -214,6 +240,7 @@ export function createAttorneyWorkspaceReads(
       history: calls.history,
       documents: calls.documents,
       compliance: calls.compliance,
+      activity: calls.activity,
     }),
     clientSource,
     deadlineMs,

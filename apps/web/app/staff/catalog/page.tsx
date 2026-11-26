@@ -6,26 +6,36 @@
 // row policy and its functions do. Practice areas are listed one page at a
 // time, by code. The one query value read, page, only asks which page to
 // show; the server checks it.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Platform › Marketplace,
+// practice areas): the design's list, each row holding its activity form,
+// then the pager and the creation form.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
 
 import { resolveCatalog } from "../../../src/application/staff-configuration.ts";
 import { STAFF_CONFIGURATION_SOURCES } from "../../../src/infrastructure/staff/staff-configuration-adapter.ts";
+import { Disclosure } from "../../../src/presentation/design-system.tsx";
 import {
-  Disclosure,
-  Status,
-  Table,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
+  ActionCell,
+  Cell,
+  Empty,
+  ListBox,
+  ListRow,
+  Panel,
+  PillCell,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
+import { PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
 import { CreatePracticeAreaForm, PracticeAreaActivityForm } from "./forms.tsx";
 
 export const metadata: Metadata = {
   title: "Practice-area catalog",
   robots: { index: false, follow: false },
 };
+
+const COLUMNS = ["Practice area", "Status", "Change"] as const;
 
 export default async function CatalogPage({
   searchParams,
@@ -41,51 +51,40 @@ export default async function CatalogPage({
     return refusalPage(view, "/staff/catalog", "Practice-area catalog");
   }
   return (
-    <StaffFrame eyebrow="Staff configuration" title="Practice-area catalog">
-      <BackLink href="/staff">Staff tools</BackLink>
-      {view.areas.length === 0 && view.pager.page === 1 ? (
-        <Text>There are no practice areas yet.</Text>
-      ) : null}
-      {view.areas.length === 0 ? null : (
-        <Table id="practice-areas" caption="Practice areas, by code">
-          <thead>
-            <tr>
-              <th scope="col">Code</th>
-              <th scope="col">Name</th>
-              <th scope="col">Status</th>
-              <th scope="col">Change</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.areas.map((area) => (
-              <tr key={area.id}>
-                <td>{area.code}</td>
-                <td>{area.name}</td>
-                <td>
-                  <Status tone={area.active ? "success" : "neutral"}>
-                    {area.active ? "Active" : "Inactive"}
-                  </Status>
-                </td>
-                <td>
-                  <PracticeAreaActivityForm
-                    area={area.id}
-                    active={area.active}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+    <StaffFrame
+      title="Marketplace"
+      subtitle="Practice areas in the catalog, active or inactive."
+    >
+      <ListBox label="Practice areas, by code" columns={COLUMNS} sub>
+        {view.areas.length === 0 && view.pager.page === 1 ? (
+          <Empty title="There are no practice areas yet." />
+        ) : null}
+        {view.areas.map((area) => (
+          <ListRow key={area.id} columns={3} sub>
+            <Cell label="Practice area" strong>
+              {area.name}
+            </Cell>
+            <Cell label="">{area.code}</Cell>
+            <PillCell label="Status" tone={area.active ? "success" : "neutral"}>
+              {area.active ? "Active" : "Inactive"}
+            </PillCell>
+            <ActionCell>
+              <PracticeAreaActivityForm area={area.id} active={area.active} />
+            </ActionCell>
+          </ListRow>
+        ))}
+      </ListBox>
       <PagerLinks
         pager={view.pager}
         base="/staff/catalog"
         noun="practice areas"
         shown={view.areas.length}
       />
-      <Disclosure summary="Add a practice area">
-        <CreatePracticeAreaForm />
-      </Disclosure>
+      <Panel id="catalog-create-title" title="Add a practice area">
+        <Disclosure summary="Add a practice area">
+          <CreatePracticeAreaForm />
+        </Disclosure>
+      </Panel>
     </StaffFrame>
   );
 }

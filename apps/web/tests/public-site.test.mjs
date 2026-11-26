@@ -67,6 +67,9 @@ const relink = (code) =>
     if (s.endsWith("public-site.tsx")) {
       return `${keyword}"${local("public-site.mjs")}"`;
     }
+    if (s.endsWith("site-chrome.tsx")) {
+      return `${keyword}"${local("site-chrome.mjs")}"`;
+    }
     if (s.endsWith("public-content.ts")) {
       return `${keyword}"${content}"`;
     }
@@ -75,6 +78,7 @@ const relink = (code) =>
 
 for (const [name, path] of [
   ["design-system.mjs", "src/presentation/design-system.tsx"],
+  ["site-chrome.mjs", "src/presentation/site-chrome.tsx"],
   ["public-site.mjs", "src/presentation/public-site.tsx"],
 ]) {
   writeFileSync(join(directory, name), relink(transpile(read(path), path)));
@@ -111,35 +115,112 @@ const NAVIGATION_HREFS = [
   "/disclosures",
 ];
 
-test("S5-P1. every public content page renders only the public navigation, its title, the fixed statement that its information is not yet available, and the way home", async () => {
-  for (const [topic, title] of Object.entries(PUBLIC_CONTENT_TOPICS)) {
-    const page = await render(`app/${topic}/page.tsx`);
-    assert.equal(
-      page.text,
-      `${NAVIGATION_TEXT} Rosuno ${title} ${title} information is not yet available. Return to the home page`,
-      topic,
-    );
-    assert.deepEqual(page.hrefs, [...NAVIGATION_HREFS, "/"], topic);
-    assert.deepEqual(page.metadata, { title }, topic);
-    assert.match(page.html, /<nav aria-label="Rosuno">/);
-    // Fail closed: nothing that could be policy, legal or contact text.
-    assert.doesNotMatch(
-      page.text.replace(NAVIGATION_TEXT, ""),
-      /policy|we collect|personal data|cookie|consent|retain|liab|warrant|disclaim|complain|contact us|@|phone|email|licensed|approved|live in|regulated/i,
-      topic,
-    );
+// DEV-001: the public site chrome of the owner's design (header and footer)
+// frames every public page. Its text is fixed first-party navigation and the
+// design's placeholders, pinned here once and held to the fail-closed rule.
+const CHROME_HEADER_TEXT =
+  "rosuno Find an attorney Legal matters How it works Help For attorneys Log in Sign up";
+const CHROME_FOOTER_TEXT =
+  "rosuno Talk to an attorney by video or audio — now, or at a time that suits you. [platform statement — counsel’s text] Clients Find an attorney Help me find an attorney How it works My consultations Finish account confirmation Attorneys Rosuno for attorneys Apply to join Attorney sign in Rosuno About Help &amp; FAQ Contact Legal Privacy Terms Disclosures © Rosuno Legal and regulatory disclosures [jurisdiction disclosures — counsel’s text]";
+const CHROME_HEADER_HREFS = [
+  "/",
+  "/find-an-attorney",
+  "/#legal-issues",
+  "/how-it-works",
+  "/help",
+  "/for-attorneys",
+  "/sign-in",
+  "/sign-up",
+];
+const CHROME_FOOTER_HREFS = [
+  "/",
+  "/find-an-attorney",
+  "/client/requests/new",
+  "/how-it-works",
+  "/client/consultations",
+  "/auth/confirm",
+  "/for-attorneys",
+  "/attorney/apply",
+  "/sign-in",
+  "/about",
+  "/help",
+  "/contact",
+  "/privacy",
+  "/terms",
+  "/disclosures",
+  "/disclosures",
+];
+const FAIL_CLOSED =
+  /policy|we collect|personal data|cookie|consent|retain|liab|warrant|disclaim|complain|contact us|@|phone|email|licensed|approved|live in|regulated/i;
+
+async function renderChrome() {
+  const module = await import(local("site-chrome.mjs"));
+  const text = (html) =>
+    html
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  const header = renderToStaticMarkup(
+    module.SiteHeader({ session: "anonymous" }),
+  );
+  const footer = renderToStaticMarkup(module.SiteFooter());
+  return {
+    headerText: text(header),
+    footerText: text(footer),
+    headerHrefs: [...header.matchAll(/href="([^"]*)"/g)].map((m) => m[1]),
+    footerHrefs: [...footer.matchAll(/href="([^"]*)"/g)].map((m) => m[1]),
+  };
+}
+
+test("S5-P0. the site chrome holds only fixed first-party links, labels and the design's placeholders", async () => {
+  const chrome = await renderChrome();
+  assert.equal(chrome.headerText, CHROME_HEADER_TEXT);
+  assert.equal(chrome.footerText, CHROME_FOOTER_TEXT);
+  assert.deepEqual(chrome.headerHrefs, CHROME_HEADER_HREFS);
+  assert.deepEqual(chrome.footerHrefs, CHROME_FOOTER_HREFS);
+  for (const text of [chrome.headerText, chrome.footerText]) {
+    assert.doesNotMatch(text, FAIL_CLOSED);
   }
 });
 
-test("S5-P2. the existing privacy and help pages say the same fixed statement in the same frame, without navigation (unchanged)", async () => {
+const SIDE_TEXT = `Rosuno ${NAVIGATION_TEXT}`;
+
+function assertContentPage(page, title, label) {
+  assert.equal(
+    page.text,
+    `${CHROME_HEADER_TEXT} ${SIDE_TEXT} Rosuno ${title} ${title} information is not yet available. Return to the home page ${CHROME_FOOTER_TEXT}`,
+    label,
+  );
+  assert.deepEqual(
+    page.hrefs,
+    [...CHROME_HEADER_HREFS, ...NAVIGATION_HREFS, "/", ...CHROME_FOOTER_HREFS],
+    label,
+  );
+  assert.deepEqual(page.metadata, { title }, label);
+  // DEV-001: the owner's UI/UX design names the site-pages list "Site pages";
+  // its phone rule (one column, the list as a row) keys on that name.
+  assert.match(page.html, /<nav [^>]*aria-label="Site pages">/);
+  // The current page is marked in the site-pages list, exactly once.
+  assert.equal(page.html.match(/aria-current="page"/g)?.length, 1, label);
+  // Fail closed: nothing on the page could be policy, legal or contact text.
+  assert.doesNotMatch(
+    page.text.replace(NAVIGATION_TEXT, ""),
+    FAIL_CLOSED,
+    label,
+  );
+}
+
+test("S5-P1. every public content page renders only the site chrome, the site-pages list, its title, the fixed statement that its information is not yet available, and the way home", async () => {
+  for (const [topic, title] of Object.entries(PUBLIC_CONTENT_TOPICS)) {
+    assertContentPage(await render(`app/${topic}/page.tsx`), title, topic);
+  }
+});
+
+test("S5-P2. the privacy and help pages say the same fixed statement in the same frame", async () => {
   for (const [path, title] of [
     ["app/privacy/page.tsx", "Privacy"],
     ["app/help/page.tsx", "Help"],
   ]) {
-    const page = await render(path);
-    assert.equal(
-      page.text,
-      `Rosuno ${title} ${title} information is not yet available. Return to the home page`,
-    );
+    assertContentPage(await render(path), title, path);
   }
 });

@@ -2636,6 +2636,7 @@ test("36. the sign-up page is an accessible design-system form with show and hid
     "../../src/application/client-registration.ts",
     "../../src/application/form-operation.ts",
     "../../src/presentation/design-system.tsx",
+    "../../src/presentation/auth-frame.tsx",
     "../../src/presentation/form-entries.ts",
     "./actions.ts",
   ]);
@@ -2723,7 +2724,12 @@ test("36. the sign-up page is an accessible design-system form with show and hid
   const used = [
     ...new Set([...code.matchAll(/<([A-Z]\w*)/g)].map((match) => match[1])),
   ].sort();
-  assert.deepEqual(used, imported);
+  // DEV-001: the owner's UI/UX design frames the page in the shared auth
+  // frame (public header, account card, plain statements); every other
+  // component still comes from the design system, and the frame wraps
+  // the page exactly once.
+  assert.deepEqual(used, [...imported, "AuthFrame"].sort());
+  assert.equal(code.match(/<AuthFrame>/g)?.length, 1);
   assert.deepEqual(
     [...new Set([...code.matchAll(/<([a-z]\w*)/g)].map((match) => match[1]))],
     ["form"],
@@ -2732,9 +2738,11 @@ test("36. the sign-up page is an accessible design-system form with show and hid
     code,
     /className|\bstyle=|#[0-9a-f]{3,8}\b|rgb\(|hsl\(|\.css|<style\b|https?:/i,
   );
+  // DEV-001: the shared auth frame is the public site frame, so the page
+  // names no density of its own.
   assert.deepEqual(
     [...code.matchAll(/\bdensity="([^"]+)"/g)].map((match) => match[1]),
-    ["public"],
+    [],
   );
   assert.deepEqual(
     [...code.matchAll(/\bhref="([^"]+)"/g)].map((match) => match[1]),
@@ -2939,6 +2947,14 @@ const AI_SUGGESTION_RPCS = Object.freeze({
   ai_record_intake_suggestion:
     'await admin\n          .rpc("ai_record_intake_suggestion", {\n            p_user_id: input.userId,\n            p_intake_id: input.intakeId,\n            p_revision_number: input.revisionNumber,\n            p_suggestion_type: input.type,\n            p_suggestion_value: input.value,\n            p_model_reference: input.modelReference,\n            p_generated_at: input.generatedAt,\n          })\n          .abortSignal(AbortSignal.timeout(AI_RECORD_DEADLINE_MS));',
 });
+// The reviewed Staging access gate design (P2-925, DEV-001): the privileged
+// module's one further call is the PS-A2 API accessor, with no argument, as a
+// literal call on its own privileged client under a deadline. The accessor
+// is not unique to this module (the request-scoped adapters call it through
+// the request's own session, pinned below), so it is pinned by its exact
+// call text here.
+const DEPLOYMENT_IDENTITY_RPC =
+  'await admin\n            .rpc("deployment_environment_identity")\n            .abortSignal(AbortSignal.timeout(IDENTITY_CALL_DEADLINE_MS))';
 // MVP-001 S3: the protected resource adapter calls the database's own five
 // resource functions (voice memo and verification artifact start,
 // completion, abandonment, and access authorization), each exactly once and
@@ -3123,6 +3139,9 @@ const COMPLETION_RPCS = Object.freeze([
   "staff_legal_holds",
   "staff_place_legal_hold",
   "staff_release_legal_hold",
+  // DEV-001 (20261129010000): the attorney name and practice area on the
+  // client's own consultations.
+  "client_consultation_parties",
 ]);
 // MVP-001 S11 pass 2: the staff operations adapter calls the database's own
 // audit reads, the counts-only operations summary, the referral reads, the
@@ -3166,6 +3185,10 @@ const WORKSPACE_RPCS = Object.freeze([
   "attorney_consultation_history",
   "attorney_documents",
   "attorney_compliance_records",
+  // DEV-001 (20261129010000): the client's own requests and the attorney's
+  // own activity counts.
+  "client_requests",
+  "attorney_activity_counts",
 ]);
 // MVP-001 S11 PS-A6: the privacy and security actions adapter calls the six
 // break-glass and seven data request functions, each as a literal call
@@ -3187,6 +3210,29 @@ const PRIVACY_RPCS = Object.freeze([
   "staff_assign_data_request",
   "staff_decide_data_request",
 ]);
+// DEV-001: website & appearance studio: the appearance adapter calls the two
+// public appearance reads and the twelve staff appearance functions, each as
+// a literal call through the request's own unprivileged session; it builds or
+// receives no privileged client, and no other file names any of the fourteen
+// functions.
+const APPEARANCE_ADAPTER =
+  "src/infrastructure/appearance/appearance-adapter.ts";
+const APPEARANCE_RPCS = Object.freeze([
+  "public_site_appearance",
+  "public_site_appearance_asset",
+  "staff_site_appearance_overview",
+  "staff_site_appearance_versions",
+  "staff_site_appearance_version",
+  "staff_site_appearance_preview",
+  "staff_site_appearance_assets",
+  "staff_site_appearance_asset",
+  "staff_save_site_appearance_draft",
+  "staff_publish_site_appearance",
+  "staff_restore_site_appearance",
+  "staff_reset_site_appearance",
+  "staff_discard_site_appearance_draft",
+  "staff_upload_site_appearance_asset",
+]);
 const PAYMENT_ADAPTER = "src/infrastructure/payments/payment-adapter.ts";
 const PAYMENT_RPCS = Object.freeze([
   "client_request_payment",
@@ -3203,6 +3249,8 @@ const PAYMENT_RPCS = Object.freeze([
   "staff_assign_reconciliation_exception",
   "staff_resolve_reconciliation_exception",
   "staff_request_reconciliation",
+  // DEV-001 (20261129010000): one payment's dispute events for finance staff.
+  "staff_payment_dispute_events",
 ]);
 const CAPABILITY_PREDICATE_RPC =
   'const result = await client.rpc("has_staff_capability", {\n                p_capability: capability,\n                p_jurisdiction: jurisdictionId,\n                p_any_jurisdiction: anyJurisdiction,\n              });';
@@ -3222,7 +3270,10 @@ const RPC_OCCURRENCES = Object.freeze({
     // MVP-001 S9: the three media recording calls.
     Object.keys(MEDIA_RECORDING_RPCS).length +
     // MVP-001 S10: the three notification recording calls.
-    Object.keys(NOTIFICATION_RECORDING_RPCS).length,
+    Object.keys(NOTIFICATION_RECORDING_RPCS).length +
+    // The reviewed Staging access gate design (P2-925, DEV-001): the one
+    // deployment identity call.
+    1,
   // MVP-001 S1: the staff adapter's second RPC is exactly the PS-A2
   // environment accessor, pinned by name below.
   [STAFF_ADAPTER]: 2,
@@ -3268,6 +3319,9 @@ const RPC_OCCURRENCES = Object.freeze({
   // MVP-001 S11 PS-A6: the thirteen privacy and security functions, plus the
   // environment accessor.
   [PRIVACY_ADAPTER]: PRIVACY_RPCS.length + 1,
+  // DEV-001: website & appearance studio: the fourteen appearance functions,
+  // plus the environment accessor.
+  [APPEARANCE_ADAPTER]: APPEARANCE_RPCS.length + 1,
 });
 
 // codes: app/ and src/ source paths mapped to their comment-free code.
@@ -3593,6 +3647,33 @@ function assertQuotaRpcContract(codes) {
         /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
       );
     }
+    // DEV-001: website & appearance studio: the appearance functions, as for
+    // the privacy and security functions.
+    for (const name of APPEARANCE_RPCS) {
+      assert.equal(
+        code.match(new RegExp(`client\\.rpc\\(\\s*"${name}"`, "g"))?.length ??
+          0,
+        file === APPEARANCE_ADAPTER ? 1 : 0,
+        `${file}: ${name}`,
+      );
+      if (file !== APPEARANCE_ADAPTER) {
+        assert.equal(
+          code.match(new RegExp(`\\b${name}\\b`, "g"))?.length ?? 0,
+          0,
+          `${file}: ${name}`,
+        );
+      }
+    }
+    if (file === APPEARANCE_ADAPTER) {
+      assert.equal(
+        code.match(/client\.rpc\("[a-z_]+"/g)?.length,
+        APPEARANCE_RPCS.length + 1,
+      );
+      assert.doesNotMatch(
+        code,
+        /\badmin\b|createClient\b|adminKey|ADMIN_KEY|service_role|registration-provisioning|\.from\(/i,
+      );
+    }
     // MVP-001 S7: the payment functions, as for the offer functions.
     for (const name of PAYMENT_RPCS) {
       assert.equal(
@@ -3644,7 +3725,10 @@ function assertQuotaRpcContract(codes) {
         file === COMPLETION_ADAPTER ||
         file === OPERATIONS_ADAPTER ||
         // MVP-001 S11 PS-A6: the privacy adapter's environment accessor.
-        file === PRIVACY_ADAPTER
+        file === PRIVACY_ADAPTER ||
+        // DEV-001: website & appearance studio: the appearance adapter's
+        // environment accessor.
+        file === APPEARANCE_ADAPTER
         ? 1
         : 0,
       file,
@@ -3738,17 +3822,58 @@ function assertQuotaRpcContract(codes) {
   // the MVP-001 S3 protected storage port, the MVP-001 S3 part 2 AI
   // suggestion recording port, and the MVP-001 S7 payment recording port;
   // MVP-001 S9: eleven with the media recording port; MVP-001 S10: twelve
-  // with the notification recording port) and one publishable client (the
-  // confirmation request), each built only from the verified binding.
+  // with the notification recording port; the reviewed Staging access gate
+  // design, P2-925 under DEV-001: thirteen with the deployment identity port)
+  // and one publishable client (the confirmation request), each built only
+  // from the verified binding.
   assert.equal(
     provisioning.match(
       /\bcreate\(binding\.url, binding\.adminKey, clientOptions\(\)\)/g,
     ).length,
-    12,
+    13,
   );
-  assert.equal(provisioning.match(/\bcreate\(/g).length, 13);
+  assert.equal(provisioning.match(/\bcreate\(/g).length, 14);
   assert.equal(provisioning.match(/\bbinding\.publishableKey\b/g).length, 1);
-  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 12);
+  assert.equal(provisioning.match(/\bbinding\.adminKey\b/g).length, 13);
+  // The reviewed Staging access gate design (P2-925, DEV-001): the deployment
+  // identity port is built like the other ports, the verified binding first
+  // and then its one cookie-free privileged client, never returned; it sits
+  // in its own section between the binding check and the payment recording
+  // port, offers exactly its one read, makes exactly the one literal accessor
+  // call with no argument under its two-second deadline, answers rows or
+  // unreadable, and reads or writes no table and calls nothing else.
+  const identityStart = provisioning.indexOf(
+    "export async function createDeploymentIdentityPort(",
+  );
+  const identityEnd = provisioning.indexOf(
+    "export async function createPaymentRecorder(",
+  );
+  assert.ok(
+    provisioning.indexOf("export function hasPrivilegedProjectBinding(") <
+      identityStart && identityStart < identityEnd,
+  );
+  const identity = provisioning.slice(identityStart, identityEnd);
+  assert.match(
+    identity,
+    /\): Promise<\{ readonly read: \(\) => Promise<RowsResult> \} \| null> \{\n {2}const binding = readProjectBinding\(environment\);\n {2}if \(binding === null\) \{\n {4}return null;\n {2}\}\n {2}const admin = create\(binding\.url, binding\.adminKey, clientOptions\(\)\);\n {2}return Object\.freeze\(\{\n {4}read: async \(\) => \{\n {6}try \{\n {8}return rowsResultOf\(\n {10}await admin\n/,
+  );
+  assert.deepEqual(
+    [...identity.matchAll(/^ {4}(\w+): async /gm)].map((match) => match[1]),
+    ["read"],
+  );
+  assert.equal(identity.split(DEPLOYMENT_IDENTITY_RPC).length, 2);
+  assert.equal(identity.match(/\.rpc\(/g).length, 1);
+  assert.equal(identity.match(/deployment_environment_identity/g).length, 1);
+  assert.match(identity, /\} catch \{\n {8}return UNREADABLE_ROWS;\n {6}\}/);
+  assert.match(provisioning, /^const IDENTITY_CALL_DEADLINE_MS = 2000;$/m);
+  assert.equal(
+    provisioning.match(/deployment_environment_identity/g).length,
+    1,
+  );
+  assert.doesNotMatch(
+    identity,
+    /\.from\(|\.storage\b|\.insert\(|\.update\(|\.upsert\(|\.delete\(|auth\.admin|deployment_environment\b|record_deployment_environment|return admin\b|admin[,;)]|process\.env|\.\.\./,
+  );
   // The worker port is built exactly like the other ports: the verified
   // binding first, then its one cookie-free privileged client, never
   // returned; it offers exactly the three worker calls and nothing else.
@@ -4031,6 +4156,9 @@ function assertPrivilegedExports(provisioning) {
       "createRegistrationProvisioning",
       "createConfirmationDispatch",
       "hasPrivilegedProjectBinding",
+      // The reviewed Staging access gate design (P2-925, DEV-001): the one
+      // narrow deployment identity capability.
+      "createDeploymentIdentityPort",
       // MVP-001 S7: the one narrow payment recording capability.
       "createPaymentRecorder",
       // MVP-001 S9: the one narrow media recording capability.
@@ -4051,8 +4179,10 @@ function assertPrivilegedExports(provisioning) {
     ],
   );
   // MVP-001 S9: fourteen with the media recording capability. MVP-001 S10:
-  // fifteen with the notification recording capability.
-  assert.equal(provisioning.match(/\bexport\b/g).length, 15);
+  // fifteen with the notification recording capability. The reviewed Staging
+  // access gate design (P2-925, DEV-001): sixteen with the deployment
+  // identity capability.
+  assert.equal(provisioning.match(/\bexport\b/g).length, 16);
   // The binding check returns only whether a binding exists.
   assert.match(
     provisioning,
@@ -4076,8 +4206,16 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
     assert.ok(sources.includes(file), file);
   }
   const codes = new Map(sources.map((file) => [file, codeOf(read(file))]));
+  // The reviewed Staging access gate design (P2-925, DEV-001): the gate's one
+  // removal is exactly the Authorization request header after its check, never a row or an account.
+  const GATE = "src/infrastructure/environment/staging-access-gate.ts";
+  const HEADER_REMOVAL = '\n  request.headers.delete("authorization");\n';
+  assert.equal(codes.get(GATE).split(HEADER_REMOVAL).length, 2);
   for (const file of sources) {
-    const code = codes.get(file);
+    const code =
+      file === GATE
+        ? codes.get(file).replace(HEADER_REMOVAL, "\n")
+        : codes.get(file);
     // No public signUp, magic-link, or OTP-creation path. The only RPC is the
     // quota decision, and the only code exchange is the P2-008 recovery
     // exception, both checked below.
@@ -4143,6 +4281,10 @@ test("37. the privileged module stays server-only, and no public signUp or enrol
           // event recording.
           "src/infrastructure/notifications/notification-jobs.ts",
           "src/infrastructure/notifications/resend-webhook.ts",
+          // The reviewed Staging access gate design (P2-925, DEV-001): the
+          // server-only gate, which only reads the deployment identity
+          // through the one identity port, bounded in time.
+          "src/infrastructure/environment/staging-access-gate.ts",
         ].includes(file),
         file,
       );
@@ -4550,19 +4692,36 @@ test("38. registration navigation is fixed first-party links on the sign-in and 
     [...signIn.matchAll(/\bhref="([^"]*)"/g)].map((match) => match[1]),
     ["/forgot-password", "/"],
   );
-  // MVP-001 D-1: account creation is refused by design until a client
-  // address can be trusted, so the home page offers no account-creation
-  // call to action at all. It keeps only the fixed confirmation-resume link.
+  // P2-923 (DECISION C) activated hosted self-registration, so the site
+  // chrome's visitor header offers sign-up beside sign-in (DEV-001, the
+  // owner's UI/UX design). The fixed confirmation-resume link and the help
+  // and privacy entry points are fixed first-party links of the site chrome,
+  // which the home page renders.
   const home = codeOf(read("app/page.tsx"));
-  assert.doesNotMatch(home, /\/sign-up|Create an account/);
-  // MVP-001 S3 part 2: beside it, exactly the fixed help and privacy entry
-  // points, and nothing else in that cluster.
+  const chrome = codeOf(read("src/presentation/site-chrome.tsx"));
   assert.match(
     home,
-    /<Cluster>\n\s+<ButtonLink variant="tertiary" href="\/auth\/confirm">\n\s+Finish account confirmation\n\s+<\/ButtonLink>\n\s+<ButtonLink variant="tertiary" href="\/help">\n\s+Help\n\s+<\/ButtonLink>\n\s+<ButtonLink variant="tertiary" href="\/privacy">\n\s+Privacy\n\s+<\/ButtonLink>\n\s+<\/Cluster>/,
+    /<SitePage session=\{view\.session\} signOut=\{signOut\}>/,
   );
-  // Links only: the home page still has just the one sign-out form.
-  assert.equal(home.match(/<form\b/g).length, 1);
+  assert.equal(chrome.match(/href="\/sign-up"/g).length, 1);
+  assert.equal(chrome.match(/href="\/sign-in"/g).length, 1);
+  assert.equal(
+    chrome.match(
+      /\{ href: "\/auth\/confirm", label: "Finish account confirmation" \}/g,
+    ).length,
+    1,
+  );
+  assert.equal(
+    chrome.match(/\{ href: "\/help", label: "Help & FAQ" \}/g).length,
+    1,
+  );
+  assert.equal(
+    chrome.match(/\{ href: "\/privacy", label: "Privacy" \}/g).length,
+    1,
+  );
+  // Links only on the home page; the chrome's one form is the sign-out action.
+  assert.doesNotMatch(home, /<form\b/);
+  assert.equal(chrome.match(/<form\b/g).length, 1);
   // The sign-up route is a page and its action, and nothing else.
   assert.deepEqual(filesIn("app/sign-up/"), [
     "app/sign-up/actions.ts",

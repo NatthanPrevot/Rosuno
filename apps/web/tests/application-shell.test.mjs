@@ -69,7 +69,6 @@ const shellAppFiles = Object.freeze([
   "app/layout.tsx",
   "app/loading.tsx",
   "app/not-found.tsx",
-  "app/page.tsx",
 ]);
 
 const shellApplicationFiles = Object.freeze([
@@ -337,9 +336,15 @@ test("1. App Router shell route and boundary files exist", () => {
 test("2. root layout is shared by every route and renders its children", () => {
   const source = read("app/layout.tsx");
   assert.doesNotMatch(source, /^["']use client["']/m);
+  // DEV-001: website & appearance studio: the body also holds one constant
+  // same-origin stylesheet link, the published appearance (React places it
+  // in the head). It is a fixed literal: no expression, no data read, no
+  // other attribute. G3: and the preview loader, a client component with no
+  // attribute that renders nothing (it acts only in the studio's preview
+  // mode, for an editor the server confirms).
   assert.match(
     source,
-    /<html lang="en">\s*<body>\s*<main>\{children\}<\/main>\s*<\/body>\s*<\/html>/,
+    /<html lang="en">\s*<body>\s*<link\s+rel="stylesheet"\s+href="\/appearance\/theme\.css"\s+precedence="rosuno-appearance"\s*\/>\s*<AppearancePreviewLoader \/>\s*<main>\{children\}<\/main>\s*<\/body>\s*<\/html>/,
   );
   assert.match(
     source,
@@ -355,8 +360,8 @@ test("2. root layout is shared by every route and renders its children", () => {
     functions: 1,
     returns: 1,
     arrows: 0,
-    tags: ["html", "body", "main"],
-    attributes: ["lang"],
+    tags: ["html", "body", "link", "AppearancePreviewLoader", "main"],
+    attributes: ["lang", "rel", "href", "precedence"],
     expressions: ["children"],
     text: ["{}"],
   });
@@ -987,379 +992,49 @@ test("11. browser-supplied assertions are never authoritative session state", as
 });
 
 test("12. presentation reaches application state only through application modules", () => {
+  // DEV-001: the product home page of the owner's UI/UX design replaced the
+  // P2 interface-foundation page, so it is no longer a shell file. It keeps
+  // the P2-005 session contract: connection() first, the session read once
+  // through the trusted server source, and sign-out as the one server action,
+  // offered by the site chrome. Its other reads go through application
+  // modules and their adapters.
   const page = read("app/page.tsx");
-  const pageImports = importsOf(page);
-  for (const specifier of [
+  assert.deepEqual(importsOf(page), [
+    "next",
     "next/server",
+    // DEV-001: website & appearance studio: React's node type, the published
+    // appearance use case and its adapter, the schema's section resolver,
+    // the presentation registry (its validator and the Home section group)
+    // and the text slot component.
+    "react",
+    "../src/application/appearance.ts",
+    "../src/application/appearance-schema.ts",
+    "../src/application/discovery.ts",
     "../src/application/shell.ts",
-    "../src/presentation/design-system.tsx",
-  ]) {
-    assert.ok(pageImports.includes(specifier), specifier);
-  }
-  // The page renders a server-derived view. P2-005 passes the existing
-  // trusted server-owned session source, and nothing else, to the service.
-  assert.match(page, /\nexport default async function HomePage\(\)/);
-  assert.match(page, /await connection\(\);/);
-  assert.match(page, /const view = await getShellView\(/);
+    "../src/infrastructure/appearance/appearance-adapter.ts",
+    "../src/infrastructure/discovery/discovery-adapter.ts",
+    "../src/infrastructure/identity/server-session-source.ts",
+    "../src/presentation/appearance/registry.ts",
+    "../src/presentation/appearance/slot.tsx",
+    "../src/presentation/attorney-card.tsx",
+    "../src/presentation/site-chrome.tsx",
+    "./home-finder.tsx",
+    "./sign-in/actions.ts",
+  ]);
+  assert.match(page, /\nexport default async function HomePage\(\{/);
+  assert.equal(page.split("await connection();").length, 2);
   assert.equal(page.split(`const view = await ${trustedShellView};`).length, 2);
+  assert.ok(
+    page.indexOf("await connection();") < page.indexOf(trustedShellView),
+  );
   assert.equal(page.split(`\n${trustedSessionImport}\n`).length, 2);
   assert.equal(page.split(`\n${sessionEntryImport}\n`).length, 2);
-  // MVP-001 S5: the public navigation is imported once, by name, from its
-  // presentation module, and rendered once, without attributes, as the
-  // page's first element (pinned by the shape below).
-  assert.equal(page.split(`\n${publicNavigationImport}\n`).length, 2);
-  assert.equal(page.match(/<PublicNavigation \/>/g)?.length, 1);
-  assert.equal(codeOf(page).match(/\bview\b/g)?.length, 3);
-  // The registration navigation appears once, right after the session entry,
-  // and is fixed links only: no condition, expression, or form of its own.
-  assert.equal(
-    codeOf(page).replace(/\s+/g, " ").split(registrationEntry).length,
-    2,
+  assert.match(
+    page,
+    /<SitePage session=\{view\.session\} signOut=\{signOut\}>/,
   );
-  assert.ok(
-    codeOf(page)
-      .replace(/\s+/g, " ")
-      .includes(
-        ` </form> </Cluster> )} ${registrationEntry} </Stack> </Surface> <Columns columns="split">`,
-      ),
-  );
-  // Its expressions are the server-derived session state and the one session
-  // entry chosen by that state: every other tag, attribute, and text is fixed
-  // design-system presentation.
-  const shape = componentShape(page);
-  shape.expressions = shape.expressions.map((expression) =>
-    expression.replace(/\s+/g, " "),
-  );
-  assert.deepEqual(shape, {
-    functions: 1,
-    returns: 1,
-    arrows: 0,
-    tags: [
-      "Page",
-      // MVP-001 S5: the fixed public navigation, first on the page.
-      "PublicNavigation",
-      "Surface",
-      "Stack",
-      "Eyebrow",
-      "Display",
-      "Text",
-      "Rule",
-      "Status",
-      "Cluster",
-      "ButtonLink",
-      "ButtonLink",
-      "ButtonLink",
-      "Columns",
-      "Stack",
-      "Heading",
-      "Text",
-      "Cluster",
-      "Button",
-      "Button",
-      "Button",
-      "Button",
-      "Text",
-      "Cluster",
-      "Status",
-      "Status",
-      "Status",
-      "Status",
-      "Alert",
-      "Surface",
-      "Stack",
-      "Eyebrow",
-      "Heading",
-      "Text",
-      "Surface",
-      "Stack",
-      "Heading",
-      "FieldGroup",
-      "Columns",
-      "TextField",
-      "SelectField",
-      "option",
-      "option",
-      "TextAreaField",
-      "Choice",
-      "Disclosure",
-      "Text",
-      "Stack",
-      "Heading",
-      "Table",
-      "thead",
-      "tr",
-      "th",
-      "th",
-      "th",
-      "tbody",
-      "tr",
-      "th",
-      "td",
-      "td",
-      "tr",
-      "th",
-      "td",
-      "td",
-      "tr",
-      "th",
-      "td",
-      "td",
-      "tr",
-      "th",
-      "td",
-      "td",
-      "Columns",
-      "Stack",
-      "Heading",
-      "Dialog",
-      "DialogBody",
-      "Text",
-      "DialogActions",
-      "Button",
-      "DialogDismissal",
-      "Button",
-      "Stack",
-      "Heading",
-      "MediaFrame",
-    ],
-    attributes: [
-      "density",
-      "as",
-      "tone",
-      "emphasis",
-      "as",
-      "size",
-      "tone",
-      "tone",
-      "tone",
-      "variant",
-      "href",
-      "variant",
-      "href",
-      "variant",
-      "href",
-      "columns",
-      "size",
-      "tone",
-      "variant",
-      "variant",
-      "variant",
-      "variant",
-      "disabled",
-      "tone",
-      "tone",
-      "tone",
-      "tone",
-      "tone",
-      "tone",
-      "title",
-      "as",
-      "tone",
-      "emphasis",
-      "gap",
-      "as",
-      "size",
-      "size",
-      "tone",
-      "emphasis",
-      "size",
-      "id",
-      "legend",
-      "hint",
-      "columns",
-      "id",
-      "label",
-      "hint",
-      "id",
-      "label",
-      "hint",
-      "id",
-      "label",
-      "errors",
-      "type",
-      "label",
-      "hint",
-      "summary",
-      "tone",
-      "size",
-      "id",
-      "caption",
-      "scope",
-      "scope",
-      "scope",
-      "scope",
-      "scope",
-      "scope",
-      "scope",
-      "columns",
-      "size",
-      "id",
-      "title",
-      "titleAs",
-      "presentation",
-      "open",
-      "tone",
-      "variant",
-      "variant",
-      "size",
-      "ratio",
-      "overlay",
-      "caption",
-    ],
-    expressions: ["view.session", sessionEntry],
-    text: [
-      "Interface foundation",
-      "Rosuno",
-      "One visual language for every Rosuno screen: warm surfaces, restrained gold, and clear hierarchy.",
-      "Session: {}",
-      "{}",
-      "Finish account confirmation",
-      "Help",
-      "Privacy",
-      "Actions and status",
-      "Three levels of emphasis, each with hover, focus, pressed, and disabled states.",
-      "Primary action",
-      "Secondary action",
-      "Tertiary action",
-      "Unavailable action",
-      "Status meaning is always written out; tone adds a glyph and a color beside the text.",
-      "Success",
-      "Warning",
-      "Error",
-      "Information",
-      "An alert presents a message supplied by the caller with a semantic state.",
-      "Supporting surface",
-      "Dark surfaces are used with intent",
-      "Working screens stay light. Deep cocoa and chocolate mark selected moments, and narrow screens use less of them.",
-      "Form controls",
-      "First option",
-      "Second option",
-      "Secondary detail stays one step away until it is needed.",
-      "Tables",
-      "Tone",
-      "Palette",
-      "Placement",
-      "Light",
-      "Warm White",
-      "Content panels",
-      "Cream",
-      "Cream",
-      "Canvas and summary blocks",
-      "Dark",
-      "Deep Cocoa",
-      "Premium modules",
-      "Chocolate",
-      "Chocolate",
-      "Supporting modules on wider screens",
-      "Dialog",
-      "A strong title, concise supporting content, one primary action, and a quiet dismissal path.",
-      "Primary action",
-      "Dismiss",
-      "Media frame",
-    ],
-  });
-  // componentShape reads attribute names. Their values are fixed as well, in
-  // source order, so no copy or variant on the page goes unpinned.
-  assert.deepEqual(
-    [
-      ...codeOf(page)
-        .slice(codeOf(page).lastIndexOf("return"))
-        .matchAll(/\s([A-Za-z]+)="([^"]*)"/g),
-    ].map((match) => `${match[1]}=${match[2]}`),
-    [
-      "density=public",
-      "as=header",
-      "tone=dark",
-      "emphasis=raised",
-      "as=h1",
-      "size=lede",
-      "tone=muted",
-      "tone=gold",
-      "tone=neutral",
-      "variant=primary",
-      "href=/sign-in",
-      "variant=primary",
-      "href=/client",
-      "variant=secondary",
-      "href=/attorney",
-      "variant=secondary",
-      "href=/staff/verification",
-      "variant=secondary",
-      "type=submit",
-      "variant=tertiary",
-      "href=/auth/confirm",
-      // MVP-001 S3 part 2: the help and privacy entry points.
-      "variant=tertiary",
-      "href=/help",
-      "variant=tertiary",
-      "href=/privacy",
-      "columns=split",
-      "size=lg",
-      "tone=muted",
-      "variant=primary",
-      "variant=secondary",
-      "variant=tertiary",
-      "variant=secondary",
-      "tone=muted",
-      "tone=success",
-      "tone=warning",
-      "tone=error",
-      "tone=information",
-      "tone=information",
-      "title=Information",
-      "as=aside",
-      "tone=chocolate",
-      "emphasis=raised",
-      "gap=tight",
-      "as=h3",
-      "size=sm",
-      "size=small",
-      "tone=muted",
-      "emphasis=raised",
-      "size=lg",
-      "id=foundation-group",
-      "legend=Grouped fields",
-      "hint=Labels, hints, and messages are supplied by the caller.",
-      "columns=2",
-      "id=foundation-text",
-      "label=Text field",
-      "hint=Hint text guides the entry.",
-      "id=foundation-select",
-      "label=Select",
-      "hint=Options are supplied by the caller.",
-      "id=foundation-area",
-      "label=Text area",
-      "errors=Validation message supplied by the caller.",
-      "type=checkbox",
-      "label=Choice",
-      "hint=A selectable option with a supporting hint.",
-      "summary=More detail",
-      "tone=muted",
-      "size=lg",
-      "id=foundation-table",
-      "caption=Surface tones",
-      "scope=col",
-      "scope=col",
-      "scope=col",
-      "scope=row",
-      "scope=row",
-      "scope=row",
-      "scope=row",
-      "columns=split",
-      "size=lg",
-      "id=foundation-dialog",
-      "title=Dialog frame",
-      "titleAs=h3",
-      "presentation=inline",
-      "tone=muted",
-      "variant=primary",
-      "variant=tertiary",
-      "size=lg",
-      "ratio=standard",
-      "overlay=scrim",
-      "caption=Crop, overlay, and framing for media supplied by the caller.",
-    ],
-  );
+  assert.doesNotMatch(page, /["']use (?:client|server)["']/);
+  assert.doesNotMatch(codeOf(page), /<form\b/);
   for (const file of shellAppFiles) {
     // Each app module exports only its component (the root layout also its
     // metadata), so no route segment config (dynamic, revalidate, ...) can
@@ -1380,8 +1055,13 @@ test("12. presentation reaches application state only through application module
       // trusted server session source and the sign-out server action (P2-005)
       // and (MVP-001 S5) the fixed public navigation, which holds only fixed
       // first-party links.
+      // DEV-001: website & appearance studio: the root layout also renders
+      // the preview loader, the one presentation module it imports.
       if (
-        (file === "app/layout.tsx" && specifier === "./globals.css") ||
+        (file === "app/layout.tsx" &&
+          (specifier === "./globals.css" ||
+            specifier ===
+              "../src/presentation/appearance/preview-loader.tsx")) ||
         (file === "app/page.tsx" &&
           [
             "../src/presentation/design-system.tsx",
@@ -1498,7 +1178,11 @@ test("14. generated Next.js state stays in ignored app-local locations", async (
   assert.equal(nextConfig.agentRules, false);
   assert.equal(nextConfig.distDir, "dist");
   assert.equal(typeof nextConfig.headers, "function");
-  assert.equal((await nextConfig.headers()).length, 2);
+  // DEV-001: website & appearance studio: one more fixed rule, the
+  // appearance image headers, and (G3, D3 pending owner decision) two more,
+  // the studio page frame source and the preview framing rule (all pinned in
+  // full by tests/security-headers.test.mjs).
+  assert.equal((await nextConfig.headers()).length, 5);
   // Next.js copies every own key of the config, enumerable or not, and runs it
   // in its own process, so the file itself is exactly these three directives
   // and their fixed header values: nothing hidden or conditional on how it is
@@ -1510,10 +1194,16 @@ test("14. generated Next.js state stays in ignored app-local locations", async (
   // exactly one more: the CSP frame-src origin, taken only from the
   // server-side ROSUNO_DAILY_DOMAIN setting when it is a strict DNS label, and
   // none otherwise (every case pinned in tests/security-headers.test.mjs). No
-  // other environment value is read.
+  // other environment value is read. DEV-001: website & appearance studio:
+  // the fixed appearance image headers and their one rule, exactly the paths
+  // the image route answers, which the page rule then leaves out, and (G3,
+  // D3 pending owner decision) the two preview framing rules, built on the
+  // page policy: frame-src self for the studio page, and
+  // frame-ancestors self and SAMEORIGIN for page addresses with exactly
+  // rz-preview=1 (every case pinned in tests/security-headers.test.mjs).
   assert.equal(
     codeOf(read("next.config.ts")),
-    'import type { NextConfig } from "next";\nconst SUPABASE_ORIGIN =\n  /^(?:https:\\/\\/[a-z]{20}\\.supabase\\.co|http:\\/\\/(?:127\\.0\\.0\\.1|localhost):54321)$/;\n\nfunction mediaSource(url: string | undefined): string {\n  const origin = typeof url === "string" ? url.replace(/\\/$/, "") : "";\n  return SUPABASE_ORIGIN.test(origin) ? origin : "\'none\'";\n}\nconst DAILY_DOMAIN_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;\n\nfunction frameSource(label: string | undefined): string {\n  return typeof label === "string" && DAILY_DOMAIN_LABEL.test(label)\n    ? `https://${label}.daily.co`\n    : "\'none\'";\n}\n\nconst CONTENT_SECURITY_POLICY = [\n  "default-src \'self\'",\n  "script-src \'self\' \'unsafe-inline\'",\n  "style-src \'self\'",\n  "img-src \'self\'",\n  "font-src \'self\'",\n  "connect-src \'self\'",\n  `media-src ${mediaSource(process.env.NEXT_PUBLIC_SUPABASE_URL)}`,\n  `frame-src ${frameSource(process.env.ROSUNO_DAILY_DOMAIN)}`,\n  "object-src \'none\'",\n  "base-uri \'none\'",\n  "form-action \'self\'",\n  "frame-ancestors \'none\'",\n].join("; ");\n\nconst TRANSPORT_SECURITY = {\n  key: "Strict-Transport-Security",\n  value: "max-age=31536000; includeSubDomains",\n};\n\nconst SECURITY_HEADERS = [\n  { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },\n  { key: "X-Frame-Options", value: "DENY" },\n  { key: "Referrer-Policy", value: "same-origin" },\n  { key: "X-Content-Type-Options", value: "nosniff" },\n  TRANSPORT_SECURITY,\n];\n\nconst nextConfig: NextConfig = {\n  agentRules: false,\n  distDir: "dist",\n  async headers() {\n    return [\n      { source: "/((?!auth/confirm$).*)", headers: SECURITY_HEADERS },\n      { source: "/auth/confirm", headers: [TRANSPORT_SECURITY] },\n    ];\n  },\n};\n\nexport default nextConfig;\n',
+    'import type { NextConfig } from "next";\nconst SUPABASE_ORIGIN =\n  /^(?:https:\\/\\/[a-z]{20}\\.supabase\\.co|http:\\/\\/(?:127\\.0\\.0\\.1|localhost):54321)$/;\n\nfunction mediaSource(url: string | undefined): string {\n  const origin = typeof url === "string" ? url.replace(/\\/$/, "") : "";\n  return SUPABASE_ORIGIN.test(origin) ? origin : "\'none\'";\n}\nconst DAILY_DOMAIN_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;\n\nfunction frameSource(label: string | undefined): string {\n  return typeof label === "string" && DAILY_DOMAIN_LABEL.test(label)\n    ? `https://${label}.daily.co`\n    : "\'none\'";\n}\n\nconst CONTENT_SECURITY_POLICY = [\n  "default-src \'self\'",\n  "script-src \'self\' \'unsafe-inline\'",\n  "style-src \'self\'",\n  "img-src \'self\'",\n  "font-src \'self\'",\n  "connect-src \'self\'",\n  `media-src ${mediaSource(process.env.NEXT_PUBLIC_SUPABASE_URL)}`,\n  `frame-src ${frameSource(process.env.ROSUNO_DAILY_DOMAIN)}`,\n  "object-src \'none\'",\n  "base-uri \'none\'",\n  "form-action \'self\'",\n  "frame-ancestors \'none\'",\n].join("; ");\n\nconst TRANSPORT_SECURITY = {\n  key: "Strict-Transport-Security",\n  value: "max-age=31536000; includeSubDomains",\n};\n\nconst SECURITY_HEADERS = [\n  { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },\n  { key: "X-Frame-Options", value: "DENY" },\n  { key: "Referrer-Policy", value: "same-origin" },\n  { key: "X-Content-Type-Options", value: "nosniff" },\n  TRANSPORT_SECURITY,\n];\nconst ASSET_HEADERS = [\n  {\n    key: "Content-Security-Policy",\n    value: "default-src \'none\'; frame-ancestors \'none\'; sandbox",\n  },\n  { key: "X-Frame-Options", value: "DENY" },\n  { key: "Referrer-Policy", value: "same-origin" },\n  { key: "X-Content-Type-Options", value: "nosniff" },\n  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },\n  TRANSPORT_SECURITY,\n];\nconst PREVIEW_FRAMING_RULES = [\n  {\n    source: "/staff/appearance",\n    headers: [\n      {\n        key: "Content-Security-Policy",\n        value: CONTENT_SECURITY_POLICY.replace(\n          /frame-src [^;]+/,\n          "frame-src \'self\'",\n        ),\n      },\n    ],\n  },\n  {\n    source: "/((?!auth/confirm$|appearance/).*)",\n    has: [{ type: "query" as const, key: "rz-preview", value: "1" }],\n    headers: [\n      {\n        key: "Content-Security-Policy",\n        value: CONTENT_SECURITY_POLICY.replace(\n          "frame-ancestors \'none\'",\n          "frame-ancestors \'self\'",\n        ),\n      },\n      { key: "X-Frame-Options", value: "SAMEORIGIN" },\n    ],\n  },\n];\n\nconst nextConfig: NextConfig = {\n  agentRules: false,\n  distDir: "dist",\n  async headers() {\n    return [\n      {\n        source: "/((?!auth/confirm$|appearance/assets/[^/]+$).*)",\n        headers: SECURITY_HEADERS,\n      },\n      { source: "/auth/confirm", headers: [TRANSPORT_SECURITY] },\n      { source: "/appearance/assets/:asset", headers: ASSET_HEADERS },\n      ...PREVIEW_FRAMING_RULES,\n    ];\n  },\n};\n\nexport default nextConfig;\n',
   );
   assert.deepEqual(read("next.config.ts").match(/process\.env\.\w+/g), [
     "process.env.NEXT_PUBLIC_SUPABASE_URL",

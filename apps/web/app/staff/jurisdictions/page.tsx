@@ -7,28 +7,36 @@
 // which page to show; the server checks it. Creating a jurisdiction is
 // offered only with the global jurisdiction-configuration grant, and a new
 // jurisdiction is never live.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Platform › Marketplace):
+// the design's list of jurisdictions, each row opening its record, then the
+// pager and the creation form.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
 
 import { resolveJurisdictionList } from "../../../src/application/staff-configuration.ts";
 import { STAFF_CONFIGURATION_SOURCES } from "../../../src/infrastructure/staff/staff-configuration-adapter.ts";
-import {
-  ButtonLink,
-  Disclosure,
-  Status,
-  Table,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
+import { Disclosure } from "../../../src/presentation/design-system.tsx";
 import { LIFECYCLE_LABELS } from "../../../src/presentation/staff-configuration-labels.ts";
+import {
+  Cell,
+  Empty,
+  ListBox,
+  ListRow,
+  Panel,
+  PillCell,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
+import { PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
 import { CreateJurisdictionForm } from "./forms.tsx";
 
 export const metadata: Metadata = {
   title: "Jurisdictions",
   robots: { index: false, follow: false },
 };
+
+const COLUMNS = ["Jurisdiction", "Region type", "Lifecycle"] as const;
 
 export default async function JurisdictionsPage({
   searchParams,
@@ -44,62 +52,50 @@ export default async function JurisdictionsPage({
     return refusalPage(view, "/staff/jurisdictions", "Jurisdictions");
   }
   return (
-    <StaffFrame eyebrow="Staff configuration" title="Jurisdictions">
-      <BackLink href="/staff">Staff tools</BackLink>
-      {view.jurisdictions.length === 0 && view.pager.page === 1 ? (
-        <Text>There are no jurisdictions you can read yet.</Text>
-      ) : null}
-      {view.jurisdictions.length === 0 ? null : (
-        <Table id="jurisdictions" caption="Jurisdictions, by code">
-          <thead>
-            <tr>
-              <th scope="col">Code</th>
-              <th scope="col">Name</th>
-              <th scope="col">Region type</th>
-              <th scope="col">Lifecycle</th>
-              <th scope="col">Open</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.jurisdictions.map((j) => (
-              <tr key={j.id}>
-                <td>{j.code}</td>
-                <td>{j.name}</td>
-                <td>{j.regionType}</td>
-                <td>
-                  <Status tone={LIFECYCLE_LABELS[j.state].tone}>
-                    {LIFECYCLE_LABELS[j.state].label}
-                  </Status>
-                </td>
-                <td>
-                  <ButtonLink
-                    variant="tertiary"
-                    href={`/staff/jurisdictions/${j.id}`}
-                  >
-                    Open
-                  </ButtonLink>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+    <StaffFrame
+      title="Marketplace"
+      subtitle="Jurisdictions: their lifecycle and service areas."
+    >
+      <ListBox label="Jurisdictions, by code" columns={COLUMNS} sub>
+        {view.jurisdictions.length === 0 && view.pager.page === 1 ? (
+          <Empty title="There are no jurisdictions you can read yet." />
+        ) : null}
+        {view.jurisdictions.map((j) => (
+          <ListRow
+            key={j.id}
+            href={`/staff/jurisdictions/${j.id}`}
+            columns={3}
+            sub
+          >
+            <Cell label="Jurisdiction" strong>
+              {j.name}
+            </Cell>
+            <Cell label="">{j.code}</Cell>
+            <Cell label="Region type">{j.regionType}</Cell>
+            <PillCell label="Lifecycle" tone={LIFECYCLE_LABELS[j.state].tone}>
+              {LIFECYCLE_LABELS[j.state].label}
+            </PillCell>
+          </ListRow>
+        ))}
+      </ListBox>
       <PagerLinks
         pager={view.pager}
         base="/staff/jurisdictions"
         noun="jurisdictions"
         shown={view.jurisdictions.length}
       />
-      {view.canCreate ? (
-        <Disclosure summary="Create a jurisdiction">
-          <CreateJurisdictionForm />
-        </Disclosure>
-      ) : (
-        <Text tone="muted">
-          Creating a jurisdiction needs the jurisdiction-configuration
-          capability for all jurisdictions.
-        </Text>
-      )}
+      <Panel id="jurisdiction-create-title" title="Create a jurisdiction">
+        {view.canCreate ? (
+          <Disclosure summary="Create a jurisdiction">
+            <CreateJurisdictionForm />
+          </Disclosure>
+        ) : (
+          <p className="st-emd">
+            Creating a jurisdiction needs the jurisdiction-configuration
+            capability for all jurisdictions.
+          </p>
+        )}
+      </Panel>
     </StaffFrame>
   );
 }

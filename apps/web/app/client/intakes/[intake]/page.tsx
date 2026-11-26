@@ -51,6 +51,10 @@ import {
   type IntakeReferralsView,
 } from "../../../../src/application/discovery.ts";
 import {
+  getShellView,
+  type ShellView,
+} from "../../../../src/application/shell.ts";
+import {
   resolveVoiceMemo,
   type VoiceMemoView,
 } from "../../../../src/application/voice-memo.ts";
@@ -58,17 +62,19 @@ import { CLIENT_INTAKE_SOURCES } from "../../../../src/infrastructure/client/cli
 import { DISCOVERY_SOURCES } from "../../../../src/infrastructure/discovery/discovery-adapter.ts";
 import { logRequestEvent } from "../../../../src/infrastructure/observability/request-log.ts";
 import { REQUEST_SOURCES } from "../../../../src/infrastructure/requests/consultation-request-adapter.ts";
+import { SUPABASE_SERVER_SESSION_SOURCE } from "../../../../src/infrastructure/identity/server-session-source.ts";
 import { VOICE_MEMO_SOURCES } from "../../../../src/infrastructure/resources/protected-resource-adapter.ts";
+import {
+  ClientAccount,
+  ClientGate,
+  ClientPill,
+} from "../../../../src/presentation/client-account.tsx";
 import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
   Heading,
-  Page,
   Stack,
-  Status,
-  Surface,
   Table,
   Text,
 } from "../../../../src/presentation/design-system.tsx";
@@ -93,7 +99,9 @@ import {
   utcText,
 } from "../../../../src/presentation/discovery-labels.ts";
 import { REQUEST_STATE_LABELS } from "../../../../src/presentation/request-labels.ts";
+import { SitePage } from "../../../../src/presentation/site-chrome.tsx";
 import { VOICE_MEMO_NOT_CONFIGURED } from "../../../../src/presentation/voice-memo-labels.ts";
+import { signOut } from "../../../sign-in/actions.ts";
 import {
   CloseIntakeForm,
   IntakeChangeForm,
@@ -110,27 +118,37 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// DEV-001: the owner's UI/UX design, the client account's legal matter: the
+// account navigation, the way back to the list, and the matter's card.
 function IntakeFrame({
+  session,
   title,
   children,
 }: {
+  readonly session: ShellView["session"];
   readonly title: string;
   readonly children: ReactNode;
 }) {
   return (
-    <Page density="client">
-      <Surface emphasis="raised" labelledBy="client-intake-title">
-        <Stack>
-          <Eyebrow>Client workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="client-intake-title">
-            {title}
-          </Heading>
+    <SitePage session={session} signOut={signOut}>
+      <ClientAccount area="matters" heading={title}>
+        {ALL_MATTERS}
+        <section
+          className="cx-card cx-pad rz-cx-panel l-mt12"
+          aria-label="Legal matter"
+        >
           {children}
-        </Stack>
-      </Surface>
-    </Page>
+        </section>
+      </ClientAccount>
+    </SitePage>
   );
 }
+
+const ALL_MATTERS = (
+  <a className="link sm" href="/client/intakes">
+    ← All legal matters
+  </a>
+);
 
 function dateTime(timestamp: string): string {
   return `${new Date(timestamp).toISOString().slice(0, 16).replace("T", " ")} UTC`;
@@ -321,7 +339,7 @@ function SuggestionList({
         return (
           <Stack key={suggestion.id}>
             <Cluster>
-              <Status tone={status.tone}>{status.label}</Status>
+              <ClientPill tone={status.tone}>{status.label}</ClientPill>
               {suggestion.current ? null : (
                 <Text tone="muted">Made from an earlier saved version.</Text>
               )}
@@ -340,14 +358,6 @@ function SuggestionList({
   );
 }
 
-const BACK = (
-  <Cluster>
-    <ButtonLink variant="tertiary" href="/client">
-      Back to your Intakes
-    </ButtonLink>
-  </Cluster>
-);
-
 export default async function ClientIntakePage({
   params,
   searchParams,
@@ -357,6 +367,7 @@ export default async function ClientIntakePage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  const shell = await getShellView(SUPABASE_SERVER_SESSION_SOURCE);
   const { intake } = await params;
   const { questions } = await searchParams;
   const view = await resolveIntake(
@@ -391,9 +402,9 @@ export default async function ClientIntakePage({
       });
     }
     return (
-      <IntakeFrame title="Your Intake">
+      <IntakeFrame session={shell.session} title="Your legal matter">
         <Cluster>
-          <Status tone={state.tone}>{state.label}</Status>
+          <ClientPill tone={state.tone}>{state.label}</ClientPill>
           <Text tone="muted">
             {view.lastSavedAt === null
               ? "Nothing saved yet."
@@ -538,37 +549,41 @@ export default async function ClientIntakePage({
         <ReferralSection view={referrals} requests={requests} />
         <VoiceMemoSection view={memo} />
         {view.closable ? <CloseIntakeForm intakeId={view.intakeId} /> : null}
-        {BACK}
       </IntakeFrame>
     );
   }
   if (view.status === "not-found") {
     return (
-      <IntakeFrame title="Intake not found">
+      <IntakeFrame session={shell.session} title="Legal matter not found">
         <Text>We could not find that Intake in your workspace.</Text>
-        {BACK}
       </IntakeFrame>
     );
   }
   if (view.status === "sign-in-required") {
     return (
-      <IntakeFrame title="Sign in to continue">
-        <Text>Sign in to see your Intake.</Text>
-        <Cluster>
-          <ButtonLink variant="primary" href="/sign-in">
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Sign in to continue">
+          <p className="sm muted">Sign in to see your Intake.</p>
+          <a className="btn btn-ink" href="/sign-in">
             Sign in
-          </ButtonLink>
-        </Cluster>
-      </IntakeFrame>
+          </a>
+        </ClientGate>
+      </SitePage>
     );
   }
   if (view.status === "denied") {
     return (
-      <IntakeFrame title="Client workspace unavailable">
-        <Alert tone="error" title="Not available for this account" role="alert">
-          The client workspace is available to signed-in client accounts.
-        </Alert>
-      </IntakeFrame>
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Client workspace unavailable">
+          <Alert
+            tone="error"
+            title="Not available for this account"
+            role="alert"
+          >
+            The client workspace is available to signed-in client accounts.
+          </Alert>
+        </ClientGate>
+      </SitePage>
     );
   }
   await logRequestEvent("warn", "client_intake.view_unavailable", {
@@ -576,11 +591,13 @@ export default async function ClientIntakePage({
     outcome: view.status,
   });
   return (
-    <IntakeFrame title="Intake unavailable">
-      <Alert tone="error" title="Something went wrong" role="alert">
-        Your Intake could not be shown. Please try again later.
-      </Alert>
-      {BACK}
-    </IntakeFrame>
+    <SitePage session={shell.session} signOut={signOut}>
+      <ClientGate heading="Legal matter unavailable">
+        <Alert tone="error" title="Something went wrong" role="alert">
+          Your Intake could not be shown. Please try again later.
+        </Alert>
+        {ALL_MATTERS}
+      </ClientGate>
+    </SitePage>
   );
 }

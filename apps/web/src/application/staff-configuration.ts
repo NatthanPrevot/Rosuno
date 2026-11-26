@@ -118,6 +118,9 @@ export const STAFF_CAPABILITIES = Object.freeze([
   // handling data requests.
   "approve_break_glass",
   "manage_data_requests",
+  // DEV-001: the website and appearance studio (catalogue code pending owner
+  // confirmation A53).
+  "manage_site_appearance",
 ] as const);
 export type StaffCapability = (typeof STAFF_CAPABILITIES)[number];
 
@@ -150,6 +153,8 @@ export const STAFF_SURFACES = Object.freeze([
   // MVP-001 S11 PS-A6.
   "break-glass",
   "data-requests",
+  // DEV-001: the website and appearance studio.
+  "appearance",
 ] as const);
 export type StaffSurface = (typeof STAFF_SURFACES)[number];
 
@@ -1644,15 +1649,21 @@ export async function resolveStaffHome(
       // break-glass access needs only the active Staff Profile; the queue of
       // that surface needs approve_break_glass, which it checks itself.
       ["manage_data_requests", false],
+      // DEV-001: the website and appearance studio (global grant only).
+      ["manage_site_appearance", false],
     ];
-    const answers: boolean[] = [];
-    for (const [capability, anyJurisdiction] of asked) {
-      const answer = await holds(reads, capability, null, anyJurisdiction);
-      if (answer === null) {
-        return UNAVAILABLE;
-      }
-      answers.push(answer);
+    // DEV-001: the staff layout asks this on every staff page, so the
+    // independent capability reads run together (started in the same order);
+    // any unreadable answer still makes the home unavailable.
+    const replies = await Promise.all(
+      asked.map(([capability, anyJurisdiction]) =>
+        holds(reads, capability, null, anyJurisdiction),
+      ),
+    );
+    if (!replies.every((answer): answer is boolean => answer !== null)) {
+      return UNAVAILABLE;
     }
+    const answers: readonly boolean[] = replies;
     const [
       verify,
       policy,
@@ -1674,6 +1685,7 @@ export async function resolveStaffHome(
       clients,
       referrals,
       dataRequests,
+      appearance,
     ] = answers;
     const held: Readonly<Record<StaffSurface, boolean>> = {
       verification: verify,
@@ -1702,6 +1714,8 @@ export async function resolveStaffHome(
       // access.
       "break-glass": true,
       "data-requests": dataRequests,
+      // DEV-001: the website and appearance studio.
+      appearance,
     };
     return Object.freeze({
       status: "ready",

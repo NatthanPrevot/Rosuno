@@ -1,0 +1,167 @@
+/* Canonical client additions to the owner's design system (values from its tokens). Only client screens add rules here. */
+
+/* The account frame for a visitor the page does not admit: the heading and one card, without the navigation. */
+.cx .cx-shell.rz-cx-solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+.cx .rz-cx-solo .cx-main {
+  max-width: 720px;
+}
+.cx .rz-cx-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+.cx .rz-cx-gate > .rz-alert {
+  align-self: stretch;
+}
+
+/* The tile where the design shows a portrait: no consented image exists, so it carries the consultation glyph. */
+.cx .rz-cx-tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 52px;
+  border-radius: 10px;
+  background: var(--paper-2);
+  color: var(--subtle);
+}
+.cx .rz-cx-tile[data-size="next"] {
+  width: 112px;
+  height: 128px;
+  border-radius: 14px;
+}
+.cx .rz-cx-tile[data-size="next"] .cux-ico {
+  width: 28px;
+  height: 28px;
+}
+/* The Overview's lists use the design's smaller portrait size (its cx-li3 image). */
+.cx .rz-cx-tile[data-size="list"] {
+  width: 40px;
+  height: 46px;
+  border-radius: 9px;
+}
+
+/* Rows that open their own page: the design's expand control points to the page instead of opening in place. */
+.cx .rz-cx-row:hover .cx-rn,
+.cx .rz-cx-row:hover .rz-cx-rt {
+  text-decoration: underline;
+}
+.cx .rz-cx-row:hover .cx-expb {
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line-3);
+}
+
+/* The segmented switch of the design, as links to the page's own filtered view. */
+.cx .cx-seg a {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.cx .cx-seg a:hover {
+  color: var(--ink);
+}
+.cx .cx-seg a.on {
+  background: var(--page);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow:
+    0 1px 2px rgba(15, 16, 19, 0.08),
+    0 0 0 0.5px rgba(15, 16, 19, 0.06);
+}
+
+/* A card that holds the page's existing primitives (tables, forms, alerts) inside the account. */
+.cx .rz-cx-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cx .rz-cx-panel + .rz-cx-panel,
+.cx .rz-cx-panel + .cx-card,
+.cx .cx-card + .rz-cx-panel {
+  margin-top: 16px;
+}
+/* A panel's slot that holds nothing at the moment (a form's message slot before any answer) takes no room. */
+.cx .rz-cx-panel > .rz-stack:empty {
+  display: none;
+}
+/* A fixed sentence the page keeps as its text primitive, set as the design's row description. */
+.cx .cx-srow .rz-text {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--subtle);
+}
+/* A row header of the design that opens nothing here (its details are shown below it). */
+.cx .rz-cx-static {
+  cursor: default !important;
+}
+.cx .rz-cx-none {
+  padding: 12px 0;
+}
+.cx .rz-cx-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 18px;
+}
+
+/* Request review and status: the panels hold the page's existing forms and messages in one column. */
+.rz .m4-rq .rz-rq-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.rz .m4-rq .rz-rq-start {
+  align-self: flex-start;
+}
+
+@media (max-width: 700px) {
+  /* The design's phone rules for the request pages, restated with the specificity they need over the layout classes
+     that now carry the build's inline grid and padding with equal weight. */
+  .rz .app-scroll .m4-rq {
+    padding-top: 20px !important;
+    padding-bottom: 48px !important;
+  }
+  .rz .m4-rq .m4-g2 {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 16px !important;
+  }
+  .rz .m4-rq .m4-g4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .cx .rz-cx-tile[data-size="next"] {
+    width: 56px;
+    height: 64px;
+    border-radius: 12px;
+  }
+  .cx .rz-cx-tile[data-size="next"] .cux-ico {
+    width: 20px;
+    height: 20px;
+  }
+  /* The Overview's open Requests: on a phone the row's button goes under its text, so the name, state and times
+     keep the row's width, and a long state word wraps inside its pill instead of running under the button. */
+  .cx .cx-li3 {
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: start;
+  }
+  .cx .cx-li3 > .btn {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .cx .cx-li3 .cx-lt3 .pill {
+    max-width: 100%;
+    height: auto;
+    min-height: 22px;
+    white-space: normal;
+  }
+}

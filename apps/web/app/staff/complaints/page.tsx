@@ -8,6 +8,9 @@
 // first, with the minimum metadata: state, linkage, instants and whether the
 // case is assigned to the caller. The two query values read, state and page,
 // only choose the list and the page.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Support › Complaints): the
+// design's status tabs and list, one row per case opening its own page.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -22,21 +25,23 @@ import {
   utcText,
 } from "../../../src/presentation/completion-labels.ts";
 import {
-  ButtonLink,
-  Cluster,
-  Heading,
-  Stack,
-  Status,
-  Surface,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
+  Cell,
+  Empty,
+  ListBox,
+  ListRow,
+  PagerRow,
+  PillCell,
+  TabLinks,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../frame.tsx";
+import { refusalPage, StaffFrame } from "../frame.tsx";
 
 export const metadata: Metadata = {
   title: "Reported problems",
   robots: { index: false, follow: false },
 };
+
+const COLUMNS = ["Reported (UTC)", "Assignment", "Status"] as const;
 
 export default async function ComplaintQueuePage({
   searchParams,
@@ -60,78 +65,74 @@ export default async function ComplaintQueuePage({
   }
   const base = `/staff/complaints?state=${view.complaintState}`;
   return (
-    <StaffFrame eyebrow="Complaints" title="Reported problems">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Text tone="muted">
-        A reported problem is a restricted record. Opening one changes nothing
-        about the consultation or its payment.
-      </Text>
-      <Cluster>
-        {COMPLAINT_STATES.map((entry) => (
-          <ButtonLink
-            key={entry}
-            variant={entry === view.complaintState ? "primary" : "secondary"}
-            href={`/staff/complaints?state=${entry}`}
-            aria-current={entry === view.complaintState ? "page" : undefined}
-          >
-            {COMPLAINT_STATE_LABELS[entry].label}
-          </ButtonLink>
-        ))}
-      </Cluster>
-      {view.cases.length === 0 ? (
-        <Text>
-          {view.pager.page === 1
-            ? "There are no reported problems in this list."
-            : "There are no reported problems on this page."}
-        </Text>
-      ) : (
-        view.cases.map((entry) => (
-          <Surface key={entry.id} labelledBy={`case-${entry.id}`}>
-            <Stack gap="tight">
-              <Heading as="h2" size="sm" id={`case-${entry.id}`}>
+    <StaffFrame
+      title="Support"
+      subtitle="Reported problems: concerns clients and attorneys report about a consultation."
+      lead={
+        <p>
+          A reported problem is a restricted record. Opening one changes nothing
+          about the consultation or its payment.
+        </p>
+      }
+      utc
+    >
+      <TabLinks
+        label="Reported problems by state"
+        links={COMPLAINT_STATES.map((entry) => ({
+          href: `/staff/complaints?state=${entry}`,
+          label: COMPLAINT_STATE_LABELS[entry].label,
+        }))}
+        current={base}
+      />
+      <ListBox label="Reported problems" columns={COLUMNS} sub>
+        {view.cases.length === 0 ? (
+          <Empty
+            title={
+              view.pager.page === 1
+                ? "There are no reported problems in this list."
+                : "There are no reported problems on this page."
+            }
+          />
+        ) : (
+          view.cases.map((entry) => (
+            <ListRow
+              key={entry.id}
+              href={`/staff/complaints/${entry.id}`}
+              columns={3}
+              sub
+            >
+              <Cell label="Reported" strong>
                 {`Reported ${utcText(entry.openedAt)}`}
-              </Heading>
-              <Cluster>
-                <Status tone={COMPLAINT_STATE_LABELS[entry.state].tone}>
-                  {COMPLAINT_STATE_LABELS[entry.state].label}
-                </Status>
-                {entry.assignedToMe ? (
-                  <Status tone="neutral">Assigned to you</Status>
-                ) : null}
-                {entry.consultationId === null ? null : (
-                  <Status tone="neutral">About a consultation</Status>
-                )}
-              </Cluster>
-              <Cluster>
-                <ButtonLink
-                  variant="tertiary"
-                  href={`/staff/complaints/${entry.id}`}
-                >
-                  Open the case
-                </ButtonLink>
-              </Cluster>
-            </Stack>
-          </Surface>
-        ))
+              </Cell>
+              <Cell label="">
+                {entry.consultationId === null
+                  ? "Not about a consultation"
+                  : "About a consultation"}
+              </Cell>
+              <Cell label="Assignment">
+                {entry.assignedToMe ? "Assigned to you" : "Not assigned to you"}
+              </Cell>
+              <PillCell
+                label="Status"
+                tone={COMPLAINT_STATE_LABELS[entry.state].tone}
+              >
+                {COMPLAINT_STATE_LABELS[entry.state].label}
+              </PillCell>
+            </ListRow>
+          ))
+        )}
+      </ListBox>
+      {view.pager.page === 1 && !view.pager.hasNext ? null : (
+        <PagerRow
+          note={`Page ${view.pager.page} of this list.`}
+          previous={
+            view.pager.page > 1 ? `${base}&page=${view.pager.page - 1}` : null
+          }
+          next={
+            view.pager.hasNext ? `${base}&page=${view.pager.page + 1}` : null
+          }
+        />
       )}
-      <Cluster>
-        {view.pager.page > 1 ? (
-          <ButtonLink
-            variant="secondary"
-            href={`${base}&page=${view.pager.page - 1}`}
-          >
-            Previous page
-          </ButtonLink>
-        ) : null}
-        {view.pager.hasNext ? (
-          <ButtonLink
-            variant="secondary"
-            href={`${base}&page=${view.pager.page + 1}`}
-          >
-            Next page
-          </ButtonLink>
-        ) : null}
-      </Cluster>
     </StaffFrame>
   );
 }

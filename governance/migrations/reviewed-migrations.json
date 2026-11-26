@@ -2045,6 +2045,88 @@
       "drift_check": "clean",
       "rollback_plan": "Applied to Rosuno Staging only. A verified defect requires a separately authorized, reviewed forward corrective migration replacing the slot start read again; no relation, column, policy or row is changed. This migration, every earlier migration and the migration history stay byte-identical.",
       "depends_on": ["20261127210000_mvp_001_s11_complaint_configuration"]
+    },
+    {
+      "migration_id": "20261128010000_p2_924_development_regulatory_mode_and_staff_bootstrap",
+      "migration_kind": "product",
+      "sequence": 77,
+      "artifact_path": "supabase/migrations/20261128010000_p2_924_development_regulatory_mode_and_staff_bootstrap.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "PHYSICAL-SPECIFICATION-AMENDMENT-PS-A2-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-DEV-001-ENGINEERING-PROGRAM"],
+      "decision_refs": ["DEC-20261125-DEV-001-ENGINEERING-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Not applied anywhere. Forward-only: a separately authorized, reviewed corrective migration may drop either function; rows already written stay, because configuration and audit history are append-only. Production is unaffected by design: both functions refuse every recorded class other than development or staging and write nothing. This migration, every earlier migration and the migration history stay byte-identical.",
+      "depends_on": ["20261127220000_mvp_001_s11_offered_start_containment"]
+    },
+    {
+      "migration_id": "20261129010000_dev_001_workspace_reads",
+      "migration_kind": "product",
+      "sequence": 78,
+      "artifact_path": "supabase/migrations/20261129010000_dev_001_workspace_reads.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+        "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-DEV-001-ENGINEERING-PROGRAM"],
+      "decision_refs": ["DEC-20261125-DEV-001-ENGINEERING-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Not applied anywhere. Forward-only: a separately authorized, reviewed corrective migration may drop or replace any of the four read functions; no relation, column, policy or row is changed. This migration, every earlier migration and the migration history stay byte-identical.",
+      "depends_on": [
+        "20261128010000_p2_924_development_regulatory_mode_and_staff_bootstrap"
+      ]
+    },
+    {
+      "migration_id": "20261130010000_dev_001_site_appearance",
+      "migration_kind": "product",
+      "sequence": 79,
+      "artifact_path": "supabase/migrations/20261130010000_dev_001_site_appearance.sql",
+      "authority_refs": [
+        "IMPLEMENTATION-MASTER-PLAN-V1.0-LOCKED",
+        "MVP-BUILD-SPECIFICATION-V1.0-LOCKED",
+        "TECHNICAL-ARCHITECTURE-V0.2-LOCKED",
+        "PHYSICAL-SUPABASE-POSTGRES-V1.0-LOCKED",
+        "FINANCIAL-PROVENANCE-PHYSICAL-CORRECTION-FP-1-LOCKED",
+        "PAYMENT-ENGAGEMENT-MATRIX-V0.2-LOCKED",
+        "DOMAIN-MODEL-V1.4-LOCKED",
+        "RELATIONAL-OBJECT-SPEC-V1.0-LOCKED",
+        "MASTER-BLUEPRINT-V1-LOCKED"
+      ],
+      "work_item_refs": ["WI-P2-DEV-001-ENGINEERING-PROGRAM"],
+      "decision_refs": ["DEC-20261125-DEV-001-ENGINEERING-PROGRAM"],
+      "release_refs": [],
+      "reviewed": false,
+      "reviewed_by": "pending designated human PR review",
+      "reviewed_at": null,
+      "applied_environment": "none",
+      "non_production_validation": true,
+      "drift_check": "clean",
+      "rollback_plan": "Not applied anywhere. Forward-only: a separately authorized, reviewed corrective migration may drop the three appearance relations and their functions, and remove the capability catalogue code manage_site_appearance only if no grant references it; audit events stay. This migration, every earlier migration and the migration history stay byte-identical.",
+      "depends_on": ["20261129010000_dev_001_workspace_reads"]
     }
   ]
 }

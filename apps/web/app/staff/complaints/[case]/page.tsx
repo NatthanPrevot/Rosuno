@@ -15,6 +15,11 @@
 // database selects for the case (PS-A6 section 4; while none is configured
 // the page says so and the database would change nothing). Holders of the
 // global Legal Holds grant can place a hold on the case from here.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, the Support complaint
+// record): the design's record panel with the state pill, the case, the
+// consultation facts, what was reported, then the handling forms and the
+// Legal Hold form.
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -36,14 +41,13 @@ import {
   utcText,
 } from "../../../../src/presentation/completion-labels.ts";
 import {
-  ButtonLink,
-  Cluster,
-  Heading,
-  Status,
-  Table,
-} from "../../../../src/presentation/design-system.tsx";
+  Block,
+  KeyValues,
+  Note,
+  RecordPanel,
+} from "../../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../../frame.tsx";
+import { refusalPage } from "../../frame.tsx";
 import { PlaceHoldForm } from "../../legal-holds/forms.tsx";
 import { CaseActionsForm, DecideCaseForm } from "../forms.tsx";
 
@@ -87,7 +91,7 @@ export default async function ComplaintCasePage({
     return refusalPage(view, "/staff/complaints/[case]", "Reported problems");
   }
   const record = view.complaintCase;
-  const rows: [string, string][] = [
+  const caseRows: [string, string][] = [
     [
       "Reported by",
       record.complainantRole === "client" ? "The client" : "The attorney",
@@ -101,6 +105,9 @@ export default async function ComplaintCasePage({
           ["Resolved", utcText(record.resolvedAt)],
           ["Resolution", record.resolutionCode ?? ""],
         ] as [string, string][])),
+    ["Legal Holds in force", String(record.activeLegalHolds)],
+  ];
+  const consultationRows: [string, string][] = [
     [
       "Consultation",
       record.consultationId === null
@@ -127,70 +134,66 @@ export default async function ComplaintCasePage({
         ? "No payment"
         : record.paymentState.replaceAll("_", " "),
     ],
-    ["Legal Holds in force", String(record.activeLegalHolds)],
-    ["What was reported", record.statement ?? "No description given"],
   ];
   const holds = await legalHoldsHeld(LEGAL_HOLD_SOURCES);
   return (
-    <StaffFrame eyebrow="Complaints" title="Reported problem">
-      <BackLink href="/staff/complaints">Reported problems</BackLink>
-      <Cluster>
-        <Status tone={COMPLAINT_STATE_LABELS[record.state].tone}>
-          {COMPLAINT_STATE_LABELS[record.state].label}
-        </Status>
-      </Cluster>
-      <Table id="complaint-case" caption="Case metadata">
-        <tbody>
-          {rows.map(([label, value]) => (
-            <tr key={label}>
-              <th scope="row">{label}</th>
-              <td>{value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-      {record.consultationId === null ? null : (
-        <Cluster>
-          <ButtonLink
-            variant="tertiary"
-            href={`/staff/consultations/${record.consultationId}`}
-          >
-            Open the consultation (needs consultation operations)
-          </ButtonLink>
-        </Cluster>
-      )}
-      <Heading as="h2" size="md" id="case-steps-title">
-        Handling
-      </Heading>
-      {record.state === "resolved" ? null : (
-        <>
-          <CaseActionsForm
-            caseId={record.id}
-            actions={actionsOf(record.state, record.assignedToMe)}
-          />
-          <DecideCaseForm
-            caseId={record.id}
-            kind="classify"
-            codes={record.categoryCodes}
-          />
-        </>
-      )}
-      {/* One slot for the resolution form, so it (and the message for the
-          state its action returned) stays mounted when the case is resolved. */}
-      <DecideCaseForm
-        caseId={record.id}
-        kind="resolve"
-        codes={record.resolutionCodes}
-        resolved={record.state === "resolved"}
-      />
+    <RecordPanel
+      titleId="staff-configuration-title"
+      title="Reported problem"
+      sub={`Reported ${utcText(record.openedAt)} · times in UTC`}
+      pill={{
+        tone: COMPLAINT_STATE_LABELS[record.state].tone,
+        label: COMPLAINT_STATE_LABELS[record.state].label,
+      }}
+      back={{ href: "/staff/complaints", label: "Reported problems" }}
+    >
+      <Block title="Case">
+        <KeyValues items={caseRows} />
+      </Block>
+      <Block title="What was reported">
+        <Note>{record.statement ?? "No description given"}</Note>
+      </Block>
+      <Block title="Consultation">
+        <KeyValues items={consultationRows} />
+        {record.consultationId === null ? null : (
+          <div className="st-links">
+            <a
+              className="btn btn-line btn-sm"
+              href={`/staff/consultations/${record.consultationId}`}
+            >
+              Open the consultation (needs consultation operations)
+            </a>
+          </div>
+        )}
+      </Block>
+      <Block title="Handling">
+        {record.state === "resolved" ? null : (
+          <>
+            <CaseActionsForm
+              caseId={record.id}
+              actions={actionsOf(record.state, record.assignedToMe)}
+            />
+            <DecideCaseForm
+              caseId={record.id}
+              kind="classify"
+              codes={record.categoryCodes}
+            />
+          </>
+        )}
+        {/* One slot for the resolution form, so it (and the message for the
+            state its action returned) stays mounted when the case is resolved. */}
+        <DecideCaseForm
+          caseId={record.id}
+          kind="resolve"
+          codes={record.resolutionCodes}
+          resolved={record.state === "resolved"}
+        />
+      </Block>
       {holds ? (
-        <>
-          <Heading as="h2" size="md" id="case-hold-title">
-            Legal Hold
-          </Heading>
+        <Block title="Legal Hold">
           <PlaceHoldForm scope={{ type: "complaint_case", id: record.id }} />
-        </>
+        </Block>
       ) : null}
-    </StaffFrame>
+    </RecordPanel>
   );
 }

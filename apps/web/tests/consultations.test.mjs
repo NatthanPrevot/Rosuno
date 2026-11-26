@@ -866,14 +866,34 @@ test("S9-7. the routes: server pages that opt out of prerendering (the attorney 
       page,
     );
   }
+  // DEV-001: website & appearance studio: the studio's preview frame is the
+  // one other frame, admitted by exact file with its own contract below: a
+  // client module with one frame of a same-origin preview address, its
+  // title, nothing granted (no allow), no sandbox escape hatch, no inline
+  // document and no token.
+  const STUDIO_FRAME = "app/staff/appearance/preview-frame.tsx";
   const frames = [...filesIn("app/"), ...filesIn("src/")].filter((file) =>
     /<iframe\b/.test(read(file)),
   );
   assert.deepEqual(frames, [
     "app/attorney/consultations/[consultation]/forms.tsx",
     "app/client/consultations/[consultation]/forms.tsx",
+    STUDIO_FRAME,
   ]);
-  for (const file of frames) {
+  {
+    const code = read(STUDIO_FRAME);
+    assert.match(code, /^"use client";\n/);
+    assert.equal(code.match(/<iframe\b/g).length, 1);
+    assert.match(
+      code,
+      /<iframe\n\s+key=\{`\$\{address\}#\$\{reloadKey\}`\}\n\s+ref=\{frame\}\n\s+className="rzs-frame"\n\s+title=\{title\}\n\s+src=\{address\}\n\s+onLoad=\{handshake\}\n\s+\/>/,
+    );
+    assert.doesNotMatch(
+      code,
+      /\ballow=|sandbox|srcDoc|dangerouslySetInnerHTML|console\.|token|frameUrl/,
+    );
+  }
+  for (const file of frames.filter((entry) => entry !== STUDIO_FRAME)) {
     const code = read(file);
     assert.match(code, /^"use client";\n/, file);
     assert.equal(code.match(/<iframe\b/g).length, 1, file);

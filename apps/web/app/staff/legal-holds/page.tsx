@@ -9,6 +9,10 @@
 // file, a reported problem or a User, and released once; each step is
 // audited. The two query values read, status and page, only choose the list
 // and the page.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Administration ›
+// Settings): the placing form in the design's panel, then the status tabs and
+// one card per hold with its release form, and the pager.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -24,16 +28,15 @@ import {
   utcText,
 } from "../../../src/presentation/completion-labels.ts";
 import {
-  ButtonLink,
-  Cluster,
-  Heading,
-  Stack,
-  Status,
-  Surface,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
+  Empty,
+  KeyValues,
+  PagerRow,
+  Panel,
+  Pill,
+  TabLinks,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../frame.tsx";
+import { refusalPage, StaffFrame } from "../frame.tsx";
 import { PlaceHoldForm, ReleaseHoldForm } from "./forms.tsx";
 
 export const metadata: Metadata = {
@@ -59,77 +62,80 @@ export default async function LegalHoldsPage({
   }
   const base = `/staff/legal-holds?status=${view.holdStatus}`;
   return (
-    <StaffFrame eyebrow="Records" title="Legal Holds">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Heading as="h2" size="md" id="place-title">
-        Place a Legal Hold
-      </Heading>
-      <PlaceHoldForm scope={null} />
-      <Heading as="h2" size="md" id="holds-title">
+    <StaffFrame
+      title="Settings"
+      subtitle="Legal holds: place and release them, and see which are in force."
+      utc
+    >
+      <Panel id="place-title" title="Place a Legal Hold">
+        <PlaceHoldForm scope={null} />
+      </Panel>
+      <h2 className="st-h2" id="holds-title">
         Legal Holds
-      </Heading>
-      <Cluster>
-        {HOLD_STATUSES.map((entry) => (
-          <ButtonLink
-            key={entry}
-            variant={entry === view.holdStatus ? "primary" : "secondary"}
-            href={`/staff/legal-holds?status=${entry}`}
-            aria-current={entry === view.holdStatus ? "page" : undefined}
-          >
-            {HOLD_STATUS_LABELS[entry]}
-          </ButtonLink>
-        ))}
-      </Cluster>
+      </h2>
+      <TabLinks
+        label="Legal Holds by status"
+        links={HOLD_STATUSES.map((entry) => ({
+          href: `/staff/legal-holds?status=${entry}`,
+          label: HOLD_STATUS_LABELS[entry],
+        }))}
+        current={base}
+      />
       {view.holds.length === 0 ? (
-        <Text>
-          {view.pager.page === 1
-            ? "There are no Legal Holds in this list."
-            : "There are no Legal Holds on this page."}
-        </Text>
+        <section className="st-listbox" aria-label="Legal Holds">
+          <Empty
+            title={
+              view.pager.page === 1
+                ? "There are no Legal Holds in this list."
+                : "There are no Legal Holds on this page."
+            }
+          />
+        </section>
       ) : (
         view.holds.map((hold) => (
-          <Surface key={hold.id} labelledBy={`hold-${hold.id}`}>
-            <Stack gap="tight">
-              <Heading as="h3" size="sm" id={`hold-${hold.id}`}>
+          <section
+            key={hold.id}
+            className="w-card st-panel"
+            aria-labelledby={`hold-${hold.id}`}
+          >
+            <div className="st-ptop">
+              <h3 className="st-h2" id={`hold-${hold.id}`}>
                 {`${HOLD_SCOPE_LABELS[hold.scope]} ${hold.scopeId}`}
-              </Heading>
-              <Cluster>
-                <Status tone={hold.status === "active" ? "warning" : "neutral"}>
-                  {HOLD_STATUS_LABELS[hold.status]}
-                </Status>
-                {hold.placedByMe ? (
-                  <Status tone="neutral">Placed by you</Status>
-                ) : null}
-              </Cluster>
-              <Text size="small">{`Reason: ${hold.reason}`}</Text>
-              <Text size="small" tone="muted">
-                {`Started ${utcText(hold.startedAt)}${hold.releasedAt === null ? "" : `; released ${utcText(hold.releasedAt)}`}`}
-              </Text>
-              {hold.status === "active" ? (
-                <ReleaseHoldForm hold={hold.id} />
+              </h3>
+              <span className="grow"></span>
+              {hold.placedByMe ? (
+                <Pill tone="neutral">Placed by you</Pill>
               ) : null}
-            </Stack>
-          </Surface>
+              <Pill tone={hold.status === "active" ? "warning" : "neutral"}>
+                {HOLD_STATUS_LABELS[hold.status]}
+              </Pill>
+            </div>
+            <KeyValues
+              items={[
+                ["Reason", hold.reason],
+                ["Started", utcText(hold.startedAt)],
+                ...(hold.releasedAt === null
+                  ? []
+                  : ([["Released", utcText(hold.releasedAt)]] as const)),
+              ]}
+            />
+            {hold.status === "active" ? (
+              <ReleaseHoldForm hold={hold.id} />
+            ) : null}
+          </section>
         ))
       )}
-      <Cluster>
-        {view.pager.page > 1 ? (
-          <ButtonLink
-            variant="secondary"
-            href={`${base}&page=${view.pager.page - 1}`}
-          >
-            Previous page
-          </ButtonLink>
-        ) : null}
-        {view.pager.hasNext ? (
-          <ButtonLink
-            variant="secondary"
-            href={`${base}&page=${view.pager.page + 1}`}
-          >
-            Next page
-          </ButtonLink>
-        ) : null}
-      </Cluster>
+      {view.pager.page === 1 && !view.pager.hasNext ? null : (
+        <PagerRow
+          note={`Page ${view.pager.page} of this list.`}
+          previous={
+            view.pager.page > 1 ? `${base}&page=${view.pager.page - 1}` : null
+          }
+          next={
+            view.pager.hasNext ? `${base}&page=${view.pager.page + 1}` : null
+          }
+        />
+      )}
     </StaffFrame>
   );
 }

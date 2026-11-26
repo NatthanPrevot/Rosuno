@@ -68,7 +68,10 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
+import {
+  assertRegisteredLifecycle,
+  assertTailThenRegistered,
+} from "./migration-lifecycle.mjs";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54343;
@@ -516,7 +519,7 @@ function applyMigrations() {
   // migrations.
   const s6 = files.indexOf(S6_LAST);
   assert.ok(s6 >= 0, "the S6 PS-A3 migration is present");
-  assert.deepEqual(files.slice(s6 + 1), [
+  assertTailThenRegistered(files.slice(s6 + 1), [
     ...S7_MIGRATIONS,
     ...S8_MIGRATIONS,
     ...S9_MIGRATIONS,
@@ -527,7 +530,7 @@ function applyMigrations() {
     ...S11_CORRECTIONS_MIGRATIONS,
     ...S11_PS_A6_MIGRATIONS,
     ...S11_OFFERED_START_MIGRATIONS,
-  ]);
+  ], S7_MIGRATIONS.at(-1));
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),

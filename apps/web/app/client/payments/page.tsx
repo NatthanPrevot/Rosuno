@@ -9,63 +9,44 @@
 // the state and amounts Rosuno recorded (a refund as the recorded refunded
 // amount) and links to its existing receipt page, which shows the components
 // and each refund as the ledger recorded it. Read-only; nothing here states
-// an entitlement or a settlement.
+// an entitlement or a settlement. DEV-001: the owner's UI/UX design, the
+// client account's Payments: one calm row per attempt, opening its receipt.
+// The design's saved payment methods have no record, so they are not
+// offered.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import type { ReactNode } from "react";
 
 import { resolveClientPayments } from "../../../src/application/participant-workspaces.ts";
+import { getShellView } from "../../../src/application/shell.ts";
+import { SUPABASE_SERVER_SESSION_SOURCE } from "../../../src/infrastructure/identity/server-session-source.ts";
 import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";
 import { CLIENT_WORKSPACE_SOURCES } from "../../../src/infrastructure/workspaces/workspace-adapter.ts";
 import {
-  Alert,
-  ButtonLink,
-  Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Status,
-  Surface,
-  Table,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
+  ClientAccount,
+  ClientGate,
+  ClientPill,
+  whenText,
+} from "../../../src/presentation/client-account.tsx";
+import { Alert } from "../../../src/presentation/design-system.tsx";
 import {
   PAYMENT_STATE_LABELS,
   PAYMENT_STATUS_NOTE,
 } from "../../../src/presentation/payment-labels.ts";
+import { SitePage } from "../../../src/presentation/site-chrome.tsx";
 import {
   moneyText,
   NO_PAYMENTS,
   PAYMENTS_INTRO,
   refundText,
   TIMES_NOTE,
-  utcText,
 } from "../../../src/presentation/workspace-labels.ts";
-import { ClientNavigation } from "../../../src/presentation/workspace-navigation.tsx";
+import { signOut } from "../../sign-in/actions.ts";
 
 export const metadata: Metadata = {
   title: "Your payments",
   robots: { index: false, follow: false },
 };
-
-function Frame({ children }: { readonly children: ReactNode }) {
-  return (
-    <Page density="client">
-      <Surface emphasis="raised" labelledBy="payments-title">
-        <Stack>
-          <Eyebrow>Client workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="payments-title">
-            Your payments
-          </Heading>
-          {children}
-          <ClientNavigation current="/client/payments" />
-        </Stack>
-      </Surface>
-    </Page>
-  );
-}
 
 function pageHref(page: number): string {
   return page === 1 ? "/client/payments" : `/client/payments?page=${page}`;
@@ -78,29 +59,32 @@ export default async function ClientPaymentsPage({
 }) {
   // Access belongs to each request on the server; never prerender or cache it.
   await connection();
+  const shell = await getShellView(SUPABASE_SERVER_SESSION_SOURCE);
   const { page } = await searchParams;
   const view = await resolveClientPayments(CLIENT_WORKSPACE_SOURCES, page);
   if (view.status === "sign-in-required") {
     return (
-      <Frame>
-        <Text tone="muted">
-          Your payments are available only to their signed-in client.
-        </Text>
-        <Cluster>
-          <ButtonLink variant="primary" href="/sign-in">
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Sign in to continue">
+          <p className="sm muted">
+            Your payments are available only to their signed-in client.
+          </p>
+          <a className="btn btn-ink" href="/sign-in">
             Sign in
-          </ButtonLink>
-        </Cluster>
-      </Frame>
+          </a>
+        </ClientGate>
+      </SitePage>
     );
   }
   if (view.status === "denied") {
     return (
-      <Frame>
-        <Alert tone="warning" title="Not available" role="status">
-          This account does not have client payments.
-        </Alert>
-      </Frame>
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Payments">
+          <Alert tone="warning" title="Not available" role="status">
+            This account does not have client payments.
+          </Alert>
+        </ClientGate>
+      </SitePage>
     );
   }
   if (view.status !== "ready") {
@@ -109,84 +93,108 @@ export default async function ClientPaymentsPage({
       outcome: view.status,
     });
     return (
-      <Frame>
-        <Alert tone="error" title="Something went wrong" role="alert">
-          Your payments could not be shown right now. Please try again later.
-        </Alert>
-      </Frame>
+      <SitePage session={shell.session} signOut={signOut}>
+        <ClientGate heading="Payments">
+          <Alert tone="error" title="Something went wrong" role="alert">
+            Your payments could not be shown right now. Please try again later.
+          </Alert>
+        </ClientGate>
+      </SitePage>
     );
   }
+  const count = view.payments.length;
+  const paged = view.pager.page > 1 || view.pager.hasNext;
   return (
-    <Frame>
-      <Text tone="muted">{PAYMENTS_INTRO}</Text>
-      <Text tone="muted">{TIMES_NOTE}</Text>
-      {view.payments.length === 0 ? (
-        <Text>{NO_PAYMENTS}</Text>
-      ) : (
-        <Table id="client-payments" caption="Your payments">
-          <thead>
-            <tr>
-              <th scope="col">Created</th>
-              <th scope="col">State</th>
-              <th scope="col">Amount</th>
-              <th scope="col">Refund</th>
-              <th scope="col">Receipt</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.payments.map((payment) => {
-              const state = PAYMENT_STATE_LABELS[payment.state];
-              return (
-                <tr key={payment.id}>
-                  <th scope="row">{utcText(payment.createdAt)}</th>
-                  <td>
-                    <Status tone={state.tone}>{state.label}</Status>
-                  </td>
-                  <td>{moneyText(payment.totalMinor, payment.currency)}</td>
-                  <td>
-                    {refundText(
-                      payment.state,
-                      payment.refundedMinor,
-                      moneyText(payment.refundedMinor, payment.currency),
-                    ) ?? "None"}
-                  </td>
-                  <td>
-                    <ButtonLink
-                      variant="tertiary"
+    <SitePage session={shell.session} signOut={signOut}>
+      <ClientAccount area="payments" heading="Payments">
+        {count === 0 && view.pager.page === 1 ? (
+          <section
+            className="cx-card l-mt18-p40-28-dflex-fdcolumn-aicente-8ccc4d"
+            aria-labelledby="py-empty-h"
+          >
+            <h2 className="h4" id="py-empty-h">
+              No payments yet
+            </h2>
+            <p className="sm muted l-mt4-mw460">{NO_PAYMENTS}</p>
+            <a className="btn btn-ink btn-sm l-mt16" href="/find-an-attorney">
+              Find an attorney
+            </a>
+          </section>
+        ) : (
+          <>
+            <div className="cx-tools l-fwrwrap-g10">
+              <p className="sm muted">
+                {paged
+                  ? `Page ${view.pager.page}, newest first`
+                  : count === 1
+                    ? "1 payment"
+                    : `${count} payments`}
+              </p>
+            </div>
+            <p className="xs subtle l-mt6-mw640">
+              {`${PAYMENTS_INTRO} ${TIMES_NOTE}`}
+            </p>
+            <ul
+              className="stack l-g10-mt14-p0-lstnone"
+              aria-label="Your payments"
+            >
+              {view.payments.map((payment) => {
+                const state = PAYMENT_STATE_LABELS[payment.state];
+                const refund = refundText(
+                  payment.state,
+                  payment.refundedMinor,
+                  moneyText(payment.refundedMinor, payment.currency),
+                );
+                return (
+                  <li key={payment.id}>
+                    <a
+                      className="cx-card l-dflex-w100pc-p16-20-g12-aicenter-j-730d17 rz-cx-row"
                       href={`/client/payments/${payment.id}`}
                     >
-                      Open the receipt
-                    </ButtonLink>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
-      )}
-      <Text size="small" tone="muted">
-        {PAYMENT_STATUS_NOTE}
-      </Text>
-      {view.pager.page > 1 || view.pager.hasNext ? (
-        <Cluster>
-          {view.pager.page > 1 ? (
-            <ButtonLink
-              variant="secondary"
-              href={pageHref(view.pager.page - 1)}
-            >
-              Show newer payments
-            </ButtonLink>
-          ) : null}
-          {view.pager.hasNext ? (
-            <ButtonLink
-              variant="secondary"
-              href={pageHref(view.pager.page + 1)}
-            >
-              Show older payments
-            </ButtonLink>
-          ) : null}
-        </Cluster>
-      ) : null}
-    </Frame>
+                      <span className="stack l-g2-minw0">
+                        <span className="sm l-fw600 rz-cx-rt">
+                          Consultation request payment
+                        </span>
+                        <span className="xs subtle">
+                          {`Started ${whenText(payment.createdAt)}`}
+                          {refund === null ? null : ` · ${refund}`}
+                        </span>
+                      </span>
+                      <span className="row l-g10-aicenter">
+                        <span className="sm num l-fw600">
+                          {moneyText(payment.totalMinor, payment.currency)}
+                        </span>
+                        <ClientPill tone={state.tone}>{state.label}</ClientPill>
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+        <p className="xs subtle l-mt14">{PAYMENT_STATUS_NOTE}</p>
+        {paged ? (
+          <div className="row l-g8 l-mt14">
+            {view.pager.page > 1 ? (
+              <a
+                className="btn btn-line btn-sm"
+                href={pageHref(view.pager.page - 1)}
+              >
+                Show newer payments
+              </a>
+            ) : null}
+            {view.pager.hasNext ? (
+              <a
+                className="btn btn-line btn-sm"
+                href={pageHref(view.pager.page + 1)}
+              >
+                Show older payments
+              </a>
+            ) : null}
+          </div>
+        ) : null}
+      </ClientAccount>
+    </SitePage>
   );
 }

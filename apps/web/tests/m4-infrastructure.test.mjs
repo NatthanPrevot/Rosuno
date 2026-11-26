@@ -763,6 +763,8 @@ const MVP001_STAFF_APP = [
   "app/staff/attorneys/[attorney]/page.tsx",
   "app/staff/attorneys/actions.ts",
   "app/staff/attorneys/forms.tsx",
+  // DEV-001: the owner's UI/UX design's Attorneys list.
+  "app/staff/attorneys/page.tsx",
   "app/staff/audit/[event]/page.tsx",
   "app/staff/audit/page.tsx",
   "app/staff/clients/[client]/page.tsx",
@@ -813,6 +815,11 @@ const MVP001_STAFF_APP = [
   "app/staff/launch/[jurisdiction]/page.tsx",
   "app/staff/launch/forms.tsx",
   "app/staff/launch/page.tsx",
+  // DEV-001: the owner's UI/UX design's staff workspace frame (a server
+  // layout) and its navigation (a client module); their own contract is
+  // SR-1 and SR-13 in staff-configuration-routes.test.mjs.
+  "app/staff/layout.tsx",
+  "app/staff/navigation.tsx",
   // MVP-001 S11: the Legal Holds page, its forms and its server action module.
   "app/staff/legal-holds/actions.ts",
   "app/staff/legal-holds/forms.tsx",
@@ -841,6 +848,19 @@ const MVP001_STAFF_APP = [
   "app/staff/data-requests/actions.ts",
   "app/staff/data-requests/forms.tsx",
   "app/staff/data-requests/page.tsx",
+  // DEV-001: website & appearance studio: its server page, its one server
+  // action module and its client modules; their own contract is the studio
+  // test (site-appearance-studio.test.mjs) and SR-1 in
+  // staff-configuration-routes.test.mjs.
+  "app/staff/appearance/actions.ts",
+  "app/staff/appearance/assets.tsx",
+  "app/staff/appearance/inspector.tsx",
+  "app/staff/appearance/layers.tsx",
+  "app/staff/appearance/page.tsx",
+  "app/staff/appearance/preview-frame.tsx",
+  "app/staff/appearance/publish-dialog.tsx",
+  "app/staff/appearance/studio.tsx",
+  "app/staff/appearance/versions.tsx",
 ];
 
 // MVP-001 D-4: the verification queue page reads exactly one query value,

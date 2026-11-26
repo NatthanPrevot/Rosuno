@@ -76,6 +76,68 @@ const SECURITY_HEADERS = [
   TRANSPORT_SECURITY,
 ];
 
+// DEV-001 website and appearance studio: an appearance image
+// (/appearance/assets/<sha256>.<png|jpg|webp>) is served with a policy that
+// allows nothing at all and sandboxes the response, no framing, no sniffing
+// and same-origin resource loading only. It replaces the page set for
+// exactly the paths the image route answers (one segment under
+// /appearance/assets/); every other path, any deeper or empty one included,
+// keeps the full page set.
+const ASSET_HEADERS = [
+  {
+    key: "Content-Security-Policy",
+    value: "default-src 'none'; frame-ancestors 'none'; sandbox",
+  },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "same-origin" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  TRANSPORT_SECURITY,
+];
+
+// DEV-001 website and appearance studio: the studio's live preview. D3
+// pending owner decision. Same-origin framing for the preview, and nothing
+// more, in two rules kept together in this one constant:
+// - the studio page itself (exactly /staff/appearance) may load frames of
+//   this origin only (frame-src 'self' instead of the page policy's frame
+//   source; the studio embeds no provider page); it stays unframeable;
+// - a page response to an address with ?rz-preview=1 may be framed by this
+//   origin only (frame-ancestors 'self' and X-Frame-Options SAMEORIGIN).
+// Every other directive is unchanged, every other response keeps
+// frame-src as configured, frame-ancestors 'none' and DENY, and nothing
+// under /appearance/ (the stylesheets, the editor status, the images) is
+// ever frameable. The preview loader blocks every activation inside the
+// frame. If the owner declines D3, remove this constant and its one spread
+// below: the studio then offers the preview in a new window instead.
+const PREVIEW_FRAMING_RULES = [
+  {
+    source: "/staff/appearance",
+    headers: [
+      {
+        key: "Content-Security-Policy",
+        value: CONTENT_SECURITY_POLICY.replace(
+          /frame-src [^;]+/,
+          "frame-src 'self'",
+        ),
+      },
+    ],
+  },
+  {
+    source: "/((?!auth/confirm$|appearance/).*)",
+    has: [{ type: "query" as const, key: "rz-preview", value: "1" }],
+    headers: [
+      {
+        key: "Content-Security-Policy",
+        value: CONTENT_SECURITY_POLICY.replace(
+          "frame-ancestors 'none'",
+          "frame-ancestors 'self'",
+        ),
+      },
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+    ],
+  },
+];
+
 const nextConfig: NextConfig = {
   // next dev writes AGENTS.md and CLAUDE.md into the app whenever it detects a
   // coding agent, and Replit's REPL_ID counts as one. Keep that generation off
@@ -86,8 +148,13 @@ const nextConfig: NextConfig = {
   distDir: "dist",
   async headers() {
     return [
-      { source: "/((?!auth/confirm$).*)", headers: SECURITY_HEADERS },
+      {
+        source: "/((?!auth/confirm$|appearance/assets/[^/]+$).*)",
+        headers: SECURITY_HEADERS,
+      },
       { source: "/auth/confirm", headers: [TRANSPORT_SECURITY] },
+      { source: "/appearance/assets/:asset", headers: ASSET_HEADERS },
+      ...PREVIEW_FRAMING_RULES,
     ];
   },
 };

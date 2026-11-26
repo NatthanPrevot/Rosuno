@@ -1175,7 +1175,11 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
   // route, (MVP-001 S7) the Stripe webhook route, (MVP-001 S9) the Daily
   // webhook route and (MVP-001 S10) the Resend webhook route, each admitted by
   // its exact path and nothing broader, and the sign-out form is a POST server
-  // action on the home page.
+  // action on the home page. DEV-001: website & appearance studio: so are the
+  // published stylesheet and appearance image routes, each admitted by its
+  // exact path. DEV-001: website & appearance studio: and the studio
+  // preview's draft stylesheet and editor status routes, each admitted by
+  // its exact path.
   assert.deepEqual(
     filesIn("app/").filter((path) => /(?:^|\/)route\.[jt]sx?$/.test(path)),
     [
@@ -1183,9 +1187,71 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
       "app/api/media/daily/route.ts",
       "app/api/notifications/resend/route.ts",
       "app/api/payments/stripe/route.ts",
+      "app/appearance/assets/[asset]/route.ts",
+      "app/appearance/draft.css/route.ts",
+      "app/appearance/editor/route.ts",
+      "app/appearance/theme.css/route.ts",
       "app/auth/confirm/route.ts",
     ],
   );
+  // DEV-001: website & appearance studio: the two preview routes have no
+  // sign-out or session capability either: each imports only the appearance
+  // adapter and the appearance delivery module, names no cookie, session or
+  // authentication call itself, never ends a session, and answers GET only.
+  for (const route of [
+    "app/appearance/draft.css/route.ts",
+    "app/appearance/editor/route.ts",
+  ]) {
+    const previewSource = read(route);
+    assert.deepEqual(importsOf(previewSource), [
+      "../../../src/infrastructure/appearance/appearance-adapter.ts",
+      "../../../src/presentation/appearance/delivery.ts",
+    ]);
+    assert.doesNotMatch(
+      codeOf(previewSource),
+      /sign-in\/actions|signOut|sign-?out|\.auth\.|cookies|getSession|getClaims|getUser|supabase-server|server-session-source|next\/headers|\bimport\s*\(/i,
+      route,
+    );
+    assert.deepEqual(
+      [
+        ...codeOf(previewSource).matchAll(
+          /^export (?:async function|function|const) (\w+)/gm,
+        ),
+      ].map((match) => match[1]),
+      ["dynamic", "GET"],
+      route,
+    );
+  }
+  // DEV-001: website & appearance studio: the two appearance routes have no
+  // sign-out or session capability: each imports only the appearance
+  // adapter, the request logger and the appearance delivery module, names no
+  // cookie, session or authentication call itself, never ends a session, and
+  // answers GET only.
+  for (const [route, depth] of [
+    ["app/appearance/theme.css/route.ts", "../../../"],
+    ["app/appearance/assets/[asset]/route.ts", "../../../../"],
+  ]) {
+    const appearanceSource = read(route);
+    assert.deepEqual(importsOf(appearanceSource), [
+      `${depth}src/infrastructure/appearance/appearance-adapter.ts`,
+      `${depth}src/infrastructure/observability/request-log.ts`,
+      `${depth}src/presentation/appearance/delivery.ts`,
+    ]);
+    assert.doesNotMatch(
+      codeOf(appearanceSource),
+      /sign-in\/actions|signOut|sign-?out|\.auth\.|cookies|getSession|getClaims|getUser|supabase-server|server-session-source|next\/headers|\bimport\s*\(/i,
+      route,
+    );
+    assert.deepEqual(
+      [
+        ...codeOf(appearanceSource).matchAll(
+          /^export (?:async function|function|const) (\w+)/gm,
+        ),
+      ].map((match) => match[1]),
+      ["dynamic", "GET"],
+      route,
+    );
+  }
   // MVP-001 S10: the Resend webhook route has no sign-out or session
   // capability either, exactly as the Daily and Stripe webhook routes: it
   // imports only its server-only webhook adapter, reads no cookie or session,
@@ -1297,10 +1363,17 @@ test("9. the server actions are POST-only, fixed-destination, and request-scoped
     "app/sign-in/actions.ts",
     "app/sign-in/page.tsx",
   ]);
+  // DEV-001: the home page renders the site chrome, whose one form is the
+  // sign-out action; the page passes the action and holds no form itself.
   const home = read("app/page.tsx");
-  assert.equal(home.match(/<form\b[^>]*>/g)?.length, 1);
-  assert.match(home, /<form action=\{signOut\}>/);
-  assert.doesNotMatch(home, /\bmethod=|href="[^"]*sign-?out/i);
+  const chrome = read("src/presentation/site-chrome.tsx");
+  assert.equal(codeOf(home).match(/<form\b/g), null);
+  assert.match(home, /signOut=\{signOut\}/);
+  assert.equal(chrome.match(/<form\b[^>]*>/g)?.length, 1);
+  assert.match(chrome, /<form action=\{signOut\}>/);
+  for (const source of [home, chrome]) {
+    assert.doesNotMatch(source, /\bmethod="post"|href="[^"]*sign-?out/i);
+  }
   // The home page reads session state only through the trusted source.
   assert.match(
     home,
@@ -1320,6 +1393,7 @@ test("10. the sign-in page is an accessible design-system form that shows only f
     "../../src/application/form-operation.ts",
     "../../src/application/sign-in-continuation.ts",
     "../../src/presentation/design-system.tsx",
+    "../../src/presentation/auth-frame.tsx",
     "../../src/presentation/form-entries.ts",
     "./actions.ts",
   ]);
@@ -1419,7 +1493,12 @@ test("10. the sign-in page is an accessible design-system form that shows only f
   const used = [
     ...new Set([...code.matchAll(/<([A-Z]\w*)/g)].map((match) => match[1])),
   ].sort();
-  assert.deepEqual(used, imported);
+  // DEV-001: the owner's UI/UX design frames the page in the shared auth
+  // frame (public header, account card, plain statements); every other
+  // component still comes from the design system, and the frame wraps
+  // the page exactly once.
+  assert.deepEqual(used, [...imported, "AuthFrame"].sort());
+  assert.equal(code.match(/<AuthFrame>/g)?.length, 1);
   // MVP-001 S5: besides the form, the one native element is the hidden
   // continuation field pinned above.
   assert.deepEqual(
@@ -1431,9 +1510,11 @@ test("10. the sign-in page is an accessible design-system form that shows only f
     code,
     /className|\bstyle=|#[0-9a-f]{3,8}\b|rgb\(|hsl\(|\.css|<style\b|https?:/i,
   );
+  // DEV-001: the shared auth frame is the public site frame, so the page
+  // names no density of its own.
   assert.deepEqual(
     [...code.matchAll(/\bdensity="([^"]+)"/g)].map((match) => match[1]),
-    ["public"],
+    [],
   );
   // The copy holds no record, placeholder, or certification claim.
   assert.doesNotMatch(

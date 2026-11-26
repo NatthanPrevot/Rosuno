@@ -72,7 +72,10 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { assertRegisteredLifecycle } from "./migration-lifecycle.mjs";
+import {
+  assertRegisteredLifecycle,
+  assertTailThenRegistered,
+} from "./migration-lifecycle.mjs";
 
 const BIN = "/usr/lib/postgresql/16/bin";
 const PORT = 54347;
@@ -487,14 +490,14 @@ function applyMigrations() {
   // in a consistent lifecycle state.
   const s10 = files.indexOf(S10_LAST);
   assert.ok(s10 >= 0, "the last S10 migration is present");
-  assert.deepEqual(files.slice(s10 + 1), [
+  assertTailThenRegistered(files.slice(s10 + 1), [
     ...S11_MIGRATIONS,
     ...S11_OPERATIONS_MIGRATIONS,
     ...S11_SURFACES_MIGRATIONS,
     ...S11_CORRECTIONS_MIGRATIONS,
     ...S11_PS_A6_MIGRATIONS,
     ...S11_OFFERED_START_MIGRATIONS,
-  ]);
+  ], S11_MIGRATIONS.at(-1));
   const workItems = JSON.parse(
     fs.readFileSync(
       path.join(REPOSITORY_ROOT, "governance/work-items/index.json"),
@@ -2779,7 +2782,11 @@ async function migrationChecks() {
         // two codes of the later registered PS-A6 migrations
         // (approve_break_glass, 20261127190000; manage_data_requests,
         // 20261127200000).
-        "approve_break_glass,authorize_jurisdiction_launch,manage_attorney_verification,manage_client_accounts,manage_complaints,manage_compliance_reviews,manage_consultation_operations,manage_data_requests,manage_financial_operations,manage_intake_configuration,manage_jurisdiction_configuration,manage_legal_holds,manage_operational_jobs,manage_policy_configuration,manage_staff_capabilities,moderate_reviews,view_audit_events,view_operations,view_referral_operations",
+        // DEV-001: website & appearance studio re-pin: and exactly the one code
+        // of the later registered site appearance migration
+        // (manage_site_appearance, 20261130010000; pending owner confirmation
+        // A53).
+        "approve_break_glass,authorize_jurisdiction_launch,manage_attorney_verification,manage_client_accounts,manage_complaints,manage_compliance_reviews,manage_consultation_operations,manage_data_requests,manage_financial_operations,manage_intake_configuration,manage_jurisdiction_configuration,manage_legal_holds,manage_operational_jobs,manage_policy_configuration,manage_site_appearance,manage_staff_capabilities,moderate_reviews,view_audit_events,view_operations,view_referral_operations",
       );
       assert.equal(
         sql(

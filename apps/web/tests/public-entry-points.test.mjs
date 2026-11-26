@@ -84,17 +84,21 @@ const relink = (code) =>
     if (s.endsWith("design-system.tsx")) {
       return `${keyword}"${pathToFileURL(join(directory, "design-system.mjs")).href}"`;
     }
+    if (s.endsWith("site-chrome.tsx")) {
+      return `${keyword}"${pathToFileURL(join(directory, "site-chrome.mjs")).href}"`;
+    }
+    if (s.endsWith("public-site.tsx")) {
+      return `${keyword}"${pathToFileURL(join(directory, "public-site.mjs")).href}"`;
+    }
     throw new Error(`unexpected import ${s}`);
   });
-writeFileSync(
-  join(directory, "design-system.mjs"),
-  relink(
-    transpile(
-      read("src/presentation/design-system.tsx"),
-      "src/presentation/design-system.tsx",
-    ),
-  ),
-);
+for (const [name, path] of [
+  ["design-system.mjs", "src/presentation/design-system.tsx"],
+  ["site-chrome.mjs", "src/presentation/site-chrome.tsx"],
+  ["public-site.mjs", "src/presentation/public-site.tsx"],
+]) {
+  writeFileSync(join(directory, name), relink(transpile(read(path), path)));
+}
 
 async function render(path) {
   const name = `${path.replace(/[/[\]]/g, "_")}.mjs`;
@@ -117,9 +121,10 @@ test("PE-1. the privacy and help pages are fixed public server pages that read a
     const source = read(path);
     const code = codeOf(source);
     assert.doesNotMatch(source, /["']use (?:client|server)["']/, path);
+    // DEV-001: the pages render the public-site frame of the owner's design.
     assert.deepEqual(importsOf(source), [
       "next",
-      "../../src/presentation/design-system.tsx",
+      "../../src/presentation/public-site.tsx",
     ]);
     assert.doesNotMatch(
       code,
@@ -127,15 +132,30 @@ test("PE-1. the privacy and help pages are fixed public server pages that read a
       path,
     );
     const page = await render(path);
+    // The page's own content (its article) is the title, the one fixed
+    // sentence and the way home; the chrome and the site-pages list around it
+    // are fixed navigation, pinned in the public-site tests.
+    const article = page.html.slice(
+      page.html.indexOf("<article"),
+      page.html.indexOf("</article>") + "</article>".length,
+    );
+    const articleText = article
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     assert.equal(
-      page.text,
+      articleText,
       `Rosuno ${title} ${sentence} Return to the home page`,
       path,
     );
-    assert.deepEqual(page.hrefs, ["/"], path);
+    assert.deepEqual(
+      [...article.matchAll(/href="([^"]*)"/g)].map((m) => m[1]),
+      ["/"],
+      path,
+    );
     assert.deepEqual(page.metadata, { title }, path);
     assert.doesNotMatch(
-      page.text,
+      articleText,
       /policy|terms|we collect|personal data|cookie|consent|retain|disclos|complain|contact us|@/i,
       path,
     );
@@ -143,12 +163,31 @@ test("PE-1. the privacy and help pages are fixed public server pages that read a
 });
 
 test("PE-2. the entry points are reachable from the home page and the client workspace as fixed first-party links", () => {
+  // DEV-001: the home page renders the site chrome, whose footer holds the
+  // fixed help and privacy entry points once each.
   const home = codeOf(read("app/page.tsx"));
+  const chrome = codeOf(read("src/presentation/site-chrome.tsx"));
+  const footer = chrome.slice(chrome.indexOf("SITE_FOOTER"));
+  assert.match(
+    home,
+    /<SitePage session=\{view\.session\} signOut=\{signOut\}>/,
+  );
+  assert.equal(footer.match(/href: "\/help"/g).length, 1);
+  assert.equal(footer.match(/href: "\/privacy"/g).length, 1);
+  // DEV-001: the owner's UI/UX design renders the client workspace inside the
+  // same site chrome, so its help and privacy entry points are the chrome's
+  // own fixed links (the header's Help and the footer's two, pinned above),
+  // and the workspace adds no second copy of either.
   const workspace = codeOf(read("app/client/page.tsx"));
-  for (const code of [home, workspace]) {
-    assert.equal(code.match(/href="\/help"/g).length, 1);
-    assert.equal(code.match(/href="\/privacy"/g).length, 1);
-  }
+  assert.equal(
+    workspace.match(
+      /<SitePage session=\{shell\.session\} signOut=\{signOut\}>/g,
+    ).length,
+    4,
+  );
+  assert.match(chrome, /\{ href: "\/help", label: "Help" \}/);
+  assert.equal(workspace.match(/href="\/help"/g), null);
+  assert.equal(workspace.match(/href="\/privacy"/g), null);
 });
 
 test("PE-3. client suggestion wording: places only ever 'may be relevant', a category only as one that may fit, no banned recommendation claim, and nothing changes until the client saves", () => {
@@ -210,18 +249,33 @@ test("PE-3. client suggestion wording: places only ever 'may be relevant', a cat
   }
   assert.equal(suggestionMessage({ status: "idle" }), null);
   // Packet rule 11: no unapproved legal text (no disclaimer wording).
-  assert.doesNotMatch(AI_SUGGESTION_NOTE, /legal advice|disclaim|liab|warrant/i);
+  assert.doesNotMatch(
+    AI_SUGGESTION_NOTE,
+    /legal advice|disclaim|liab|warrant/i,
+  );
   assert.match(AI_SUGGESTION_NOTE, /never choose an attorney/);
-  assert.match(AI_SUGGESTION_NOTE, /Nothing changes in your answers unless you save them/);
+  assert.match(
+    AI_SUGGESTION_NOTE,
+    /Nothing changes in your answers unless you save them/,
+  );
   assert.match(PREFILL_NOTE, /saved only when you save/);
   assert.match(
     suggestionMessage({ status: "ai-unavailable" }).body,
     /complete and submit your Intake on your own/,
   );
-  assert.match(routingText({ kind: "category", name: "Family" }), /your own choice, not a legal classification/);
-  assert.match(routingText({ kind: "not_sure" }), /We have not chosen one for you/);
+  assert.match(
+    routingText({ kind: "category", name: "Family" }),
+    /your own choice, not a legal classification/,
+  );
+  assert.match(
+    routingText({ kind: "not_sure" }),
+    /We have not chosen one for you/,
+  );
   assert.match(CHANGE_NOTE, /not available yet/);
-  assert.match(outcomeMessage({ status: "change-not-configured" }).title, /Not available yet/);
+  assert.match(
+    outcomeMessage({ status: "change-not-configured" }).title,
+    /Not available yet/,
+  );
 });
 
 test("PE-4. the client suggestion section is offered only on a draft with saved content, decision forms only for an undecided suggestion, and change forms only after submission or expiry", () => {

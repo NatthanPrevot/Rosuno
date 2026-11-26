@@ -24,6 +24,7 @@ import { join, posix } from "node:path";
 import { after, test } from "node:test";
 import { pathToFileURL } from "node:url";
 
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 
@@ -94,6 +95,10 @@ const CONFIGURATION_FILES = [
   "app/staff/launch/[jurisdiction]/page.tsx",
   "app/staff/launch/forms.tsx",
   "app/staff/launch/page.tsx",
+  // DEV-001: the owner's UI/UX design's staff workspace frame (a server
+  // layout) and its navigation (a client module the layout alone imports).
+  "app/staff/layout.tsx",
+  "app/staff/navigation.tsx",
   "app/staff/outcome.tsx",
   "app/staff/page.tsx",
   "app/staff/policies/[version]/page.tsx",
@@ -130,6 +135,9 @@ const S11_OPERATIONS_STAFF_FILES = [
   "app/staff/attorneys/[attorney]/page.tsx",
   "app/staff/attorneys/actions.ts",
   "app/staff/attorneys/forms.tsx",
+  // DEV-001: the owner's UI/UX design's Attorneys list, on the existing
+  // compliance workspace use case (SR-14).
+  "app/staff/attorneys/page.tsx",
   "app/staff/audit/[event]/page.tsx",
   "app/staff/audit/page.tsx",
   "app/staff/clients/[client]/page.tsx",
@@ -152,6 +160,21 @@ const S11_PS_A6_STAFF_FILES = [
   "app/staff/data-requests/actions.ts",
   "app/staff/data-requests/forms.tsx",
   "app/staff/data-requests/page.tsx",
+];
+
+// DEV-001: website & appearance studio: its own staff surface (the
+// appearance adapter's sources and its own use cases), admitted by its exact
+// files: one server page, one server action module and its client modules.
+const APPEARANCE_STAFF_FILES = [
+  "app/staff/appearance/actions.ts",
+  "app/staff/appearance/assets.tsx",
+  "app/staff/appearance/inspector.tsx",
+  "app/staff/appearance/layers.tsx",
+  "app/staff/appearance/page.tsx",
+  "app/staff/appearance/preview-frame.tsx",
+  "app/staff/appearance/publish-dialog.tsx",
+  "app/staff/appearance/studio.tsx",
+  "app/staff/appearance/versions.tsx",
 ];
 
 // Each list page: its use case. Each reads exactly one query value, page.
@@ -194,10 +217,55 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
         !f.startsWith("app/staff/finance/") &&
         !S11_STAFF_FILES.includes(f) &&
         !S11_OPERATIONS_STAFF_FILES.includes(f) &&
-        !S11_PS_A6_STAFF_FILES.includes(f),
+        !S11_PS_A6_STAFF_FILES.includes(f) &&
+        !APPEARANCE_STAFF_FILES.includes(f),
     ),
     CONFIGURATION_FILES,
   );
+  // DEV-001: website & appearance studio: its exact files; the page is a
+  // server module rendered per request and unindexed that reads the
+  // appearance adapter's sources and nothing this list forbids, the actions
+  // are one server module, and every other file is a client module that
+  // imports no infrastructure and renders no inline style or raw markup.
+  assert.deepEqual(
+    filesIn("app/staff/").filter((f) => f.startsWith("app/staff/appearance/")),
+    APPEARANCE_STAFF_FILES,
+  );
+  {
+    const file = "app/staff/appearance/page.tsx";
+    const source = read(file);
+    const code = codeOf(source);
+    assert.doesNotMatch(source, /["']use (?:client|server)["']/, file);
+    assert.match(code, /robots: \{ index: false, follow: false \},/, file);
+    assert.ok(code.indexOf("await connection();") > 0, file);
+    assert.doesNotMatch(code, FORBIDDEN_IN_PAGES, file);
+    assert.doesNotMatch(
+      code,
+      /STAFF_CONFIGURATION_SOURCES|searchParams|params/,
+      file,
+    );
+    assert.match(
+      code,
+      /import \{ APPEARANCE_SOURCES \} from "\.\.\/\.\.\/\.\.\/src\/infrastructure\/appearance\/appearance-adapter\.ts";/,
+      file,
+    );
+  }
+  assert.match(read("app/staff/appearance/actions.ts"), /^"use server";\n/);
+  for (const file of APPEARANCE_STAFF_FILES.filter(
+    (f) => !f.endsWith("page.tsx") && !f.endsWith("actions.ts"),
+  )) {
+    const source = read(file);
+    assert.match(source, /^"use client";\n/, file);
+    assert.ok(
+      importsOf(source).every((specifier) => !/infrastructure/.test(specifier)),
+      file,
+    );
+    assert.doesNotMatch(
+      codeOf(source),
+      /\bstyle=|dangerouslySetInnerHTML|innerHTML|\.rpc\(|process\.env/,
+      file,
+    );
+  }
   // MVP-001 S11 PS-A6: break-glass access and data requests are their own
   // staff surfaces, admitted by their exact files: server pages rendered per
   // request and unindexed that read the privacy adapter's sources and nothing
@@ -470,6 +538,60 @@ test("SR-1. the staff configuration routes are exactly these files: server pages
     read("app/staff/frame.tsx"),
     /["']use (?:client|server)["']/,
   );
+  // DEV-001: the owner's UI/UX design's staff workspace frame. The layout is
+  // a server module rendered per request: it opts out of prerendering, asks
+  // the step-up gate first and then only the staff home's own use case with
+  // the trusted sources, reads nothing of the request, offers no form, and
+  // imports exactly these modules. Its navigation is a client module that
+  // reads only the browser path, imports no infrastructure and holds no
+  // state, and only the layout imports it.
+  const layout = read("app/staff/layout.tsx");
+  const layoutCode = codeOf(layout);
+  assert.doesNotMatch(layout, /["']use (?:client|server)["']/);
+  assert.ok(
+    layoutCode.includes(
+      '  await connection();\n  await requireSteppedUp("staff");\n  const home = await resolveStaffHome(STAFF_CONFIGURATION_SOURCES);\n',
+    ),
+  );
+  assert.equal(layoutCode.match(/\bawait /g).length, 3);
+  assert.doesNotMatch(layoutCode, FORBIDDEN_IN_PAGES);
+  assert.doesNotMatch(
+    layoutCode,
+    /searchParams|params|<form|action=|logRequestEvent/,
+  );
+  assert.deepEqual(importsOf(layout), [
+    "next/server",
+    "react",
+    "../../src/application/staff-configuration.ts",
+    "../../src/infrastructure/staff/staff-configuration-adapter.ts",
+    "../../src/presentation/staff-workspace.tsx",
+    "../account/gate.ts",
+    "./navigation.tsx",
+  ]);
+  const navigation = read("app/staff/navigation.tsx");
+  assert.match(navigation, /^"use client";\n/);
+  assert.deepEqual(importsOf(navigation), [
+    "next/navigation",
+    "../../src/application/staff-configuration.ts",
+    "../../src/presentation/staff-workspace.tsx",
+  ]);
+  assert.ok(
+    navigation.includes(
+      'import type { StaffSurface } from "../../src/application/staff-configuration.ts";',
+    ),
+  );
+  assert.doesNotMatch(
+    codeOf(navigation),
+    /\bstyle=|dangerouslySetInnerHTML|fetch\(|useEffect|useState|useSearchParams|useParams|document\.|window\.|<form/,
+  );
+  assert.deepEqual(
+    filesIn("app/").filter(
+      (f) =>
+        /\.tsx?$/.test(f) &&
+        importsOf(read(f)).some((s) => /(?:^|\/)navigation\.tsx$/.test(s)),
+    ),
+    ["app/staff/layout.tsx"],
+  );
 });
 
 test("SR-2. the server actions hand the form and the trusted sources to the use cases, never read the previous state, and log only the action and its outcome", () => {
@@ -553,16 +675,24 @@ const react = import.meta.resolve("react");
 
 write(
   "wiring.mjs",
-  `export const wiring = { sources: null, log: [] };
+  `export const wiring = { sources: null, log: [], path: "/staff" };
 const delegate = new Proxy({}, { get: (_t, key) => wiring.sources[key] });
 export const STAFF_CONFIGURATION_SOURCES = delegate;
 export const STAFF_VERIFICATION_SOURCES = delegate;
+export const ADMINISTRATION_SOURCES = delegate;
 `,
 );
 write(
   "next-server.mjs",
   `import { wiring } from "./wiring.mjs";
 export async function connection() { wiring.log.push("connection"); }
+`,
+);
+// DEV-001: the browser path the staff navigation marks, given by the test.
+write(
+  "next-navigation.mjs",
+  `import { wiring } from "./wiring.mjs";
+export function usePathname() { return wiring.path; }
 `,
 );
 write(
@@ -624,11 +754,18 @@ function targetOf(from, specifier) {
   if (specifier === "next/server") {
     return target("next-server.mjs");
   }
+  // DEV-001: only the staff navigation reads the browser path.
+  if (specifier === "next/navigation") {
+    assert.equal(from, "app/staff/navigation.tsx");
+    return target("next-navigation.mjs");
+  }
   assert.ok(specifier.startsWith("."), `${from}: ${specifier}`);
   const path = posix.normalize(posix.join(posix.dirname(from), specifier));
   if (
     path === "src/infrastructure/staff/staff-configuration-adapter.ts" ||
-    path === "src/infrastructure/staff/staff-verification-adapter.ts"
+    path === "src/infrastructure/staff/staff-verification-adapter.ts" ||
+    // DEV-001: the Attorneys list's administration sources (SR-14).
+    path === "src/infrastructure/staff/operations-adapter.ts"
   ) {
     return target("wiring.mjs");
   }
@@ -931,7 +1068,7 @@ test("SR-8. launch offers gate changes and authorization only to their own capab
   assert.ok(otherMember.text.includes("authorize_jurisdiction_launch"));
 });
 
-test("SR-9. D-4: the verification queue page links to its neighbouring pages and to the other staff tools", async () => {
+test("SR-9. D-4: the verification queue page links to its neighbouring pages (DEV-001: the other staff tools are in the staff layout's navigation)", async () => {
   const w = createVerificationWorld();
   const a = addVerificationJurisdiction(w, 1, "SYN_A");
   for (let n = 0; n < 30; n += 1) {
@@ -950,7 +1087,13 @@ test("SR-9. D-4: the verification queue page links to its neighbouring pages and
   assert.ok(first.text.includes("More of the queue is on the next page."));
   assert.ok(first.hrefs.includes("/staff/verification?page=2"));
   assert.equal(first.text.includes("Previous page"), false);
-  assert.ok(first.hrefs.includes("/staff"));
+  // DEV-001: the owner's UI/UX design reaches the other staff tools through
+  // the staff layout's navigation (SR-13), so the queue page itself links
+  // only its rows and its neighbouring pages.
+  assert.deepEqual(
+    first.hrefs.filter((h) => !/^\/staff\/verification\/.+/.test(h)),
+    ["/staff/verification?page=2"],
+  );
   assert.equal(
     first.hrefs.filter((h) => /^\/staff\/verification\/.+/.test(h)).length,
     25,
@@ -1031,17 +1174,20 @@ test("SR-10. the job view is listed for its capability holders, shows escalated 
   }
   assert.equal(view.text.includes("Synthetic message never shown"), false);
   assert.equal(view.html.includes("synthetic-worker"), false);
+  // DEV-001: the owner's UI/UX design: the group tabs only (the other staff
+  // tools are in the staff layout's navigation, SR-13), the current group
+  // marked.
   assert.deepEqual(view.hrefs, [
-    "/staff",
     "/staff/jobs",
     "/staff/jobs?state=open",
     "/staff/jobs?state=finished",
   ]);
   assert.ok(
     view.html.includes(
-      'aria-current="page" class="rs-button" data-variant="primary" href="/staff/jobs"',
+      'class="w-tb on" href="/staff/jobs" aria-current="page"',
     ),
   );
+  assert.equal(view.html.match(/aria-current="page"/g).length, 1);
 });
 
 test("SR-11. waiting and running jobs show that they wait for a worker run, finished jobs offer no change, and every group pages on its own address", async () => {
@@ -1149,8 +1295,9 @@ test("SR-12. MVP-001 S3 part 2: the jurisdiction assessment review lists the Int
     view.text,
     /description|answer|voice|client_id|governing law is|best match|recommended/i,
   );
+  // DEV-001: the owner's UI/UX design: the group tabs only (the other staff
+  // tools are in the staff layout's navigation, SR-13).
   assert.deepEqual(view.hrefs, [
-    "/staff",
     "/staff/jurisdiction-review",
     "/staff/jurisdiction-review?group=unnamed",
   ]);
@@ -1175,11 +1322,380 @@ test("SR-12. MVP-001 S3 part 2: the jurisdiction assessment review lists the Int
     firstPage,
   );
   assert.ok(scopedView.text.includes("No assessment waits for your review."));
-  assert.deepEqual(scopedView.hrefs, ["/staff", "/staff/jurisdiction-review"]);
+  assert.deepEqual(scopedView.hrefs, ["/staff/jurisdiction-review"]);
   const refused = await render(
     "app/staff/jurisdiction-review/page.tsx",
     sources(w, plain),
     firstPage,
   );
   assert.ok(refused.text.includes("No access"));
+});
+
+// ---------------------------------------------------------------------------
+// DEV-001: the staff workspace navigation (the owner's UI/UX design)
+// ---------------------------------------------------------------------------
+
+async function renderLayout(sources, path) {
+  wiring.sources = sources;
+  wiring.path = path;
+  wiring.log.length = 0;
+  const module = await page("app/staff/layout.tsx");
+  const html = renderToStaticMarkup(
+    await module.default({
+      children: createElement("p", { id: "page-marker" }, "Page content"),
+    }),
+  );
+  return {
+    html,
+    hrefs: [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]),
+    log: [...wiring.log],
+  };
+}
+
+function sliceOf(html, open, close) {
+  const start = html.indexOf(open);
+  if (start < 0) {
+    return null;
+  }
+  return html.slice(start, html.indexOf(close, start) + close.length);
+}
+
+const hrefsIn = (html) =>
+  html === null ? [] : [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+
+test("SR-13. DEV-001: the staff workspace navigation shows only the destinations whose surfaces the staff home's use case answered for the caller, marks where the caller is, and stands in for no page's own access decision", async () => {
+  const { STAFF_SURFACES } = await import(
+    real("src/application/staff-configuration.ts")
+  );
+  const shell = await import(build("src/presentation/staff-workspace.tsx"));
+  // Every destination's view is an existing staff page, every staff surface
+  // is one destination's view, and only the overview needs no surface.
+  const views = shell.STAFF_NAVIGATION.flatMap((group) =>
+    group.destinations.flatMap((destination) => destination.views),
+  );
+  for (const view of views) {
+    assert.match(view.href, /^\/staff(\/[a-z-]+)*$/, view.href);
+    assert.ok(
+      statSync(
+        new URL(`app${view.href}/page.tsx`.replace("//", "/"), appRoot),
+      ).isFile(),
+      view.href,
+    );
+  }
+  assert.deepEqual(
+    [...new Set(views.map((view) => view.surface).filter(Boolean))].sort(),
+    [...STAFF_SURFACES].sort(),
+  );
+  assert.deepEqual(
+    views.filter((view) => view.surface === null).map((view) => view.href),
+    ["/staff"],
+  );
+  // The Owner group holds Approvals only (no owner role exists); the
+  // design's Readiness and access matrix are not shipped.
+  assert.deepEqual(
+    shell.STAFF_NAVIGATION.map((group) => [
+      group.id,
+      group.destinations.map((destination) => destination.id),
+    ]),
+    [
+      ["home", ["overview"]],
+      ["owner", ["approvals"]],
+      ["operations", ["bookings", "support"]],
+      ["people", ["attorneys", "clients", "applications"]],
+      ["platform", ["marketplace", "finance"]],
+      ["admin", ["staff", "settings"]],
+    ],
+  );
+
+  const { w, admin, scoped, plain } = world();
+  const nav = (html) => hrefsIn(sliceOf(html, '<nav class="st-nav"', "</nav>"));
+  const tabs = (html) =>
+    hrefsIn(sliceOf(html, '<nav class="w-tabs st-tabs st-vtabs"', "</nav>"));
+  // A holder of every configuration capability: exactly the destinations
+  // holding the surfaces the staff home answered, each to its first held
+  // view, then the account link; the page follows unchanged.
+  const full = await renderLayout(sources(w, admin), "/staff/launch");
+  assert.deepEqual(full.log, ["connection"]);
+  assert.deepEqual(nav(full.html), [
+    "/staff",
+    "/staff/policies",
+    "/staff/attorneys",
+    "/staff/verification",
+    "/staff/jurisdictions",
+    "/staff/capabilities",
+  ]);
+  assert.deepEqual(full.hrefs, [
+    "/",
+    ...nav(full.html),
+    "/account/security",
+    ...tabs(full.html),
+  ]);
+  assert.ok(
+    full.html.endsWith(
+      '<p id="page-marker">Page content</p></div></div></div></div></div>',
+    ),
+  );
+  // The current destination and its current view are marked, and the
+  // destination's held views are its tabs.
+  assert.equal(full.html.match(/aria-current="page"/g).length, 2);
+  assert.ok(
+    full.html.includes(
+      'class="w-ni on" href="/staff/jurisdictions" aria-current="page"',
+    ),
+  );
+  assert.deepEqual(tabs(full.html), [
+    "/staff/jurisdictions",
+    "/staff/launch",
+    "/staff/catalog",
+    "/staff/intake-configuration",
+    "/staff/jurisdiction-review",
+  ]);
+  assert.ok(
+    full.html.includes(
+      'class="w-tb on" href="/staff/launch" aria-current="page"',
+    ),
+  );
+  // A record page belongs to its list's view.
+  const record = await renderLayout(
+    sources(w, admin),
+    "/staff/capabilities/00000000-0000-4000-8000-000000000001",
+  );
+  assert.ok(
+    record.html.includes(
+      'class="w-ni on" href="/staff/capabilities" aria-current="page"',
+    ),
+  );
+  // Only the held views are tabs (the activity log needs view_audit_events,
+  // which this caller does not hold), the list's view marked.
+  assert.deepEqual(tabs(record.html), [
+    "/staff/capabilities",
+    "/staff/break-glass",
+  ]);
+  assert.ok(
+    record.html.includes(
+      'class="w-tb on" href="/staff/capabilities" aria-current="page"',
+    ),
+  );
+  // A destination with one held view shows no tabs.
+  const policies = await renderLayout(sources(w, scoped), "/staff/policies");
+  assert.deepEqual(nav(policies.html), [
+    "/staff",
+    "/staff/policies",
+    "/staff/break-glass",
+  ]);
+  assert.deepEqual(tabs(policies.html), []);
+  // An active staff member without any grant: the dashboard and break-glass
+  // access only.
+  const none = await renderLayout(sources(w, plain), "/staff");
+  assert.deepEqual(nav(none.html), ["/staff", "/staff/break-glass"]);
+  assert.deepEqual(tabs(none.html), []);
+  for (const forbidden of [
+    "/staff/policies",
+    "/staff/verification",
+    "/staff/finance",
+    "/staff/capabilities",
+    "/staff/jobs",
+  ]) {
+    assert.equal(none.hrefs.includes(forbidden), false, forbidden);
+  }
+  // On a page the caller does not hold, nothing of it is advertised: the
+  // page's own refusal decides, the navigation adds no way in.
+  const elsewhere = await renderLayout(sources(w, plain), "/staff/catalog");
+  assert.deepEqual(nav(elsewhere.html), ["/staff", "/staff/break-glass"]);
+  assert.equal(elsewhere.html.includes('aria-current="page"'), false);
+  assert.deepEqual(tabs(elsewhere.html), []);
+  // DEV-001: website & appearance studio: a holder of the global
+  // manage_site_appearance grant only sees Settings, opening the studio (its
+  // one held view, so no tabs); a scoped grant opens nothing.
+  const designer = addStaff(w, 13);
+  grant(w, designer.userId, "manage_site_appearance");
+  const studio = await renderLayout(sources(w, designer), "/staff/appearance");
+  assert.deepEqual(nav(studio.html), [
+    "/staff",
+    "/staff/break-glass",
+    "/staff/appearance",
+  ]);
+  assert.ok(
+    studio.html.includes(
+      'class="w-ni on" href="/staff/appearance" aria-current="page"',
+    ),
+  );
+  assert.deepEqual(tabs(studio.html), []);
+  const scopedDesigner = addStaff(w, 14);
+  grant(w, scopedDesigner.userId, "manage_site_appearance", {
+    jurisdiction_id: addJurisdiction(w, 2, "SYN_B"),
+  });
+  const scopedStudio = await renderLayout(
+    sources(w, scopedDesigner),
+    "/staff/appearance",
+  );
+  assert.deepEqual(nav(scopedStudio.html), ["/staff", "/staff/break-glass"]);
+  assert.equal(scopedStudio.html.includes("/staff/appearance"), false);
+  const operator = jobWorld();
+  const jobs = await renderLayout(
+    sources(operator.w, operator.operator),
+    "/staff/jobs",
+  );
+  assert.deepEqual(nav(jobs.html), [
+    "/staff",
+    "/staff/break-glass",
+    "/staff/jobs",
+  ]);
+  // A visitor the staff home does not admit, or a home that cannot be read:
+  // the frame with the brand only, no navigation, no account link.
+  for (const [name, refused] of [
+    ["signed out", configurationSources(w, null)],
+    ["unavailable", { ...sources(w, admin), reads: async () => null }],
+  ]) {
+    const frame = await renderLayout(refused, "/staff");
+    assert.deepEqual(frame.hrefs, ["/"], name);
+    assert.equal(frame.html.includes("<nav"), false, name);
+    assert.ok(
+      frame.html.includes('<p id="page-marker">Page content</p>'),
+      name,
+    );
+  }
+  // The frame offers no form, field or button of its own.
+  assert.doesNotMatch(full.html, /<form|<input|<select|<textarea|<button/);
+});
+
+// DEV-001: the owner's UI/UX design's Attorneys list, over the existing
+// compliance workspace use case and its administration reads (synthetic).
+function administration(w, who, records) {
+  const calls = [];
+  return {
+    calls,
+    sources: {
+      staff: sources(w, who),
+      reads: async () => ({
+        complianceSummary: async () => ({ kind: "rows", rows: [] }),
+        complianceRecords: async (section, offset) => {
+          calls.push([section, offset]);
+          return records === null ? null : { kind: "rows", rows: records };
+        },
+        policyChanges: async () => ({ kind: "rows", rows: [] }),
+        jurisdictionNames: async () => ({ kind: "rows", rows: [] }),
+      }),
+      writes: async () => null,
+      environment: () => null,
+    },
+  };
+}
+
+const profileRow = (w, n, state) => ({
+  record_type: "attorney_profile",
+  record_id: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
+  attorney_id: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
+  display_name: `Synthetic Attorney ${n}`,
+  profile_state: state,
+  jurisdiction_id: null,
+  status_code: null,
+  recorded_at: stamp(w.now - n * 1000),
+  lapses_on: null,
+});
+
+test("SR-14. DEV-001: the Attorneys list shows the attorney records only to holders of manage_attorney_verification, one profile stage at a time, links a profile's lifecycle page only for the global grant, and refuses everyone else with no record", async () => {
+  const { w, a, admin, plain } = world();
+  const STAGE_HREFS = [
+    "/staff/attorneys?section=under_review",
+    "/staff/attorneys?section=approved",
+    "/staff/attorneys?section=suspended",
+    "/staff/attorneys?section=removed",
+  ];
+  // A global holder: the first stage, each row opening its lifecycle page.
+  const global = administration(w, admin, [profileRow(w, 70, "under_review")]);
+  const first = await render(
+    "app/staff/attorneys/page.tsx",
+    global.sources,
+    firstPage,
+  );
+  assert.deepEqual(first.log, ["connection"]);
+  assert.deepEqual(global.calls, [["under_review", 0]]);
+  assert.ok(first.metadata.robots.index === false);
+  assert.ok(first.text.includes("Applications under review"));
+  assert.ok(first.text.includes("Synthetic Attorney 70"));
+  assert.deepEqual(first.hrefs, [
+    ...STAGE_HREFS,
+    "/staff/attorneys/00000000-0000-4000-8000-000000000070",
+  ]);
+  assert.ok(
+    first.html.includes(
+      'class="w-tb on" href="/staff/attorneys?section=under_review" aria-current="page"',
+    ),
+  );
+  assert.equal(first.html.includes("<form"), false);
+  // A profile stage is read as asked; any other section shows the first
+  // stage (the page lists attorney profiles only).
+  const removed = administration(w, admin, [profileRow(w, 71, "removed")]);
+  await render("app/staff/attorneys/page.tsx", removed.sources, {
+    searchParams: Promise.resolve({ section: "removed", page: "2" }),
+  });
+  assert.deepEqual(removed.calls, [["removed", 25]]);
+  const other = administration(w, admin, []);
+  const fallback = await render("app/staff/attorneys/page.tsx", other.sources, {
+    searchParams: Promise.resolve({ section: "waitlist" }),
+  });
+  assert.deepEqual(other.calls, [["under_review", 0]]);
+  assert.ok(fallback.text.includes("There is nothing in this section."));
+  // A jurisdiction-scoped holder reads the records but opens no lifecycle
+  // page (it needs the global grant).
+  const reviewer = addStaff(w, 14);
+  grant(w, reviewer.userId, "manage_attorney_verification", {
+    jurisdiction_id: a,
+  });
+  const scoped = administration(w, reviewer, [
+    profileRow(w, 72, "under_review"),
+  ]);
+  const scopedView = await render(
+    "app/staff/attorneys/page.tsx",
+    scoped.sources,
+    firstPage,
+  );
+  assert.ok(scopedView.text.includes("Synthetic Attorney 72"));
+  assert.deepEqual(scopedView.hrefs, STAGE_HREFS);
+  // A staff member holding none of the compliance capabilities, and one
+  // holding another compliance capability but not the attorney records:
+  // the fixed refusal, no record read and none shown.
+  const holds = addStaff(w, 15);
+  grant(w, holds.userId, "manage_legal_holds");
+  for (const who of [plain, holds]) {
+    const refused = administration(w, who, [profileRow(w, 73, "under_review")]);
+    const view = await render(
+      "app/staff/attorneys/page.tsx",
+      refused.sources,
+      firstPage,
+    );
+    assert.deepEqual(refused.calls, []);
+    assert.ok(view.text.includes("Attorneys not available"));
+    assert.ok(view.text.includes("No access"));
+    assert.equal(view.text.includes("Synthetic Attorney"), false);
+    assert.deepEqual(view.hrefs, ["/staff"]);
+  }
+  // Records that cannot be read: the unavailable page and its one log line.
+  const broken = administration(w, admin, null);
+  const unavailable = await render(
+    "app/staff/attorneys/page.tsx",
+    broken.sources,
+    firstPage,
+  );
+  assert.ok(unavailable.text.includes("Attorneys unavailable"));
+  assert.deepEqual(unavailable.hrefs, []);
+  assert.deepEqual(unavailable.log, [
+    "connection",
+    {
+      level: "warn",
+      event: "staff_configuration.view_unavailable",
+      fields: { route: "/staff/attorneys", outcome: "unavailable" },
+    },
+  ]);
+  // The page asks only the compliance workspace use case, with the trusted
+  // administration sources, and reads only its two query values.
+  const code = codeOf(read("app/staff/attorneys/page.tsx"));
+  assert.ok(
+    code.includes(
+      "  const { section, page } = await searchParams;\n  const workspace = await resolveComplianceWorkspace(\n    ADMINISTRATION_SOURCES,\n",
+    ),
+  );
+  assert.equal(code.match(/await /g).length, 4);
+  assert.doesNotMatch(code, /\bparams\b|STAFF_CONFIGURATION_SOURCES/);
 });

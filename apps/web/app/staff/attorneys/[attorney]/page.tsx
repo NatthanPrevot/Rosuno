@@ -11,6 +11,10 @@
 // reinstatement while a rejoin review is open. An unknown or malformed
 // identifier shows that no profile is available. The one route value read,
 // attorney, only names the profile.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, the Attorneys record):
+// the design's record panel with the stage pill, the profile facts, the link
+// to the verification record and the one lifecycle panel.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -20,19 +24,19 @@ import {
   resolveAttorneyLifecycle,
 } from "../../../../src/application/administration-workspace.ts";
 import { ADMINISTRATION_SOURCES } from "../../../../src/infrastructure/staff/operations-adapter.ts";
-import {
-  Alert,
-  ButtonLink,
-  Cluster,
-  Status,
-  Table,
-  Text,
-} from "../../../../src/presentation/design-system.tsx";
+import { Alert } from "../../../../src/presentation/design-system.tsx";
 import {
   PROFILE_STAGE_LABELS,
   REJOIN_REVIEW_NOTE,
   utcText,
 } from "../../../../src/presentation/operations-labels.ts";
+import {
+  Block,
+  Empty,
+  KeyValues,
+  Note,
+  RecordPanel,
+} from "../../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
 import { BackLink, refusalPage, StaffFrame } from "../../frame.tsx";
 import { AttorneyLifecyclePanel } from "../forms.tsx";
@@ -41,6 +45,8 @@ export const metadata: Metadata = {
   title: "Attorney operations",
   robots: { index: false, follow: false },
 };
+
+const BACK = { href: "/staff/attorneys", label: "Attorneys" };
 
 export default async function AttorneyOperationsPage({
   params,
@@ -65,53 +71,56 @@ export default async function AttorneyOperationsPage({
   const { attorney } = view;
   if (attorney === null) {
     return (
-      <StaffFrame eyebrow="Attorneys" title="Attorney operations">
-        <BackLink href="/staff/compliance">Compliance</BackLink>
-        <Text>No such attorney profile is available.</Text>
+      <StaffFrame title="Attorney operations">
+        <BackLink href={BACK.href}>{BACK.label}</BackLink>
+        <section className="w-card st-panel">
+          <Empty title="No such attorney profile is available." />
+        </section>
       </StaffFrame>
     );
   }
   const stage = PROFILE_STAGE_LABELS[attorney.state];
   const intents = lifecycleIntentsFor(attorney.state);
   return (
-    <StaffFrame eyebrow="Attorneys" title="Attorney operations">
-      <BackLink href="/staff/compliance">Compliance</BackLink>
-      <Table id="attorney-profile" caption="Attorney profile">
-        <tbody>
-          <tr>
-            <th scope="row">Profile identifier</th>
-            <td>{attorney.id}</td>
-          </tr>
-          <tr>
-            <th scope="row">Name</th>
-            <td>{attorney.displayName ?? "No name recorded"}</td>
-          </tr>
-          <tr>
-            <th scope="row">Stage</th>
-            <td>
-              <Status tone={stage.tone}>{stage.label}</Status>
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">Last changed (UTC)</th>
-            <td>{utcText(attorney.updatedAt)}</td>
-          </tr>
-        </tbody>
-      </Table>
-      <Cluster>
-        <ButtonLink
-          variant="secondary"
-          href={`/staff/verification/${attorney.id}`}
-        >
-          Open the verification record
-        </ButtonLink>
-      </Cluster>
+    <RecordPanel
+      titleId="staff-configuration-title"
+      title={attorney.displayName ?? "No name recorded"}
+      sub="Attorney operations · times in UTC"
+      pill={{ tone: stage.tone, label: stage.label }}
+      back={BACK}
+    >
+      <Block title="Attorney profile">
+        <KeyValues
+          items={[
+            ["Profile identifier", attorney.id],
+            ["Name", attorney.displayName ?? "No name recorded"],
+            ["Stage", stage.label],
+            ["Last changed (UTC)", utcText(attorney.updatedAt)],
+          ]}
+        />
+        <Note>
+          Each status is separate: the profile stage does not verify
+          credentials, authorize a practice area or make an attorney eligible.
+        </Note>
+        <div className="st-links">
+          <a
+            className="btn btn-line btn-sm"
+            href={`/staff/verification/${attorney.id}`}
+          >
+            Open the verification record
+          </a>
+        </div>
+      </Block>
       {attorney.rejoinReviewOpen ? (
-        <Alert tone="warning" title="Compliance review open" role="status">
-          {REJOIN_REVIEW_NOTE}
-        </Alert>
+        <Block>
+          <Alert tone="warning" title="Compliance review open" role="status">
+            {REJOIN_REVIEW_NOTE}
+          </Alert>
+        </Block>
       ) : null}
-      <AttorneyLifecyclePanel attorney={attorney.id} intents={intents} />
-    </StaffFrame>
+      <Block title="Lifecycle">
+        <AttorneyLifecyclePanel attorney={attorney.id} intents={intents} />
+      </Block>
+    </RecordPanel>
   );
 }

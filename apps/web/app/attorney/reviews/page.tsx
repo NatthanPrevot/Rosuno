@@ -7,6 +7,12 @@
 // attorney: the rating, the text and the publication instant. Never the
 // client, the Consultation, a submitted or a rejected review, and no stored
 // aggregate (PS P3).
+//
+// DEV-001: the owner's UI/UX design (UIUX-HANDOFF-P2 build_p8, the attorney
+// workspace Public profile, reviews): the workspace frame around the
+// published reviews as the design's review rows, with the section's switch
+// to the profile. Clients are never named. A visitor the page does not admit
+// sees the design's signed-out panel.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -16,6 +22,12 @@ import { resolveAttorneyReviews } from "../../../src/application/reviews.ts";
 import { ATTORNEY_REVIEW_SOURCES } from "../../../src/infrastructure/consultations/completion-adapter.ts";
 import { logRequestEvent } from "../../../src/infrastructure/observability/request-log.ts";
 import {
+  AttorneyGate,
+  AttorneyWorkspace,
+  Card,
+  PROFILE_PAGES,
+} from "../../../src/presentation/attorney-workspace.tsx";
+import {
   RATING_LABELS,
   utcText,
 } from "../../../src/presentation/completion-labels.ts";
@@ -23,11 +35,6 @@ import {
   Alert,
   ButtonLink,
   Cluster,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
-  Surface,
   Text,
 } from "../../../src/presentation/design-system.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
@@ -37,24 +44,23 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function Frame({ children }: { readonly children: ReactNode }) {
+const BACK = (
+  <Cluster>
+    <ButtonLink variant="tertiary" href="/attorney">
+      Back to your workspace
+    </ButtonLink>
+  </Cluster>
+);
+
+function GateFrame({ children }: { readonly children: ReactNode }) {
   return (
-    <Page density="attorney">
-      <Surface emphasis="raised" labelledBy="attorney-reviews-title">
-        <Stack>
-          <Eyebrow>Attorney workspace</Eyebrow>
-          <Heading as="h1" size="lg" id="attorney-reviews-title">
-            Your published reviews
-          </Heading>
-          {children}
-          <Cluster>
-            <ButtonLink variant="tertiary" href="/attorney">
-              Back to your workspace
-            </ButtonLink>
-          </Cluster>
-        </Stack>
-      </Surface>
-    </Page>
+    <AttorneyGate
+      titleId="attorney-reviews-title"
+      title="Your published reviews"
+    >
+      {children}
+      {BACK}
+    </AttorneyGate>
   );
 }
 
@@ -65,23 +71,23 @@ export default async function AttorneyReviewsPage() {
   const view = await resolveAttorneyReviews(ATTORNEY_REVIEW_SOURCES);
   if (view.status === "sign-in-required") {
     return (
-      <Frame>
+      <GateFrame>
         <Text tone="muted">Sign in to see your reviews.</Text>
         <Cluster>
           <ButtonLink variant="primary" href="/sign-in">
             Sign in
           </ButtonLink>
         </Cluster>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status === "denied") {
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="warning" title="Not available" role="status">
           This account does not have published reviews.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   if (view.status !== "ready") {
@@ -90,39 +96,60 @@ export default async function AttorneyReviewsPage() {
       outcome: view.status,
     });
     return (
-      <Frame>
+      <GateFrame>
         <Alert tone="error" title="Something went wrong" role="alert">
           Your reviews could not be shown right now. Please try again later.
         </Alert>
-      </Frame>
+      </GateFrame>
     );
   }
   return (
-    <Frame>
-      <Text tone="muted">
-        Reviews come from clients of your completed consultations and are
-        published after Rosuno reviews them. Clients are never named.
-      </Text>
-      {view.reviews.length === 0 ? (
-        <Text>You have no published review yet.</Text>
-      ) : (
-        view.reviews.map((review, index) => (
-          <Surface
-            key={`${review.publishedAt}-${index}`}
-            labelledBy={`attorney-review-${index}`}
-          >
-            <Stack gap="tight">
-              <Heading as="h2" size="sm" id={`attorney-review-${index}`}>
-                {`Rating: ${RATING_LABELS[review.rating]}`}
-              </Heading>
-              {review.text === null ? null : <Text>{review.text}</Text>}
-              <Text size="small" tone="muted">
-                {`Published ${utcText(review.publishedAt)}`}
-              </Text>
-            </Stack>
-          </Surface>
-        ))
-      )}
-    </Frame>
+    <AttorneyWorkspace
+      section="profile"
+      titleId="attorney-reviews-title"
+      title="Your published reviews"
+      description="What clients see on Rosuno"
+      width="narrow"
+      pages={{
+        label: "Public profile pages",
+        links: PROFILE_PAGES,
+        current: "/attorney/reviews",
+      }}
+    >
+      <Card
+        id="attorney-reviews-list"
+        title="Reviews"
+        count={view.reviews.length}
+      >
+        <Text tone="muted">
+          Reviews come from clients of your completed consultations and are
+          published after Rosuno reviews them. Clients are never named.
+        </Text>
+        {view.reviews.length === 0 ? (
+          <div className="w-calm">
+            <span className="sm b">You have no published review yet.</span>
+          </div>
+        ) : (
+          <ul className="w-feed aw-reviews">
+            {view.reviews.map((review, index) => (
+              <li key={`${review.publishedAt}-${index}`}>
+                <span className="col grow l-g0-minw0 aw-review">
+                  <h2 className="sm b" id={`attorney-review-${index}`}>
+                    {`Rating: ${RATING_LABELS[review.rating]}`}
+                  </h2>
+                  {review.text === null ? null : (
+                    <p className="sm aw-review-text">{review.text}</p>
+                  )}
+                  <span className="xs subtle">
+                    {`Published ${utcText(review.publishedAt)}`}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      {BACK}
+    </AttorneyWorkspace>
   );
 }

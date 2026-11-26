@@ -13,21 +13,42 @@
 // fixed first-party pages.
 
 import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { test } from "node:test";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, test } from "node:test";
+import { pathToFileURL } from "node:url";
+
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import ts from "typescript";
 
 import {
   ACCOUNT_OVERVIEW_COLUMNS,
+  ACTIVITY_COLUMNS,
   alertSummaryOf,
   ATTORNEY_DOCUMENT_COLUMNS,
   availabilitySummaryOf,
   CLIENT_PAYMENT_COLUMNS,
+  CLIENT_REQUEST_COLUMNS,
   clientHomeOf,
   COMPLIANCE_RECORD_COLUMNS,
   complianceAlertsOf,
+  CONSULTATION_OUTCOMES,
   consultationSummaryOf,
   DATA_CATEGORIES,
+  isActivityPeriod,
+  REQUEST_OUTCOMES,
   requestSummaryOf,
+  resolveAttorneyActivity,
   resolveAttorneyCompliance,
   resolveAttorneyComplianceRecords,
   resolveAttorneyDashboard,
@@ -36,6 +57,7 @@ import {
   resolveAttorneyThreads,
   resolveClientAccount,
   resolveClientPayments,
+  resolveClientRequests,
   resolveClientThreads,
   resolveScheduleWeek,
   THREAD_COLUMNS,
@@ -98,10 +120,17 @@ const CLIENT_PAGES = Object.freeze({
     "resolveClientAccount(CLIENT_WORKSPACE_SOURCES)",
   "app/client/privacy/page.tsx":
     "resolveClientAccount(CLIENT_WORKSPACE_SOURCES)",
+  // DEV-001: the owner's UI/UX design's Account security page reads the same
+  // account overview, held to the same contract.
+  "app/client/settings/security/page.tsx":
+    "resolveClientAccount(CLIENT_WORKSPACE_SOURCES)",
 });
 const ATTORNEY_PAGES = Object.freeze({
+  // DEV-001: the owner's UI/UX design's Overview hands the dashboard use case
+  // its own sources through a wrapper that keeps what each answered (pinned
+  // in S11C-1); the use case and its sources are unchanged.
   "app/attorney/dashboard/page.tsx":
-    "resolveAttorneyDashboard(DASHBOARD_SOURCES)",
+    "resolveAttorneyDashboard(keepingSources(kept))",
   "app/attorney/consultations/history/page.tsx":
     "resolveAttorneyHistory(ATTORNEY_WORKSPACE_SOURCES)",
   "app/attorney/schedule/week/page.tsx":
@@ -112,6 +141,16 @@ const ATTORNEY_PAGES = Object.freeze({
     "resolveAttorneyDocuments(ATTORNEY_WORKSPACE_SOURCES)",
   "app/attorney/compliance/page.tsx":
     "resolveAttorneyCompliance({ professional: ATTORNEY_PROFESSIONAL_SOURCES, workspace: ATTORNEY_WORKSPACE_SOURCES, })",
+});
+// DEV-001: the owner's UI/UX design shows the client's own open Requests
+// (client_requests) on the client's Overview and My consultations; each page
+// makes exactly this one call of the participant workspace sources (its
+// position after the existing reads is pinned in S11C-18).
+const REQUEST_PAGES = Object.freeze({
+  "app/client/page.tsx":
+    'resolveClientRequests( CLIENT_WORKSPACE_SOURCES, "open", "1", );',
+  "app/client/consultations/page.tsx":
+    'resolveClientRequests( CLIENT_WORKSPACE_SOURCES, "open", pending ? page : "1", );',
 });
 const pathOf = (file) =>
   `/${file.replace(/^app\//, "").replace(/\/page\.tsx$/, "")}`;
@@ -186,6 +225,16 @@ function workspaceWorld(answers = {}, options = {}) {
     compliance: async () => {
       calls.push(["compliance"]);
       return answers.compliance ?? rows([]);
+    },
+    // DEV-001 (20261129010000): the client's own Requests and the
+    // attorney's own activity counts.
+    requests: async (segment, offset) => {
+      calls.push(["requests", segment, offset]);
+      return answers.requests ?? rows([]);
+    },
+    activity: async (from, until) => {
+      calls.push(["activity", from, until]);
+      return answers.activity ?? rows([]);
     },
   };
   return {
@@ -301,7 +350,24 @@ test("S11C-1 (MBS section 18.6) the new pages are server pages rendered per requ
       // MVP-001 S11 PS-A6 section 3: the privacy and data page also renders
       // the data request forms of its own client module (the one admitted
       // sibling import).
-      if (file === "app/client/privacy/page.tsx" && specifier === "./forms.tsx") {
+      if (
+        file === "app/client/privacy/page.tsx" &&
+        specifier === "./forms.tsx"
+      ) {
+        continue;
+      }
+      // DEV-001: the owner's UI/UX design renders the client pages inside the
+      // site chrome, which offers the existing sign-out server action; a page
+      // imports exactly that action and hands it only to the chrome (it still
+      // renders no form and offers no action of its own, checked above).
+      if (/^(?:\.\.\/)+sign-in\/actions\.ts$/.test(specifier)) {
+        assert.ok(
+          source.includes(`\nimport { signOut } from "${specifier}";\n`),
+          `${file}: ${specifier}`,
+        );
+        const handed = code.match(/signOut=\{signOut\}/g)?.length ?? 0;
+        assert.ok(handed > 0, file);
+        assert.equal(code.match(/\bsignOut\b/g).length, 1 + 2 * handed, file);
         continue;
       }
       assert.match(
@@ -319,6 +385,55 @@ test("S11C-1 (MBS section 18.6) the new pages are server pages rendered per requ
       );
     } else {
       assert.doesNotMatch(code, /requireSteppedUp/, file);
+    }
+    // DEV-001: the Overview's wrapper hands the dashboard exactly its own
+    // production sources, keeping the queue, the Consultation list and the
+    // clock reading each source answered; every source still runs once, as
+    // the dashboard asks, and nothing else is read.
+    if (file === "app/attorney/dashboard/page.tsx") {
+      assert.ok(
+        code.includes(
+          "function keepingSources(kept: Kept): AttorneyDashboardSources {\n  return Object.freeze({\n    ...DASHBOARD_SOURCES,\n    consultations: async () =>\n      (kept.consultations = await DASHBOARD_SOURCES.consultations()),\n    requests: async () => (kept.queue = await DASHBOARD_SOURCES.requests()),\n    clock: () => (kept.now = DASHBOARD_SOURCES.clock()),\n  });\n}\n",
+        ),
+        file,
+      );
+      assert.equal(code.match(/keepingSources\(/g).length, 2, file);
+      assert.equal(code.match(/DASHBOARD_SOURCES\./g).length, 3, file);
+      assert.ok(
+        code.includes(
+          "  const kept: Kept = {};\n  const view = await resolveAttorneyDashboard(keepingSources(kept));\n",
+        ),
+        file,
+      );
+      // DEV-001: the owner's UI/UX design's performance panel reads the
+      // attorney's own activity counts exactly once, through the participant
+      // workspace sources (which admit the attorney through the Security
+      // Shell again), after the dashboard and its refusals, for the calendar
+      // month in UTC of the dashboard's own clock reading (kept above); the
+      // page reads no other clock.
+      assert.equal(code.match(/resolveAttorneyActivity\(/g).length, 1, file);
+      assert.ok(
+        code
+          .replace(/\n(?:[ \t]*\n)+/g, "\n")
+          .includes(
+            "  const now =\n    kept.now !== undefined && Number.isFinite(kept.now) ? kept.now : null;\n  const period = monthPeriodOf(now);\n  const activity = await resolveAttorneyActivity(\n    ATTORNEY_WORKSPACE_SOURCES,\n    period,\n  );\n",
+          ),
+        file,
+      );
+      assert.equal(code.match(/\bmonthPeriodOf\(/g).length, 1, file);
+      assert.equal(code.match(/\bkept\.now\b/g).length, 4, file);
+      assert.doesNotMatch(code, /Date\.now|new Date\(|performance\.now/, file);
+      const order = [
+        "await connection();",
+        'await requireSteppedUp("attorney");',
+        "await resolveAttorneyDashboard(",
+        'if (view.status !== "ready") {',
+        "await resolveAttorneyActivity(",
+      ].map((step) => code.indexOf(step));
+      assert.ok(
+        order.every((at, n) => at > 0 && (n === 0 || at > order[n - 1])),
+        `${file}: ${order}`,
+      );
     }
     const queries = code.match(/\bsearchParams\b/g)?.length ?? 0;
     if (file === "app/client/payments/page.tsx") {
@@ -360,17 +475,40 @@ test("S11C-1 (MBS section 18.6) the new pages are server pages rendered per requ
       );
     }
   }
-  // The participant workspace adapter is reached only by these pages.
+  // The participant workspace adapter is reached only by these pages and,
+  // DEV-001: the owner's UI/UX design, by the client's Overview and My
+  // consultations for exactly the client's own open Requests.
   for (const file of [...filesIn("app/"), ...filesIn("src/")].filter((f) =>
     /\.tsx?$/.test(f),
   )) {
     if (/workspace-adapter\.ts/.test(read(file))) {
       assert.ok(
-        Object.hasOwn(all, file) &&
+        (Object.hasOwn(all, file) || Object.hasOwn(REQUEST_PAGES, file)) &&
           file !== "app/attorney/schedule/week/page.tsx",
         file,
       );
     }
+  }
+  // DEV-001: each of those two client pages imports exactly the client's
+  // participant workspace sources and hands them only to its one
+  // client_requests call; it reads no other request value of its own.
+  for (const [file, call] of Object.entries(REQUEST_PAGES)) {
+    const source = read(file);
+    const code = codeOf(source);
+    assert.equal(source.match(/workspace-adapter\.ts/g).length, 1, file);
+    assert.match(
+      code,
+      /^import \{ CLIENT_WORKSPACE_SOURCES \} from "(?:\.\.\/)+src\/infrastructure\/workspaces\/workspace-adapter\.ts";$/m,
+      file,
+    );
+    assert.equal(code.match(/\bCLIENT_WORKSPACE_SOURCES\b/g).length, 2, file);
+    assert.equal(code.match(/resolveClientRequests\(/g).length, 1, file);
+    assert.ok(code.replace(/\s+/g, " ").includes(call), `${file}: ${call}`);
+    assert.doesNotMatch(
+      code,
+      /headers\(|cookies\(|process\.env|dangerouslySetInnerHTML|\.rpc\(|\.from\(|createClient|service_role|\bparams\b/,
+      file,
+    );
   }
 });
 
@@ -396,32 +534,250 @@ test("S11C-2 one consistent navigation per workspace: fixed first-party links, e
       assert.ok(link.label.length > 0 && link.label.length <= 40);
     }
   }
-  for (const file of Object.keys(CLIENT_PAGES)) {
-    const code = codeOf(read(file));
-    assert.ok(
-      code.includes(`<ClientNavigation current="${pathOf(file)}" />`),
-      file,
-    );
-    assert.ok(
-      labels.CLIENT_NAVIGATION.some((link) => link.href === pathOf(file)),
-      file,
-    );
-  }
-  for (const file of Object.keys(ATTORNEY_PAGES)) {
-    const code = codeOf(read(file));
-    assert.ok(
-      code.includes(`<AttorneyNavigation current="${pathOf(file)}" />`),
-      file,
-    );
-    assert.ok(
-      labels.ATTORNEY_NAVIGATION.some((link) => link.href === pathOf(file)),
-      file,
-    );
-  }
-  const home = codeOf(read("app/client/page.tsx"));
-  const homeLinks = new Set(
-    [...home.matchAll(/href="([^"]*)"/g)].map((m) => m[1]),
+  // DEV-001: the owner's UI/UX design gives the client account one
+  // navigation (fixed first-party links, each to a client page that exists,
+  // its own area marked), which the account frame renders on the home and on
+  // every account page, inside the site chrome. The home reaches every client
+  // area of the set from that navigation, the chrome's primary links (Find an
+  // attorney, Help) or its own page-local links.
+  const account = codeOf(read("src/presentation/client-account.tsx"));
+  const accountNavigation = [
+    ...account
+      .slice(
+        account.indexOf("export const CLIENT_ACCOUNT_NAVIGATION:"),
+        account.indexOf("export const CLIENT_ACCOUNT_NAVIGATION_LABEL"),
+      )
+      .replace(/\s+/g, " ")
+      .matchAll(/\{ area: "([a-z]+)", href: "([^"]+)", label: "([^"]+)",? \}/g),
+  ].map(([, area, href, label]) => ({ area, href, label }));
+  assert.deepEqual(
+    accountNavigation.map((link) => link.area),
+    [
+      "overview",
+      "consultations",
+      "matters",
+      "payments",
+      "profile",
+      "settings",
+      "help",
+    ],
   );
+  assert.equal(
+    new Set(accountNavigation.map((link) => link.href)).size,
+    accountNavigation.length,
+  );
+  for (const link of accountNavigation) {
+    assert.match(link.href, /^\/client(?:\/[a-z-/]*)?$/, link.href);
+    assert.ok(exists(link.href), link.href);
+    assert.ok(link.label.length > 0 && link.label.length <= 40);
+  }
+  assert.match(
+    account,
+    /aria-current=\{link\.area === area \? "page" : undefined\}/,
+  );
+  // DEV-001: website & appearance studio: the navigation also carries its
+  // data-rz id, right after its class.
+  assert.match(
+    account,
+    /<nav\s+className="cx-nav"\s+data-rz="client\.nav"\s+aria-label=\{CLIENT_ACCOUNT_NAVIGATION_LABEL\}\s*>/,
+  );
+  // DEV-001: the owner's UI/UX design renders every client page of this pass
+  // in the account frame with its own area marked (the navigation of the
+  // design replaces the workspace navigation component on these pages).
+  const CLIENT_FRAMES = {
+    "app/client/payments/page.tsx":
+      '<ClientAccount area="payments" heading="Payments">',
+    "app/client/messages/page.tsx":
+      '<ClientAccount area="consultations" heading="Your messages">',
+    "app/client/settings/page.tsx":
+      '<ClientAccount area="profile" heading="My profile">',
+    "app/client/privacy/page.tsx":
+      '<ClientAccount area="settings" heading="Settings">',
+    "app/client/settings/security/page.tsx":
+      '<ClientAccount area="settings" heading="Settings">',
+  };
+  const settingsNavigation = [
+    ...codeOf(read("src/presentation/client-account.tsx"))
+      .slice(
+        codeOf(read("src/presentation/client-account.tsx")).indexOf(
+          "export const CLIENT_SETTINGS_NAVIGATION",
+        ),
+      )
+      .replace(/\s+/g, " ")
+      .matchAll(
+        /\{ category: "([a-z]+)", href: "([^"]+)", label: "[^"]+",? \}/g,
+      ),
+  ].map(([, category, href]) => ({ category, href }));
+  assert.deepEqual(
+    settingsNavigation.map((entry) => entry.category),
+    ["security", "notifications", "privacy"],
+  );
+  assert.deepEqual(
+    Object.keys(CLIENT_FRAMES).sort(),
+    Object.keys(CLIENT_PAGES).sort(),
+  );
+  for (const [file, frame] of Object.entries(CLIENT_FRAMES)) {
+    const code = codeOf(read(file));
+    assert.ok(code.includes(frame), file);
+    assert.doesNotMatch(code, /<ClientNavigation\b/, file);
+    // The page's area is one of the navigation's: the area of its own link
+    // when the account navigation holds the page; the Settings pages also
+    // mark their own category; a page the design's navigation does not hold
+    // is linked from both the overview and My consultations.
+    const area = /area="([a-z]+)"/.exec(frame)[1];
+    assert.ok(
+      accountNavigation.some((link) => link.area === area),
+      file,
+    );
+    const own = accountNavigation.find((link) => link.href === pathOf(file));
+    const category = settingsNavigation.find(
+      (entry) => entry.href === pathOf(file),
+    )?.category;
+    if (own !== undefined) {
+      assert.equal(own.area, area, file);
+    }
+    if (category !== undefined) {
+      assert.equal(area, "settings", file);
+      assert.ok(code.includes(`<ClientSettings category="${category}"`), file);
+    }
+    if (own === undefined && category === undefined) {
+      for (const page of [
+        "app/client/page.tsx",
+        "app/client/consultations/page.tsx",
+      ]) {
+        assert.ok(
+          codeOf(read(page)).includes(`href="${pathOf(file)}"`),
+          `${page}: ${file}`,
+        );
+      }
+    }
+  }
+  // DEV-001: the owner's UI/UX design renders the attorney pages in the
+  // workspace frame, whose grouped section navigation (fixed first-party
+  // links, each to an attorney page that exists, the current section marked)
+  // replaces the workspace navigation component on every page of the set. A page the section navigation does not hold itself is one page of
+  // its section's page switch, which marks the page and holds the section's
+  // own page.
+  const shell = codeOf(read("src/presentation/attorney-workspace.tsx"));
+  const sections = [
+    ...shell
+      .slice(
+        shell.indexOf("export const ATTORNEY_SECTIONS:"),
+        shell.indexOf("export const ATTORNEY_SECTIONS_LABEL"),
+      )
+      .replace(/\s+/g, " ")
+      .matchAll(
+        /\{ section: "([a-z]+)", href: "([^"]+)", label: "([^"]+)", group: "(Work|Practice|Account)",? \}/g,
+      ),
+  ].map(([, section, href, label, group]) => ({ section, href, label, group }));
+  assert.deepEqual(
+    sections.map((link) => `${link.group}/${link.section}`),
+    [
+      "Work/dashboard",
+      "Work/requests",
+      "Work/calendar",
+      "Work/consultations",
+      "Work/messages",
+      "Practice/availability",
+      "Practice/profile",
+      "Practice/earnings",
+      "Account/compliance",
+      "Account/settings",
+    ],
+  );
+  assert.equal(new Set(sections.map((link) => link.href)).size, 10);
+  for (const link of sections) {
+    assert.match(link.href, /^\/attorney\/[a-z-/]+$/, link.href);
+    assert.ok(exists(link.href), link.href);
+    assert.ok(link.label.length > 0 && link.label.length <= 40);
+  }
+  assert.match(
+    shell,
+    /aria-current=\{link\.section === section \? "page" : undefined\}/,
+  );
+  // DEV-001: website & appearance studio: the navigation also carries its
+  // data-rz id, right after its class.
+  assert.match(
+    shell,
+    /<nav\s+className="w-nav"\s+data-rz="attorney\.sidebar\.nav"\s+aria-label=\{ATTORNEY_SECTIONS_LABEL\}\s*>/,
+  );
+  const switches = Object.fromEntries(
+    [
+      ...shell.matchAll(
+        /export const ([A-Z_]+_PAGES): readonly AttorneyPageLink\[\] = Object\.freeze\(\[([\s\S]*?)\]\);/g,
+      ),
+    ].map(([, name, body]) => [
+      name,
+      [...body.matchAll(/href: "([^"]+)"/g)].map((m) => m[1]),
+    ]),
+  );
+  for (const hrefs of Object.values(switches)) {
+    for (const href of hrefs) {
+      assert.ok(exists(href), href);
+    }
+  }
+  const ATTORNEY_FRAMES = {
+    "app/attorney/dashboard/page.tsx": { section: "dashboard" },
+    "app/attorney/consultations/history/page.tsx": {
+      section: "consultations",
+      label: "Consultation pages",
+      pages: "CONSULTATION_PAGES",
+    },
+    "app/attorney/schedule/week/page.tsx": { section: "calendar" },
+    "app/attorney/messages/page.tsx": { section: "messages" },
+    "app/attorney/documents/page.tsx": {
+      section: "consultations",
+      label: "Consultation pages",
+      pages: "CONSULTATION_PAGES",
+    },
+    "app/attorney/compliance/page.tsx": { section: "compliance" },
+  };
+  assert.deepEqual(
+    Object.keys(ATTORNEY_FRAMES).sort(),
+    Object.keys(ATTORNEY_PAGES).sort(),
+  );
+  for (const [file, frame] of Object.entries(ATTORNEY_FRAMES)) {
+    const code = codeOf(read(file));
+    const flat = code.replace(/\s+/g, " ");
+    assert.doesNotMatch(code, /<AttorneyNavigation\b/, file);
+    assert.ok(
+      flat.includes(`<AttorneyWorkspace section="${frame.section}"`),
+      file,
+    );
+    const own = sections.find((link) => link.section === frame.section);
+    assert.ok(own !== undefined, file);
+    if (own.href !== pathOf(file)) {
+      assert.ok(
+        flat.includes(
+          `pages={{ label: "${frame.label}", links: ${frame.pages}, current: "${pathOf(file)}", }}`,
+        ),
+        file,
+      );
+      assert.ok(switches[frame.pages].includes(pathOf(file)), file);
+      assert.ok(switches[frame.pages].includes(own.href), file);
+    }
+  }
+  const chrome = codeOf(read("src/presentation/site-chrome.tsx"));
+  const primary = [
+    ...chrome
+      .slice(
+        chrome.indexOf("export const SITE_NAVIGATION"),
+        chrome.indexOf("export const SITE_FOOTER"),
+      )
+      .matchAll(/href: "([^"]+)"/g),
+  ].map((m) => m[1]);
+  const home = codeOf(read("app/client/page.tsx"));
+  assert.ok(
+    home.includes('<ClientAccount area="overview" heading="Overview">'),
+  );
+  assert.ok(
+    home.includes("<SitePage session={shell.session} signOut={signOut}>"),
+  );
+  const homeLinks = new Set([
+    ...[...home.matchAll(/href="([^"]*)"/g)].map((m) => m[1]),
+    ...accountNavigation.map((link) => link.href),
+    ...primary,
+  ]);
   for (const link of labels.CLIENT_NAVIGATION) {
     if (link.href !== "/client") {
       assert.ok(homeLinks.has(link.href), link.href);
@@ -464,6 +820,13 @@ test("S11C-3 the participant workspace adapter calls each of its six reads by it
   await attorneyReads.history();
   await attorneyReads.documents();
   await attorneyReads.compliance();
+  // DEV-001 (20261129010000): the client's own Requests (one segment, one
+  // page of 25) and the attorney's own activity counts (one period).
+  await clientReads.requests("open", 25);
+  await attorneyReads.activity(
+    "2026-11-01T00:00:00.000Z",
+    "2026-12-01T00:00:00.000Z",
+  );
   assert.deepEqual(log, [
     ["client_payments", { p_offset: 25 }],
     ["client_account_overview", undefined],
@@ -472,6 +835,14 @@ test("S11C-3 the participant workspace adapter calls each of its six reads by it
     ["attorney_consultation_history", undefined],
     ["attorney_documents", undefined],
     ["attorney_compliance_records", undefined],
+    ["client_requests", { p_segment: "open", p_offset: 25 }],
+    [
+      "attorney_activity_counts",
+      {
+        p_from: "2026-11-01T00:00:00.000Z",
+        p_until: "2026-12-01T00:00:00.000Z",
+      },
+    ],
   ]);
   log.length = 0;
   for (const offset of [-25, 7, 100025, 1.5, "0", null]) {
@@ -480,13 +851,35 @@ test("S11C-3 the participant workspace adapter calls each of its six reads by it
   for (const role of ["staff", "Client", "", null]) {
     assert.deepEqual(await clientReads.threads(role), UNREADABLE);
   }
+  // DEV-001: a malformed segment, offset or period is refused before
+  // anything is sent.
+  for (const [segment, offset] of [
+    ["pending", 0],
+    ["Open", 0],
+    [null, 0],
+    ["all", 7],
+    ["all", -25],
+    ["all", 100025],
+  ]) {
+    assert.deepEqual(await clientReads.requests(segment, offset), UNREADABLE);
+  }
+  for (const [from, until] of [
+    ["2026-12-01T00:00:00.000Z", "2026-11-01T00:00:00.000Z"],
+    ["2025-01-01T00:00:00.000Z", "2026-11-01T00:00:00.000Z"],
+    ["not a time", "2026-11-01T00:00:00.000Z"],
+    [null, null],
+  ]) {
+    assert.deepEqual(await attorneyReads.activity(from, until), UNREADABLE);
+  }
   assert.deepEqual(log, []);
   assert.deepEqual(Object.keys(clientReads).sort(), [
     "overview",
     "payments",
+    "requests",
     "threads",
   ]);
   assert.deepEqual(Object.keys(attorneyReads).sort(), [
+    "activity",
     "compliance",
     "documents",
     "history",
@@ -1336,6 +1729,600 @@ test("S11C-17 (MBS section 18.3 schedule; correction pass A2) the week view read
     Date.parse(`${lastRead}T00:00:00Z`) <=
       Date.parse("2026-11-20T00:00:00Z") + 3653 * 86400000,
   );
+});
+
+// ---------------------------------------------------------------------------
+// DEV-001: the owner's UI/UX design's workspace reads on the pages
+// (client_requests, client_consultation_parties, attorney_activity_counts)
+// ---------------------------------------------------------------------------
+
+// The code (comments already stripped) on single spaces, so a pin matches
+// it whatever its line breaks.
+const flatOf = (code) => code.replace(/\s+/g, " ");
+
+// Each step is found after the one before it (the first from the start).
+function assertInOrder(code, steps, label) {
+  const at = [];
+  for (const step of steps) {
+    at.push(code.indexOf(step, at.length === 0 ? 0 : at.at(-1) + 1));
+  }
+  assert.ok(
+    at.every((position) => position > 0),
+    `${label}: ${steps.map((s, n) => `${s}@${at[n]}`).join(", ")}`,
+  );
+}
+
+test("S11C-18 (DEV-001) the owner's UI/UX design's workspace reads on the pages: the client's Overview reads the first page of the client's own open Requests after its existing reads and nothing else of a Request (no message, amount or quote), and shows them only through the design's card; My consultations shows the design's Pending view for exactly show=pending, reads the page value only for it, and joins the attorney's presentable name and the client's own practice area to its list by Consultation id; the consultation page picks its own row; an unavailable parties read only leaves the names out; the attorney's Overview shows the month's counts beside the ledger net per currency", () => {
+  // The Overview: the existing reads, then the one Requests read.
+  const home = codeOf(read("app/client/page.tsx"));
+  assertInOrder(
+    home,
+    [
+      "await connection();",
+      "await resolveClientConsultations(CLIENT_OUTCOME_SOURCES);",
+      'if (view.status !== "ready") {',
+      "await resolveClientNotifications(CLIENT_CENTER_SOURCES);",
+      "await resolveClientRequests(",
+    ],
+    "app/client/page.tsx",
+  );
+  for (const line of [
+    'const open = requests.status === "ready" ? requests.requests : [];',
+    'const awaiting = open.filter((entry) => entry.displayState !== "expired");',
+    'view.entries.length === 0 && center.status === "ready" && center.entries.length === 0 && requests.status === "ready" && open.length === 0;',
+    'const pendingCard = requests.status !== "ready" || open.length > 0;',
+    ") : awaiting.length > 0 ? null : (",
+    '<div className={pendingCard ? "cx-ov2-row" : "cx-ov2-row one"}>',
+    "<AwaitingRequests view={requests} primary={focus === null} />",
+    'operation: "resolveClientRequests",',
+  ]) {
+    assert.equal(flatOf(home).split(line).length, 2, line);
+  }
+  // Nothing of a Request beyond the client_requests read reaches the
+  // Overview: no request page read, message, amount, price or quote.
+  assert.doesNotMatch(
+    home,
+    /resolveConsultationRequest|resolveRequestDecision|resolveRequestPayment|resolveRequestReview|resolveIntakeRequests|requestPathFor|moneyText|amount|Minor\b|\.message\b|message:|quote|price|\bfee\b/i,
+  );
+  // The design's card and rows read only the client_requests columns they
+  // show, link only to the request page (and, past the first page, to the
+  // Pending view), and import nothing at run time but the state labels.
+  const accountSource = read("src/presentation/client-account.tsx");
+  const account = codeOf(accountSource);
+  assert.deepEqual(importsOf(accountSource), [
+    "react",
+    "../application/participant-workspaces.ts",
+    "./design-system.tsx",
+    "./request-labels.ts",
+  ]);
+  assert.match(
+    account,
+    /^import type \{\n {2}ClientRequestEntry,\n {2}ClientRequestsView,\n\} from "\.\.\/application\/participant-workspaces\.ts";$/m,
+  );
+  assert.match(
+    account,
+    /^import \{ REQUEST_STATE_LABELS \} from "\.\/request-labels\.ts";$/m,
+  );
+  const requestsPart = account.slice(
+    account.indexOf("export const REQUEST_PATH_TEXT"),
+  );
+  assert.ok(requestsPart.length > 0);
+  assert.deepEqual(
+    [
+      ...new Set(
+        [...requestsPart.matchAll(/\bentry\.(\w+)/g)].map((m) => m[1]),
+      ),
+    ].sort(),
+    [
+      "attorneyName",
+      "createdAt",
+      "displayState",
+      "id",
+      "modality",
+      "path",
+      "responseDeadline",
+      "slotStart",
+    ],
+  );
+  assert.equal(
+    account.split("return `/client/requests/${entry.id}`;").length,
+    2,
+  );
+  assert.equal(account.match(/href=\{requestHref\(entry\)\}/g).length, 2);
+  assert.equal(
+    account.match(/href="\/client\/consultations\?show=pending"/g).length,
+    1,
+  );
+  assert.doesNotMatch(
+    account,
+    /moneyText|amount|Minor\b|\.message\b|quote|price|\bfee\b|style=|dangerouslySetInnerHTML/i,
+  );
+
+  // My consultations: the view is chosen only by exactly "past" or exactly
+  // "pending"; the page value reaches only the Requests read, in the Pending
+  // view; the list read, then the parties read, then the Requests read.
+  const list = codeOf(read("app/client/consultations/page.tsx"));
+  assert.equal(
+    list.split("  const { show, page } = await searchParams;\n").length,
+    2,
+  );
+  assert.equal(list.match(/\bsearchParams\b/g).length, 3);
+  assert.equal(list.match(/\bshow ===/g).length, 2);
+  assert.equal(list.split('  const past = show === "past";\n').length, 2);
+  assert.equal(list.split('  const pending = show === "pending";\n').length, 2);
+  assert.equal(list.match(/(?<![."\w])page\b(?![="])/g).length, 3);
+  assert.equal(
+    flatOf(list).split('"open", pending ? page : "1", );').length,
+    2,
+  );
+  assertInOrder(
+    list,
+    [
+      "await connection();",
+      "await resolveClientConsultations(CLIENT_OUTCOME_SOURCES);",
+      'if (view.status !== "ready") {',
+      "await resolveClientConsultationParties(",
+      "await resolveClientRequests(",
+    ],
+    "app/client/consultations/page.tsx",
+  );
+  assert.equal(list.match(/resolveClientConsultationParties\(/g).length, 1);
+  for (const line of [
+    "const parties = await resolveClientConsultationParties( CLIENT_OUTCOME_SOURCES, );",
+    'const partyOf = (entry: ClientConsultationEntry): ConsultationParty | null => parties.status === "ready" ? (parties.parties.get(entry.id) ?? null) : null;',
+    "party={partyOf(entry)}",
+    "const name = party?.attorneyName ?? null;",
+    "{name ?? modalityText(entry.modality)}",
+    "party?.practiceArea ?? null, outcome ?? PATH_LABELS[entry.path],",
+    'operation: "resolveClientConsultationParties",',
+    'operation: "resolveClientRequests",',
+    'const pendingCount = requests.status === "ready" && requests.pager.page === 1 ? `${requests.requests.length}${requests.pager.hasNext ? "+" : ""}` : null;',
+    "{pending ? (",
+    "<RequestRows view={requests} />",
+    'href="/client/consultations?show=pending"',
+  ]) {
+    assert.equal(flatOf(list).split(line).length, 2, line);
+  }
+
+  // The consultation page: its own Consultation first, then its own row of
+  // the parties read; without it, no name and no area.
+  const detail = codeOf(
+    read("app/client/consultations/[consultation]/page.tsx"),
+  );
+  assert.equal(detail.match(/resolveClientConsultationParties\(/g).length, 1);
+  assertInOrder(
+    detail,
+    [
+      "await connection();",
+      "await resolveClientConsultation(",
+      'if (view.status !== "ready") {',
+      "const record = view.consultation;",
+      "await resolveClientConsultationParties(",
+    ],
+    "app/client/consultations/[consultation]/page.tsx",
+  );
+  for (const line of [
+    "const parties = await resolveClientConsultationParties( CLIENT_OUTCOME_SOURCES, );",
+    'const party = parties.status === "ready" ? (parties.parties.get(record.id) ?? null) : null;',
+    "const attorneyName = party?.attorneyName ?? null;",
+    "const practiceArea = party?.practiceArea ?? null;",
+    'operation: "resolveClientConsultationParties",',
+  ]) {
+    assert.equal(flatOf(detail).split(line).length, 2, line);
+  }
+
+  // The attorney's Overview: the month's counts (or the panel's own
+  // unavailable line), then the ledger net per currency, never added.
+  const dashboard = codeOf(read("app/attorney/dashboard/page.tsx"));
+  for (const line of [
+    "month={period === null ? null : monthText(period.from)}",
+    'activity={activity.status === "ready" ? activity.activity : null}',
+    "{earnings.totals.map((total) => (",
+    "{moneyText(total.netMinor, total.currency)}",
+    'operation: "resolveAttorneyActivity",',
+  ]) {
+    assert.equal(flatOf(dashboard).split(line).length, 2, line);
+  }
+  assert.doesNotMatch(dashboard, /\.reduce\(|netMinor \+|\+ total\./);
+  // The panel derives nothing from the counts but "answered" (in the use
+  // case): no rate, rating, ranking, score or average, and no arithmetic.
+  const shell = codeOf(read("src/presentation/attorney-workspace.tsx"));
+  const panel = shell.slice(
+    shell.indexOf("export function monthPeriodOf("),
+    shell.indexOf("export function ExpandGroup("),
+  );
+  assert.ok(panel.length > 0);
+  assert.doesNotMatch(
+    panel,
+    /Math\.|\brate\b|rating|rank|score|average|percent|%/i,
+  );
+  assert.doesNotMatch(panel, /\.(?:answered|resolved)\s*[-+*]/);
+  assert.doesNotMatch(panel, /\bresolved\b/);
+});
+
+// The presentation modules are transpiled with the installed TypeScript and
+// rendered on the server; each run-time import is relinked to its target and
+// every import must have one, so the modules' imports stay exact.
+const renderDirectory = mkdtempSync(join(tmpdir(), "rosuno-dev-001-reads-"));
+after(() => rmSync(renderDirectory, { recursive: true, force: true }));
+
+async function presentationModule(path, targets) {
+  const output = ts.transpileModule(read(path), {
+    fileName: path,
+    reportDiagnostics: true,
+    compilerOptions: {
+      jsx: ts.JsxEmit.ReactJSX,
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+      verbatimModuleSyntax: true,
+    },
+  });
+  assert.deepEqual(output.diagnostics, [], path);
+  const all = {
+    "react/jsx-runtime": import.meta.resolve("react/jsx-runtime"),
+    ...targets,
+  };
+  const seen = new Set();
+  const code = output.outputText.replace(
+    /(\bfrom\s+|\bimport\s+)"([^"]+)"/g,
+    (_match, keyword, specifier) => {
+      assert.ok(Object.hasOwn(all, specifier), `${path}: ${specifier}`);
+      seen.add(specifier);
+      return `${keyword}"${all[specifier]}"`;
+    },
+  );
+  assert.deepEqual([...seen].sort(), Object.keys(all).sort(), path);
+  const file = join(renderDirectory, `${path.replace(/[/.]/g, "_")}.mjs`);
+  writeFileSync(file, code);
+  return import(pathToFileURL(file).href);
+}
+
+function renderedOf(component, props) {
+  const html = renderToStaticMarkup(createElement(component, props));
+  return {
+    html,
+    text: html
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&#x27;/g, "'")
+      .replace(/&amp;/g, "&")
+      .replace(/[  ]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+    hrefs: [...html.matchAll(/href="([^"]*)"/g)].map((m) =>
+      m[1].replaceAll("&amp;", "&"),
+    ),
+  };
+}
+
+const requestRow = (overrides = {}) => ({
+  request_id: ID(90),
+  intake_id: ID(80),
+  state: "awaiting_attorney",
+  expired_due: false,
+  request_path: "scheduled",
+  attorney_display_name: "Synthetic Attorney",
+  requested_modality: "synthetic_video",
+  duration_minutes: 30,
+  slot_start_at: "2026-11-21T10:30:00+00:00",
+  slot_end_at: "2026-11-21T11:00:00+00:00",
+  response_deadline_at: "2026-11-20T18:00:00+00:00",
+  created_at: T,
+  consultation_id: null,
+  ...overrides,
+});
+
+// A Talk now Request the server reports past its deadline, with no
+// presentable name.
+const expiredRow = requestRow({
+  request_id: ID(91),
+  expired_due: true,
+  request_path: "instant",
+  attorney_display_name: null,
+  requested_modality: "synthetic_audio",
+  slot_start_at: null,
+  slot_end_at: null,
+  response_deadline_at: "2026-11-20T10:05:00+00:00",
+});
+
+const activityRows = (values) => [
+  ...REQUEST_OUTCOMES.map((dimension, n) => ({
+    metric: "requests",
+    dimension,
+    value: values[n],
+  })),
+  ...CONSULTATION_OUTCOMES.map((dimension, n) => ({
+    metric: "consultations",
+    dimension,
+    value: values[REQUEST_OUTCOMES.length + n],
+  })),
+];
+
+test("S11C-19 (DEV-001) rendered: the client's open Requests read through the use case show the design's card and rows (the presentable name or the request page's fallback, the path, the time asked for and the reply deadline in UTC, the state, a Request past its deadline as expired, a link to its request page and nothing of a message, amount or quote); no open Request shows no card and the Pending view's empty row; an unreadable or refused read shows the unavailable line and no row; the attorney's counts for the server clock's UTC month show the design's KPIs and both outcome lists with zeros as zeros and nothing derived, and without counts or a clock reading the panel's unavailable line", async () => {
+  const account = await presentationModule(
+    "src/presentation/client-account.tsx",
+    {
+      "./request-labels.ts": new URL(
+        "src/presentation/request-labels.ts",
+        appRoot,
+      ).href,
+    },
+  );
+  const shell = await presentationModule(
+    "src/presentation/attorney-workspace.tsx",
+    {},
+  );
+  assert.deepEqual(Object.keys(requestRow()), [...CLIENT_REQUEST_COLUMNS]);
+
+  // The Overview's card, from the first page of the open segment.
+  const w = workspaceWorld({ requests: rows([requestRow(), expiredRow]) });
+  const view = await resolveClientRequests(w.client, "open", "1");
+  assert.equal(view.status, "ready");
+  assert.deepEqual(w.calls, [["requests", "open", 0]]);
+  assert.deepEqual(
+    view.requests.map((r) => [r.state, r.displayState]),
+    [
+      ["awaiting_attorney", "awaiting_attorney"],
+      ["awaiting_attorney", "expired"],
+    ],
+  );
+  const card = renderedOf(account.AwaitingRequests, { view, primary: true });
+  assert.equal(
+    card.text,
+    [
+      "Awaiting attorney response",
+      "Nothing is booked until the attorney accepts.",
+      "Synthetic Attorney Waiting for the attorney",
+      "Scheduled · Sat, Nov 21 · 10:30 AM UTC",
+      "Reply due Fri, Nov 20 · 6:00 PM UTC",
+      "View request",
+      "Attorney not shown Expired",
+      "Talk now · Requested Fri, Nov 20 · 10:00 AM UTC",
+      "Reply due Fri, Nov 20 · 10:05 AM UTC",
+      "View request",
+    ].join(" "),
+  );
+  assert.deepEqual(card.hrefs, [
+    `/client/requests/${ID(90)}`,
+    `/client/requests/${ID(91)}`,
+  ]);
+  assert.match(card.html, /<span class="pill pending"><i><\/i>Expired<\/span>/);
+  assert.match(
+    card.html,
+    /class="btn btn-sm btn-ink" href="[^"]+" aria-label="View request to Synthetic Attorney">/,
+  );
+  assert.match(card.html, /aria-label="View request">View request</);
+  assert.doesNotMatch(card.text, /XTS|\$|message|quote|price|fee|total/i);
+  assert.doesNotMatch(card.html, /style=/);
+  // Below a consultation card the button is the outlined one.
+  assert.match(
+    renderedOf(account.AwaitingRequests, { view, primary: false }).html,
+    /class="btn btn-sm btn-line"/,
+  );
+  // A full first page links to the Pending view for the rest.
+  const full = await resolveClientRequests(
+    workspaceWorld({
+      requests: rows(
+        Array.from({ length: 26 }, (_, n) =>
+          requestRow({ request_id: ID(200 + n) }),
+        ),
+      ),
+    }).client,
+    "open",
+    "1",
+  );
+  const fullCard = renderedOf(account.AwaitingRequests, {
+    view: full,
+    primary: true,
+  });
+  assert.equal(fullCard.hrefs.length, 26);
+  assert.equal(fullCard.hrefs[0], "/client/consultations?show=pending");
+  assert.match(fullCard.text, /^Awaiting attorney response All requests /);
+
+  // No open Request: no card (as in the design), and the Pending view's
+  // empty row.
+  const none = await resolveClientRequests(
+    workspaceWorld({ requests: rows([]) }).client,
+    "open",
+    "1",
+  );
+  assert.deepEqual(none, {
+    status: "ready",
+    segment: "open",
+    requests: [],
+    pager: { page: 1, hasNext: false },
+  });
+  assert.equal(
+    renderedOf(account.AwaitingRequests, { view: none, primary: true }).html,
+    "",
+  );
+  const empty = renderedOf(account.RequestRows, { view: none });
+  assert.equal(
+    empty.text,
+    "No requests awaiting a response Requests you send appear here until the attorney responds.",
+  );
+  assert.deepEqual(empty.hrefs, []);
+
+  // Unreadable, malformed, outside the open segment or refused: the card's
+  // unavailable line and the Pending view's unavailable row, and no row.
+  const signedOut = workspaceWorld({}, { subject: null });
+  const refusals = [
+    await resolveClientRequests(
+      workspaceWorld({ requests: UNREADABLE }).client,
+      "open",
+      "1",
+    ),
+    await resolveClientRequests(
+      workspaceWorld({ requests: rows([requestRow({ extra: 1 })]) }).client,
+      "open",
+      "1",
+    ),
+    await resolveClientRequests(
+      workspaceWorld({
+        requests: rows([
+          requestRow({ state: "accepted", consultation_id: ID(92) }),
+        ]),
+      }).client,
+      "open",
+      "1",
+    ),
+    await resolveClientRequests(signedOut.client, "open", "1"),
+  ];
+  assert.deepEqual(
+    refusals.map((r) => r.status),
+    ["unavailable", "unavailable", "unavailable", "sign-in-required"],
+  );
+  assert.deepEqual(signedOut.calls, []);
+  for (const refused of refusals) {
+    const unavailableCard = renderedOf(account.AwaitingRequests, {
+      view: refused,
+      primary: true,
+    });
+    assert.equal(
+      unavailableCard.text,
+      "Awaiting attorney response Your requests could not be shown right now.",
+    );
+    assert.deepEqual(unavailableCard.hrefs, []);
+    assert.doesNotMatch(unavailableCard.html, /cx-li3/);
+    const unavailableRows = renderedOf(account.RequestRows, { view: refused });
+    assert.equal(
+      unavailableRows.text,
+      "Requests unavailable Your requests could not be shown right now.",
+    );
+    assert.deepEqual(unavailableRows.hrefs, []);
+  }
+
+  // My consultations' Pending rows, one page asked for by its page value.
+  const paged = workspaceWorld({ requests: rows([requestRow(), expiredRow]) });
+  const pendingView = await resolveClientRequests(paged.client, "open", "2");
+  assert.deepEqual(paged.calls, [["requests", "open", 25]]);
+  const pendingRows = renderedOf(account.RequestRows, { view: pendingView });
+  assert.equal(
+    pendingRows.text,
+    [
+      "Synthetic Attorney Scheduled",
+      "Sat, Nov 21 · 10:30 AM UTC Reply due Fri, Nov 20 · 6:00 PM UTC",
+      "Waiting for the attorney",
+      "Attorney not shown Talk now",
+      "Requested Fri, Nov 20 · 10:00 AM UTC Reply due Fri, Nov 20 · 10:05 AM UTC",
+      "Expired",
+    ].join(" "),
+  );
+  assert.deepEqual(pendingRows.hrefs, [
+    `/client/requests/${ID(90)}`,
+    `/client/requests/${ID(91)}`,
+  ]);
+  assert.equal(pendingRows.html.match(/class="cx-rec"/g).length, 2);
+
+  // The attorney's month: the server clock reading's calendar month in UTC,
+  // from its first instant to the next month's, a period the database counts.
+  assert.deepEqual(shell.monthPeriodOf(NOW), {
+    from: "2026-11-01T00:00:00.000Z",
+    until: "2026-12-01T00:00:00.000Z",
+  });
+  for (const [at, from, until] of [
+    ["2026-11-01T00:00:00.000Z", "2026-11-01", "2026-12-01"],
+    ["2026-11-30T23:59:59.999Z", "2026-11-01", "2026-12-01"],
+    ["2026-12-31T23:59:59.999Z", "2026-12-01", "2027-01-01"],
+    ["2028-02-29T12:00:00.000Z", "2028-02-01", "2028-03-01"],
+  ]) {
+    const period = shell.monthPeriodOf(Date.parse(at));
+    assert.deepEqual(
+      period,
+      { from: `${from}T00:00:00.000Z`, until: `${until}T00:00:00.000Z` },
+      at,
+    );
+    assert.ok(isActivityPeriod(period), at);
+  }
+  for (const bad of [null, Number.NaN, Infinity, 9e15]) {
+    assert.equal(shell.monthPeriodOf(bad), null, String(bad));
+  }
+  assert.equal(shell.monthText("2026-11-01T00:00:00.000Z"), "November 2026");
+
+  // The counts as the use case read them, shown as they are.
+  assert.deepEqual(Object.keys(activityRows([0, 0, 0, 0, 0, 0, 0, 0, 0])[0]), [
+    ...ACTIVITY_COLUMNS,
+  ]);
+  const period = shell.monthPeriodOf(NOW);
+  const counted = workspaceWorld({
+    activity: rows(activityRows([2, 1, 1, 0, 0, 3, 1, 0, 0])),
+  });
+  const activity = await resolveAttorneyActivity(counted.attorney, period);
+  assert.equal(activity.status, "ready");
+  assert.deepEqual(counted.calls, [["activity", period.from, period.until]]);
+  const panel = renderedOf(shell.ActivityPanel, {
+    month: shell.monthText(period.from),
+    activity: activity.activity,
+  });
+  assert.equal(
+    panel.text,
+    [
+      "November 2026 · UTC",
+      "Requests answered 3 Accepted or declined, received in November 2026",
+      "Consultations completed 3 Ended in November 2026",
+      "Requests received in November 2026",
+      "Accepted 2 Declined 1 Expired 1 Withdrawn by the client 0 Could not go ahead 0",
+      "Consultations ended in November 2026",
+      "Completed 3 Cancelled 1 Did not take place 0 Ended by a technical problem 0",
+      shell.ACTIVITY_NOTE,
+    ].join(" "),
+  );
+  assert.deepEqual(panel.hrefs, []);
+  assert.doesNotMatch(panel.html, /style=/);
+  assert.doesNotMatch(panel.text, /%|\brate\b|rating|rank|score|average/i);
+  // Zeros are counts too.
+  const zero = await resolveAttorneyActivity(
+    workspaceWorld({
+      activity: rows(activityRows([0, 0, 0, 0, 0, 0, 0, 0, 0])),
+    }).attorney,
+    period,
+  );
+  const zeros = renderedOf(shell.ActivityPanel, {
+    month: "November 2026",
+    activity: zero.activity,
+  });
+  assert.match(zeros.text, /^November 2026 · UTC Requests answered 0 /);
+  assert.equal(zeros.html.match(/<b class="num">0<\/b>/g).length, 11);
+  assert.ok(!zeros.text.includes(shell.ACTIVITY_UNAVAILABLE));
+
+  // Malformed counts, a refused attorney, or no clock reading (no period is
+  // sent): the panel's unavailable line and no count.
+  const noClock = workspaceWorld({
+    activity: rows(activityRows([1, 1, 1, 1, 1, 1, 1, 1, 1])),
+  });
+  const notAttorney = workspaceWorld({}, { stage: null });
+  const missing = [
+    await resolveAttorneyActivity(
+      workspaceWorld({
+        activity: rows(activityRows([1, 1, 1, 1, 1, 1, 1, 1, 1]).slice(1)),
+      }).attorney,
+      period,
+    ),
+    await resolveAttorneyActivity(
+      workspaceWorld({
+        activity: rows(activityRows([1, 1, -1, 1, 1, 1, 1, 1, 1])),
+      }).attorney,
+      period,
+    ),
+    await resolveAttorneyActivity(noClock.attorney, shell.monthPeriodOf(null)),
+    await resolveAttorneyActivity(notAttorney.attorney, period),
+  ];
+  assert.deepEqual(
+    missing.map((m) => m.status),
+    ["unavailable", "unavailable", "unavailable", "denied"],
+  );
+  assert.deepEqual(noClock.calls, []);
+  assert.deepEqual(notAttorney.calls, []);
+  for (const month of ["November 2026", null]) {
+    const unavailable = renderedOf(shell.ActivityPanel, {
+      month,
+      activity: null,
+    });
+    assert.equal(
+      unavailable.text,
+      `${month ?? "This month"} · UTC ${shell.ACTIVITY_UNAVAILABLE}`,
+    );
+    assert.doesNotMatch(unavailable.html, /w-kpi|w-otoday/);
+  }
 });
 
 // ---------------------------------------------------------------------------

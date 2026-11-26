@@ -943,9 +943,22 @@ test("J-I12. the route and the adapter stay narrow: exact imports, no cookie, se
     "app/api/payments/stripe/route.ts",
   ]);
   // No page links to or calls the worker route.
+  const GATE = "src/infrastructure/environment/staging-access-gate.ts";
   for (const file of [...filesIn("app/"), ...filesIn("src/")].filter(
-    (f) => /\.tsx?$/.test(f) && f !== "app/api/jobs/run/route.ts",
+    (f) => /\.tsx?$/.test(f) && f !== "app/api/jobs/run/route.ts" && f !== GATE,
   )) {
     assert.doesNotMatch(codeOf(read(file)), /\/api\/jobs/, file);
   }
+  // Updated for the reviewed Staging access gate design (P2-925, DEV-001): the gate names the worker route once, as one exact entry of its fixed machine-route exemption list, and neither links to nor calls it.
+  const gate = codeOf(read(GATE));
+  assert.equal(gate.match(/\/api\/jobs/g).length, 1);
+  assert.ok(
+    gate.includes(
+      'export const MACHINE_ROUTES: readonly string[] = Object.freeze([\n  "/api/payments/stripe",\n  "/api/media/daily",\n  "/api/notifications/resend",\n  "/api/jobs/run",\n]);\n',
+    ),
+  );
+  assert.doesNotMatch(
+    gate,
+    /\bfetch\s*\(|href|redirect|\bimport\s*\(|job-worker|handleJobWorkerRequest/,
+  );
 });

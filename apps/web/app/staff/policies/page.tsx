@@ -8,40 +8,41 @@
 // anything else. Policy changes are offered only on a recorded environment
 // that matches this deployment, and development configuration only where
 // the database records a development or staging environment.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Owner › Approvals): the
+// design's list of policy versions, each row opening its record, then the
+// pager and the draft form in a panel. No owner role exists: the Approvals
+// destination is this page, for holders of the policy capability.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
 
 import { resolvePolicyWorkspace } from "../../../src/application/staff-configuration.ts";
 import { STAFF_CONFIGURATION_SOURCES } from "../../../src/infrastructure/staff/staff-configuration-adapter.ts";
-import {
-  Alert,
-  ButtonLink,
-  Disclosure,
-  Heading,
-  Status,
-  Table,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
+import { Alert, Disclosure } from "../../../src/presentation/design-system.tsx";
 import {
   ENVIRONMENT_LABELS,
   periodLabel,
   POLICY_STATUS_LABELS,
 } from "../../../src/presentation/staff-configuration-labels.ts";
-import { requireSteppedUp } from "../../account/gate.ts";
 import {
-  BackLink,
-  BoundNotice,
-  PagerLinks,
-  refusalPage,
-  StaffFrame,
-} from "../frame.tsx";
+  Cell,
+  Empty,
+  ListBox,
+  ListRow,
+  Panel,
+  PillCell,
+} from "../../../src/presentation/staff-workspace.tsx";
+import { requireSteppedUp } from "../../account/gate.ts";
+import { BoundNotice, PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
 import { CreatePolicyForm } from "./forms.tsx";
 
 export const metadata: Metadata = {
   title: "Policy configuration",
   robots: { index: false, follow: false },
 };
+
+const COLUMNS = ["Policy type", "Scope", "Effective", "Status"] as const;
 
 export default async function PolicyConfigurationPage({
   searchParams,
@@ -57,11 +58,13 @@ export default async function PolicyConfigurationPage({
     return refusalPage(view, "/staff/policies", "Policy configuration");
   }
   return (
-    <StaffFrame eyebrow="Staff configuration" title="Policy configuration">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Text tone="muted">
-        {`Database environment: ${ENVIRONMENT_LABELS[view.environment]}.`}
-      </Text>
+    <StaffFrame
+      title="Approvals"
+      subtitle="Policy versions: drafts, review, approval and their authority references."
+      lead={
+        <p>{`Database environment: ${ENVIRONMENT_LABELS[view.environment]}.`}</p>
+      }
+    >
       {view.canChange ? null : (
         <Alert tone="warning" title="Policy changes are refused" role="status">
           The database environment is not recorded, or it does not match this
@@ -69,54 +72,40 @@ export default async function PolicyConfigurationPage({
           can be created or changed until that is resolved.
         </Alert>
       )}
-      {view.versions.length === 0 && view.pager.page === 1 ? (
-        <Text>There are no policy versions you can read yet.</Text>
-      ) : null}
-      {view.versions.length === 0 ? null : (
-        <Table id="policy-versions" caption="Policy versions, newest first">
-          <thead>
-            <tr>
-              <th scope="col">Policy type</th>
-              <th scope="col">Scope</th>
-              <th scope="col">Version</th>
-              <th scope="col">Status</th>
-              <th scope="col">Effective</th>
-              <th scope="col">Open</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.versions.map((version) => (
-              <tr key={version.id}>
-                <td>{version.type}</td>
-                <td>{version.jurisdiction}</td>
-                <td>{version.label}</td>
-                <td>
-                  {version.developmentOnly ? (
-                    <Status tone="warning" emphasis="strong">
-                      Development configuration
-                    </Status>
-                  ) : (
-                    <Status tone={POLICY_STATUS_LABELS[version.status].tone}>
-                      {POLICY_STATUS_LABELS[version.status].label}
-                    </Status>
-                  )}
-                </td>
-                <td>
-                  {periodLabel(version.effectiveFrom, version.effectiveUntil)}
-                </td>
-                <td>
-                  <ButtonLink
-                    variant="tertiary"
-                    href={`/staff/policies/${version.id}`}
-                  >
-                    Open
-                  </ButtonLink>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+      <ListBox label="Policy versions, newest first" columns={COLUMNS} sub>
+        {view.versions.length === 0 && view.pager.page === 1 ? (
+          <Empty title="There are no policy versions you can read yet." />
+        ) : null}
+        {view.versions.map((version) => (
+          <ListRow
+            key={version.id}
+            href={`/staff/policies/${version.id}`}
+            columns={4}
+            sub
+          >
+            <Cell label="Policy type" strong>
+              {version.type}
+            </Cell>
+            <Cell label="">{version.label}</Cell>
+            <Cell label="Scope">{version.jurisdiction}</Cell>
+            <Cell label="Effective">
+              {periodLabel(version.effectiveFrom, version.effectiveUntil)}
+            </Cell>
+            {version.developmentOnly ? (
+              <PillCell label="Status" tone="warning">
+                Development configuration
+              </PillCell>
+            ) : (
+              <PillCell
+                label="Status"
+                tone={POLICY_STATUS_LABELS[version.status].tone}
+              >
+                {POLICY_STATUS_LABELS[version.status].label}
+              </PillCell>
+            )}
+          </ListRow>
+        ))}
+      </ListBox>
       <PagerLinks
         pager={view.pager}
         base="/staff/policies"
@@ -124,10 +113,7 @@ export default async function PolicyConfigurationPage({
         shown={view.versions.length}
       />
       {view.canChange ? (
-        <>
-          <Heading as="h2" size="md">
-            New policy version
-          </Heading>
+        <Panel id="policy-new-title" title="New policy version">
           <BoundNotice
             complete={view.policyTypesComplete}
             noun="policy types"
@@ -139,10 +125,10 @@ export default async function PolicyConfigurationPage({
             </Alert>
           ) : null}
           {view.policyTypes.length === 0 || view.scopes.length === 0 ? (
-            <Text tone="muted">
+            <p className="st-emd">
               A new version needs a policy type and a scope you hold the policy
               capability for.
-            </Text>
+            </p>
           ) : (
             <Disclosure summary="Create a draft policy version">
               <CreatePolicyForm
@@ -154,7 +140,7 @@ export default async function PolicyConfigurationPage({
               />
             </Disclosure>
           )}
-        </>
+        </Panel>
       ) : null}
     </StaffFrame>
   );
