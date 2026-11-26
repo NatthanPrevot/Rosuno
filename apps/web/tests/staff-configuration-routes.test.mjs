@@ -135,6 +135,9 @@ const S11_OPERATIONS_STAFF_FILES = [
   "app/staff/attorneys/[attorney]/page.tsx",
   "app/staff/attorneys/actions.ts",
   "app/staff/attorneys/forms.tsx",
+  // DEV-001: the owner's UI/UX design's Attorneys list, on the existing
+  // compliance workspace use case (SR-14).
+  "app/staff/attorneys/page.tsx",
   "app/staff/audit/[event]/page.tsx",
   "app/staff/audit/page.tsx",
   "app/staff/clients/[client]/page.tsx",
@@ -616,6 +619,7 @@ write(
 const delegate = new Proxy({}, { get: (_t, key) => wiring.sources[key] });
 export const STAFF_CONFIGURATION_SOURCES = delegate;
 export const STAFF_VERIFICATION_SOURCES = delegate;
+export const ADMINISTRATION_SOURCES = delegate;
 `,
 );
 write(
@@ -699,7 +703,9 @@ function targetOf(from, specifier) {
   const path = posix.normalize(posix.join(posix.dirname(from), specifier));
   if (
     path === "src/infrastructure/staff/staff-configuration-adapter.ts" ||
-    path === "src/infrastructure/staff/staff-verification-adapter.ts"
+    path === "src/infrastructure/staff/staff-verification-adapter.ts" ||
+    // DEV-001: the Attorneys list's administration sources (SR-14).
+    path === "src/infrastructure/staff/operations-adapter.ts"
   ) {
     return target("wiring.mjs");
   }
@@ -1002,7 +1008,7 @@ test("SR-8. launch offers gate changes and authorization only to their own capab
   assert.ok(otherMember.text.includes("authorize_jurisdiction_launch"));
 });
 
-test("SR-9. D-4: the verification queue page links to its neighbouring pages and to the other staff tools", async () => {
+test("SR-9. D-4: the verification queue page links to its neighbouring pages (DEV-001: the other staff tools are in the staff layout's navigation)", async () => {
   const w = createVerificationWorld();
   const a = addVerificationJurisdiction(w, 1, "SYN_A");
   for (let n = 0; n < 30; n += 1) {
@@ -1021,7 +1027,13 @@ test("SR-9. D-4: the verification queue page links to its neighbouring pages and
   assert.ok(first.text.includes("More of the queue is on the next page."));
   assert.ok(first.hrefs.includes("/staff/verification?page=2"));
   assert.equal(first.text.includes("Previous page"), false);
-  assert.ok(first.hrefs.includes("/staff"));
+  // DEV-001: the owner's UI/UX design reaches the other staff tools through
+  // the staff layout's navigation (SR-13), so the queue page itself links
+  // only its rows and its neighbouring pages.
+  assert.deepEqual(
+    first.hrefs.filter((h) => !/^\/staff\/verification\/.+/.test(h)),
+    ["/staff/verification?page=2"],
+  );
   assert.equal(
     first.hrefs.filter((h) => /^\/staff\/verification\/.+/.test(h)).length,
     25,
@@ -1325,7 +1337,7 @@ test("SR-13. DEV-001: the staff workspace navigation shows only the destinations
       ["home", ["overview"]],
       ["owner", ["approvals"]],
       ["operations", ["bookings", "support"]],
-      ["people", ["clients", "applications"]],
+      ["people", ["attorneys", "clients", "applications"]],
       ["platform", ["marketplace", "finance"]],
       ["admin", ["staff", "settings"]],
     ],
@@ -1343,6 +1355,7 @@ test("SR-13. DEV-001: the staff workspace navigation shows only the destinations
   assert.deepEqual(nav(full.html), [
     "/staff",
     "/staff/policies",
+    "/staff/attorneys",
     "/staff/verification",
     "/staff/jurisdictions",
     "/staff/capabilities",
@@ -1453,4 +1466,145 @@ test("SR-13. DEV-001: the staff workspace navigation shows only the destinations
   }
   // The frame offers no form, field or button of its own.
   assert.doesNotMatch(full.html, /<form|<input|<select|<textarea|<button/);
+});
+
+// DEV-001: the owner's UI/UX design's Attorneys list, over the existing
+// compliance workspace use case and its administration reads (synthetic).
+function administration(w, who, records) {
+  const calls = [];
+  return {
+    calls,
+    sources: {
+      staff: sources(w, who),
+      reads: async () => ({
+        complianceSummary: async () => ({ kind: "rows", rows: [] }),
+        complianceRecords: async (section, offset) => {
+          calls.push([section, offset]);
+          return records === null ? null : { kind: "rows", rows: records };
+        },
+        policyChanges: async () => ({ kind: "rows", rows: [] }),
+        jurisdictionNames: async () => ({ kind: "rows", rows: [] }),
+      }),
+      writes: async () => null,
+      environment: () => null,
+    },
+  };
+}
+
+const profileRow = (w, n, state) => ({
+  record_type: "attorney_profile",
+  record_id: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
+  attorney_id: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
+  display_name: `Synthetic Attorney ${n}`,
+  profile_state: state,
+  jurisdiction_id: null,
+  status_code: null,
+  recorded_at: stamp(w.now - n * 1000),
+  lapses_on: null,
+});
+
+test("SR-14. DEV-001: the Attorneys list shows the attorney records only to holders of manage_attorney_verification, one profile stage at a time, links a profile's lifecycle page only for the global grant, and refuses everyone else with no record", async () => {
+  const { w, a, admin, plain } = world();
+  const STAGE_HREFS = [
+    "/staff/attorneys?section=under_review",
+    "/staff/attorneys?section=approved",
+    "/staff/attorneys?section=suspended",
+    "/staff/attorneys?section=removed",
+  ];
+  // A global holder: the first stage, each row opening its lifecycle page.
+  const global = administration(w, admin, [profileRow(w, 70, "under_review")]);
+  const first = await render(
+    "app/staff/attorneys/page.tsx",
+    global.sources,
+    firstPage,
+  );
+  assert.deepEqual(first.log, ["connection"]);
+  assert.deepEqual(global.calls, [["under_review", 0]]);
+  assert.ok(first.metadata.robots.index === false);
+  assert.ok(first.text.includes("Applications under review"));
+  assert.ok(first.text.includes("Synthetic Attorney 70"));
+  assert.deepEqual(first.hrefs, [
+    ...STAGE_HREFS,
+    "/staff/attorneys/00000000-0000-4000-8000-000000000070",
+  ]);
+  assert.ok(
+    first.html.includes(
+      'class="w-tb on" href="/staff/attorneys?section=under_review" aria-current="page"',
+    ),
+  );
+  assert.equal(first.html.includes("<form"), false);
+  // A profile stage is read as asked; any other section shows the first
+  // stage (the page lists attorney profiles only).
+  const removed = administration(w, admin, [profileRow(w, 71, "removed")]);
+  await render("app/staff/attorneys/page.tsx", removed.sources, {
+    searchParams: Promise.resolve({ section: "removed", page: "2" }),
+  });
+  assert.deepEqual(removed.calls, [["removed", 25]]);
+  const other = administration(w, admin, []);
+  const fallback = await render("app/staff/attorneys/page.tsx", other.sources, {
+    searchParams: Promise.resolve({ section: "waitlist" }),
+  });
+  assert.deepEqual(other.calls, [["under_review", 0]]);
+  assert.ok(fallback.text.includes("There is nothing in this section."));
+  // A jurisdiction-scoped holder reads the records but opens no lifecycle
+  // page (it needs the global grant).
+  const reviewer = addStaff(w, 14);
+  grant(w, reviewer.userId, "manage_attorney_verification", {
+    jurisdiction_id: a,
+  });
+  const scoped = administration(w, reviewer, [
+    profileRow(w, 72, "under_review"),
+  ]);
+  const scopedView = await render(
+    "app/staff/attorneys/page.tsx",
+    scoped.sources,
+    firstPage,
+  );
+  assert.ok(scopedView.text.includes("Synthetic Attorney 72"));
+  assert.deepEqual(scopedView.hrefs, STAGE_HREFS);
+  // A staff member holding none of the compliance capabilities, and one
+  // holding another compliance capability but not the attorney records:
+  // the fixed refusal, no record read and none shown.
+  const holds = addStaff(w, 15);
+  grant(w, holds.userId, "manage_legal_holds");
+  for (const who of [plain, holds]) {
+    const refused = administration(w, who, [profileRow(w, 73, "under_review")]);
+    const view = await render(
+      "app/staff/attorneys/page.tsx",
+      refused.sources,
+      firstPage,
+    );
+    assert.deepEqual(refused.calls, []);
+    assert.ok(view.text.includes("Attorneys not available"));
+    assert.ok(view.text.includes("No access"));
+    assert.equal(view.text.includes("Synthetic Attorney"), false);
+    assert.deepEqual(view.hrefs, ["/staff"]);
+  }
+  // Records that cannot be read: the unavailable page and its one log line.
+  const broken = administration(w, admin, null);
+  const unavailable = await render(
+    "app/staff/attorneys/page.tsx",
+    broken.sources,
+    firstPage,
+  );
+  assert.ok(unavailable.text.includes("Attorneys unavailable"));
+  assert.deepEqual(unavailable.hrefs, []);
+  assert.deepEqual(unavailable.log, [
+    "connection",
+    {
+      level: "warn",
+      event: "staff_configuration.view_unavailable",
+      fields: { route: "/staff/attorneys", outcome: "unavailable" },
+    },
+  ]);
+  // The page asks only the compliance workspace use case, with the trusted
+  // administration sources, and reads only its two query values.
+  const code = codeOf(read("app/staff/attorneys/page.tsx"));
+  assert.ok(
+    code.includes(
+      "  const { section, page } = await searchParams;\n  const workspace = await resolveComplianceWorkspace(\n    ADMINISTRATION_SOURCES,\n",
+    ),
+  );
+  assert.equal(code.match(/await /g).length, 4);
+  assert.doesNotMatch(code, /\bparams\b|STAFF_CONFIGURATION_SOURCES/);
 });

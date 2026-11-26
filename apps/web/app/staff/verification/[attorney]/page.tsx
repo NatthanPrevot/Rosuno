@@ -9,25 +9,23 @@
 // determination is recorded only when a reviewer explicitly asks for one.
 // MVP-001 S3: a finding whose source is an uploaded document offers its
 // download, which the server authorizes again for each request.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, the Applications &
+// verification record): the design's record panel with the application,
+// the professional records and their evidence, the current assessment
+// (shown, never recorded), the recorded determinations and the history,
+// each with its unchanged forms.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import type { ReactNode } from "react";
 
 import type { ProfileState } from "../../../../src/application/professional-records.ts";
 import { resolveStaffReview } from "../../../../src/application/staff-verification.ts";
 import { STAFF_VERIFICATION_SOURCES } from "../../../../src/infrastructure/staff/staff-verification-adapter.ts";
 import {
   Alert,
-  ButtonLink,
-  Cluster,
   Disclosure,
-  Eyebrow,
-  Heading,
-  Page,
-  Stack,
   Status,
-  Surface,
   Table,
   Text,
 } from "../../../../src/presentation/design-system.tsx";
@@ -37,6 +35,16 @@ import {
   RESULT_LABELS,
   reasonLabel,
 } from "../../../../src/presentation/professional-labels.ts";
+import {
+  Block,
+  DenyCard,
+  KeyValues,
+  Pill,
+  RecordPanel,
+  StaffBody,
+  StaffHeader,
+  Timeline,
+} from "../../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
 import {
   ArtifactDownload,
@@ -68,35 +76,17 @@ const KIND_HEADINGS = {
   practice_area_authorisation: "Practice area",
 } as const;
 
-function ReviewFrame({
-  title,
-  children,
-}: {
-  readonly title: string;
-  readonly children: ReactNode;
-}) {
-  return (
-    <Page density="admin">
-      <Surface emphasis="raised" labelledBy="staff-review-title">
-        <Stack>
-          <Eyebrow>Staff verification</Eyebrow>
-          <Heading as="h1" size="lg" id="staff-review-title">
-            {title}
-          </Heading>
-          {children}
-        </Stack>
-      </Surface>
-    </Page>
-  );
-}
+const TITLE_ID = "staff-review-title";
+
+const BACK = { href: "/staff/verification", label: "Back to the queue" };
 
 function BackToQueue() {
   return (
-    <Cluster>
-      <ButtonLink variant="tertiary" href="/staff/verification">
-        Back to the queue
-      </ButtonLink>
-    </Cluster>
+    <div className="st-links">
+      <a className="btn btn-line btn-sm" href={BACK.href}>
+        {BACK.label}
+      </a>
+    </div>
   );
 }
 
@@ -159,70 +149,106 @@ export default async function StaffReviewPage({
   const view = await resolveStaffReview(STAFF_VERIFICATION_SOURCES, attorney);
   if (view.status === "sign-in-required") {
     return (
-      <ReviewFrame title="Sign in to continue">
-        <Cluster>
-          <ButtonLink variant="primary" href="/sign-in">
-            Sign in
-          </ButtonLink>
-        </Cluster>
-      </ReviewFrame>
+      <>
+        <StaffHeader titleId={TITLE_ID} title="Sign in to continue" />
+        <StaffBody>
+          <DenyCard
+            pill="Signed out"
+            tone="neutral"
+            role="status"
+            links={
+              <a className="btn btn-ink btn-sm" href="/sign-in">
+                Sign in
+              </a>
+            }
+          >
+            Verification review is available only to signed-in staff.
+          </DenyCard>
+        </StaffBody>
+      </>
     );
   }
   if (view.status === "denied") {
     return (
-      <ReviewFrame title="Review not available">
-        <Alert tone="warning" title="Not available" role="status">
-          There is nothing to review here within your current verification
-          access.
-        </Alert>
-        <BackToQueue />
-      </ReviewFrame>
+      <>
+        <StaffHeader titleId={TITLE_ID} title="Review not available" />
+        <StaffBody>
+          <DenyCard
+            pill="Not available"
+            tone="warning"
+            role="status"
+            links={
+              <a className="btn btn-line btn-sm" href={BACK.href}>
+                {BACK.label}
+              </a>
+            }
+          >
+            There is nothing to review here within your current verification
+            access.
+          </DenyCard>
+        </StaffBody>
+      </>
     );
   }
   if (view.status === "unavailable") {
     return (
-      <ReviewFrame title="Review unavailable">
-        <Alert tone="error" title="The review could not be opened" role="alert">
-          This review could not be opened right now. Please try again later.
-        </Alert>
-        <BackToQueue />
-      </ReviewFrame>
+      <>
+        <StaffHeader titleId={TITLE_ID} title="Review unavailable" />
+        <StaffBody>
+          <DenyCard
+            pill="The review could not be opened"
+            tone="error"
+            role="alert"
+            links={
+              <a className="btn btn-line btn-sm" href={BACK.href}>
+                {BACK.label}
+              </a>
+            }
+          >
+            This review could not be opened right now. Please try again later.
+          </DenyCard>
+        </StaffBody>
+      </>
     );
   }
   const profile = view.profile;
   return (
-    <ReviewFrame
+    <RecordPanel
+      titleId={TITLE_ID}
       title={profile === null ? "Attorney records in your scope" : profile.name}
+      sub="Attorney application and professional records"
+      pill={
+        profile === null
+          ? undefined
+          : { tone: "neutral", label: STAGE_LABELS[profile.stage] }
+      }
+      back={BACK}
     >
       {profile === null ? (
-        <Alert tone="information" title="Profile not in your scope">
-          Profile details and profile-stage changes need jurisdiction-free
-          access. The records below are those in your jurisdictions.
-        </Alert>
+        <Block>
+          <Alert tone="information" title="Profile not in your scope">
+            Profile details and profile-stage changes need jurisdiction-free
+            access. The records below are those in your jurisdictions.
+          </Alert>
+        </Block>
       ) : (
-        <>
-          <Table id="review-profile" caption="Application">
-            <tbody>
-              <tr>
-                <th scope="row">Profile stage</th>
-                <td>
-                  <Status tone="neutral">{STAGE_LABELS[profile.stage]}</Status>
-                </td>
-              </tr>
-              <tr>
-                <th scope="row">Headline</th>
-                <td>{profile.headline || "Not provided"}</td>
-              </tr>
-              <tr>
-                <th scope="row">Years of experience</th>
-                <td>{profile.yearsExperience}</td>
-              </tr>
-            </tbody>
-          </Table>
+        <Block title="Application">
+          <KeyValues
+            items={[
+              [
+                "Profile stage",
+                <Status key="stage" tone="neutral">
+                  {STAGE_LABELS[profile.stage]}
+                </Status>,
+              ],
+              ["Headline", profile.headline || "Not provided"],
+              ["Years of experience", profile.yearsExperience],
+            ]}
+          />
           {profile.transitions.length === 0 ? (
-            <Text tone="muted">
+            <p className="st-emd">
               No profile-stage change is available from this stage here.
-            </Text>
+            </p>
           ) : (
             profile.transitions.map((intent) => (
               <Disclosure
@@ -245,43 +271,25 @@ export default async function StaffReviewPage({
               </Disclosure>
             ))
           )}
-        </>
+        </Block>
       )}
 
-      <Heading as="h2" size="md">
-        Professional records and evidence
-      </Heading>
-      {view.records.length === 0 ? (
-        <Text tone="muted">No professional records in your scope.</Text>
-      ) : (
-        view.records.map((record) => (
-          <Surface
-            key={record.id}
-            as="article"
-            tone="cream"
-            labelledBy={`record-${record.id}`}
-          >
-            <Stack>
-              <Heading as="h3" size="sm" id={`record-${record.id}`}>
+      <Block title="Professional records and evidence">
+        {view.records.length === 0 ? (
+          <p className="st-emd">No professional records in your scope.</p>
+        ) : (
+          view.records.map((record) => (
+            <article
+              key={record.id}
+              className="st-subcard"
+              aria-labelledby={`record-${record.id}`}
+            >
+              <h3 className="st-h2s" id={`record-${record.id}`}>
                 {`${KIND_HEADINGS[record.kind]}: ${record.title} (${record.jurisdiction})`}
-              </Heading>
-              <Table
-                id={`details-${record.id}`}
-                caption="Claimed and recorded details"
-              >
-                <tbody>
-                  {record.details.map(([label, value]) => (
-                    <tr key={label}>
-                      <th scope="row">{label}</th>
-                      <td>{value}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
+              </h3>
+              <KeyValues items={record.details} />
               {record.evidence.length === 0 ? (
-                <Status tone="warning">
-                  No verification evidence recorded
-                </Status>
+                <Pill tone="warning">No verification evidence recorded</Pill>
               ) : (
                 <Table
                   id={`evidence-${record.id}`}
@@ -342,127 +350,111 @@ export default async function StaffReviewPage({
                   </Disclosure>
                 </>
               ) : (
-                <Text tone="muted" size="small">
+                <p className="st-emd">
                   Findings can be recorded once the application is under review.
-                </Text>
+                </p>
               )}
               {record.canDecide ? (
                 <Disclosure summary="Decide this practice-area request">
                   <DecisionForm record={record.id} />
                 </Disclosure>
               ) : null}
-            </Stack>
-          </Surface>
-        ))
-      )}
-      {view.disciplineJurisdictions.length > 0 ? (
-        <Disclosure summary="Record a discipline finding from a source">
-          <DisciplineForm
-            attorney={view.attorneyId}
-            jurisdictions={view.disciplineJurisdictions}
-          />
-        </Disclosure>
-      ) : null}
+            </article>
+          ))
+        )}
+        {view.disciplineJurisdictions.length > 0 ? (
+          <Disclosure summary="Record a discipline finding from a source">
+            <DisciplineForm
+              attorney={view.attorneyId}
+              jurisdictions={view.disciplineJurisdictions}
+            />
+          </Disclosure>
+        ) : null}
+      </Block>
 
-      <Heading as="h2" size="md">
-        Current eligibility assessment
-      </Heading>
-      <Alert tone="information" title="Shown, not recorded">
-        These assessments are computed now from current records, evidence, and
-        applicable approved policy. Viewing them records nothing. Eligibility is
-        not bookability or marketplace activation.
-      </Alert>
-      {view.assessments.length === 0 ? (
-        <Text tone="muted">
-          No jurisdiction in your scope has records to assess.
-        </Text>
-      ) : (
-        view.assessments.map((entry) => {
-          const result = RESULT_LABELS[entry.assessment.result];
-          return (
-            <Stack key={entry.jurisdictionId}>
-              <Heading as="h3" size="sm">
-                {entry.jurisdiction}
-              </Heading>
-              <Status tone={result.tone} emphasis="strong">
-                {result.label}
-              </Status>
-              <FactorTable
-                id={`assessment-${entry.jurisdictionId}`}
-                caption={`Factors as of ${entry.assessment.asOf}`}
-                factors={entry.assessment.factors}
-              />
-              {entry.canRecord ? (
-                <DeterminationForm
-                  attorney={view.attorneyId}
-                  jurisdiction={entry.jurisdictionId}
-                  practiceAreas={view.practiceAreas}
+      <Block title="Current eligibility assessment">
+        <Alert tone="information" title="Shown, not recorded">
+          These assessments are computed now from current records, evidence, and
+          applicable approved policy. Viewing them records nothing. Eligibility
+          is not bookability or marketplace activation.
+        </Alert>
+        {view.assessments.length === 0 ? (
+          <p className="st-emd">
+            No jurisdiction in your scope has records to assess.
+          </p>
+        ) : (
+          view.assessments.map((entry) => {
+            const result = RESULT_LABELS[entry.assessment.result];
+            return (
+              <div key={entry.jurisdictionId} className="st-subcard">
+                <div className="st-ptop">
+                  <h3 className="st-h2s">{entry.jurisdiction}</h3>
+                  <span className="grow"></span>
+                  <Status tone={result.tone} emphasis="strong">
+                    {result.label}
+                  </Status>
+                </div>
+                <FactorTable
+                  id={`assessment-${entry.jurisdictionId}`}
+                  caption={`Factors as of ${entry.assessment.asOf}`}
+                  factors={entry.assessment.factors}
                 />
-              ) : null}
-            </Stack>
-          );
-        })
-      )}
+                {entry.canRecord ? (
+                  <DeterminationForm
+                    attorney={view.attorneyId}
+                    jurisdiction={entry.jurisdictionId}
+                    practiceAreas={view.practiceAreas}
+                  />
+                ) : null}
+              </div>
+            );
+          })
+        )}
+      </Block>
 
-      <Heading as="h2" size="md">
-        Recorded eligibility determinations
-      </Heading>
-      {view.evaluations.length === 0 ? (
-        <Text tone="muted">No determinations recorded in your scope.</Text>
-      ) : (
-        view.evaluations.map((evaluation) => {
-          const result = RESULT_LABELS[evaluation.result] ?? {
-            tone: "neutral" as const,
-            label: "Recorded",
-          };
-          return (
-            <Disclosure
-              key={evaluation.id}
-              summary={`${evaluation.evaluatedAt}: ${evaluation.jurisdiction}, ${evaluation.context}: ${result.label}`}
-            >
-              <FactorTable
-                id={`evaluation-${evaluation.id}`}
-                caption="Recorded factors (immutable)"
-                factors={evaluation.factors}
-              />
-            </Disclosure>
-          );
-        })
-      )}
+      <Block title="Recorded eligibility determinations">
+        {view.evaluations.length === 0 ? (
+          <p className="st-emd">No determinations recorded in your scope.</p>
+        ) : (
+          view.evaluations.map((evaluation) => {
+            const result = RESULT_LABELS[evaluation.result] ?? {
+              tone: "neutral" as const,
+              label: "Recorded",
+            };
+            return (
+              <Disclosure
+                key={evaluation.id}
+                summary={`${evaluation.evaluatedAt}: ${evaluation.jurisdiction}, ${evaluation.context}: ${result.label}`}
+              >
+                <FactorTable
+                  id={`evaluation-${evaluation.id}`}
+                  caption="Recorded factors (immutable)"
+                  factors={evaluation.factors}
+                />
+              </Disclosure>
+            );
+          })
+        )}
+      </Block>
 
       {view.global ? (
-        <>
-          <Heading as="h2" size="md">
-            Application history
-          </Heading>
-          {view.history.length === 0 ? (
-            <Text tone="muted">No recorded history.</Text>
-          ) : (
-            <Table
-              id="review-history"
-              caption="Recorded application history, newest first"
-            >
-              <thead>
-                <tr>
-                  <th scope="col">When</th>
-                  <th scope="col">What</th>
-                  <th scope="col">Detail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {view.history.map((entry, index) => (
-                  <tr key={`${entry.occurredAt}-${index}`}>
-                    <td>{entry.occurredAt}</td>
-                    <td>{entry.action}</td>
-                    <td>{entry.detail}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          )}
-        </>
+        <Block title="Application history">
+          <Timeline
+            items={view.history.map((entry, index) => ({
+              key: `${entry.occurredAt}-${index}`,
+              at: entry.occurredAt,
+              text:
+                entry.detail === ""
+                  ? entry.action
+                  : `${entry.action}: ${entry.detail}`,
+            }))}
+            none="No recorded history."
+          />
+        </Block>
       ) : null}
-      <BackToQueue />
-    </ReviewFrame>
+      <Block>
+        <BackToQueue />
+      </Block>
+    </RecordPanel>
   );
 }

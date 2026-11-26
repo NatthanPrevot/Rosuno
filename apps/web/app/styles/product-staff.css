@@ -207,6 +207,23 @@
 .W.st .st-blk > :not(.st-h3) + * {
   margin-top: 10px;
 }
+/* A record inside a record (a professional record, a jurisdiction's assessment): a bordered card of its own. */
+.W.st .st-subcard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.W.st .st-subcard > .st-ptop {
+  margin-bottom: 0;
+}
+.W.st .st-subcard > .st-kv {
+  margin-top: -4px;
+}
 .W.st .st-backrow {
   margin: 0;
 }
@@ -264,4 +281,12 @@
 }
 .W.st button.btn[aria-disabled="true"] {
   color: var(--faint);
+}
+
+/* A stacked row (narrow windows and phones) wraps each value instead of cutting it. */
+@media (max-width: 980px) {
+  .W.st .st-row > .st-cell .st-cv {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }

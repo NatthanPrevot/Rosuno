@@ -207,8 +207,10 @@ test("S2-R3. every attorney page and every staff page asks the step-up gate firs
   // pass 2: and the nine staff operations and administration pages. MVP-001
   // S11 pass 2B: and the attorney's dashboard, past consultations, week
   // view, messages, documents and compliance pages. MVP-001 S11 PS-A6: and
-  // the four staff break-glass and data request pages.
-  assert.equal(GATED_PAGES.length, 57);
+  // the four staff break-glass and data request pages. DEV-001: and the
+  // owner's UI/UX design's staff Attorneys list.
+  assert.equal(GATED_PAGES.length, 58);
+  assert.ok(GATED_PAGES.includes("app/staff/attorneys/page.tsx"));
   for (const file of [
     "app/staff/break-glass/page.tsx",
     "app/staff/break-glass/[grant]/page.tsx",

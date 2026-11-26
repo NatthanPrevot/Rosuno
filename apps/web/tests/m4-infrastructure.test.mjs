@@ -763,6 +763,8 @@ const MVP001_STAFF_APP = [
   "app/staff/attorneys/[attorney]/page.tsx",
   "app/staff/attorneys/actions.ts",
   "app/staff/attorneys/forms.tsx",
+  // DEV-001: the owner's UI/UX design's Attorneys list.
+  "app/staff/attorneys/page.tsx",
   "app/staff/audit/[event]/page.tsx",
   "app/staff/audit/page.tsx",
   "app/staff/clients/[client]/page.tsx",

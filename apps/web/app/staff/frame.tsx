@@ -18,9 +18,9 @@ import type { Pager } from "../../src/application/staff-configuration.ts";
 import { logRequestEvent } from "../../src/infrastructure/observability/request-log.ts";
 import { Alert } from "../../src/presentation/design-system.tsx";
 import {
+  DenyCard,
   Lead,
   PagerRow,
-  Pill,
   StaffBody,
   StaffHeader,
   TIMES_IN_UTC,
@@ -148,30 +148,6 @@ export function BoundNotice({
     <Alert tone="warning" title="Not every entry is shown" role="status">
       {`There are more ${noun} than this page can list. Only the first are shown; nothing is changed by that.`}
     </Alert>
-  );
-}
-
-// The design's card for a page that is not shown: its pill, the fixed
-// message and, where the design has them, links onward.
-export function DenyCard({
-  pill,
-  tone,
-  role,
-  children,
-  links,
-}: {
-  readonly pill: string;
-  readonly tone: "warning" | "error" | "neutral";
-  readonly role: "status" | "alert";
-  readonly children: ReactNode;
-  readonly links?: ReactNode;
-}) {
-  return (
-    <section className="w-card st-deny" role={role}>
-      <Pill tone={tone}>{pill}</Pill>
-      <p className="st-emd">{children}</p>
-      {links === undefined ? null : <div className="st-links">{links}</div>}
-    </section>
   );
 }
 

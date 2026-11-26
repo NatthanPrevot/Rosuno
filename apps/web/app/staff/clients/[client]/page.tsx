@@ -10,6 +10,10 @@
 // database decides again, never lets staff act on their own account and,
 // for a suspension with open matters, opens one compliance review item. The
 // one route value read, client, only names the account.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, the client record): the
+// design's record panel with the account state pill, the account and its
+// counts, then the one slot of the state change form.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -17,15 +21,15 @@ import { connection } from "next/server";
 import { resolveClient } from "../../../../src/application/administration-workspace.ts";
 import { ADMINISTRATION_SOURCES } from "../../../../src/infrastructure/staff/operations-adapter.ts";
 import {
-  Heading,
-  Status,
-  Table,
-  Text,
-} from "../../../../src/presentation/design-system.tsx";
-import {
   ACCOUNT_STATE_LABELS,
   utcText,
 } from "../../../../src/presentation/operations-labels.ts";
+import {
+  Block,
+  Empty,
+  KeyValues,
+  RecordPanel,
+} from "../../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
 import { BackLink, refusalPage, StaffFrame } from "../../frame.tsx";
 import { ClientAccountForm } from "../forms.tsx";
@@ -51,69 +55,65 @@ export default async function ClientAccountPage({
   const { client } = view;
   if (client === null) {
     return (
-      <StaffFrame eyebrow="Clients" title="Client account">
+      <StaffFrame title="Client account">
         <BackLink href="/staff/clients">Client accounts</BackLink>
-        <Text>No such client account is available.</Text>
+        <section className="w-card st-panel">
+          <Empty title="No such client account is available." />
+        </section>
       </StaffFrame>
     );
   }
   const label = ACCOUNT_STATE_LABELS[client.state];
   return (
-    <StaffFrame eyebrow="Clients" title="Client account">
-      <BackLink href="/staff/clients">Client accounts</BackLink>
-      <Table id="client-account" caption="Account">
-        <tbody>
-          <tr>
-            <th scope="row">User identifier</th>
-            <td>{client.id}</td>
-          </tr>
-          <tr>
-            <th scope="row">Name</th>
-            <td>{client.displayName ?? "No name recorded"}</td>
-          </tr>
-          <tr>
-            <th scope="row">State</th>
-            <td>
-              <Status tone={label.tone}>{label.label}</Status>
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">Created (UTC)</th>
-            <td>{utcText(client.createdAt)}</td>
-          </tr>
-          <tr>
-            <th scope="row">Intakes</th>
-            <td>{client.intakes}</td>
-          </tr>
-          <tr>
-            <th scope="row">Requests (awaiting a decision)</th>
-            <td>{`${client.requests} (${client.openRequests})`}</td>
-          </tr>
-          <tr>
-            <th scope="row">Consultations (not ended)</th>
-            <td>{`${client.consultations} (${client.openConsultations})`}</td>
-          </tr>
-          <tr>
-            <th scope="row">Reported problems not resolved</th>
-            <td>{client.openComplaints}</td>
-          </tr>
-        </tbody>
-      </Table>
+    <RecordPanel
+      titleId="staff-configuration-title"
+      title={client.displayName ?? "No name recorded"}
+      sub="Client account · times in UTC"
+      pill={{ tone: label.tone, label: label.label }}
+      back={{ href: "/staff/clients", label: "Client accounts" }}
+    >
+      <Block title="Account">
+        <KeyValues
+          items={[
+            ["User identifier", client.id],
+            ["Name", client.displayName ?? "No name recorded"],
+            ["State", label.label],
+            ["Created (UTC)", utcText(client.createdAt)],
+          ]}
+        />
+      </Block>
+      <Block title="Activity">
+        <KeyValues
+          items={[
+            ["Intakes", client.intakes],
+            [
+              "Requests (awaiting a decision)",
+              `${client.requests} (${client.openRequests})`,
+            ],
+            [
+              "Consultations (not ended)",
+              `${client.consultations} (${client.openConsultations})`,
+            ],
+            ["Reported problems not resolved", client.openComplaints],
+          ]}
+        />
+      </Block>
       {client.state === "active" || client.state === "suspended" ? (
         // One slot for either intent, so the form (and the message for the
         // state its action returned) stays mounted when the state changes.
-        <>
-          <Heading as="h2" size="md">
-            {client.state === "active"
+        <Block
+          title={
+            client.state === "active"
               ? "Suspend the account"
-              : "Reactivate the account"}
-          </Heading>
+              : "Reactivate the account"
+          }
+        >
           <ClientAccountForm
             client={client.id}
             intent={client.state === "active" ? "suspend" : "reactivate"}
           />
-        </>
+        </Block>
       ) : null}
-    </StaffFrame>
+    </RecordPanel>
   );
 }

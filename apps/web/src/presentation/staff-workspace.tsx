@@ -163,6 +163,18 @@ export const STAFF_NAVIGATION: readonly StaffNavigationGroup[] = Object.freeze([
     hidden: false,
     destinations: [
       {
+        id: "attorneys",
+        label: "Attorneys",
+        icon: ICON.attorneys,
+        views: [
+          {
+            href: "/staff/attorneys",
+            label: "Attorneys",
+            surface: "verification",
+          },
+        ],
+      },
+      {
         id: "clients",
         label: "Clients",
         icon: ICON.clients,
@@ -910,6 +922,30 @@ export function PagerRow({
         </div>
       )}
     </div>
+  );
+}
+
+// The design's card for a page that is not shown: its pill, the fixed
+// message and, where the design has them, links onward.
+export function DenyCard({
+  pill,
+  tone,
+  role,
+  children,
+  links,
+}: {
+  readonly pill: string;
+  readonly tone: "warning" | "error" | "neutral";
+  readonly role: "status" | "alert";
+  readonly children: ReactNode;
+  readonly links?: ReactNode;
+}) {
+  return (
+    <section className="w-card st-deny" role={role}>
+      <Pill tone={tone}>{pill}</Pill>
+      <p className="st-emd">{children}</p>
+      {links === undefined ? null : <div className="st-links">{links}</div>}
+    </section>
   );
 }
 

@@ -28,6 +28,12 @@
 // sections are not presented. The query values read, status and page (the
 // review items) and section and records (the attorney records), only choose
 // the lists and their pages.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Applications &
+// verification › Compliance review): the design's count panels (exact counts
+// the summary answered), the attorney records as the design's list with its
+// section tabs, the compliance review items and the recent policy status
+// changes.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -40,14 +46,7 @@ import { resolveFamilyExceptions } from "../../../src/application/consultation-o
 import { jurisdictionLabel } from "../../../src/application/operations-workspace.ts";
 import { OPERATIONS_SOURCES } from "../../../src/infrastructure/consultations/completion-adapter.ts";
 import { ADMINISTRATION_SOURCES } from "../../../src/infrastructure/staff/operations-adapter.ts";
-import {
-  ButtonLink,
-  Cluster,
-  Heading,
-  Status,
-  Table,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
+import { ButtonLink } from "../../../src/presentation/design-system.tsx";
 import {
   COMPLIANCE_COUNT_TITLES,
   COMPLIANCE_DIMENSION_LABELS,
@@ -58,8 +57,20 @@ import {
   PROFILE_STAGE_LABELS,
   utcText,
 } from "../../../src/presentation/operations-labels.ts";
+import {
+  ActionCell,
+  Cell,
+  Empty,
+  ListBox,
+  ListRow,
+  PagerRow,
+  Panel,
+  PanelGrid,
+  PillCell,
+  TabLinks,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../frame.tsx";
+import { refusalPage, StaffFrame } from "../frame.tsx";
 import { ReviewItemList } from "../review-item-list.tsx";
 import {
   assignComplianceItemAction,
@@ -77,6 +88,23 @@ const COUNT_GROUPS = [
   "compliance_reviews",
   "complaints",
   "legal_holds",
+] as const;
+
+const RECORD_COLUMNS = [
+  "Attorney",
+  "Jurisdiction",
+  "Recorded (UTC)",
+  "Date",
+  "Stage",
+  "Open",
+] as const;
+
+const CHANGE_COLUMNS = [
+  "When (UTC)",
+  "Policy type",
+  "Scope",
+  "From",
+  "To",
 ] as const;
 
 export default async function ComplianceItemsPage({
@@ -119,176 +147,170 @@ export default async function ComplianceItemsPage({
     return refusalPage(view, "/staff/compliance", "Compliance");
   }
   const recordsBase = `/staff/compliance?section=${workspace.section}`;
+  const groups = COUNT_GROUPS.filter(
+    (group) => workspace.counts[group] !== undefined,
+  );
   return (
-    <StaffFrame eyebrow="Compliance" title="Compliance">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Text tone="muted">{COMPLIANCE_INTRO}</Text>
-      {COUNT_GROUPS.filter(
-        (group) => workspace.counts[group] !== undefined,
-      ).map((group) => (
-        <Table
-          key={group}
-          id={`compliance-counts-${group}`}
-          caption={COMPLIANCE_COUNT_TITLES[group]}
-        >
-          <tbody>
-            {workspace.counts[group].map((count) => (
-              <tr key={count.dimension}>
-                <th scope="row">
-                  {COMPLIANCE_DIMENSION_LABELS[count.dimension] ??
-                    count.dimension}
-                </th>
-                <td>{count.value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      ))}
-      {workspace.held.complaints ? (
-        <Cluster>
-          <ButtonLink variant="secondary" href="/staff/complaints">
-            Open reported problems
-          </ButtonLink>
-        </Cluster>
-      ) : null}
-      {workspace.held.legalHolds ? (
-        <Cluster>
-          <ButtonLink variant="secondary" href="/staff/legal-holds">
-            Open Legal Holds
-          </ButtonLink>
-        </Cluster>
+    <StaffFrame
+      title="Applications & verification"
+      description="Compliance: attorney records, review items and policy status changes."
+      lead={<p>{COMPLIANCE_INTRO}</p>}
+      utc
+    >
+      {groups.length === 0 ? null : (
+        <PanelGrid>
+          {groups.map((group) => (
+            <Panel
+              key={group}
+              id={`compliance-counts-${group}-title`}
+              title={COMPLIANCE_COUNT_TITLES[group]}
+              place="s6"
+            >
+              <table className="st-cov" id={`compliance-counts-${group}`}>
+                <caption>{COMPLIANCE_COUNT_TITLES[group]}</caption>
+                <tbody>
+                  {workspace.counts[group].map((count) => (
+                    <tr key={count.dimension}>
+                      <th scope="row">
+                        {COMPLIANCE_DIMENSION_LABELS[count.dimension] ??
+                          count.dimension}
+                      </th>
+                      <td className="r num">{count.value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Panel>
+          ))}
+        </PanelGrid>
+      )}
+      {workspace.held.complaints || workspace.held.legalHolds ? (
+        <div className="st-links">
+          {workspace.held.complaints ? (
+            <a className="btn btn-line btn-sm" href="/staff/complaints">
+              Open reported problems
+            </a>
+          ) : null}
+          {workspace.held.legalHolds ? (
+            <a className="btn btn-line btn-sm" href="/staff/legal-holds">
+              Open Legal Holds
+            </a>
+          ) : null}
+        </div>
       ) : null}
       {workspace.sections.records === "unavailable" ? (
         <>
-          <Heading as="h2" size="md">
-            Attorney records
-          </Heading>
-          <Text tone="muted">
+          <h2 className="st-h2">Attorney records</h2>
+          <p className="st-emd">
             The attorney records could not be shown right now.
-          </Text>
+          </p>
         </>
       ) : null}
       {workspace.records === null || workspace.pager === null ? null : (
         <>
-          <Heading as="h2" size="md">
-            Attorney records
-          </Heading>
-          <Cluster>
-            {COMPLIANCE_SECTIONS.map((entry) => (
-              <ButtonLink
-                key={entry}
-                variant={entry === workspace.section ? "primary" : "secondary"}
-                href={`/staff/compliance?section=${entry}`}
-                aria-current={entry === workspace.section ? "page" : undefined}
-              >
-                {COMPLIANCE_SECTION_LABELS[entry]}
-              </ButtonLink>
-            ))}
-          </Cluster>
-          <Text size="small" tone="muted">
+          <h2 className="st-h2">Attorney records</h2>
+          <TabLinks
+            label="Attorney records by section"
+            links={COMPLIANCE_SECTIONS.map((entry) => ({
+              href: `/staff/compliance?section=${entry}`,
+              label: COMPLIANCE_SECTION_LABELS[entry],
+            }))}
+            current={recordsBase}
+          />
+          <p className="st-emd">
             {COMPLIANCE_SECTION_NOTES[workspace.section]}
-          </Text>
-          {workspace.records.length === 0 ? (
-            <Text>
-              {workspace.pager.page === 1
-                ? "There is nothing in this section."
-                : "There is nothing on this page."}
-            </Text>
-          ) : (
-            <Table
-              id="compliance-records"
-              caption={COMPLIANCE_SECTION_LABELS[workspace.section]}
-            >
-              <thead>
-                <tr>
-                  <th scope="col">Attorney</th>
-                  <th scope="col">Stage</th>
-                  <th scope="col">Jurisdiction</th>
-                  <th scope="col">Recorded (UTC)</th>
-                  <th scope="col">Date</th>
-                  <th scope="col">Open</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workspace.records.map((record) => {
-                  const stage = PROFILE_STAGE_LABELS[record.profileState];
-                  return (
-                    <tr key={`${record.recordType}-${record.recordId}`}>
-                      <td>{record.displayName ?? "No name recorded"}</td>
-                      <td>
-                        <Status tone={stage.tone}>{stage.label}</Status>
-                      </td>
-                      <td>
-                        {record.jurisdictionId === null
-                          ? "—"
-                          : jurisdictionLabel(
-                              workspace.names,
-                              record.jurisdictionId,
-                            )}
-                      </td>
-                      <td>
-                        {record.recordedAt === null
-                          ? "No evidence recorded"
-                          : utcText(record.recordedAt)}
-                      </td>
-                      <td>
-                        {[record.lapsesOn, record.statusCode]
-                          .filter((part) => part !== null)
-                          .join(", ") || "—"}
-                      </td>
-                      <td>
-                        {workspace.attorneyPages ? (
-                          <ButtonLink
-                            variant="tertiary"
-                            href={`/staff/attorneys/${record.attorneyId}`}
-                          >
-                            Open
-                          </ButtonLink>
-                        ) : (
-                          "Not in your scope"
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
+          </p>
+          <ListBox
+            label={COMPLIANCE_SECTION_LABELS[workspace.section]}
+            columns={RECORD_COLUMNS}
+          >
+            {workspace.records.length === 0 ? (
+              <Empty
+                title={
+                  workspace.pager.page === 1
+                    ? "There is nothing in this section."
+                    : "There is nothing on this page."
+                }
+              />
+            ) : (
+              workspace.records.map((record) => {
+                const stage = PROFILE_STAGE_LABELS[record.profileState];
+                return (
+                  <ListRow
+                    key={`${record.recordType}-${record.recordId}`}
+                    columns={6}
+                  >
+                    <Cell label="Attorney" strong>
+                      {record.displayName ?? "No name recorded"}
+                    </Cell>
+                    <Cell label="Jurisdiction">
+                      {record.jurisdictionId === null
+                        ? "—"
+                        : jurisdictionLabel(
+                            workspace.names,
+                            record.jurisdictionId,
+                          )}
+                    </Cell>
+                    <Cell label="Recorded">
+                      {record.recordedAt === null
+                        ? "No evidence recorded"
+                        : utcText(record.recordedAt)}
+                    </Cell>
+                    <Cell label="Date">
+                      {[record.lapsesOn, record.statusCode]
+                        .filter((part) => part !== null)
+                        .join(", ") || "—"}
+                    </Cell>
+                    <PillCell label="Stage" tone={stage.tone}>
+                      {stage.label}
+                    </PillCell>
+                    <ActionCell label="Open">
+                      {workspace.attorneyPages ? (
+                        <ButtonLink
+                          variant="tertiary"
+                          href={`/staff/attorneys/${record.attorneyId}`}
+                        >
+                          Open
+                        </ButtonLink>
+                      ) : (
+                        "Not in your scope"
+                      )}
+                    </ActionCell>
+                  </ListRow>
+                );
+              })
+            )}
+          </ListBox>
+          {workspace.pager.page === 1 && !workspace.pager.hasNext ? null : (
+            <PagerRow
+              note={`Page ${workspace.pager.page} of this section.`}
+              previous={
+                workspace.pager.page > 1
+                  ? `${recordsBase}&records=${workspace.pager.page - 1}`
+                  : null
+              }
+              next={
+                workspace.pager.hasNext
+                  ? `${recordsBase}&records=${workspace.pager.page + 1}`
+                  : null
+              }
+            />
           )}
-          <Cluster>
-            {workspace.pager.page > 1 ? (
-              <ButtonLink
-                variant="secondary"
-                href={`${recordsBase}&records=${workspace.pager.page - 1}`}
-              >
-                Previous page
-              </ButtonLink>
-            ) : null}
-            {workspace.pager.hasNext ? (
-              <ButtonLink
-                variant="secondary"
-                href={`${recordsBase}&records=${workspace.pager.page + 1}`}
-              >
-                Next page
-              </ButtonLink>
-            ) : null}
-          </Cluster>
         </>
       )}
       {view === null ? null : (
         <>
-          <Heading as="h2" size="md">
-            Compliance review items
-          </Heading>
-          <Text tone="muted">
+          <h2 className="st-h2">Compliance review items</h2>
+          <p className="st-emd">
             An eligibility or jurisdiction change that affects an open request
             or consultation, a possible return of a removed attorney, or a
             client account suspended with open matters is recorded here for a
             person to review. Nothing is decided automatically.
-          </Text>
+          </p>
           {view.status !== "ready" ? (
-            <Text tone="muted">
+            <p className="st-emd">
               The review items could not be shown right now.
-            </Text>
+            </p>
           ) : (
             <ReviewItemList
               view={view}
@@ -302,74 +324,56 @@ export default async function ComplianceItemsPage({
       )}
       {workspace.sections.policyChanges === "unavailable" ? (
         <>
-          <Heading as="h2" size="md">
-            Recent policy status changes
-          </Heading>
-          <Text tone="muted">
+          <h2 className="st-h2">Recent policy status changes</h2>
+          <p className="st-emd">
             The policy status changes could not be shown right now.
-          </Text>
+          </p>
         </>
       ) : null}
       {workspace.policyChanges === null ? null : (
         <>
-          <Heading as="h2" size="md">
-            Recent policy status changes
-          </Heading>
-          {workspace.policyChanges.length === 0 ? (
-            <Text>No policy status change is recorded in your scope.</Text>
-          ) : (
-            <Table
-              id="compliance-policy-changes"
-              caption="Policy version status changes, newest first"
-            >
-              <thead>
-                <tr>
-                  <th scope="col">When (UTC)</th>
-                  <th scope="col">Policy type</th>
-                  <th scope="col">Scope</th>
-                  <th scope="col">From</th>
-                  <th scope="col">To</th>
-                  <th scope="col">Open</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workspace.policyChanges.map((change) => (
-                  <tr key={change.id}>
-                    <td>{utcText(change.occurredAt)}</td>
-                    <td>{change.typeCode}</td>
-                    <td>
-                      {change.jurisdictionId === null
-                        ? "Every jurisdiction"
-                        : jurisdictionLabel(
-                            workspace.names,
-                            change.jurisdictionId,
-                          )}
-                    </td>
-                    <td>
-                      {change.fromStatus === null
-                        ? "—"
-                        : (POLICY_STATUS_TEXT[change.fromStatus] ??
-                          change.fromStatus)}
-                    </td>
-                    <td>
-                      {change.toStatus === null
-                        ? "—"
-                        : (POLICY_STATUS_TEXT[change.toStatus] ??
-                          change.toStatus)}
-                    </td>
-                    <td>
-                      <ButtonLink
-                        variant="tertiary"
-                        href={`/staff/policies/${change.versionId}`}
-                      >
-                        Open
-                      </ButtonLink>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          )}
+          <h2 className="st-h2">Recent policy status changes</h2>
+          <ListBox
+            label="Policy version status changes, newest first"
+            columns={CHANGE_COLUMNS}
+          >
+            {workspace.policyChanges.length === 0 ? (
+              <Empty title="No policy status change is recorded in your scope." />
+            ) : (
+              workspace.policyChanges.map((change) => (
+                <ListRow
+                  key={change.id}
+                  href={`/staff/policies/${change.versionId}`}
+                  columns={5}
+                >
+                  <Cell label="When" strong>
+                    {utcText(change.occurredAt)}
+                  </Cell>
+                  <Cell label="Policy type">{change.typeCode}</Cell>
+                  <Cell label="Scope">
+                    {change.jurisdictionId === null
+                      ? "Every jurisdiction"
+                      : jurisdictionLabel(
+                          workspace.names,
+                          change.jurisdictionId,
+                        )}
+                  </Cell>
+                  <Cell label="From">
+                    {change.fromStatus === null
+                      ? "—"
+                      : (POLICY_STATUS_TEXT[change.fromStatus] ??
+                        change.fromStatus)}
+                  </Cell>
+                  <Cell label="To">
+                    {change.toStatus === null
+                      ? "—"
+                      : (POLICY_STATUS_TEXT[change.toStatus] ??
+                        change.toStatus)}
+                  </Cell>
+                </ListRow>
+              ))
+            )}
+          </ListBox>
         </>
       )}
     </StaffFrame>
