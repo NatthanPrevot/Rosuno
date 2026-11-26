@@ -253,11 +253,14 @@ test("SP-4 the root layout renders the preview loader, which renders nothing and
   );
   // The server decides through the editor route only, same origin, never
   // stored; the bridge loads only for an editor.
+  // DEV-001: the request relies on fetch's default credentials mode
+  // (same-origin) for its relative path; no credentials override is allowed.
   assert.ok(
     code.includes(
-      'await fetch("/appearance/editor", {\n    credentials: "same-origin",\n    cache: "no-store",\n    signal,\n  });',
+      'await fetch("/appearance/editor", {\n    cache: "no-store",\n    signal,\n  });',
     ),
   );
+  assert.doesNotMatch(code, /credentials\s*:/);
   assert.equal(code.match(/fetch\(/g).length, 1);
   assert.ok(
     code.includes(

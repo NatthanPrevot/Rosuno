@@ -102,8 +102,9 @@ function framedHere(): boolean | null {
 }
 
 async function isEditor(signal: AbortSignal): Promise<boolean> {
+  // Same-origin path with the default credentials mode (same-origin), so the
+  // request carries the viewer's own session cookie and nothing else.
   const response = await fetch("/appearance/editor", {
-    credentials: "same-origin",
     cache: "no-store",
     signal,
   });
