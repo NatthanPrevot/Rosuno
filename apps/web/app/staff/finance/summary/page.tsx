@@ -11,6 +11,12 @@
 // posted and disputes opened. Read-only, from the append-only ledger. The
 // query values read, from, until and jurisdiction, are checked on the
 // server; nothing is read until a valid period is chosen.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Platform › Finance,
+// reports): the period form in the design's panel, then the ledger totals,
+// the payments by current state and the refunds and disputes, each an exact
+// read of the chosen period in its own panel. No figure is shown before a
+// valid period.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -23,8 +29,6 @@ import {
   Cluster,
   SelectField,
   Stack,
-  Table,
-  Text,
   TextField,
 } from "../../../../src/presentation/design-system.tsx";
 import {
@@ -33,8 +37,12 @@ import {
   FINANCE_SUMMARY_INTRO,
   PAYMENT_STATE_LABELS,
 } from "../../../../src/presentation/operations-labels.ts";
+import {
+  Panel,
+  PanelGrid,
+} from "../../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../../frame.tsx";
+import { refusalPage, StaffFrame } from "../../frame.tsx";
 
 export const metadata: Metadata = {
   title: "Financial activity summary",
@@ -65,110 +73,138 @@ export default async function FinanceSummaryPage({
   }
   const { values, summary } = view;
   return (
-    <StaffFrame eyebrow="Finance" title="Financial activity summary">
-      <BackLink href="/staff/finance">Finance</BackLink>
-      <Text tone="muted">{FINANCE_SUMMARY_INTRO}</Text>
-      <form method="get" action="/staff/finance/summary">
-        <Stack gap="tight">
-          <Cluster>
-            <TextField
-              id="finance-summary-from"
-              name="from"
-              type="date"
-              label="From (UTC day)"
-              defaultValue={values.from}
-              required
-            />
-            <TextField
-              id="finance-summary-until"
-              name="until"
-              type="date"
-              label="Until (UTC day, included)"
-              defaultValue={values.until}
-              required
-            />
-            <SelectField
-              id="finance-summary-jurisdiction"
-              name="jurisdiction"
-              label="Jurisdiction"
-              defaultValue={values.jurisdiction}
-            >
-              <option value="">Every jurisdiction</option>
-              {[...view.names.entries()].map(([id, label]) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </SelectField>
-          </Cluster>
-          <Cluster>
-            <Button variant="primary" type="submit">
-              Show the summary
-            </Button>
-          </Cluster>
-        </Stack>
-      </form>
+    <StaffFrame
+      title="Finance"
+      subtitle="Reports: ledger totals, payment states, refunds and disputes for a chosen period."
+      lead={<p>{FINANCE_SUMMARY_INTRO}</p>}
+    >
+      <Panel id="finance-summary-period" title="Period">
+        <form method="get" action="/staff/finance/summary">
+          <Stack gap="tight">
+            <Cluster>
+              <TextField
+                id="finance-summary-from"
+                name="from"
+                type="date"
+                label="From (UTC day)"
+                defaultValue={values.from}
+                required
+              />
+              <TextField
+                id="finance-summary-until"
+                name="until"
+                type="date"
+                label="Until (UTC day, included)"
+                defaultValue={values.until}
+                required
+              />
+              <SelectField
+                id="finance-summary-jurisdiction"
+                name="jurisdiction"
+                label="Jurisdiction"
+                defaultValue={values.jurisdiction}
+              >
+                <option value="">Every jurisdiction</option>
+                {[...view.names.entries()].map(([id, label]) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </SelectField>
+            </Cluster>
+            <Cluster>
+              <Button variant="primary" type="submit">
+                Show the summary
+              </Button>
+            </Cluster>
+          </Stack>
+        </form>
+      </Panel>
       {view.period === "invalid" ? (
         <Alert tone="warning" title="Check the period" role="status">
           {FINANCE_PERIOD_INVALID}
         </Alert>
       ) : null}
       {summary === null ? null : (
-        <>
-          <Table id="finance-summary-ledger" caption="Ledger totals">
-            <thead>
-              <tr>
-                <th scope="col">Entry type</th>
-                <th scope="col">Direction</th>
-                <th scope="col">Currency</th>
-                <th scope="col">Total (minor units)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summary.ledger.length === 0 ? (
-                <tr>
-                  <td colSpan={4}>No ledger entry in this period.</td>
-                </tr>
-              ) : (
-                summary.ledger.map((entry) => (
-                  <tr
-                    key={`${entry.entryType}-${entry.direction}-${entry.currency}`}
-                  >
-                    <td>{ENTRY_TYPE_LABELS[entry.entryType]}</td>
-                    <td>{entry.direction === "debit" ? "Debit" : "Credit"}</td>
-                    <td>{entry.currency}</td>
-                    <td>{entry.amountMinor}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </Table>
-          <Table
-            id="finance-summary-payments"
-            caption="Payments created in this period, by current state"
+        <PanelGrid>
+          <Panel
+            id="finance-summary-ledger-title"
+            title="Ledger totals"
+            place="s12"
           >
-            <tbody>
-              {summary.payments.map((entry) => (
-                <tr key={entry.state}>
-                  <th scope="row">{PAYMENT_STATE_LABELS[entry.state]}</th>
-                  <td>{entry.count}</td>
+            <table className="st-cov" id="finance-summary-ledger">
+              <caption>Ledger totals</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Entry type</th>
+                  <th scope="col">Direction</th>
+                  <th scope="col">Currency</th>
+                  <th scope="col" className="r">
+                    Total (minor units)
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </Table>
-          <Table id="finance-summary-events" caption="Refunds and disputes">
-            <tbody>
-              <tr>
-                <th scope="row">Refunds posted in this period</th>
-                <td>{summary.refunds}</td>
-              </tr>
-              <tr>
-                <th scope="row">Disputes opened in this period</th>
-                <td>{summary.disputes}</td>
-              </tr>
-            </tbody>
-          </Table>
-        </>
+              </thead>
+              <tbody>
+                {summary.ledger.length === 0 ? (
+                  <tr>
+                    <td colSpan={4}>No ledger entry in this period.</td>
+                  </tr>
+                ) : (
+                  summary.ledger.map((entry) => (
+                    <tr
+                      key={`${entry.entryType}-${entry.direction}-${entry.currency}`}
+                    >
+                      <th scope="row">{ENTRY_TYPE_LABELS[entry.entryType]}</th>
+                      <td>
+                        {entry.direction === "debit" ? "Debit" : "Credit"}
+                      </td>
+                      <td>{entry.currency}</td>
+                      <td className="r num">{entry.amountMinor}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </Panel>
+          <Panel
+            id="finance-summary-payments-title"
+            title="Payments created in this period, by current state"
+            place="s6"
+          >
+            <table className="st-cov" id="finance-summary-payments">
+              <caption>
+                Payments created in this period, by current state
+              </caption>
+              <tbody>
+                {summary.payments.map((entry) => (
+                  <tr key={entry.state}>
+                    <th scope="row">{PAYMENT_STATE_LABELS[entry.state]}</th>
+                    <td className="r num">{entry.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Panel>
+          <Panel
+            id="finance-summary-events-title"
+            title="Refunds and disputes"
+            place="s6"
+          >
+            <table className="st-cov" id="finance-summary-events">
+              <caption>Refunds and disputes</caption>
+              <tbody>
+                <tr>
+                  <th scope="row">Refunds posted in this period</th>
+                  <td className="r num">{summary.refunds}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Disputes opened in this period</th>
+                  <td className="r num">{summary.disputes}</td>
+                </tr>
+              </tbody>
+            </table>
+          </Panel>
+        </PanelGrid>
       )}
     </StaffFrame>
   );

@@ -20,6 +20,11 @@
 // the compliance family is on the compliance review items page and the
 // operations family on the consultation operations page, each under its own
 // capability.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Platform › Finance,
+// payment exceptions): the design's status tabs above one card per exception
+// (its kind, severity pill, facts, the kept evidence as a quiet note, the
+// payment link and the unchanged forms), then the pager.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -30,21 +35,21 @@ import {
 } from "../../../../src/application/finance-workspace.ts";
 import { FINANCE_SOURCES } from "../../../../src/infrastructure/payments/payment-adapter.ts";
 import {
-  ButtonLink,
-  Cluster,
-  Heading,
-  Stack,
-  Status,
-  Surface,
-  Text,
-} from "../../../../src/presentation/design-system.tsx";
-import {
   EXCEPTION_STATUS_LINKS,
   SEVERITY_TONES,
   utcText,
 } from "../../../../src/presentation/payment-labels.ts";
+import {
+  Block,
+  Empty,
+  KeyValues,
+  PagerRow,
+  Pill,
+  QuietNote,
+  TabLinks,
+} from "../../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../../frame.tsx";
+import { refusalPage, StaffFrame } from "../../frame.tsx";
 import { AssignExceptionForm, ResolveExceptionForm } from "../forms.tsx";
 
 export const metadata: Metadata = {
@@ -70,109 +75,110 @@ export default async function ReconciliationExceptionsPage({
   }
   const base = EXCEPTION_STATUS_LINKS[view.exceptionStatus].href;
   return (
-    <StaffFrame eyebrow="Finance" title="Reconciliation exceptions">
-      <BackLink href="/staff/finance">All payments</BackLink>
-      <Text tone="muted">
-        A reconciliation exception records a disagreement between Rosuno and the
-        payment provider, or a provider operation that could not be completed.
-        It is reviewed and resolved here; nothing is corrected silently.
-      </Text>
-      <Cluster>
-        {EXCEPTION_STATUSES.map((entry) => (
-          <ButtonLink
-            key={entry}
-            variant={entry === view.exceptionStatus ? "primary" : "secondary"}
-            href={EXCEPTION_STATUS_LINKS[entry].href}
-            aria-current={entry === view.exceptionStatus ? "page" : undefined}
-          >
-            {EXCEPTION_STATUS_LINKS[entry].title}
-          </ButtonLink>
-        ))}
-      </Cluster>
+    <StaffFrame
+      title="Finance"
+      subtitle="Payment exceptions: disagreements with the payment provider, reviewed by a person."
+      lead={
+        <p>
+          A reconciliation exception records a disagreement between Rosuno and
+          the payment provider, or a provider operation that could not be
+          completed. It is reviewed and resolved here; nothing is corrected
+          silently.
+        </p>
+      }
+      utc
+    >
+      <TabLinks
+        label="Exceptions by status"
+        links={EXCEPTION_STATUSES.map((entry) => ({
+          href: EXCEPTION_STATUS_LINKS[entry].href,
+          label: EXCEPTION_STATUS_LINKS[entry].title,
+        }))}
+        current={base}
+      />
       {view.exceptions.length === 0 ? (
-        <Text>
-          {view.pager.page === 1
-            ? "There are no exceptions in this list."
-            : "There are no exceptions on this page."}
-        </Text>
+        <section className="st-listbox" aria-label="Exceptions">
+          <Empty
+            title={
+              view.pager.page === 1
+                ? "There are no exceptions in this list."
+                : "There are no exceptions on this page."
+            }
+          />
+        </section>
       ) : (
-        <Stack>
-          {view.exceptions.map((exception) => (
-            <Surface
-              key={exception.id}
-              labelledBy={`exception-${exception.id}`}
-            >
-              <Stack gap="tight">
-                <Heading as="h2" size="md" id={`exception-${exception.id}`}>
-                  {exception.exceptionType.replaceAll("_", " ")}
-                </Heading>
-                <Cluster>
-                  <Status
-                    tone={SEVERITY_TONES[exception.severity] ?? "neutral"}
-                  >
-                    {exception.severity}
-                  </Status>
-                  <Status tone="neutral">
-                    {exception.assignedToMe
-                      ? "Assigned to you"
-                      : exception.assigned
-                        ? "Assigned to another staff member"
-                        : "Unassigned"}
-                  </Status>
-                </Cluster>
-                <Text size="small">{`Detected ${utcText(exception.detectedAt)} from ${exception.sourceType.replaceAll("_", " ")}`}</Text>
-                {exception.canonicalId === null ||
-                exception.canonicalType !== "payment_transaction" ? null : (
-                  <Cluster>
-                    <ButtonLink
-                      variant="tertiary"
-                      href={`/staff/finance/${exception.canonicalId}`}
-                    >
-                      Open the payment
-                    </ButtonLink>
-                  </Cluster>
-                )}
-                <Text size="small" tone="muted">
-                  {exception.evidence}
-                </Text>
-                {exception.status === "resolved" ? (
-                  <Text>{`Resolved ${exception.resolvedAt === null ? "" : utcText(exception.resolvedAt)}: ${exception.resolutionNotes ?? ""}`}</Text>
-                ) : (
-                  <>
-                    <AssignExceptionForm
-                      exception={exception.id}
-                      assign={exception.assignedToMe ? "nobody" : "me"}
-                    />
-                    <ResolveExceptionForm exception={exception.id} />
-                  </>
-                )}
-              </Stack>
-            </Surface>
-          ))}
-        </Stack>
+        view.exceptions.map((exception) => (
+          <section
+            key={exception.id}
+            className="w-card st-panel"
+            aria-labelledby={`exception-${exception.id}`}
+          >
+            <div className="st-ptop">
+              <h2 className="st-h2" id={`exception-${exception.id}`}>
+                {exception.exceptionType.replaceAll("_", " ")}
+              </h2>
+              <span className="grow"></span>
+              <Pill tone={SEVERITY_TONES[exception.severity] ?? "neutral"}>
+                {exception.severity}
+              </Pill>
+            </div>
+            <KeyValues
+              items={[
+                ["Detected", utcText(exception.detectedAt)],
+                ["From", exception.sourceType.replaceAll("_", " ")],
+                [
+                  "Assignment",
+                  exception.assignedToMe
+                    ? "Assigned to you"
+                    : exception.assigned
+                      ? "Assigned to another staff member"
+                      : "Unassigned",
+                ],
+              ]}
+            />
+            {exception.canonicalId === null ||
+            exception.canonicalType !== "payment_transaction" ? null : (
+              <div className="st-links">
+                <a
+                  className="btn btn-line btn-sm"
+                  href={`/staff/finance/${exception.canonicalId}`}
+                >
+                  Open the payment
+                </a>
+              </div>
+            )}
+            <QuietNote>{exception.evidence}</QuietNote>
+            {exception.status === "resolved" ? (
+              <Block title="Resolution">
+                <p className="st-note">{`Resolved ${exception.resolvedAt === null ? "" : utcText(exception.resolvedAt)}: ${exception.resolutionNotes ?? ""}`}</p>
+              </Block>
+            ) : (
+              <>
+                <AssignExceptionForm
+                  exception={exception.id}
+                  assign={exception.assignedToMe ? "nobody" : "me"}
+                />
+                <ResolveExceptionForm exception={exception.id} />
+              </>
+            )}
+          </section>
+        ))
       )}
-      <Cluster>
-        {view.pager.page > 1 ? (
-          <ButtonLink
-            variant="secondary"
-            href={
-              view.pager.page === 2
+      {view.pager.page === 1 && !view.pager.hasNext ? null : (
+        <PagerRow
+          note={`Page ${view.pager.page} of this list.`}
+          previous={
+            view.pager.page > 1
+              ? view.pager.page === 2
                 ? base
                 : `${base}&page=${view.pager.page - 1}`
-            }
-          >
-            Previous page
-          </ButtonLink>
-        ) : null}
-        {view.pager.hasNext ? (
-          <ButtonLink
-            variant="secondary"
-            href={`${base}&page=${view.pager.page + 1}`}
-          >
-            Next page
-          </ButtonLink>
-        ) : null}
-      </Cluster>
+              : null
+          }
+          next={
+            view.pager.hasNext ? `${base}&page=${view.pager.page + 1}` : null
+          }
+        />
+      )}
     </StaffFrame>
   );
 }

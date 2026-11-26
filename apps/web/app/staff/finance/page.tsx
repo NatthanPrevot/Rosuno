@@ -10,6 +10,10 @@
 // ask the worker to reconcile every live payment with the provider; the
 // database enqueues it and audits the request. The two query values read,
 // group and page, only choose the group and the page; the server checks both.
+//
+// DEV-001: the owner's UI/UX design (Staff.dc.html, Platform › Finance,
+// payments): the design's group tabs and list, one row per payment opening its
+// record, and the reconciliation request for every live payment.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -20,27 +24,39 @@ import {
 } from "../../../src/application/finance-workspace.ts";
 import { FINANCE_SOURCES } from "../../../src/infrastructure/payments/payment-adapter.ts";
 import {
-  ButtonLink,
-  Cluster,
-  Status,
-  Table,
-  Text,
-} from "../../../src/presentation/design-system.tsx";
-import {
   FINANCE_INTRO,
   moneyText,
   PAYMENT_GROUP_LINKS,
   STAFF_PAYMENT_STATE_LABELS,
   utcText,
 } from "../../../src/presentation/payment-labels.ts";
+import {
+  Cell,
+  Empty,
+  ListBox,
+  ListRow,
+  PagerRow,
+  Panel,
+  PillCell,
+  TabLinks,
+} from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
-import { BackLink, refusalPage, StaffFrame } from "../frame.tsx";
+import { refusalPage, StaffFrame } from "../frame.tsx";
 import { ReconcileForm } from "./forms.tsx";
 
 export const metadata: Metadata = {
   title: "Finance",
   robots: { index: false, follow: false },
 };
+
+const COLUMNS = [
+  "Created (UTC)",
+  "Total",
+  "Captured",
+  "Refunded",
+  "Open exceptions",
+  "State",
+] as const;
 
 export default async function FinancePaymentsPage({
   searchParams,
@@ -60,101 +76,83 @@ export default async function FinancePaymentsPage({
   }
   const base = PAYMENT_GROUP_LINKS[view.group].href;
   return (
-    <StaffFrame eyebrow="Staff" title="Finance">
-      <BackLink href="/staff">Staff tools</BackLink>
-      <Text tone="muted">{FINANCE_INTRO}</Text>
-      <Cluster>
-        <ButtonLink variant="secondary" href="/staff/finance/exceptions">
-          Reconciliation exceptions
-        </ButtonLink>
-      </Cluster>
-      <ReconcileForm payment={null} label="Reconcile every live payment" />
-      <Cluster>
-        {PAYMENT_GROUPS.map((entry) => (
-          <ButtonLink
-            key={entry}
-            variant={entry === view.group ? "primary" : "secondary"}
-            href={PAYMENT_GROUP_LINKS[entry].href}
-            aria-current={entry === view.group ? "page" : undefined}
-          >
-            {PAYMENT_GROUP_LINKS[entry].title}
-          </ButtonLink>
-        ))}
-      </Cluster>
-      {view.payments.length === 0 ? (
-        <Text>
-          {view.pager.page === 1
-            ? "There are no payments in this group."
-            : "There are no payments on this page."}
-        </Text>
-      ) : (
-        <Table
-          id="finance-payments"
-          caption={`${PAYMENT_GROUP_LINKS[view.group].title} payments`}
-        >
-          <thead>
-            <tr>
-              <th scope="col">Created</th>
-              <th scope="col">State</th>
-              <th scope="col">Total</th>
-              <th scope="col">Captured</th>
-              <th scope="col">Refunded</th>
-              <th scope="col">Open exceptions</th>
-              <th scope="col">Details</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.payments.map((payment) => (
-              <tr key={payment.id}>
-                <td>{utcText(payment.createdAt)}</td>
-                <td>
-                  <Status tone="neutral">
-                    {STAFF_PAYMENT_STATE_LABELS[payment.state]}
-                  </Status>
-                </td>
-                <td>{moneyText(payment.totalMinor, payment.currency)}</td>
-                <td>
-                  {payment.capturedMinor === null
-                    ? "None"
-                    : moneyText(payment.capturedMinor, payment.currency)}
-                </td>
-                <td>{moneyText(payment.refundedMinor, payment.currency)}</td>
-                <td>{payment.openExceptions}</td>
-                <td>
-                  <ButtonLink
-                    variant="tertiary"
-                    href={`/staff/finance/${payment.id}`}
-                  >
-                    Open
-                  </ButtonLink>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
-      <Cluster>
-        {view.pager.page > 1 ? (
-          <ButtonLink
-            variant="secondary"
-            href={
-              view.pager.page === 2
+    <StaffFrame
+      title="Finance"
+      subtitle="Payments as Rosuno records them, with their ledger and reconciliation."
+      lead={<p>{FINANCE_INTRO}</p>}
+      utc
+    >
+      <TabLinks
+        label="Payments by group"
+        links={PAYMENT_GROUPS.map((entry) => ({
+          href: PAYMENT_GROUP_LINKS[entry].href,
+          label: PAYMENT_GROUP_LINKS[entry].title,
+        }))}
+        current={base}
+      />
+      <ListBox
+        label={`${PAYMENT_GROUP_LINKS[view.group].title} payments`}
+        columns={COLUMNS}
+      >
+        {view.payments.length === 0 ? (
+          <Empty
+            title={
+              view.pager.page === 1
+                ? "There are no payments in this group."
+                : "There are no payments on this page."
+            }
+          />
+        ) : (
+          view.payments.map((payment) => (
+            <ListRow
+              key={payment.id}
+              href={`/staff/finance/${payment.id}`}
+              columns={6}
+            >
+              <Cell label="Created" strong>
+                {utcText(payment.createdAt)}
+              </Cell>
+              <Cell label="Total">
+                {moneyText(payment.totalMinor, payment.currency)}
+              </Cell>
+              <Cell label="Captured">
+                {payment.capturedMinor === null
+                  ? "None"
+                  : moneyText(payment.capturedMinor, payment.currency)}
+              </Cell>
+              <Cell label="Refunded">
+                {moneyText(payment.refundedMinor, payment.currency)}
+              </Cell>
+              <Cell label="Open exceptions">{payment.openExceptions}</Cell>
+              <PillCell label="State" tone="neutral">
+                {STAFF_PAYMENT_STATE_LABELS[payment.state]}
+              </PillCell>
+            </ListRow>
+          ))
+        )}
+      </ListBox>
+      {view.pager.page === 1 && !view.pager.hasNext ? null : (
+        <PagerRow
+          note={`Page ${view.pager.page} of this group.`}
+          previous={
+            view.pager.page > 1
+              ? view.pager.page === 2
                 ? base
                 : `${base}&page=${view.pager.page - 1}`
-            }
-          >
-            Previous page
-          </ButtonLink>
-        ) : null}
-        {view.pager.hasNext ? (
-          <ButtonLink
-            variant="secondary"
-            href={`${base}&page=${view.pager.page + 1}`}
-          >
-            Next page
-          </ButtonLink>
-        ) : null}
-      </Cluster>
+              : null
+          }
+          next={
+            view.pager.hasNext ? `${base}&page=${view.pager.page + 1}` : null
+          }
+        />
+      )}
+      <Panel id="finance-reconcile-title" title="Reconciliation">
+        <p className="st-emd">
+          Ask the worker to compare every live payment with the provider. A
+          disagreement opens a reconciliation exception for review.
+        </p>
+        <ReconcileForm payment={null} label="Reconcile every live payment" />
+      </Panel>
     </StaffFrame>
   );
 }
