@@ -1645,14 +1645,18 @@ export async function resolveStaffHome(
       // that surface needs approve_break_glass, which it checks itself.
       ["manage_data_requests", false],
     ];
-    const answers: boolean[] = [];
-    for (const [capability, anyJurisdiction] of asked) {
-      const answer = await holds(reads, capability, null, anyJurisdiction);
-      if (answer === null) {
-        return UNAVAILABLE;
-      }
-      answers.push(answer);
+    // DEV-001: the staff layout asks this on every staff page, so the
+    // independent capability reads run together (started in the same order);
+    // any unreadable answer still makes the home unavailable.
+    const replies = await Promise.all(
+      asked.map(([capability, anyJurisdiction]) =>
+        holds(reads, capability, null, anyJurisdiction),
+      ),
+    );
+    if (!replies.every((answer): answer is boolean => answer !== null)) {
+      return UNAVAILABLE;
     }
+    const answers: readonly boolean[] = replies;
     const [
       verify,
       policy,
