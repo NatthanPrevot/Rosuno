@@ -9,11 +9,18 @@
 // three availability filters and a page number). Every value is checked and
 // the path is rebuilt from the checked values, so nothing the browser sends
 // is ever echoed into a redirect. Anything else answers null, and sign-in
-// then returns to the fixed home page.
+// then goes to the fixed workspace route.
+//
+// DEV-001: without a continuation, sign-in goes to the fixed workspace route,
+// which decides on the server, from existing reads only, which workspace the
+// signed-in user lands on (staff, attorney, or client).
 
 import { isOneOf, isUuid } from "./professional-records.ts";
 
 export const SELECTION_PATH = "/find-an-attorney/select";
+
+// DEV-001: the fixed destination of a sign-in without a continuation.
+export const WORKSPACE_PATH = "/workspace";
 
 // The sign-in query value and form field that carry a continuation.
 export const CONTINUATION_FIELD = "continuation";
@@ -134,16 +141,16 @@ export function continuationOf(value: unknown): string | null {
 }
 
 // Where a successful sign-in goes: the canonical selection path the submitted
-// form names in exactly one continuation field, or the fixed home page.
+// form names in exactly one continuation field, or the fixed workspace route.
 export function signInDestinationOf(formData: unknown): string {
   if (!(formData instanceof FormData)) {
-    return "/";
+    return WORKSPACE_PATH;
   }
   const values = formData.getAll(CONTINUATION_FIELD);
   if (values.length !== 1) {
-    return "/";
+    return WORKSPACE_PATH;
   }
-  return continuationOf(values[0]) ?? "/";
+  return continuationOf(values[0]) ?? WORKSPACE_PATH;
 }
 
 // The sign-in address that continues to a selection afterwards.

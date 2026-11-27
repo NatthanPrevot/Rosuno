@@ -7,16 +7,18 @@
 // requests. Outcomes are verified through freshly initialized clients over the
 // request's updated cookie store, never through the client that made the
 // change. Next.js accepts these only as POST requests and applies its
-// Server Action origin checks. The only destination is the fixed home page;
-// nothing the caller sends chooses where to go. When sign-in cannot be
+// Server Action origin checks. The only destinations are fixed (DEV-001: the
+// workspace route after a sign-in, the home page after a sign-out); nothing
+// the caller sends chooses where to go. When sign-in cannot be
 // attempted or the provider answers with anything but a rejection, one log
 // line records only that fact and the provider's HTTP status.
 //
-// MVP-001 S5: after a confirmed sign-in, the one exception to the fixed home
-// page is the discovery handoff: the form's one continuation field may name
-// the attorney selection page, and the application rebuilds that path from
-// its checked parameters (signInDestinationOf); any other value, or none,
-// returns to the home page. No other destination exists.
+// MVP-001 S5: after a confirmed sign-in, the one exception to the fixed
+// destination is the discovery handoff: the form's one continuation field may
+// name the attorney selection page, and the application rebuilds that path
+// from its checked parameters (signInDestinationOf); any other value, or
+// none, goes to the fixed workspace route (DEV-001), which decides the
+// workspace on the server. No other destination exists.
 //
 // MVP-001 S4: a sign-out first ends this session's application session and
 // Instant mode on the server, best effort, through the same request-scoped

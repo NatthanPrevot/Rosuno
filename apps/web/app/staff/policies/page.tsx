@@ -13,6 +13,12 @@
 // design's list of policy versions, each row opening its record, then the
 // pager and the draft form in a panel. No owner role exists: the Approvals
 // destination is this page, for holders of the policy capability.
+//
+// DEV-001: the development test configuration panel is shown only when the
+// workspace offers it: a global policy capability holder, past this page's
+// step-up check, on a recorded development or staging environment that
+// matches this deployment, where exactly one development regulatory mode
+// exists. Its server action checks all of that again.
 
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -35,7 +41,10 @@ import {
 } from "../../../src/presentation/staff-workspace.tsx";
 import { requireSteppedUp } from "../../account/gate.ts";
 import { BoundNotice, PagerLinks, refusalPage, StaffFrame } from "../frame.tsx";
-import { CreatePolicyForm } from "./forms.tsx";
+import {
+  CreatePolicyForm,
+  DevelopmentTestConfigurationForm,
+} from "./forms.tsx";
 
 export const metadata: Metadata = {
   title: "Policy configuration",
@@ -140,6 +149,22 @@ export default async function PolicyConfigurationPage({
               />
             </Disclosure>
           )}
+        </Panel>
+      ) : null}
+      {view.canChange &&
+      view.developmentAllowed &&
+      view.developmentTest !== null ? (
+        <Panel
+          id="policy-development-test-title"
+          title="Development test configuration — test values, not policy"
+        >
+          <Alert tone="warning" title="Development-only test values">
+            {`These versions only make ${view.environment} testing possible. They decide no product, legal, regulatory or production policy, are created as development configuration in your name, and are refused in production.`}
+          </Alert>
+          <DevelopmentTestConfigurationForm
+            jurisdiction={view.developmentTest.jurisdictionLabel}
+            regulatoryMode={view.developmentTest.regulatoryModeLabel}
+          />
         </Panel>
       ) : null}
     </StaffFrame>

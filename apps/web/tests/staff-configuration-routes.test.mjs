@@ -607,8 +607,10 @@ test("SR-2. the server actions hand the form and the trusted sources to the use 
   );
   // MVP-001 S2: eighteen configuration actions and the two job actions.
   // MVP-001 S3 part 2: and the one jurisdiction assessment review action.
-  assert.equal(exported.length, 21);
-  assert.equal(code.match(/^export /gm).length, 21);
+  // DEV-001: and the one development test configuration action, through the
+  // same gated runner.
+  assert.equal(exported.length, 22);
+  assert.equal(code.match(/^export /gm).length, 22);
   for (const name of exported) {
     assert.match(name, /^[a-z][A-Za-z]+Action$/);
     const operation = name.replace(/Action$/, "");

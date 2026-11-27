@@ -46,6 +46,10 @@
 // candidate jurisdictions is shown as such, never resolved to one.
 
 import {
+  DEVELOPMENT_TEST_CONFIRMATION,
+  DEVELOPMENT_TEST_DEFINITIONS,
+} from "./development-test-configuration.ts";
+import {
   bindEnvironment,
   type EnvironmentBinding,
   type EnvironmentConfiguration,
@@ -1764,6 +1768,11 @@ export type PolicyWorkspaceView =
       // valid only with its own jurisdiction's scope (checked again on
       // creation and by the database's selection).
       readonly regulatoryModes: readonly Option[];
+      // DEV-001: the development test configuration is offered only to a
+      // global policy capability holder on a recorded development or
+      // staging environment that matches this deployment, where exactly one
+      // development regulatory mode exists; null otherwise.
+      readonly developmentTest: DevelopmentTestTarget | null;
     };
 
 // MVP-001 S11 D2: the Regulatory Modes of one jurisdiction, read strictly
@@ -1783,7 +1792,12 @@ type RegulatoryModeRecord = {
   readonly id: string;
   readonly code: string;
   readonly name: string;
+  // DEV-001: written only by the non-production development mode activation
+  // (P2-924) as both the mode's status and its mapping's approval status.
+  readonly development: boolean;
 };
+
+const DEVELOPMENT_MODE_STATUS = "development_configuration";
 
 async function regulatoryModesOf(
   reads: ConfigurationReads,
@@ -1813,7 +1827,16 @@ async function regulatoryModesOf(
     ) {
       return null;
     }
-    modes.push(Object.freeze({ id, code, name }));
+    modes.push(
+      Object.freeze({
+        id,
+        code,
+        name,
+        development:
+          f.get("status") === DEVELOPMENT_MODE_STATUS &&
+          f.get("approval_status") === DEVELOPMENT_MODE_STATUS,
+      }),
+    );
   }
   return Object.freeze(modes);
 }
@@ -1826,6 +1849,47 @@ export const GLOBAL_SCOPE = "global";
 
 function developmentAllowedIn(environment: EnvironmentBinding): boolean {
   return environment === "development" || environment === "staging";
+}
+
+// DEV-001: where the development test configuration goes: the one
+// development regulatory mode among the jurisdictions the caller reads, and
+// its jurisdiction.
+export type DevelopmentTestTarget = {
+  readonly jurisdictionId: string;
+  readonly jurisdictionLabel: string;
+  readonly regulatoryModeId: string;
+  readonly regulatoryModeLabel: string;
+};
+
+// The target, or null when there is no development mode, more than one, or
+// any list is unreadable or incomplete (fails closed: nothing is offered).
+async function developmentTestTargetOf(
+  reads: ConfigurationReads,
+  jurisdictions: Bounded<JurisdictionRecord>,
+): Promise<DevelopmentTestTarget | null> {
+  if (!jurisdictions.complete) {
+    return null;
+  }
+  const found: DevelopmentTestTarget[] = [];
+  for (const j of jurisdictions.items) {
+    const modes = await regulatoryModesOf(reads, j.id);
+    if (modes === null) {
+      return null;
+    }
+    for (const mode of modes) {
+      if (mode.development) {
+        found.push(
+          Object.freeze({
+            jurisdictionId: j.id,
+            jurisdictionLabel: jurisdictionLabel(j),
+            regulatoryModeId: mode.id,
+            regulatoryModeLabel: `${mode.name} (${mode.code})`,
+          }),
+        );
+      }
+    }
+  }
+  return found.length === 1 ? found[0] : null;
 }
 
 function changeAllowedIn(environment: EnvironmentBinding): boolean {
@@ -1929,6 +1993,10 @@ export async function resolvePolicyWorkspace(
       }
     }
     const environment = await environmentOf(sources, reads);
+    const developmentTest =
+      global && developmentAllowedIn(environment)
+        ? await developmentTestTargetOf(reads, jurisdictions)
+        : null;
     const typeNames = new Map(types.items.map((t) => [t.code, t.name]));
     const jurisdictionNames = new Map(
       jurisdictions.items.map((j) => [j.id, jurisdictionLabel(j)]),
@@ -1949,6 +2017,7 @@ export async function resolvePolicyWorkspace(
       scopes: Object.freeze(scopes),
       scopesComplete: jurisdictions.complete,
       regulatoryModes: Object.freeze(regulatoryModes),
+      developmentTest,
     });
   } catch {
     return UNAVAILABLE;
@@ -3640,6 +3709,185 @@ export async function createPolicyVersion(
       CREATE_POLICY_OUTCOMES,
     );
   });
+}
+
+// --- DEV-001: development test configuration -------------------------------
+
+export type DevelopmentTestOutcome = "created" | "exists" | "not-created";
+
+export type DevelopmentTestResult = {
+  readonly key: string;
+  readonly title: string;
+  readonly versionLabel: string;
+  readonly outcome: DevelopmentTestOutcome;
+  // The creation's own fixed state for a version not created; else null.
+  readonly state: ConfigurationActionState | null;
+};
+
+export type DevelopmentTestState =
+  | ConfigurationActionState
+  | { readonly status: "development-mode-missing" }
+  | {
+      readonly status: "completed";
+      readonly results: readonly DevelopmentTestResult[];
+    };
+
+const DEVELOPMENT_MODE_MISSING = Object.freeze({
+  status: "development-mode-missing",
+} as const);
+
+// The bound on the existing versions read for the idempotency check; beyond
+// it the database's own label uniqueness still refuses a second copy.
+const EXISTING_VERSION_PAGES = 10;
+
+function versionKey(
+  typeCode: string,
+  jurisdictionId: string | null,
+  label: string,
+): string {
+  return JSON.stringify([typeCode, jurisdictionId, label]);
+}
+
+// The type, scope and label of every version the caller's session reads,
+// or null when a page is unreadable.
+async function existingVersionKeys(
+  reads: ConfigurationReads,
+): Promise<ReadonlySet<string> | null> {
+  const keys = new Set<string>();
+  for (let page = 0; page < EXISTING_VERSION_PAGES; page += 1) {
+    const list = listOf(
+      await attempt(() => reads.policyVersions(page * LIST_BOUND, LIST_BOUND)),
+      readPolicyVersion,
+    );
+    if (list === null || list.length > LIST_BOUND) {
+      return null;
+    }
+    for (const version of list) {
+      keys.add(
+        versionKey(version.typeCode, version.jurisdictionId, version.label),
+      );
+    }
+    if (list.length < LIST_BOUND) {
+      break;
+    }
+  }
+  return keys;
+}
+
+function developmentTestResult(
+  definition: (typeof DEVELOPMENT_TEST_DEFINITIONS)[number],
+  outcome: DevelopmentTestOutcome,
+  state: ConfigurationActionState | null,
+): DevelopmentTestResult {
+  return Object.freeze({
+    key: definition.key,
+    title: definition.title,
+    versionLabel: definition.versionLabel,
+    outcome,
+    state,
+  });
+}
+
+// Creates the development test configuration: every fixed definition not yet
+// present, each through createPolicyVersion (the existing form's use case and
+// its one staff function, under the caller's own session, so each is audited
+// as the caller), as development configuration effective from now. Before
+// anything is sent it re-checks the caller's verified staff identity, the
+// global policy capability, a recorded development or staging environment
+// that matches this deployment, and the one development regulatory mode; each
+// creation then checks everything again, and the database refuses a
+// development configuration in production. It never throws.
+export async function createDevelopmentTestConfiguration(
+  sources: ConfigurationSources,
+  formData: unknown,
+): Promise<DevelopmentTestState> {
+  try {
+    if (
+      !(formData instanceof FormData) ||
+      single(formData, "confirmation") !== DEVELOPMENT_TEST_CONFIRMATION
+    ) {
+      return UNAVAILABLE;
+    }
+    const context = await contextOf(sources);
+    if (!("userId" in context)) {
+      return context;
+    }
+    const { reads } = context;
+    const global = await holds(
+      reads,
+      "manage_policy_configuration",
+      null,
+      false,
+    );
+    if (global !== true) {
+      return global === null ? UNAVAILABLE : DENIED;
+    }
+    const environment = await environmentOf(sources, reads);
+    const environmentRefused = environmentRefusal(environment);
+    if (environmentRefused !== null) {
+      return environmentRefused;
+    }
+    if (!developmentAllowedIn(environment)) {
+      return refused("environment_refused");
+    }
+    const jurisdictions = await jurisdictionsBounded(reads);
+    if (jurisdictions === null) {
+      return UNAVAILABLE;
+    }
+    const target = await developmentTestTargetOf(reads, jurisdictions);
+    if (target === null) {
+      return DEVELOPMENT_MODE_MISSING;
+    }
+    const existing = await existingVersionKeys(reads);
+    if (existing === null) {
+      return UNAVAILABLE;
+    }
+    // Effective from now, to the second (the form's own UTC format).
+    const from = new Date(Math.floor(sources.clock() / 1000) * 1000)
+      .toISOString()
+      .slice(0, 19);
+    const results: DevelopmentTestResult[] = [];
+    for (const definition of DEVELOPMENT_TEST_DEFINITIONS) {
+      const jurisdictionId =
+        definition.scope === "global" ? null : target.jurisdictionId;
+      if (
+        existing.has(
+          versionKey(
+            definition.policyTypeCode,
+            jurisdictionId,
+            definition.versionLabel,
+          ),
+        )
+      ) {
+        results.push(developmentTestResult(definition, "exists", null));
+        continue;
+      }
+      const form = new FormData();
+      form.set("policy_type", definition.policyTypeCode);
+      form.set("scope", jurisdictionId ?? GLOBAL_SCOPE);
+      form.set(
+        "regulatory_mode",
+        definition.regulatoryMode ? target.regulatoryModeId : "",
+      );
+      form.set("version_label", definition.versionLabel);
+      form.set("parameters", JSON.stringify(definition.parameters));
+      form.set("effective_from", from);
+      form.set("effective_until", "");
+      form.set("development_only", "yes");
+      const state = await createPolicyVersion(sources, form);
+      results.push(
+        state.status === "recorded"
+          ? developmentTestResult(definition, "created", null)
+          : developmentTestResult(definition, "not-created", state),
+      );
+    }
+    return Object.freeze({
+      status: "completed",
+      results: Object.freeze(results),
+    });
+  } catch {
+    return UNAVAILABLE;
+  }
 }
 
 // The policy version a change concerns, read through the caller's own
