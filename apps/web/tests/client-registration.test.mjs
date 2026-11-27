@@ -2700,7 +2700,9 @@ test("36. the sign-up page is an accessible design-system form with show and hid
     [...new Set([...code.matchAll(/\bstate\.\w+/g)].map((match) => match[0]))],
     ["state.status", "state.fieldErrors"],
   );
-  assert.equal(code.match(/<Alert\b/g).length, 3);
+  // DEV-001: one more fixed message: the attorney path's next step, shown
+  // only after a submission on that path (pinned below).
+  assert.equal(code.match(/<Alert\b/g).length, 4);
   // The neutral outcome claims no account, email, or session.
   const flat = code.replace(/\s+/g, " ");
   assert.ok(
@@ -2708,6 +2710,26 @@ test("36. the sign-up page is an accessible design-system form with show and hid
       '{state.status === "submitted" ? ( <Alert tone="information" title="Check your email" role="status"> If this email address can be used for a new account, look for a confirmation link from Rosuno. Delivery isn&apos;t guaranteed, and nothing is active until you use the link. If no email arrives, you may already have an account: try signing in. </Alert> ) : null}',
     ),
   );
+  // DEV-001: the account-type choice is two design-system radios above the
+  // form and outside it, so nothing it holds is posted: the registration's
+  // action, posted fields and fixed messages are unchanged. It changes only
+  // the copy and the next step; the attorney path adds one fixed message and
+  // one fixed link to the attorney application, which decides on its own.
+  const accountType =
+    '<FieldGroup id="sign-up-account-type" legend="How will you use Rosuno?" > <Choice type="radio" name="account_type" label="I\'m looking for legal help" hint="Find an attorney and request a consultation." checked={!attorneyPath} onChange={() => setAttorneyPath(false)} /> <Choice type="radio" name="account_type" label="I\'m an attorney" hint="Create your account first, then apply. Choosing this grants nothing by itself." checked={attorneyPath} onChange={() => setAttorneyPath(true)} /> </FieldGroup>';
+  assert.equal(flat.split(accountType).length, 2);
+  assert.ok(flat.indexOf(accountType) < flat.indexOf("<form "));
+  assert.equal(code.match(/name="account_type"/g).length, 2);
+  assert.equal(code.match(/<Choice\b/g).length, 2);
+  assert.equal(code.match(/\bsetAttorneyPath\b/g).length, 3);
+  assert.match(
+    code,
+    /\n {2}const \[attorneyPath, setAttorneyPath\] = useState\(false\);\n/,
+  );
+  const attorneyNext =
+    '{state.status === "submitted" && attorneyPath ? ( <Alert tone="information" title="Your next step as an attorney"> Confirm your email address, sign in, then continue to the attorney application. </Alert> ) : null} {state.status === "submitted" && attorneyPath ? ( <Cluster> <ButtonLink variant="primary" href="/attorney/apply"> Continue to the attorney application </ButtonLink> </Cluster> ) : null}';
+  assert.equal(flat.split(attorneyNext).length, 2);
+  assert.equal(code.match(/\battorneyPath\b/g).length, 5);
   assert.doesNotMatch(
     flat,
     /\b(?:created|sent|success|welcome|verified|signed in)\b/i,
@@ -2746,15 +2768,25 @@ test("36. the sign-up page is an accessible design-system form with show and hid
   );
   assert.deepEqual(
     [...code.matchAll(/\bhref="([^"]+)"/g)].map((match) => match[1]),
-    ["/sign-in", "/"],
+    ["/attorney/apply", "/sign-in", "/"],
   );
   assert.doesNotMatch(
     source,
     /\b(?:demo|fake|mock|sample|dummy|lorem|ipsum|todo|fixme)\b|@[a-z0-9-]+\.[a-z]{2,}|WCAG|certif/i,
   );
+  // DEV-001: "attorney" appears only in the account-type choice, the
+  // attorney path's next step, and the one state naming the path, all pinned
+  // above.
+  assert.doesNotMatch(
+    flat
+      .replace(accountType, "")
+      .replace(attorneyNext, "")
+      .replace(/\b(?:attorneyPath|setAttorneyPath)\b/g, ""),
+    /attorney|lawyer|\bstaff\b|capabilit|eligib|jurisdiction|booking|payment|subject|\.signUp\b/i,
+  );
   assert.doesNotMatch(
     code,
-    /attorney|lawyer|\bstaff\b|capabilit|eligib|jurisdiction|booking|payment|subject|\.signUp\b/i,
+    /lawyer|\bstaff\b|capabilit|eligib|jurisdiction|booking|payment|subject|\.signUp\b/i,
   );
 });
 

@@ -32,6 +32,7 @@ import {
   selectionPath,
   signInDestinationOf,
   signInPathFor,
+  WORKSPACE_PATH,
 } from "../src/application/sign-in-continuation.ts";
 import { referralAnswerOf } from "../src/infrastructure/discovery/discovery-adapter.ts";
 import * as labels from "../src/presentation/discovery-labels.ts";
@@ -314,9 +315,11 @@ test("S5-1. a continuation is only the attorney selection path rebuilt from chec
     `${CANONICAL}${"&page=1".repeat(60)}`,
   ]) {
     assert.equal(continuationOf(value), null, String(value));
+    // DEV-001: without a valid continuation, sign-in goes to the fixed
+    // workspace route (which decides the workspace on the server).
     assert.equal(
       signInDestinationOf(form({ [CONTINUATION_FIELD]: String(value) })),
-      "/",
+      WORKSPACE_PATH,
       String(value),
     );
   }
@@ -324,13 +327,14 @@ test("S5-1. a continuation is only the attorney selection path rebuilt from chec
     signInDestinationOf(form({ [CONTINUATION_FIELD]: CANONICAL })),
     CANONICAL,
   );
-  assert.equal(signInDestinationOf(form({})), "/");
+  assert.equal(signInDestinationOf(form({})), WORKSPACE_PATH);
   assert.equal(
     signInDestinationOf(form({ [CONTINUATION_FIELD]: [CANONICAL, CANONICAL] })),
-    "/",
+    WORKSPACE_PATH,
   );
-  assert.equal(signInDestinationOf(new URLSearchParams()), "/");
-  assert.equal(signInDestinationOf(null), "/");
+  assert.equal(signInDestinationOf(new URLSearchParams()), WORKSPACE_PATH);
+  assert.equal(signInDestinationOf(null), WORKSPACE_PATH);
+  assert.equal(WORKSPACE_PATH, "/workspace");
   assert.equal(
     signInPathFor(SELECTION),
     `/sign-in?continuation=${encodeURIComponent(CANONICAL)}`,

@@ -8,8 +8,10 @@ import {
   Alert,
   Button,
   ButtonLink,
+  Choice,
   Cluster,
   Eyebrow,
+  FieldGroup,
   Heading,
   Stack,
   Surface,
@@ -26,6 +28,13 @@ import { register } from "./actions.ts";
 // their own fields, so password managers, autofill, and copy and paste work
 // as usual, and nothing is kept in page state. After each submission the
 // email address stays as typed and both passwords are cleared.
+//
+// DEV-001: the account-type choice sits above the form and outside it, so
+// nothing it holds is posted: registration is unchanged (the same server
+// action, fields and fixed messages, and the same canonical account for
+// everyone). It changes only the copy and the next step shown after a
+// submission; choosing the attorney path confers nothing, and the attorney
+// application decides afresh on its own.
 export default function SignUpPage() {
   const [state, formAction, pending] = useActionState(
     register,
@@ -33,6 +42,7 @@ export default function SignUpPage() {
   );
   const [passwordShown, setPasswordShown] = useState(false);
   const [confirmationShown, setConfirmationShown] = useState(false);
+  const [attorneyPath, setAttorneyPath] = useState(false);
   const fieldErrors: FieldErrors =
     state.status === "invalid" ? state.fieldErrors : {};
   return (
@@ -43,6 +53,27 @@ export default function SignUpPage() {
           <Heading as="h1" size="lg" id="sign-up-title">
             Create an account
           </Heading>
+          <FieldGroup
+            id="sign-up-account-type"
+            legend="How will you use Rosuno?"
+          >
+            <Choice
+              type="radio"
+              name="account_type"
+              label="I'm looking for legal help"
+              hint="Find an attorney and request a consultation."
+              checked={!attorneyPath}
+              onChange={() => setAttorneyPath(false)}
+            />
+            <Choice
+              type="radio"
+              name="account_type"
+              label="I'm an attorney"
+              hint="Create your account first, then apply. Choosing this grants nothing by itself."
+              checked={attorneyPath}
+              onChange={() => setAttorneyPath(true)}
+            />
+          </FieldGroup>
           <Text tone="muted">
             Enter your email address and choose a password. We will ask you to
             confirm your email address before your account can be used.
@@ -54,6 +85,19 @@ export default function SignUpPage() {
               nothing is active until you use the link. If no email arrives, you
               may already have an account: try signing in.
             </Alert>
+          ) : null}
+          {state.status === "submitted" && attorneyPath ? (
+            <Alert tone="information" title="Your next step as an attorney">
+              Confirm your email address, sign in, then continue to the attorney
+              application.
+            </Alert>
+          ) : null}
+          {state.status === "submitted" && attorneyPath ? (
+            <Cluster>
+              <ButtonLink variant="primary" href="/attorney/apply">
+                Continue to the attorney application
+              </ButtonLink>
+            </Cluster>
           ) : null}
           {state.status === "unavailable" ? (
             <Alert
