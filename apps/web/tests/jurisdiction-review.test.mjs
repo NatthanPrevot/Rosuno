@@ -320,7 +320,9 @@ test("JR-5. the review is stepped up (aal2) before anything: its page asks the s
     page.includes('  await connection();\n  await requireSteppedUp("staff");\n'),
   );
   const actions = readFileSync(new URL("../app/staff/actions.ts", import.meta.url), "utf8");
-  const run = actions.slice(actions.indexOf("async function run("));
+  // DEV-001: the gated runner is generic over the operation's state (the
+  // development test configuration's own state); the order is unchanged.
+  const run = actions.slice(actions.indexOf("async function run<"));
   assert.ok(
     run.indexOf('const refusal = await stepUpRefusal("staff");') <
       run.indexOf("const state = await operation(STAFF_CONFIGURATION_SOURCES, formData);"),

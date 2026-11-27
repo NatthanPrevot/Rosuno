@@ -6,26 +6,48 @@
 // anything is sent. A development configuration is offered only where the
 // page says the database records a development or staging environment, and
 // it is marked as such wherever it is offered.
+//
+// DEV-001: the development test configuration is one button and a
+// confirmation listing every version it creates; the one posted value is the
+// fixed confirmation, and the server decides everything else again.
 
-import type {
-  Option,
-  PolicyStatus,
+import { useActionState, useState } from "react";
+
+import {
+  DEVELOPMENT_TEST_CONFIRMATION,
+  DEVELOPMENT_TEST_DEFINITIONS,
+} from "../../../src/application/development-test-configuration.ts";
+import {
+  INITIAL_CONFIGURATION_STATE,
+  type DevelopmentTestResult,
+  type DevelopmentTestState,
+  type Option,
+  type PolicyStatus,
 } from "../../../src/application/staff-configuration.ts";
 import {
   Alert,
   Button,
   Choice,
   Cluster,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDismissal,
   FieldGroup,
   SelectField,
   Stack,
+  Text,
   TextAreaField,
   TextField,
 } from "../../../src/presentation/design-system.tsx";
 import { keepEntries } from "../../../src/presentation/form-entries.ts";
-import { POLICY_STATUS_LABELS } from "../../../src/presentation/staff-configuration-labels.ts";
+import {
+  outcomeMessage,
+  POLICY_STATUS_LABELS,
+} from "../../../src/presentation/staff-configuration-labels.ts";
 import {
   addAuthorityReferenceAction,
+  createDevelopmentTestConfigurationAction,
   createPolicyVersionAction,
   decideAuthorityReferenceAction,
   endPolicyVersionAction,
@@ -455,5 +477,135 @@ export function DecideReferenceForm({
         </Cluster>
       </Stack>
     </form>
+  );
+}
+
+// DEV-001: what each development test version came to.
+function resultText(result: DevelopmentTestResult): string {
+  switch (result.outcome) {
+    case "created":
+      return "Created";
+    case "exists":
+      return "Already exists, skipped";
+    default:
+      return `Not created: ${
+        (result.state === null ? null : outcomeMessage(result.state))?.title ??
+        "Could not be confirmed"
+      }`;
+  }
+}
+
+function DevelopmentTestOutcome({
+  state,
+}: {
+  readonly state: DevelopmentTestState;
+}) {
+  if (state.status === "completed") {
+    const complete = state.results.every(
+      (result) => result.outcome !== "not-created",
+    );
+    return (
+      <Alert
+        tone={complete ? "success" : "warning"}
+        title="Development test configuration"
+        role={complete ? "status" : "alert"}
+      >
+        <ul>
+          {state.results.map((result) => (
+            <li key={result.key}>
+              {`${result.title} (${result.versionLabel}): ${resultText(result)}`}
+            </li>
+          ))}
+        </ul>
+      </Alert>
+    );
+  }
+  if (state.status === "development-mode-missing") {
+    return (
+      <Alert tone="warning" title="No development regulatory mode" role="alert">
+        Exactly one development regulatory mode must exist before the
+        development test configuration can be created. Nothing was sent.
+      </Alert>
+    );
+  }
+  return <Outcome state={state} />;
+}
+
+export function DevelopmentTestConfigurationForm({
+  jurisdiction,
+  regulatoryMode,
+}: {
+  readonly jurisdiction: string;
+  readonly regulatoryMode: string;
+}) {
+  const [state, formAction, pending] = useActionState<
+    DevelopmentTestState,
+    FormData
+  >(createDevelopmentTestConfigurationAction, INITIAL_CONFIGURATION_STATE);
+  const [confirming, setConfirming] = useState(false);
+  const count = DEVELOPMENT_TEST_DEFINITIONS.length;
+  return (
+    <Stack>
+      <DevelopmentTestOutcome state={state} />
+      {confirming ? (
+        <Dialog
+          id="development-test-confirmation"
+          title="Create the development test configuration?"
+          titleAs="h3"
+          presentation="inline"
+          open
+        >
+          <DialogBody>
+            <Stack gap="tight">
+              <Text>
+                {`These ${count} versions are development-only test values. They decide no production policy: each is created as development configuration in your name, effective from now, is never approved, and is never selected in production. A version whose type, scope and label already exist is skipped.`}
+              </Text>
+              <ol>
+                {DEVELOPMENT_TEST_DEFINITIONS.map((definition) => (
+                  <li key={definition.key}>
+                    {`${definition.title}: ${
+                      definition.scope === "global"
+                        ? "all jurisdictions"
+                        : jurisdiction
+                    }${
+                      definition.regulatoryMode
+                        ? `, regulatory mode ${regulatoryMode}`
+                        : ""
+                    } (${definition.versionLabel})`}
+                  </li>
+                ))}
+              </ol>
+            </Stack>
+          </DialogBody>
+          <DialogActions>
+            <form action={formAction}>
+              <input
+                type="hidden"
+                name="confirmation"
+                value={DEVELOPMENT_TEST_CONFIRMATION}
+              />
+              <Button variant="primary" type="submit" disabled={pending}>
+                {`Create the ${count} development versions`}
+              </Button>
+            </form>
+          </DialogActions>
+          <DialogDismissal>
+            <Button variant="tertiary" onClick={() => setConfirming(false)}>
+              Close
+            </Button>
+          </DialogDismissal>
+        </Dialog>
+      ) : (
+        <Cluster>
+          <Button
+            variant="primary"
+            disabled={pending}
+            onClick={() => setConfirming(true)}
+          >
+            Create the development test configuration
+          </Button>
+        </Cluster>
+      )}
+    </Stack>
   );
 }

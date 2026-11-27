@@ -22,6 +22,7 @@ import {
   addAuthorityReference,
   cancelOperationalJob,
   changeJurisdictionLifecycle,
+  createDevelopmentTestConfiguration,
   createJurisdiction,
   createPolicyVersion,
   createPracticeArea,
@@ -42,22 +43,28 @@ import {
   transitionPolicyVersion,
   type ConfigurationActionState,
   type ConfigurationSources,
+  type DevelopmentTestState,
 } from "../../src/application/staff-configuration.ts";
 import { STAFF_CONFIGURATION_SOURCES } from "../../src/infrastructure/staff/staff-configuration-adapter.ts";
 import { logRequestEvent } from "../../src/infrastructure/observability/request-log.ts";
 import { stepUpRefusal } from "../account/gate.ts";
 
-type Operation = (
+// DEV-001: an operation answers a configuration state, or the development
+// test configuration's own state (which also holds every configuration
+// state).
+type Operation<S extends DevelopmentTestState> = (
   sources: ConfigurationSources,
   formData: unknown,
-) => Promise<ConfigurationActionState>;
+) => Promise<S>;
 
-const CHANGED = new Set<ConfigurationActionState["status"]>([
+const CHANGED = new Set<DevelopmentTestState["status"]>([
   "recorded",
   "unchanged",
+  // DEV-001: the development test configuration ran to its end.
+  "completed",
 ]);
 
-const NOT_COMPLETED = new Set<ConfigurationActionState["status"]>([
+const NOT_COMPLETED = new Set<DevelopmentTestState["status"]>([
   "unavailable",
   "unconfirmed",
   "not-saved",
@@ -79,12 +86,12 @@ const PAGES: Readonly<Record<string, readonly string[]>> = Object.freeze({
   review: ["/staff/jurisdiction-review"],
 });
 
-async function run(
+async function run<S extends DevelopmentTestState>(
   name: string,
-  operation: Operation,
+  operation: Operation<S>,
   area: keyof typeof PAGES,
   formData: FormData,
-): Promise<ConfigurationActionState> {
+): Promise<S | ConfigurationActionState> {
   const refusal = await stepUpRefusal("staff");
   if (refusal !== null) {
     return refusal;
@@ -113,6 +120,20 @@ export async function createPolicyVersionAction(
   formData: FormData,
 ): Promise<ConfigurationActionState> {
   return run("createPolicyVersion", createPolicyVersion, "policies", formData);
+}
+
+// DEV-001: the one-click development test configuration (development or
+// staging only; the use case checks everything again).
+export async function createDevelopmentTestConfigurationAction(
+  _previous: DevelopmentTestState,
+  formData: FormData,
+): Promise<DevelopmentTestState> {
+  return run(
+    "createDevelopmentTestConfiguration",
+    createDevelopmentTestConfiguration,
+    "policies",
+    formData,
+  );
 }
 
 export async function revisePolicyDraftAction(
